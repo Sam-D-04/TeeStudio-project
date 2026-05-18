@@ -1,5 +1,8 @@
 "use client";
 
+import React from "react";
+
+
 const steps = [
   {
     step: 1,
@@ -76,10 +79,9 @@ export default function SimpleWorkflow() {
           className="workflow-strip"
         >
           {steps.map((step, i) => (
-            <>
+            <React.Fragment key={step.step}>
               {/* ─ Step ─ */}
               <div
-                key={step.step}
                 style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 12 }}
               >
                 {/* Icon circle */}
@@ -144,7 +146,6 @@ export default function SimpleWorkflow() {
               {/* ─ Arrow connector ─ */}
               {i < steps.length - 1 && (
                 <div
-                  key={`arrow-${i}`}
                   style={{
                     display:        "flex",
                     alignItems:     "center",
@@ -163,7 +164,7 @@ export default function SimpleWorkflow() {
                   </svg>
                 </div>
               )}
-            </>
+            </React.Fragment>
           ))}
         </div>
       </div>
