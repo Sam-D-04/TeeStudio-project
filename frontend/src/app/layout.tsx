@@ -18,15 +18,21 @@ export const metadata: Metadata = {
 
 const antdTheme = {
   token: {
-    colorPrimary:    "#0ea5e9",
-    colorLink:       "#0ea5e9",
-    borderRadius:    8,
-    fontFamily:      "var(--font-inter), sans-serif",
-    colorBgContainer:"#ffffff",
-    colorBorder:     "#e2e8f0",
-    colorText:       "#0f172a",
-    colorTextSecondary:"#475569",
-    boxShadow:       "0 4px 12px rgba(0,0,0,0.08)",
+    colorPrimary: "#0ea5e9",
+    colorLink: "#0ea5e9",
+    colorSuccess: "#10b981",
+    colorWarning: "#f59e0b",
+    colorError: "#ea580c",
+    borderRadius: 8,
+    fontFamily: "var(--font-inter), sans-serif",
+    colorBgBase: "#f6fafe",
+    colorBgContainer: "#ffffff",
+    colorBgLayout: "#f6fafe",
+    colorBorder: "#e2e8f0",
+    colorText: "#0f172a",
+    colorTextSecondary: "#475569",
+    colorTextTertiary: "#94a3b8",
+    boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
   },
   components: {
     Button: {
@@ -47,7 +53,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="vi" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-[#f1f5f9]">
+      <body suppressHydrationWarning={true} className="min-h-full flex flex-col bg-[#f1f5f9]">
         <AntdRegistry>
           <ConfigProvider theme={antdTheme} locale={viVN}>
             {children}
