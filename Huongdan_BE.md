@@ -1,3 +1,327 @@
+# Huongdan_BE - Tích hợp Backend cho Admin TeeStudio
+
+---
+
+## 12. Trang Quản lý đơn hàng – `/admin/don-hang`
+
+> **File Frontend chính:** `frontend/src/components/admin/orders/OrdersPage.tsx`
+> **Route Next.js:** `frontend/src/app/admin/don-hang/page.tsx`
+
+### 12.1. Các component và vai trò của từng component
+
+| Component | File | Vai trò |
+|---|---|---|
+| `OrdersClient` | `orders/OrdersClient.tsx` | Bao ngoài layout (Sidebar + Topbar), quản lý state màn hình |
+| `OrdersPage` | `orders/OrdersPage.tsx` | Trang chính, chứa dữ liệu mẫu, điều phối các component con |
+| `OrderStatCard` | `orders/OrderStatCard.tsx` | 4 thẻ KPI đầu trang (đơn mới, sản xuất, chờ thanh toán, hoàn tất) |
+| `OrderFilterBar` | `orders/OrderFilterBar.tsx` | Thanh lọc (pill tab trạng thái + select box nâng cao) |
+| `OrderTable` | `orders/OrderTable.tsx` | Bảng danh sách đơn hàng |
+| `OrderStatusBadge` | `orders/OrderStatusBadge.tsx` | Nhãn màu hiển thị trạng thái đơn |
+| `OrderDetailDrawer` | `orders/OrderDetailDrawer.tsx` | Ngăn kéo chi tiết đơn hàng (mở khi bấm vào hàng) |
+| `OrderPagination` | `orders/OrderPagination.tsx` | Phân trang cuối bảng |
+
+---
+
+### 12.2. Danh sách trạng thái đơn hàng (OrderStatus)
+
+Frontend dùng các giá trị sau (kiểu TypeScript `OrderStatus`). **Backend phải trả về đúng các giá trị này:**
+
+| Giá trị (Backend trả về) | Hiển thị trên giao diện | Màu badge |
+|---|---|---|
+| `cho_xac_nhan` | Chờ xác nhận | Xám nhạt |
+| `da_xac_nhan` | Đã xác nhận | Xanh dương nhạt |
+| `dang_san_xuat` | Đang sản xuất | Xanh sky nhạt |
+| `dang_in` | Đang in | Tím nhạt |
+| `cho_giao` | Chờ giao hàng | Vàng nhạt |
+| `dang_giao` | Đang giao hàng | Cam nhạt |
+| `hoan_tat` | Hoàn tất | Xanh lá nhạt |
+| `da_huy` | Đã hủy | Đỏ nhạt |
+
+---
+
+### 12.3. API thống kê KPI đầu trang
+
+#### `GET /api/admin/orders/stats`
+
+Trả về 4 con số hiển thị trong thẻ KPI đầu trang.
+
+**Response mẫu:**
+```json
+{
+  "success": true,
+  "data": {
+    "newOrders": 24,
+    "inProduction": 18,
+    "pendingPayment": 7,
+    "completedToday": 31
+  }
+}
+```
+
+**Frontend dùng ở đâu:** Mảng `STAT_CARDS` trong `OrdersPage.tsx` – thay giá trị `value` bằng dữ liệu từ `data.*`.
+
+---
+
+### 12.4. API danh sách đơn hàng (bảng chính)
+
+#### `GET /api/admin/orders`
+
+Trả về danh sách đơn hàng để hiển thị trong bảng. Hỗ trợ lọc và phân trang qua query string.
+
+**Query string (tham số lọc):**
+
+| Tham số | Kiểu | Ý nghĩa |
+|---|---|---|
+| `q` | string | Tìm kiếm theo mã đơn hoặc tên khách hàng |
+| `status` | string | Lọc trạng thái: `tat_ca`, `cho_xac_nhan`, `da_xac_nhan`, `dang_san_xuat`, `dang_in`, `cho_giao`, `dang_giao`, `hoan_tat` |
+| `payment` | string | Lọc thanh toán: `tat_ca`, `da_thanh_toan`, `cho_thanh_toan` |
+| `time` | string | Lọc thời gian: `tat_ca`, `hom_nay`, `tuan_nay`, `thang_nay` |
+| `type` | string | Lọc loại đơn: `tat_ca`, `custom_design`, `ao_mau` |
+| `page` | number | Trang hiện tại (bắt đầu từ 1) |
+| `limit` | number | Số đơn mỗi trang (mặc định 10) |
+
+**Response mẫu:**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "orderCode": "#TS-2026-00128",
+        "createdAt": "10:24, 24/10/2023",
+        "customerName": "Nguyễn Minh Anh",
+        "customerPhone": "0901234567",
+        "product": {
+          "name": "Áo thun oversize trắng",
+          "type": "custom_design",
+          "sizes": "Cỡ L, XL",
+          "imageUrl": "https://res.cloudinary.com/demo/image/upload/ao-001.jpg"
+        },
+        "totalAmountVnd": 429000,
+        "payment": {
+          "method": "VNPAY",
+          "isPaid": true
+        },
+        "status": "dang_san_xuat",
+        "hasPrintSpec": true
+      }
+    ],
+    "pagination": {
+      "currentPage": 1,
+      "totalPages": 13,
+      "totalItems": 128,
+      "itemsPerPage": 10
+    }
+  }
+}
+```
+
+**Giải thích trường `product.type`:**
+- `custom_design`: Đơn thiết kế tùy chỉnh – hiện nhãn "Tùy chỉnh" màu xanh, hiện nút "Xuất thông số in"
+- `ao_mau`: Đơn áo mẫu – hiện nhãn "Áo mẫu" màu xám, không hiện nút xuất thông số
+
+**Frontend dùng ở đâu:** Mảng `MOCK_ORDERS` trong `OrdersPage.tsx` → thay bằng `data.items`. Phân trang: `TOTAL_ITEMS` thay bằng `data.pagination.totalItems`.
+
+---
+
+### 12.5. API chi tiết một đơn hàng (cho ngăn kéo)
+
+#### `GET /api/admin/orders/:id`
+
+Gọi khi admin bấm vào một hàng trong bảng để mở ngăn kéo `OrderDetailDrawer`.
+
+**Response mẫu:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "orderCode": "#TS-2026-00128",
+    "createdAt": "10:24, 24/10/2023",
+    "customerName": "Nguyễn Minh Anh",
+    "customerPhone": "0901234567",
+    "customerEmail": "minhanh@email.com",
+    "shippingAddress": "123 Đường Nguyễn Trãi, Phường Bến Thành, Quận 1, TP.HCM",
+    "shippingCarrier": "GHTK – Tiêu chuẩn",
+    "product": {
+      "name": "Áo thun oversize trắng",
+      "type": "custom_design",
+      "sizes": "Cỡ L, XL",
+      "imageUrl": "https://res.cloudinary.com/demo/image/upload/ao-001.jpg"
+    },
+    "totalAmountVnd": 429000,
+    "subTotalVnd": 250000,
+    "designFeeVnd": 150000,
+    "shippingFeeVnd": 29000,
+    "payment": { "method": "VNPAY", "isPaid": true },
+    "status": "dang_san_xuat",
+    "hasPrintSpec": true,
+    "printPosition": "Mặt trước (Ngực giữa)",
+    "printSizeCm": "20×28 cm",
+    "printFileUrl": "https://res.cloudinary.com/demo/raw/upload/print-001.pdf",
+    "timeline": [
+      {
+        "description": "Đang sản xuất – Đã xuất thông số",
+        "time": "14:30, 24/10/2023",
+        "actor": "Admin",
+        "isActive": true
+      },
+      {
+        "description": "Đã xác nhận thanh toán",
+        "time": "10:35, 24/10/2023",
+        "actor": "Hệ thống",
+        "isActive": false
+      },
+      {
+        "description": "Tạo đơn hàng mới",
+        "time": "10:24, 24/10/2023",
+        "actor": "Khách hàng",
+        "isActive": false
+      }
+    ]
+  }
+}
+```
+
+**Lưu ý:**
+- `subTotalVnd`: Giá áo (chưa tính phí thiết kế và vận chuyển)
+- `designFeeVnd`: Phí thiết kế tùy chỉnh (= 0 nếu đơn áo mẫu)
+- `shippingFeeVnd`: Phí vận chuyển
+- `totalAmountVnd` = `subTotalVnd` + `designFeeVnd` + `shippingFeeVnd`
+- `timeline`: Mảng lịch sử xử lý, sắp xếp mới nhất lên trước. Chỉ một bước có `isActive: true`
+- `printPosition`, `printSizeCm`, `printFileUrl`: Chỉ cần trả về khi `product.type === "custom_design"`
+
+**Frontend dùng ở đâu:** Hàm `handleRowClick` trong `OrdersPage.tsx` → thay `MOCK_ORDER_DETAIL` bằng kết quả API.
+
+---
+
+### 12.6. API cập nhật trạng thái đơn hàng
+
+#### `PATCH /api/admin/orders/:id/status`
+
+Gọi khi admin bấm nút **"Cập nhật trạng thái"** trong ngăn kéo chi tiết.
+
+**Request body:**
+```json
+{
+  "status": "cho_giao",
+  "note": "Đã đóng gói xong, chuyển GHTK"
+}
+```
+
+**Response mẫu:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "status": "cho_giao",
+    "updatedAt": "2026-06-01T15:00:00.000Z"
+  }
+}
+```
+
+**Lưu ý:** Mỗi lần cập nhật trạng thái, Backend cần tạo thêm một bản ghi mới trong bảng lịch sử xử lý (timeline).
+
+---
+
+### 12.7. API hủy đơn hàng
+
+#### `PATCH /api/admin/orders/:id/cancel`
+
+Gọi khi admin bấm nút **"Hủy đơn"** trong ngăn kéo chi tiết.
+
+**Request body:**
+```json
+{
+  "reason": "Khách hàng yêu cầu hủy"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": { "id": 1, "status": "da_huy" }
+}
+```
+
+---
+
+### 12.8. API xuất thông số in
+
+#### `POST /api/admin/orders/:id/export-print-spec`
+
+Gọi khi admin bấm nút **in hình** (icon máy in) trên hàng bảng hoặc nút **"Tải file in"** trong ngăn kéo.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "printSpecUrl": "https://res.cloudinary.com/demo/raw/upload/print-spec-001.pdf"
+  }
+}
+```
+
+**Lưu ý:** Sau khi xuất thành công, Backend cập nhật `hasPrintSpec = true` cho đơn đó.
+
+---
+
+### 12.9. Cách Frontend sẽ kết nối API (hướng dẫn cho nhóm FE)
+
+Khi Backend hoàn thành, nhóm Frontend cần:
+
+1. **Tạo file** `frontend/src/services/ordersApi.ts` chứa các hàm gọi API bằng Axios.
+2. **Tạo file** `frontend/src/hooks/admin/useOrders.ts` chứa React Query hooks.
+3. **Trong `OrdersPage.tsx`**: Xóa mảng `MOCK_ORDERS`, `MOCK_ORDER_DETAIL`, `STAT_CARDS` (phần giá trị `value`) và thay bằng dữ liệu từ hooks.
+
+**Ví dụ thay thế trong `OrdersPage.tsx`:**
+```tsx
+// Trước (dữ liệu mẫu):
+const MOCK_ORDERS: Order[] = [ ... ];
+
+// Sau (dùng API):
+const { data, isLoading } = useOrders({ status: activeTab, page: currentPage });
+const orders = data?.items ?? [];
+const totalItems = data?.pagination.totalItems ?? 0;
+```
+
+---
+
+### 12.10. Database – bảng liên quan
+
+Backend cần đảm bảo các bảng sau có đủ trường:
+
+```sql
+-- Bảng đơn hàng
+orders:
+  id, order_code, customer_id, status (ENUM), total_amount_vnd,
+  sub_total_vnd, design_fee_vnd, shipping_fee_vnd,
+  has_print_spec (BOOLEAN), created_at, updated_at
+
+-- Bảng lịch sử trạng thái đơn
+order_status_history:
+  id, order_id, status, description, actor, created_at
+
+-- Bảng sản phẩm trong đơn
+order_items:
+  id, order_id, product_name, product_type (ENUM: custom_design/ao_mau),
+  sizes, image_url, print_position, print_size_cm, print_file_url
+
+-- Bảng thanh toán
+payments:
+  id, order_id, method (VNPAY/COD/Chuyen_khoan), is_paid (BOOLEAN),
+  transaction_ref, amount_vnd, created_at
+
+-- Bảng thông tin giao hàng
+shipments:
+  id, order_id, carrier_name, address, created_at
+```
+
+---
+
 # Huongdan_BE - Tich hop Backend cho Admin Dashboard TeeStudio
 
 Tai lieu nay mo ta phan du lieu Backend can cung cap cho giao dien Admin tai route `/admin`.
