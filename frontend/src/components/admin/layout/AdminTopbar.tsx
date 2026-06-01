@@ -12,7 +12,7 @@ import {
 } from "@ant-design/icons";
 import { Button, Dropdown } from "antd";
 import type { MenuProps } from "antd";
-import AdminSearchInput from "./AdminSearchInput";
+import AdminSearchInput from "../common/AdminSearchInput";
 
 type AdminTopbarProps = {
   isDesktop: boolean;

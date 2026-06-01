@@ -9,17 +9,17 @@ import {
   ToolOutlined,
 } from "@ant-design/icons";
 import { useEffect, useState } from "react";
-import AdminSidebar from "./AdminSidebar";
-import AdminTopbar from "./AdminTopbar";
+import AdminSidebar from "../layout/AdminSidebar";
+import AdminTopbar from "../layout/AdminTopbar";
 import BestSellingProductsCard, {
   type BestSellingProduct,
-} from "./BestSellingProductsCard";
-import DashboardFilterToolbar from "./DashboardFilterToolbar";
-import DesignReviewTable, { type DesignOrder } from "./DesignReviewTable";
-import InventoryWarningCard from "./InventoryWarningCard";
-import MetricCard from "./MetricCard";
-import RevenueOverviewChart from "./RevenueOverviewChart";
-import SegmentedTabs from "./SegmentedTabs";
+} from "./components/BestSellingProductsCard";
+import DashboardFilterToolbar from "./components/DashboardFilterToolbar";
+import DesignReviewTable, { type DesignOrder } from "./components/DesignReviewTable";
+import InventoryWarningCard from "./components/InventoryWarningCard";
+import MetricCard from "./components/MetricCard";
+import RevenueOverviewChart from "./components/RevenueOverviewChart";
+import SegmentedTabs from "../common/SegmentedTabs";
 
 const metrics = [
   {

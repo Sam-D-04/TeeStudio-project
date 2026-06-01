@@ -1,5 +1,5 @@
 import { EditOutlined, SkinOutlined } from "@ant-design/icons";
-import StatusBadge, { type DesignStatus } from "./StatusBadge";
+import StatusBadge, { type DesignStatus } from "../../common/StatusBadge";
 
 export type DesignOrder = {
   code: string;

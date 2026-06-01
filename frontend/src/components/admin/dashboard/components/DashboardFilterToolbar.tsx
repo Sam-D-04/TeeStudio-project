@@ -2,7 +2,7 @@ import { CalendarOutlined, DownloadOutlined, FilterOutlined } from "@ant-design/
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import type { Dayjs } from "dayjs";
-import AdminButton from "./AdminButton";
+import AdminButton from "../../common/AdminButton";
 
 const { RangePicker } = DatePicker;
 
