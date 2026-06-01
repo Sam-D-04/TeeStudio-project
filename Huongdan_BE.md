@@ -664,3 +664,386 @@ Khi thay du lieu mau:
 - Ton kho thay tu `inventory-alerts`.
 - Phu phi thay tu `pricing-surcharges`.
 
+---
+
+## 13. Trang Quản lý Kho hàng – `/admin/kho-hang`
+
+> **File Frontend chính:** `frontend/src/components/admin/inventory/InventoryPage.tsx`
+> **Route Next.js:** `frontend/src/app/admin/kho-hang/page.tsx`
+
+### 13.1. Mục đích của trang
+
+Trang này quản lý **phôi áo chưa in** (Blank Tees) trong kho. Mỗi biến thể là một tổ hợp duy nhất gồm: **Tên sản phẩm + Màu sắc + Kích cỡ**, được định danh bằng mã **SKU**.
+
+Trang không quản lý áo thành phẩm đã in. Khi xưởng in bắt đầu xử lý đơn custom, hệ thống tự động trừ số lượng khỏi kho phôi áo.
+
+---
+
+### 13.2. Các component và vai trò
+
+| Component | File | Vai trò |
+|---|---|---|
+| `InventoryPage` | `inventory/InventoryPage.tsx` | Component client chính, quản lý toàn bộ state trang |
+| `InventoryStatCard` | `inventory/InventoryStatCard.tsx` | Thẻ KPI đầu trang (4 thẻ thống kê) |
+| `InventoryFilterBar` | `inventory/InventoryFilterBar.tsx` | Thanh tìm kiếm + pill filter loại phôi |
+| `InventoryTable` | `inventory/InventoryTable.tsx` | Bảng danh sách biến thể phôi áo |
+| `InventoryStatusBadge` | `inventory/InventoryStatusBadge.tsx` | Nhãn màu trạng thái tồn kho |
+| `InventoryDetailDrawer` | `inventory/InventoryDetailDrawer.tsx` | Ngăn kéo chi tiết một biến thể phôi áo |
+| `InventoryPagination` | `inventory/InventoryPagination.tsx` | Phân trang cuối bảng |
+
+---
+
+### 13.3. Trạng thái tồn kho (InventoryStatus)
+
+Frontend dùng các giá trị sau. **Backend phải trả về đúng các chuỗi này:**
+
+| Giá trị (Backend trả về) | Hiển thị trên giao diện | Màu badge |
+|---|---|---|
+| `con_hang` | Còn hàng | Nền xanh lá nhạt `#dcfce7`, chữ `#059669` |
+| `sap_het` | Sắp hết | Nền vàng nhạt `#fef3c7`, chữ `#d97706` |
+| `het_hang` | Hết hàng | Nền đỏ nhạt `#fee2e2`, chữ `#b91c1c` |
+
+**Quy tắc xác định trạng thái (Backend tự tính):**
+- `het_hang`: `so_luong_kha_dung <= 0`
+- `sap_het`: `so_luong_kha_dung > 0` và `so_luong_kha_dung <= nguong_canh_bao` (đề xuất ngưỡng: 10)
+- `con_hang`: `so_luong_kha_dung > nguong_canh_bao`
+
+---
+
+### 13.4. Cấu trúc dữ liệu một biến thể phôi áo (InventoryItem)
+
+Frontend dùng kiểu TypeScript `InventoryItem` sau – **Backend phải trả về đúng các tên trường này:**
+
+```ts
+type InventoryItem = {
+  id: number;           // ID biến thể trong database
+  ten: string;          // Tên sản phẩm, ví dụ "Basic Cotton Tee"
+  mau: string;          // Màu sắc hiển thị, ví dụ "Trắng"
+  mauHex: string;       // Mã màu hex để vẽ ô màu, ví dụ "#f8fafc"
+  size: string;         // Kích cỡ, ví dụ "M"
+  sku: string;          // Mã SKU duy nhất, ví dụ "TS-TEE-WHT-M"
+  tonHienTai: number;   // Tổng số áo đang có trong kho (stock_quantity)
+  daGiu: number;        // Số áo đang bị giữ cho đơn chờ xử lý (reserved_quantity)
+  khaDung: number;      // Số áo có thể xuất/bán = tonHienTai - daGiu
+  trangThai: "con_hang" | "sap_het" | "het_hang"; // Trạng thái tồn kho
+};
+```
+
+---
+
+### 13.5. API thống kê KPI đầu trang
+
+#### `GET /api/admin/inventory/stats`
+
+Trả về 4 con số cho 4 thẻ thống kê đầu trang.
+
+**Response mẫu:**
+```json
+{
+  "success": true,
+  "data": {
+    "tongPhoi": 2480,
+    "soLuongSapHet": 12,
+    "canXuatChoXuong": 36,
+    "nhapTrongThang": 860
+  }
+}
+```
+
+**Frontend dùng ở đâu:** 4 thẻ `InventoryStatCard` trong `InventoryPage.tsx`. Thay các hằng số `tongPhoi`, `sapHet`, `canXuat`, `nhapThang`.
+
+| Trường Backend | Thẻ hiển thị | Màu |
+|---|---|---|
+| `tongPhoi` | Tổng phôi áo còn tồn | Xám (default) |
+| `soLuongSapHet` | Biến thể sắp hết (kèm hậu tố "SKU") | Vàng (warning) |
+| `canXuatChoXuong` | Cần xuất cho đơn in | Tím (accent) |
+| `nhapTrongThang` | Nhập kho trong tháng | Xanh lá (success) |
+
+---
+
+### 13.6. API danh sách tồn kho (bảng chính)
+
+#### `GET /api/admin/inventory/items`
+
+Trả về danh sách biến thể phôi áo. Hỗ trợ tìm kiếm, lọc và phân trang.
+
+**Query string (tham số lọc):**
+
+| Tham số | Kiểu | Ý nghĩa |
+|---|---|---|
+| `q` | string | Tìm kiếm theo SKU, tên sản phẩm hoặc màu sắc |
+| `loai` | string | Lọc theo loại: `tat_ca`, `ao_basic`, `premium`, `sap_het` |
+| `page` | number | Trang hiện tại (bắt đầu từ 1) |
+| `limit` | number | Số dòng mỗi trang (mặc định 5, Frontend dùng PAGE_SIZE = 5) |
+
+**Ý nghĩa từng giá trị `loai`:**
+- `tat_ca`: Không lọc, trả về tất cả
+- `ao_basic`: Lọc phôi áo có tên chứa "Basic"
+- `premium`: Lọc phôi áo có tên chứa "Premium"
+- `sap_het`: Lọc biến thể có `trang_thai = "sap_het"`
+
+**Response mẫu:**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": 2,
+        "ten": "Basic Cotton Tee",
+        "mau": "Trắng",
+        "mauHex": "#f8fafc",
+        "size": "M",
+        "sku": "TS-TEE-WHT-M",
+        "tonHienTai": 145,
+        "daGiu": 12,
+        "khaDung": 133,
+        "trangThai": "con_hang"
+      }
+    ],
+    "phanTrang": {
+      "trangHienTai": 1,
+      "tongSoTrang": 13,
+      "tongSoBienThe": 124,
+      "soDongMoiTrang": 5
+    }
+  }
+}
+```
+
+**Frontend dùng ở đâu:**
+- Mảng `MOCK_INVENTORY_ITEMS` trong `InventoryPage.tsx` → thay bằng `data.items`
+- Phân trang: `tongSoTrang` và `tongSoBienThe` từ `data.phanTrang`
+
+---
+
+### 13.7. API chi tiết một biến thể (cho Drawer)
+
+#### `GET /api/admin/inventory/items/:id`
+
+Gọi khi admin bấm nút "Xem chi tiết" trên bảng để mở `InventoryDetailDrawer`.
+
+**Response mẫu:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 2,
+    "ten": "Basic Cotton Tee",
+    "mau": "Trắng",
+    "mauHex": "#f8fafc",
+    "size": "M",
+    "sku": "TS-TEE-WHT-M",
+    "tonHienTai": 145,
+    "daGiu": 12,
+    "khaDung": 133,
+    "trangThai": "con_hang",
+    "donChoXuat": [
+      { "id": "ORD-2938", "soLuong": 4 },
+      { "id": "ORD-2941", "soLuong": 6 }
+    ],
+    "lichSuBienDong": [
+      {
+        "id": 1,
+        "moTa": "+50 áo (Nhập kho #PO-092)",
+        "thoiGian": "Hôm nay, 09:42 SA",
+        "loai": "nhap"
+      },
+      {
+        "id": 2,
+        "moTa": "-12 áo (Giữ cho đơn ORD-2938)",
+        "thoiGian": "Hôm qua, 14:20 CH",
+        "loai": "giu"
+      }
+    ]
+  }
+}
+```
+
+**Giải thích trường `loai` trong `lichSuBienDong`:**
+
+| Giá trị | Ý nghĩa | Màu chấm timeline |
+|---|---|---|
+| `nhap` | Nhập kho (số lượng tăng) | Xanh lá `#059669` |
+| `giu` | Giữ lại cho đơn hàng (reserved) | Vàng `#d97706` |
+| `xuat` | Xuất kho (chuyển cho xưởng in) | Đỏ `#b91c1c` |
+
+**Frontend dùng ở đâu:** `InventoryDetailDrawer.tsx` – thay `donChoXuatMau` và `lichSuMau` bằng dữ liệu từ API.
+
+---
+
+### 13.8. API nhập kho phôi áo
+
+#### `POST /api/admin/inventory/receipts`
+
+Gọi khi admin bấm nút **"Nhập kho phôi áo"** đầu trang hoặc **"Nhập thêm"** trong Drawer.
+
+**Request body:**
+```json
+{
+  "ghiChu": "Nhập bổ sung tháng 06/2026",
+  "chiTiet": [
+    { "bienTheId": 2, "soLuongNhap": 50 },
+    { "bienTheId": 5, "soLuongNhap": 30 }
+  ]
+}
+```
+
+**Response mẫu:**
+```json
+{
+  "success": true,
+  "data": {
+    "phieuNhapId": 92,
+    "tongSoLuong": 80,
+    "thoiGianNhap": "2026-06-01T15:00:00.000Z"
+  }
+}
+```
+
+**Lưu ý Backend:** Sau khi nhập thành công, cập nhật `stock_quantity` trong `product_variants` và ghi lịch sử với `loai = "nhap"`.
+
+---
+
+### 13.9. API điều chỉnh tồn kho
+
+#### `PATCH /api/admin/inventory/items/:id/dieu-chinh`
+
+Gọi khi admin bấm **"Điều chỉnh tồn"** trong Drawer (kiểm kê phát hiện sai lệch).
+
+**Request body:**
+```json
+{
+  "soLuongMoi": 130,
+  "lyDo": "Kiểm kê thực tế phát hiện chênh lệch 3 áo"
+}
+```
+
+**Response mẫu:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 2,
+    "tonHienTai": 130,
+    "khaDung": 118
+  }
+}
+```
+
+---
+
+### 13.10. API xuất phôi cho đơn hàng
+
+#### `POST /api/admin/inventory/items/:id/xuat-phoi`
+
+Gọi khi admin bấm **"Xuất phôi"** trong danh sách đơn chờ xuất bên trong Drawer.
+
+**Request body:**
+```json
+{
+  "maPhieu": "ORD-2938",
+  "soLuongXuat": 4
+}
+```
+
+**Response mẫu:**
+```json
+{
+  "success": true,
+  "data": {
+    "bienTheId": 2,
+    "daGiuMoi": 8,
+    "khaDungMoi": 125
+  }
+}
+```
+
+**Lưu ý Backend:** `reserved_quantity` giảm đúng bằng số lượng xuất. Ghi lịch sử với `loai = "xuat"`.
+
+---
+
+### 13.11. Database – bảng liên quan đến kho hàng
+
+```sql
+-- Bảng sản phẩm cơ bản
+products:
+  id, ten, mo_ta, gia_co_so_vnd, loai ('ao_basic'/'premium'),
+  created_at, updated_at
+
+-- Bảng biến thể phôi áo (1 dòng = 1 SKU duy nhất)
+product_variants:
+  id, product_id, mau (color TEXT), mau_hex (color_hex TEXT), size (TEXT),
+  sku (TEXT UNIQUE NOT NULL),
+  so_luong_ton (stock_quantity INT DEFAULT 0),
+  so_luong_giu (reserved_quantity INT DEFAULT 0),
+  -- Khả dụng = stock_quantity - reserved_quantity (tính trong query hoặc VIEW)
+  nguong_canh_bao (alert_threshold INT DEFAULT 10),
+  created_at, updated_at
+
+-- Bảng phiếu nhập kho
+inventory_receipts:
+  id, ghi_chu, tong_so_luong, nguoi_tao (user_id), created_at
+
+-- Bảng chi tiết phiếu nhập
+inventory_receipt_items:
+  id, phieu_nhap_id, bien_the_id, so_luong_nhap, created_at
+
+-- Bảng lịch sử biến động tồn kho
+inventory_logs:
+  id, bien_the_id, loai (ENUM: 'nhap'/'xuat'/'giu'/'dieu_chinh'),
+  so_luong INT,            -- Dương là tăng, âm là giảm
+  mo_ta TEXT,
+  ma_phieu_lien_quan TEXT, -- Mã đơn (ORD-xxx) hoặc mã phiếu nhập (#PO-xxx)
+  nguoi_tao (user_id), created_at
+```
+
+---
+
+### 13.12. Cách Frontend kết nối API sau khi Backend hoàn thành
+
+**Bước 1:** Tạo `frontend/src/services/inventoryApi.ts`:
+
+```ts
+import axios from "axios";
+const BASE = process.env.NEXT_PUBLIC_API_URL;
+
+export const inventoryApi = {
+  layDanhSach: (params: { q?: string; loai?: string; page?: number; limit?: number }) =>
+    axios.get(`${BASE}/admin/inventory/items`, { params }).then(r => r.data.data),
+
+  layThongKe: () =>
+    axios.get(`${BASE}/admin/inventory/stats`).then(r => r.data.data),
+
+  layChiTiet: (id: number) =>
+    axios.get(`${BASE}/admin/inventory/items/${id}`).then(r => r.data.data),
+
+  nhapKho: (body: object) =>
+    axios.post(`${BASE}/admin/inventory/receipts`, body).then(r => r.data.data),
+
+  dieuChinh: (id: number, body: object) =>
+    axios.patch(`${BASE}/admin/inventory/items/${id}/dieu-chinh`, body).then(r => r.data.data),
+
+  xuatPhoi: (id: number, body: object) =>
+    axios.post(`${BASE}/admin/inventory/items/${id}/xuat-phoi`, body).then(r => r.data.data),
+};
+```
+
+**Bước 2:** Trong `InventoryPage.tsx`, xóa `MOCK_INVENTORY_ITEMS` và thay bằng hook:
+
+```tsx
+// Trước (dữ liệu mẫu):
+const MOCK_INVENTORY_ITEMS: InventoryItem[] = [ ... ];
+
+// Sau (dùng API với React Query):
+const { data, isLoading } = useQuery({
+  queryKey: ["inventory", tuKhoaTimKiem, boLocHienTai, trangHienTai],
+  queryFn: () => inventoryApi.layDanhSach({ q: tuKhoaTimKiem, loai: boLocHienTai, page: trangHienTai, limit: 5 }),
+});
+const danhSachTrangHienTai = data?.items ?? [];
+const tongSoTrang = data?.phanTrang.tongSoTrang ?? 1;
+```
+
+**Bước 3:** Trong `InventoryDetailDrawer.tsx`, nhận thêm props `donChoXuat` và `lichSuBienDong` từ `InventoryPage` (truyền từ API `/api/admin/inventory/items/:id`), thay cho dữ liệu mẫu `donChoXuatMau` và `lichSuMau`.
+
+
