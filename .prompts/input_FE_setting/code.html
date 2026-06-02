@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TeeStudio - Cài đặt</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary": "#396477",
+                        "secondary-fixed": "#cce5ff",
+                        "tertiary-container": "#76a1b6",
+                        "surface-bright": "#f6fafe",
+                        "primary": "#006591",
+                        "on-secondary-container": "#00476e",
+                        "tertiary-fixed": "#bee9ff",
+                        "on-surface-variant": "#3e4850",
+                        "text-secondary": "#475569",
+                        "on-primary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "surface-variant": "#dfe3e7",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-on-surface": "#edf1f5",
+                        "surface-dim": "#d6dade",
+                        "secondary-fixed-dim": "#93ccff",
+                        "error-container": "#ffdad6",
+                        "inverse-surface": "#2c3134",
+                        "on-secondary-fixed-variant": "#004b73",
+                        "background": "#f6fafe",
+                        "on-primary-fixed": "#001e2f",
+                        "surface-container-low": "#f0f4f8",
+                        "on-tertiary": "#ffffff",
+                        "success": "#10b981",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed-dim": "#a1cde3",
+                        "on-tertiary-fixed": "#001f2a",
+                        "on-error-container": "#93000a",
+                        "secondary-container": "#5bb8fe",
+                        "border": "#e2e8f0",
+                        "text-muted": "#94a3b8",
+                        "surface-tint": "#006591",
+                        "on-secondary-fixed": "#001d31",
+                        "on-tertiary-container": "#01384a",
+                        "primary-container": "#0ea5e9",
+                        "outline-variant": "#bec8d2",
+                        "outline": "#6e7881",
+                        "surface": "#ffffff",
+                        "secondary": "#006398",
+                        "on-background": "#171c1f",
+                        "primary-fixed": "#c9e6ff",
+                        "accent": "#6366f1",
+                        "on-tertiary-fixed-variant": "#1e4c5f",
+                        "on-surface": "#171c1f",
+                        "on-primary-fixed-variant": "#004c6e",
+                        "inverse-primary": "#89ceff",
+                        "warning": "#f59e0b",
+                        "primary-fixed-dim": "#89ceff",
+                        "surface-alt": "#f8fafc",
+                        "on-primary-container": "#003751",
+                        "error": "#ea580c",
+                        "surface-container-highest": "#dfe3e7",
+                        "surface-container": "#eaeef2",
+                        "surface-container-high": "#e4e9ed",
+                        "text-main": "#0f172a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "header-h": "64px",
+                        "badge-padding": "2px 10px",
+                        "base": "24px",
+                        "sidebar-w": "260px",
+                        "gutter": "16px",
+                        "control-h": "40px",
+                        "pill-padding": "6px 16px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "button-text": ["Inter"],
+                        "label-bold": ["Inter"],
+                        "body-md": ["Inter"],
+                        "sidebar-item": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "card-title": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "800" }],
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "button-text": ["14px", { "lineHeight": "20px", "fontWeight": "600" }],
+                        "label-bold": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "sidebar-item": ["14px", { "lineHeight": "20px", "fontWeight": "600" }],
+                        "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                        "card-title": ["17px", { "lineHeight": "24px", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .fill-icon {
+            font-variation-settings: 'FILL' 1;
+        }
+        /* Custom scrollbar for tables */
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+    </style>
+</head>
+<body class="bg-background text-main font-body-md min-h-screen flex">
+<!-- SideNavBar (JSON Configured) -->
+<aside class="fixed left-0 top-0 h-full w-[260px] bg-surface border-r border-border flex flex-col p-base z-20">
+<!-- Brand Header -->
+<div class="mb-8 flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined fill-icon text-[20px]">admin_panel_settings</span>
+</div>
+<div>
+<h1 class="font-headline-lg text-headline-lg font-black text-primary text-[20px] leading-tight">TeeStudio</h1>
+<p class="font-body-sm text-body-sm text-text-secondary text-[11px] uppercase tracking-wider">Admin Panel</p>
+</div>
+</div>
+<!-- Navigation Tabs -->
+<nav class="flex-1 flex flex-col gap-2 font-sidebar-item text-sidebar-item">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Tổng quan</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">shopping_cart</span>
+<span>Đơn hàng</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">palette</span>
+<span>Thiết kế</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">factory</span>
+<span>Sản xuất</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span>Kho hàng</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span>Thanh toán</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">sell</span>
+<span>Khuyến mãi &amp; Báo giá</span>
+</a>
+<!-- Active Tab -->
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary-fixed text-primary font-bold opacity-80 transition-all" href="#">
+<span class="material-symbols-outlined fill-icon">settings</span>
+<span>Cài đặt</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<div class="ml-[260px] flex-1 flex flex-col min-h-screen relative w-[calc(100%-260px)]">
+<!-- TopNavBar (JSON Configured) -->
+<header class="bg-surface fixed top-0 right-0 border-b border-border shadow-sm flex justify-between items-center h-header-h px-gutter w-[calc(100%-260px)] z-10 font-body-md text-body-md">
+<!-- Search Bar (on_left) -->
+<div class="flex-1 flex items-center">
+<div class="relative w-full max-w-md">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[20px]">search</span>
+<input class="w-full h-[36px] bg-surface-alt border border-border rounded-lg pl-10 pr-4 text-body-sm font-body-sm focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-shadow text-main" placeholder="Tìm kiếm cài đặt, nhân viên..." type="text"/>
+</div>
+</div>
+<!-- Trailing Actions & Avatar -->
+<div class="flex items-center gap-4 text-text-secondary">
+<button class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface-container-high transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined">help</span>
+</button>
+<div class="h-6 w-[1px] bg-border mx-1"></div>
+<button class="w-9 h-9 rounded-full overflow-hidden border border-border bg-surface-alt flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-text-secondary">person</span>
+</button>
+</div>
+</header>
+<!-- Page Content -->
+<main class="mt-header-h p-base flex-1 flex flex-col gap-base max-w-[1440px] mx-auto w-full">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-1">Cài đặt</h2>
+<p class="font-body-md text-body-md text-text-secondary">Quản lý tài khoản nội bộ, phân quyền và cấu hình vận hành hệ thống TeeStudio.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="h-control-h px-pill-padding bg-surface border border-border rounded-lg font-button-text text-button-text text-text-secondary hover:border-tertiary-container hover:text-main transition-colors flex items-center justify-center">
+                        Khôi phục mặc định
+                    </button>
+<button class="h-control-h px-pill-padding bg-primary-container text-on-primary rounded-lg font-button-text text-button-text hover:bg-[#0284c7] transition-colors flex items-center justify-center shadow-sm">
+                        Lưu thay đổi
+                    </button>
+</div>
+</div>
+<!-- Stats Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
+<!-- Stat Card 1 -->
+<div class="bg-surface rounded-[20px] shadow-[0_1px_4px_rgba(0,0,0,0.05)] border border-border p-5 flex items-start justify-between group hover:border-tertiary-container transition-colors">
+<div>
+<p class="font-body-sm text-body-sm text-text-secondary mb-1">Tài khoản nội bộ</p>
+<h3 class="font-headline-lg text-headline-lg text-on-surface leading-none">8</h3>
+</div>
+<div class="w-10 h-10 rounded-full bg-primary-fixed/50 flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined">group</span>
+</div>
+</div>
+<!-- Stat Card 2 -->
+<div class="bg-surface rounded-[20px] shadow-[0_1px_4px_rgba(0,0,0,0.05)] border border-border p-5 flex items-start justify-between group hover:border-tertiary-container transition-colors">
+<div>
+<p class="font-body-sm text-body-sm text-text-secondary mb-1">Vai trò hệ thống</p>
+<h3 class="font-headline-lg text-headline-lg text-on-surface leading-none">4</h3>
+</div>
+<div class="w-10 h-10 rounded-full bg-secondary-fixed/50 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined">badge</span>
+</div>
+</div>
+<!-- Stat Card 3 -->
+<div class="bg-surface rounded-[20px] shadow-[0_1px_4px_rgba(0,0,0,0.05)] border border-border p-5 flex items-start justify-between group hover:border-tertiary-container transition-colors">
+<div>
+<p class="font-body-sm text-body-sm text-text-secondary mb-1">Trạng thái quy trình</p>
+<h3 class="font-headline-lg text-headline-lg text-on-surface leading-none">3 <span class="text-body-sm text-text-secondary font-normal">nhóm</span></h3>
+</div>
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed/50 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined">account_tree</span>
+</div>
+</div>
+<!-- Stat Card 4 -->
+<div class="bg-surface rounded-[20px] shadow-[0_1px_4px_rgba(0,0,0,0.05)] border border-border p-5 flex items-start justify-between group hover:border-tertiary-container transition-colors">
+<div>
+<p class="font-body-sm text-body-sm text-text-secondary mb-1">Phương thức thanh toán</p>
+<h3 class="font-headline-lg text-headline-lg text-on-surface leading-none">1 <span class="text-body-sm text-success font-normal">đang bật</span></h3>
+</div>
+<div class="w-10 h-10 rounded-full bg-[#dcfce7]/50 flex items-center justify-center text-success">
+<span class="material-symbols-outlined">credit_card</span>
+</div>
+</div>
+</div>
+<!-- Main Configuration Layout (2 Columns) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-base flex-1">
+<!-- Left Column: Settings Menu -->
+<div class="lg:col-span-3">
+<div class="bg-surface rounded-[20px] shadow-[0_1px_4px_rgba(0,0,0,0.05)] border border-border p-2 sticky top-[88px]">
+<nav class="flex flex-col gap-1 font-body-md text-body-md">
+<!-- Active Menu Item -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary-container/10 text-primary-container font-semibold transition-colors" href="#">
+<span class="material-symbols-outlined fill-icon text-[20px]">shield_person</span>
+                                Tài khoản &amp; phân quyền
+                            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-text-secondary hover:bg-surface-alt hover:text-main transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">storefront</span>
+                                Thông tin cửa hàng
+                            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-text-secondary hover:bg-surface-alt hover:text-main transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">schema</span>
+                                Trạng thái quy trình
+                            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-text-secondary hover:bg-surface-alt hover:text-main transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">account_balance_wallet</span>
+                                Phương thức thanh toán
+                            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-text-secondary hover:bg-surface-alt hover:text-main transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">security</span>
+                                Bảo mật &amp; phiên đăng nhập
+                            </a>
+<div class="h-[1px] bg-border my-2 mx-4"></div>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-error hover:bg-error-container/50 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">logout</span>
+                                Đăng xuất
+                            </a>
+</nav>
+</div>
+</div>
+<!-- Right Column: Active Tab Content ("Tài khoản & phân quyền") -->
+<div class="lg:col-span-9 flex flex-col gap-base">
+<div class="bg-surface rounded-[20px] shadow-[0_1px_4px_rgba(0,0,0,0.05)] border border-border overflow-hidden flex flex-col">
+<!-- Content Header -->
+<div class="p-6 border-b border-border flex items-center justify-between bg-surface">
+<div>
+<h3 class="font-card-title text-card-title text-on-surface">Danh sách nhân viên</h3>
+<p class="font-body-sm text-body-sm text-text-secondary mt-1">Quản lý quyền truy cập và thông tin liên hệ của đội ngũ.</p>
+</div>
+<button class="h-control-h px-pill-padding bg-primary-container text-on-primary rounded-lg font-button-text text-button-text hover:bg-[#0284c7] transition-colors flex items-center gap-2 shadow-sm">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                                Thêm nhân viên
+                            </button>
+</div>
+<!-- Table -->
+<div class="overflow-x-auto custom-scrollbar flex-1">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-alt font-label-bold text-label-bold text-text-secondary border-b border-border">
+<tr>
+<th class="py-4 px-6 font-semibold">Họ tên</th>
+<th class="py-4 px-6 font-semibold">Email</th>
+<th class="py-4 px-6 font-semibold">Vai trò</th>
+<th class="py-4 px-6 font-semibold">Trạng thái</th>
+<th class="py-4 px-6 font-semibold">Ngày tạo</th>
+<th class="py-4 px-6 font-semibold text-center">Thao tác</th>
+</tr>
+</thead>
+<tbody class="font-body-md text-body-md text-main divide-y divide-border bg-surface">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-alt/50 transition-colors">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-primary-container font-semibold text-xs">NT</div>
+<span class="font-semibold text-on-surface">Nguyễn Tuấn</span>
+</div>
+</td>
+<td class="py-4 px-6 text-text-secondary">tuan.nguyen@teestudio.vn</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center px-2 py-1 rounded-md bg-primary-container/10 text-primary-container text-xs font-semibold">Admin</span>
+</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#dcfce7] text-success text-xs font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                                            </span>
+</td>
+<td class="py-4 px-6 text-text-secondary text-sm">12/10/2023</td>
+<td class="py-4 px-6 text-center">
+<button class="text-text-muted hover:text-primary-container transition-colors p-1" title="Chỉnh sửa">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-alt/50 transition-colors">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center text-secondary font-semibold text-xs">LH</div>
+<span class="font-semibold text-on-surface">Lê Hoàng</span>
+</div>
+</td>
+<td class="py-4 px-6 text-text-secondary">hoang.le@teestudio.vn</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center px-2 py-1 rounded-md bg-secondary-fixed/50 text-secondary text-xs font-semibold">Kho</span>
+</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#dcfce7] text-success text-xs font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                                            </span>
+</td>
+<td class="py-4 px-6 text-text-secondary text-sm">15/10/2023</td>
+<td class="py-4 px-6 text-center">
+<button class="text-text-muted hover:text-primary-container transition-colors p-1" title="Chỉnh sửa">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-alt/50 transition-colors">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-tertiary-fixed flex items-center justify-center text-tertiary font-semibold text-xs">MA</div>
+<span class="font-semibold text-on-surface">Mai Anh</span>
+</div>
+</td>
+<td class="py-4 px-6 text-text-secondary">anh.mai@teestudio.vn</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center px-2 py-1 rounded-md bg-tertiary-fixed/50 text-tertiary text-xs font-semibold">Sản xuất</span>
+</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#dcfce7] text-success text-xs font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-success"></span> Active
+                                            </span>
+</td>
+<td class="py-4 px-6 text-text-secondary text-sm">20/10/2023</td>
+<td class="py-4 px-6 text-center">
+<button class="text-text-muted hover:text-primary-container transition-colors p-1" title="Chỉnh sửa">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-alt/50 transition-colors">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-text-secondary font-semibold text-xs">TD</div>
+<span class="font-semibold text-on-surface text-text-secondary">Trần Dũng</span>
+</div>
+</td>
+<td class="py-4 px-6 text-text-muted">dung.tran@teestudio.vn</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center px-2 py-1 rounded-md bg-surface-container-high text-text-secondary text-xs font-semibold">Kế toán</span>
+</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-high text-text-secondary text-xs font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-text-muted"></span> Inactive
+                                            </span>
+</td>
+<td class="py-4 px-6 text-text-muted text-sm">05/11/2023</td>
+<td class="py-4 px-6 text-center">
+<button class="text-text-muted hover:text-primary-container transition-colors p-1" title="Chỉnh sửa">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination / Footer (Optional for empty state filling) -->
+<div class="p-4 border-t border-border bg-surface flex items-center justify-between text-body-sm text-text-secondary">
+<span>Hiển thị 1 - 4 của 8 nhân viên</span>
+<div class="flex gap-1">
+<button class="w-8 h-8 rounded flex items-center justify-center hover:bg-surface-alt disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded bg-primary-fixed text-primary-container font-semibold flex items-center justify-center">1</button>
+<button class="w-8 h-8 rounded flex items-center justify-center hover:bg-surface-alt transition-colors">2</button>
+<button class="w-8 h-8 rounded flex items-center justify-center hover:bg-surface-alt transition-colors">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

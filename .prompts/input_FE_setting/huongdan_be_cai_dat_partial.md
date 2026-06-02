@@ -1,4 +1,4 @@
-﻿
+
 ---
 
 ## Module 16: Cài đặt Quản trị (`/admin/cai-dat`)
@@ -287,4 +287,3 @@ CREATE TABLE admin_users (
 5. **Màu avatar** cũng do Frontend tự quyết định theo `vaiTro` – Backend chỉ cần trả đúng giá trị ENUM.
 
 ---
-
