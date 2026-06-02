@@ -12,7 +12,6 @@ import {
   SkinOutlined,
   ShoppingCartOutlined,
   TagsOutlined,
-  ToolOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -29,8 +28,7 @@ const navItems: NavItem[] = [
   { label: "Tổng quan",  icon: <DashboardOutlined />,    href: "/admin" },
   { label: "Đơn hàng",  icon: <ShoppingCartOutlined />,  href: "/admin/don-hang" },
   { label: "Sản phẩm / Phôi áo", icon: <SkinOutlined />, href: "/admin/san-pham-phoi-ao" },
-  { label: "Thiết kế",  icon: <BgColorsOutlined />,      href: "/admin/thiet-ke" },
-  { label: "Sản xuất",  icon: <ToolOutlined />,          href: "/admin/san-xuat" },
+  { label: "Thiết kế & In ấn",  icon: <BgColorsOutlined />,      href: "/admin/thiet-ke" },
   { label: "Kho hàng",  icon: <InboxOutlined />,         href: "/admin/kho-hang" },
   { label: "Thanh toán",icon: <CreditCardOutlined />,    href: "/admin/thanh-toan" },
   { label: "Khuyến mãi & Báo giá", icon: <TagsOutlined />, href: "/admin/khuyen-mai-bao-gia" },

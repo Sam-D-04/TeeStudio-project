@@ -10,7 +10,7 @@ import type { OrderStatus } from "./OrderStatusBadge";
 
 // Danh sách các tab lọc trạng thái (pill)
 export type FilterTab = {
-  key: OrderStatus | "tat_ca"; // "tat_ca" = Tất cả
+  key: OrderStatus | "tat_ca" | "dang_xu_ly_in"; // "tat_ca" = Tất cả
   label: string;
 };
 
@@ -18,8 +18,7 @@ const FILTER_TABS: FilterTab[] = [
   { key: "tat_ca",        label: "Tất cả" },
   { key: "cho_xac_nhan",  label: "Chờ xác nhận" },
   { key: "da_xac_nhan",   label: "Đã xác nhận" },
-  { key: "dang_san_xuat", label: "Đang sản xuất" },
-  { key: "dang_in",       label: "Đang in" },
+  { key: "dang_xu_ly_in", label: "Đang xử lý in" },
   { key: "cho_giao",      label: "Chờ giao" },
   { key: "dang_giao",     label: "Đang giao" },
   { key: "hoan_tat",      label: "Hoàn tất" },

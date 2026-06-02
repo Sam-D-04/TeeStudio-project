@@ -42,7 +42,7 @@ const STAT_CARDS = [
     icon: <ShoppingCartOutlined />,
   },
   {
-    label: "Đang sản xuất",
+    label: "Đang xử lý in",
     value: 18,
     iconWrapperClassName: "bg-[#cce5ff] text-[#0284c7]",
     icon: <SyncOutlined spin />,
@@ -140,7 +140,7 @@ const MOCK_ORDER_DETAIL: OrderDetail = {
   printSizeCm: "20×28 cm",
   timeline: [
     {
-      description: "Đang sản xuất – Đã xuất thông số",
+      description: "Đang xử lý in – Đã xuất thông số",
       time: "14:30, 24/10/2023",
       actor: "Admin",
       isActive: true,
@@ -159,6 +159,14 @@ const MOCK_ORDER_DETAIL: OrderDetail = {
 };
 // ===== KẾT THÚC DỮ LIỆU MẪU =====
 
+function khopTrangThaiDonHang(order: Order, activeTab: string): boolean {
+  if (activeTab === "tat_ca") return true;
+  if (activeTab === "dang_xu_ly_in") {
+    return order.status === "dang_san_xuat" || order.status === "dang_in";
+  }
+  return order.status === activeTab;
+}
+
 export default function OrdersPage() {
   // State lưu đơn hàng đang được xem chi tiết (null = không mở ngăn kéo)
   const [selectedOrder, setSelectedOrder] = useState<OrderDetail | null>(null);
@@ -173,6 +181,9 @@ export default function OrdersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
   const TOTAL_ITEMS = 128; // Sẽ thay bằng giá trị thực từ API
+  const ordersDaLoc = MOCK_ORDERS.filter((order) =>
+    khopTrangThaiDonHang(order, activeTab),
+  );
 
   // Hàm xử lý khi bấm vào hàng đơn hàng → mở ngăn kéo
   // Trong thực tế sẽ gọi API /api/admin/orders/:id để lấy chi tiết
@@ -255,7 +266,7 @@ export default function OrdersPage() {
 
         {/* Bảng dữ liệu đơn hàng */}
         <OrderTable
-          orders={MOCK_ORDERS}
+          orders={ordersDaLoc}
           onRowClick={handleRowClick}
         />
 

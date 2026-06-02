@@ -38,7 +38,7 @@ const metrics = [
     iconClassName: "text-warning",
   },
   {
-    label: "Đang sản xuất",
+    label: "Đang xử lý in",
     value: "17",
     icon: <ToolOutlined />,
     iconClassName: "text-accent",

@@ -22,7 +22,7 @@ import type { Order } from "./OrderTable";
 
 // Một bước trong dòng thời gian (timeline) xử lý đơn
 type TimelineStep = {
-  description: string; // Mô tả bước: "Đang sản xuất – Đã xuất thông số"
+  description: string; // Mô tả bước: "Đang xử lý in – Đã xuất thông số"
   time: string;        // Thời gian: "14:30, 24/10/2023"
   actor: string;       // Người thực hiện: "Admin", "Hệ thống", "Khách hàng"
   isActive?: boolean;  // Bước hiện tại (highlight)

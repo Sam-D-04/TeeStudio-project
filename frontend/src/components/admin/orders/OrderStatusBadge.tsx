@@ -9,8 +9,8 @@
 export type OrderStatus =
   | "cho_xac_nhan"   // Chờ xác nhận
   | "da_xac_nhan"    // Đã xác nhận
-  | "dang_san_xuat"  // Đang sản xuất
-  | "dang_in"        // Đang in
+  | "dang_san_xuat"  // Đang xử lý in
+  | "dang_in"        // Đang xử lý in
   | "cho_giao"       // Chờ giao hàng
   | "dang_giao"      // Đang giao hàng
   | "hoan_tat"       // Hoàn tất
@@ -33,14 +33,14 @@ const statusConfig: Record<OrderStatus, { label: string; className: string }> = 
     className: "bg-[#cce5ff] text-[#004b73]",
   },
   dang_san_xuat: {
-    label: "Đang sản xuất",
+    label: "Đang xử lý in",
     // Nền xanh sky nhạt, chữ xanh sky đậm
     className: "bg-[#e0f2fe] text-[#0284c7]",
   },
   dang_in: {
-    label: "Đang in",
-    // Nền tím nhạt, chữ tím
-    className: "bg-[#ede9fe] text-[#6366f1]",
+    label: "Đang xử lý in",
+    // Gộp cùng cách hiển thị với trạng thái đang sản xuất cũ
+    className: "bg-[#e0f2fe] text-[#0284c7]",
   },
   cho_giao: {
     label: "Chờ giao hàng",

@@ -8,7 +8,7 @@
  *  - Giá trị giảm
  *  - Đơn hàng tối thiểu
  *  - Thời gian áp dụng
- *  - Thanh tiến độ lượt dùng
+ *  - Số lượt dùng
  *  - Badge trạng thái
  *  - Nút thao tác: xem, sửa, xóa
  */
@@ -52,10 +52,7 @@ type PromotionTableProps = {
 };
 
 // Hàm chuyển đổi loại giảm từ giá trị DB sang tiếng Việt hiển thị
-function hienThiLoaiGiam(
-  loaiGiam: MaKhuyenMai["loaiGiam"],
-  giaTriGiam: number,
-): string {
+function hienThiLoaiGiam(loaiGiam: MaKhuyenMai["loaiGiam"]): string {
   switch (loaiGiam) {
     case "phan_tram":
       return "Phần trăm";
@@ -159,8 +156,7 @@ export default function PromotionTable({
                   textTransform: "uppercase",
                   letterSpacing: "0.05em",
                   whiteSpace: "nowrap",
-                  // Cột "Lượt dùng" cần rộng hơn để chứa thanh progress
-                  minWidth: idx === 5 ? 160 : undefined,
+                  minWidth: idx === 5 ? 100 : undefined,
                 }}
               >
                 {tieuDe}
@@ -240,7 +236,7 @@ export default function PromotionTable({
                       color: "#475569",
                     }}
                   >
-                    {hienThiLoaiGiam(ma.loaiGiam, ma.giaTriGiam)}
+                    {hienThiLoaiGiam(ma.loaiGiam)}
                   </td>
 
                   {/* Giá trị giảm */}
@@ -266,7 +262,7 @@ export default function PromotionTable({
                     {hienThiThoiGian(ma.ngayBatDau, ma.ngayKetThuc)}
                   </td>
 
-                  {/* Thanh tiến độ lượt dùng */}
+                  {/* Số lượt dùng */}
                   <td style={{ padding: "12px 16px" }}>
                     <PromotionUsageBar
                       daSDung={ma.daSDung}
