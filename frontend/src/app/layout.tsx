@@ -52,7 +52,11 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="vi" className={`${inter.variable} h-full antialiased`}>
+    <html
+      lang="vi"
+      data-scroll-behavior="smooth"
+      className={`${inter.variable} h-full antialiased`}
+    >
       <body suppressHydrationWarning={true} className="min-h-full flex flex-col bg-[#f1f5f9]">
         <AntdRegistry>
           <ConfigProvider theme={antdTheme} locale={viVN}>
