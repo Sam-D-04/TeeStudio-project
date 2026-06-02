@@ -1178,3 +1178,352 @@ const STAT_DATA = statsData?.data ?? { tongPhoi: 0, dangHienThi: 0, tongBienThe:
 const alerts = alertData?.data?.alerts ?? [];
 ```
 
+
+---
+
+## Phần 15 – Phân hệ Quản lý Thanh toán (`/admin/thanh-toan`)
+
+> Được viết bởi nhóm Frontend. Nhóm Backend đọc phần này để biết cần xây dựng API nào, trả về cấu trúc JSON nào cho trang Thanh toán.
+
+### 15.1. Tổng quan giao diện
+
+Trang quản lý thanh toán gồm 4 khu vực chính:
+
+1. **Tiêu đề + nút hành động** – "Đối soát thanh toán", "Xuất báo cáo", "Kiểm tra VNPAY".
+2. **4 thẻ KPI thống kê** – tổng tiền hôm nay, giao dịch chờ, giao dịch thất bại, cần đối soát.
+3. **Bảng giao dịch** – có filter bar + phân trang. Bấm vào hàng → mở ngăn kéo chi tiết.
+4. **Panel "Giao dịch cần xử lý"** – hiển thị 2 loại cảnh báo: chưa nhận IPN, sai lệch số tiền.
+
+---
+
+### 15.2. Cấu trúc file Frontend đã tạo
+
+```
+frontend/src/
+├── app/admin/thanh-toan/
+│   └── page.tsx                        ← Server Component, chứa metadata SEO
+└── components/admin/payment/
+    ├── PaymentClient.tsx               ← Client boundary (cầu nối Server ↔ Client)
+    ├── PaymentPage.tsx                 ← Orchestrator chính, chứa toàn bộ mock data
+    ├── PaymentStatCard.tsx             ← Thẻ KPI thống kê (4 thẻ đầu trang)
+    ├── PaymentFilterBar.tsx            ← Thanh lọc: search + select + pill tabs
+    ├── PaymentTable.tsx                ← Bảng danh sách giao dịch
+    ├── PaymentStatusBadge.tsx          ← Nhãn màu trạng thái giao dịch
+    ├── PaymentPagination.tsx           ← Phân trang cuối bảng
+    └── PaymentDetailDrawer.tsx         ← Ngăn kéo chi tiết (slide từ phải)
+```
+
+---
+
+### 15.3. Kiểu dữ liệu `Payment` (TypeScript – FE đã định nghĩa)
+
+```typescript
+// File: PaymentTable.tsx
+type Payment = {
+  id: number;
+  payCode: string;         // Mã GD nội bộ, ví dụ "PAY-000128"
+  orderCode: string;       // Mã đơn hàng liên kết, ví dụ "ORD-20260602-001"
+  customerName: string;    // Tên khách hàng
+  amountVnd: number;       // Số tiền (đơn vị VNĐ, kiểu số nguyên)
+  method: "VNPAY" | "COD"; // Phương thức thanh toán
+  status: PaymentStatus;   // Xem bảng trạng thái bên dưới
+  gatewayCode: string;     // Mã từ cổng VNPAY, ví dụ "VNPAY-842193"
+};
+
+// File: PaymentDetailDrawer.tsx – dữ liệu mở rộng cho ngăn kéo chi tiết
+type PaymentDetail = Payment & {
+  customerPhone?: string;
+  createdAt: string;       // "02/06/2026 14:30"
+  paidAt?: string;         // "02/06/2026 14:31" (undefined nếu chưa thanh toán)
+  ipnHistory: {
+    description: string;   // "Nhận IPN thành công"
+    time: string;          // "02/06/2026 14:31:05"
+    note?: string;         // "Payload matched"
+    isSuccess: boolean;    // true → chấm xanh | false → chấm xám
+  }[];
+};
+```
+
+---
+
+### 15.4. Bảng trạng thái giao dịch (`PaymentStatus`)
+
+| Giá trị enum (BE lưu DB) | Hiển thị (FE) | Màu badge |
+|---|---|---|
+| `da_thanh_toan` | Đã thanh toán | Nền xanh lá nhạt `#dcfce7`, chữ `#059669` |
+| `cho_thanh_toan` | Chờ thanh toán | Nền vàng nhạt `#fef3c7`, chữ `#d97706` |
+| `that_bai` | Thất bại | Nền đỏ nhạt `#fee2e2`, viền `#fca5a5`, chữ `#b91c1c` |
+| `hoan_tien` | Hoàn tiền | Nền xám `#f1f5f9`, viền `#e2e8f0`, chữ `#475569` |
+| `can_doi_soat` | Cần đối soát | Nền vàng đậm `#fef9c3`, viền `#fde047`, chữ `#854d0e` |
+
+> **Lưu ý Backend:** Lưu ENUM vào DB, trả về đúng các giá trị trên. FE sẽ map tự động theo bảng này.
+
+---
+
+### 15.5. API cần xây dựng
+
+#### 15.5.1. `GET /api/admin/payments` – Danh sách giao dịch
+
+**Query parameters (lọc + phân trang):**
+
+| Tham số | Kiểu | Ví dụ | Mô tả |
+|---|---|---|---|
+| `page` | number | `1` | Trang hiện tại (bắt đầu từ 1) |
+| `limit` | number | `10` | Số bản ghi mỗi trang |
+| `search` | string | `PAY-000128` | Tìm theo mã GD hoặc mã đơn hàng |
+| `status` | string | `da_thanh_toan` | Lọc theo trạng thái (xem bảng 15.4) |
+| `method` | string | `vnpay` | Lọc theo phương thức: `vnpay` / `cod` |
+| `dateFrom` | string | `2026-06-01` | Lọc từ ngày (ISO 8601) |
+| `dateTo` | string | `2026-06-02` | Lọc đến ngày (ISO 8601) |
+
+**Response JSON mong đợi:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "payCode": "PAY-000128",
+        "orderCode": "ORD-20260602-001",
+        "customerName": "Nguyễn Minh Anh",
+        "amountVnd": 850000,
+        "method": "VNPAY",
+        "status": "da_thanh_toan",
+        "gatewayCode": "VNPAY-842193"
+      }
+    ],
+    "pagination": {
+      "currentPage": 1,
+      "totalPages": 13,
+      "totalItems": 128,
+      "itemsPerPage": 10
+    }
+  }
+}
+```
+
+---
+
+#### 15.5.2. `GET /api/admin/payments/:id` – Chi tiết giao dịch (dùng cho ngăn kéo)
+
+**Response JSON mong đợi:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "payCode": "PAY-000128",
+    "orderCode": "ORD-20260602-001",
+    "customerName": "Nguyễn Minh Anh",
+    "customerPhone": "0987654321",
+    "amountVnd": 850000,
+    "method": "VNPAY",
+    "status": "da_thanh_toan",
+    "gatewayCode": "VNPAY-842193",
+    "createdAt": "02/06/2026 14:30",
+    "paidAt": "02/06/2026 14:31",
+    "ipnHistory": [
+      {
+        "description": "Nhận IPN thành công",
+        "time": "02/06/2026 14:31:05",
+        "note": "Payload matched",
+        "isSuccess": true
+      },
+      {
+        "description": "Khởi tạo giao dịch",
+        "time": "02/06/2026 14:30:12",
+        "note": "Chờ thanh toán",
+        "isSuccess": false
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### 15.5.3. `GET /api/admin/payments/stats` – Thống kê KPI 4 thẻ đầu trang
+
+**Response JSON mong đợi:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "totalPaidToday": 12450000,
+    "totalPaidGrowthPercent": 8,
+    "pendingPaymentCount": 18,
+    "failedCount": 5,
+    "needReconcileCount": 7
+  }
+}
+```
+
+---
+
+#### 15.5.4. `GET /api/admin/payments/issues` – Panel "Giao dịch cần xử lý"
+
+**Response JSON mong đợi:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "ipnNotReceived": {
+      "count": 2,
+      "paymentIds": [101, 102]
+    },
+    "amountMismatch": {
+      "count": 1,
+      "paymentIds": [98],
+      "details": "Đơn ORD-20260601-008 thực tế thanh toán khác với giá trị đơn hàng."
+    }
+  }
+}
+```
+
+---
+
+#### 15.5.5. `POST /api/admin/payments/:id/sync-vnpay` – Đồng bộ lại với VNPAY
+
+Gọi khi admin bấm "Đồng bộ VNPAY" trong ngăn kéo chi tiết.
+
+**Response:**
+
+```json
+{ "success": true, "message": "Đồng bộ thành công" }
+```
+
+---
+
+#### 15.5.6. `POST /api/admin/payments/:id/refund` – Hoàn tiền
+
+Gọi khi admin bấm "Hoàn tiền" trong ngăn kéo chi tiết.
+
+**Request body:**
+```json
+{ "reason": "Khách hàng yêu cầu hoàn" }
+```
+
+**Response:**
+```json
+{ "success": true, "message": "Yêu cầu hoàn tiền đã được gửi tới VNPAY" }
+```
+
+---
+
+#### 15.5.7. `PATCH /api/admin/payments/:id/note` – Cập nhật ghi chú kế toán
+
+Gọi khi admin bấm "Lưu ghi chú" trong ngăn kéo chi tiết.
+
+**Request body:**
+```json
+{ "note": "Đã đối soát và xác nhận đúng" }
+```
+
+**Response:**
+```json
+{ "success": true }
+```
+
+---
+
+#### 15.5.8. `GET /api/admin/payments/export` – Xuất báo cáo Excel/CSV
+
+Gọi khi admin bấm nút "Xuất báo cáo".
+
+- Nhận cùng query params với API danh sách (để xuất theo bộ lọc hiện tại).
+- Trả về file binary (`Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`).
+
+---
+
+### 15.6. Cách FE kết nối API sau khi BE xong
+
+**Bước 1:** Tạo file `frontend/src/services/paymentsApi.ts`:
+
+```typescript
+import axios from "axios";
+
+const BASE = "/api/admin/payments";
+
+// Lấy danh sách giao dịch (dùng cho bảng + phân trang)
+export const getPayments = (params: object) => axios.get(BASE, { params });
+
+// Lấy chi tiết một giao dịch (dùng cho ngăn kéo)
+export const getPaymentById = (id: number) => axios.get(`${BASE}/${id}`);
+
+// Lấy thống kê KPI
+export const getPaymentStats = () => axios.get(`${BASE}/stats`);
+
+// Lấy danh sách vấn đề cần xử lý
+export const getPaymentIssues = () => axios.get(`${BASE}/issues`);
+
+// Đồng bộ VNPAY
+export const syncVnpay = (id: number) => axios.post(`${BASE}/${id}/sync-vnpay`);
+
+// Hoàn tiền
+export const refundPayment = (id: number, reason: string) =>
+  axios.post(`${BASE}/${id}/refund`, { reason });
+
+// Lưu ghi chú
+export const updateNote = (id: number, note: string) =>
+  axios.patch(`${BASE}/${id}/note`, { note });
+```
+
+**Bước 2:** Trong `PaymentPage.tsx`, thay dữ liệu mock bằng API call:
+
+```typescript
+// Thay MOCK_PAYMENTS bằng:
+const payments = apiResponse?.data?.items ?? [];
+const TOTAL_ITEMS = apiResponse?.data?.pagination?.totalItems ?? 0;
+
+// Thay handleRowClick để gọi API chi tiết:
+async function handleRowClick(payment: Payment) {
+  const res = await getPaymentById(payment.id);
+  setSelectedPayment(res.data.data);
+}
+```
+
+---
+
+### 15.7. Liên kết Database
+
+Bảng chính liên quan trong MySQL:
+
+```sql
+-- Bảng giao dịch thanh toán
+payments:
+  id            INT AUTO_INCREMENT PRIMARY KEY
+  pay_code      VARCHAR(20) UNIQUE NOT NULL     -- "PAY-000128"
+  order_id      INT NOT NULL                    -- FK → orders.id
+  amount_vnd    INT NOT NULL                    -- Số tiền VNĐ (không dùng DECIMAL để tránh float)
+  method        ENUM('VNPAY', 'COD') NOT NULL
+  status        ENUM('da_thanh_toan','cho_thanh_toan','that_bai','hoan_tien','can_doi_soat')
+  gateway_code  VARCHAR(100)                    -- Mã từ VNPAY trả về
+  accounting_note TEXT                          -- Ghi chú của kế toán
+  created_at    DATETIME DEFAULT NOW()
+  paid_at       DATETIME NULL                   -- Null nếu chưa thanh toán
+  updated_at    DATETIME ON UPDATE NOW()
+
+-- Bảng lịch sử IPN
+payment_ipn_logs:
+  id            INT AUTO_INCREMENT PRIMARY KEY
+  payment_id    INT NOT NULL                    -- FK → payments.id
+  description   VARCHAR(255)                   -- "Nhận IPN thành công"
+  note          VARCHAR(500)                   -- "Payload matched"
+  is_success    TINYINT(1) DEFAULT 0
+  logged_at     DATETIME DEFAULT NOW()
+```
+
+---
+
+### 15.8. Lưu ý tích hợp VNPAY
+
+- **IPN URL:** Backend phải expose endpoint `POST /api/payment/vnpay-ipn` (public, không cần auth) để VNPAY gọi webhook.
+- **Kiểm tra chữ ký:** Mỗi IPN request từ VNPAY đều có `vnp_SecureHash`. BE phải xác thực chữ ký trước khi cập nhật trạng thái.
+- **Đồng bộ thủ công:** API `/sync-vnpay` gọi sang VNPAY Query API để lấy trạng thái giao dịch mới nhất.
+- **Đối soát:** API `/export` nên join với bảng `orders` để xuất đủ thông tin (mã đơn, tên khách, ngày).
+
