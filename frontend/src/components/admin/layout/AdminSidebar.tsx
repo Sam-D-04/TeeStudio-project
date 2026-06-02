@@ -7,8 +7,11 @@ import {
   CreditCardOutlined,
   DashboardOutlined,
   InboxOutlined,
+  MenuOutlined,
   SettingOutlined,
+  SkinOutlined,
   ShoppingCartOutlined,
+  TagsOutlined,
   ToolOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
@@ -25,19 +28,25 @@ type NavItem = {
 const navItems: NavItem[] = [
   { label: "Tổng quan",  icon: <DashboardOutlined />,    href: "/admin" },
   { label: "Đơn hàng",  icon: <ShoppingCartOutlined />,  href: "/admin/don-hang" },
+  { label: "Sản phẩm / Phôi áo", icon: <SkinOutlined />, href: "/admin/san-pham-phoi-ao" },
   { label: "Thiết kế",  icon: <BgColorsOutlined />,      href: "/admin/thiet-ke" },
   { label: "Sản xuất",  icon: <ToolOutlined />,          href: "/admin/san-xuat" },
   { label: "Kho hàng",  icon: <InboxOutlined />,         href: "/admin/kho-hang" },
   { label: "Thanh toán",icon: <CreditCardOutlined />,    href: "/admin/thanh-toan" },
+  { label: "Khuyến mãi & Báo giá", icon: <TagsOutlined />, href: "/admin/khuyen-mai-bao-gia" },
   { label: "Cài đặt",   icon: <SettingOutlined />,       href: "/admin/cai-dat" },
 ];
 
 function SidebarContent({
+  collapsed = false,
   showCloseButton = false,
   onClose,
+  onToggleCollapse,
 }: {
+  collapsed?: boolean;
   showCloseButton?: boolean;
   onClose?: () => void;
+  onToggleCollapse?: () => void;
 }) {
   // usePathname trả về đường dẫn hiện tại (ví dụ: "/admin/don-hang")
   // Dùng để xác định mục menu nào đang được chọn (active)
@@ -46,17 +55,37 @@ function SidebarContent({
   return (
     <>
       {/* Logo + tên hệ thống */}
-      <div className="mb-8 flex items-center gap-3 px-base">
-        <div className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-primary text-on-primary">
-          <AppstoreOutlined className="text-[22px]" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-[20px] font-black leading-tight text-primary">
-            TeeStudio
-          </h1>
-          <p className="text-body-sm text-text-secondary">Quản trị sản xuất</p>
-        </div>
-        {showCloseButton ? (
+      <div
+        className={`mb-8 flex items-center ${
+          collapsed ? "justify-center px-2" : "gap-3 px-base"
+        }`}
+      >
+        {collapsed ? null : (
+          <>
+            <div className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-primary text-on-primary">
+              <AppstoreOutlined className="text-[22px]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-[20px] font-black leading-tight text-primary">
+                TeeStudio
+              </h1>
+              <p className="text-body-sm text-text-secondary">Quản trị sản xuất</p>
+            </div>
+          </>
+        )}
+        {onToggleCollapse ? (
+          <button
+            type="button"
+            aria-label={
+              collapsed ? "Mở rộng menu quản trị" : "Thu gọn menu quản trị"
+            }
+            aria-expanded={!collapsed}
+            onClick={onToggleCollapse}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] text-text-secondary transition-colors hover:bg-surface-alt hover:text-primary"
+          >
+            <MenuOutlined className="text-[20px]" />
+          </button>
+        ) : showCloseButton ? (
           <button
             type="button"
             aria-label="Đóng menu quản trị"
@@ -89,10 +118,16 @@ function SidebarContent({
                 <Link
                   href={item.href}
                   onClick={onClose} // Đóng menu mobile khi chọn mục
-                  className={`mx-2 flex items-center gap-3 rounded-[8px] px-4 py-2 text-sidebar-item font-semibold transition-colors ${itemClass}`}
+                  aria-label={item.label}
+                  title={collapsed ? item.label : undefined}
+                  className={`mx-2 flex h-11 items-center rounded-[8px] py-2 text-sidebar-item font-semibold transition-colors ${
+                    collapsed ? "justify-center px-0" : "min-w-0 gap-3 px-4"
+                  } ${itemClass}`}
                 >
-                  <span className="flex text-[22px] leading-none">{item.icon}</span>
-                  <span>{item.label}</span>
+                  <span className="flex shrink-0 text-[22px] leading-none">{item.icon}</span>
+                  <span className={collapsed ? "sr-only" : "truncate"}>
+                    {item.label}
+                  </span>
                 </Link>
               </li>
             );
@@ -104,18 +139,26 @@ function SidebarContent({
 }
 
 export default function AdminSidebar({
+  collapsed,
   mobileOpen,
   onClose,
+  onToggleCollapse,
 }: {
+  collapsed: boolean;
   mobileOpen: boolean;
   onClose: () => void;
+  onToggleCollapse: () => void;
 }) {
   return (
     <>
       <aside
         className="admin-sidebar-desktop"
+        data-collapsed={collapsed}
       >
-        <SidebarContent />
+        <SidebarContent
+          collapsed={collapsed}
+          onToggleCollapse={onToggleCollapse}
+        />
       </aside>
 
       {mobileOpen ? (
