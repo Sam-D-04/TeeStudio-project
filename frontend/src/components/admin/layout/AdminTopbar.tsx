@@ -15,7 +15,6 @@ import type { MenuProps } from "antd";
 import AdminSearchInput from "../common/AdminSearchInput";
 
 type AdminTopbarProps = {
-  isDesktop: boolean;
   onMenuClick: () => void;
 };
 
@@ -42,26 +41,10 @@ const quickCreateItems: MenuProps["items"] = [
   },
 ];
 
-export default function AdminTopbar({ isDesktop, onMenuClick }: AdminTopbarProps) {
+export default function AdminTopbar({ onMenuClick }: AdminTopbarProps) {
   return (
     <header
       className="admin-topbar"
-      style={{
-        position: "fixed",
-        top: 0,
-        right: 0,
-        left: isDesktop ? 260 : 0,
-        zIndex: 40,
-        display: "flex",
-        height: 64,
-        alignItems: "center",
-        justifyContent: "space-between",
-        borderBottom: "1px solid #e2e8f0",
-        background: "#ffffff",
-        paddingLeft: 16,
-        paddingRight: 16,
-        boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-      }}
     >
       <div className="flex flex-1 items-center gap-4">
         <button

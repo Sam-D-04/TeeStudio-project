@@ -74,7 +74,7 @@ export default function InventoryDetailDrawer({
     <Drawer
       open={isOpen}
       onClose={onClose}
-      width={420}
+      size={420}
       closable={false}        // Tắt nút X mặc định của Ant Design
       title={null}            // Tắt thanh tiêu đề mặc định
       styles={{

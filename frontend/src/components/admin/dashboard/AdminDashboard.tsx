@@ -8,9 +8,6 @@ import {
   ShoppingOutlined,
   ToolOutlined,
 } from "@ant-design/icons";
-import { useEffect, useState } from "react";
-import AdminSidebar from "../layout/AdminSidebar";
-import AdminTopbar from "../layout/AdminTopbar";
 import BestSellingProductsCard, {
   type BestSellingProduct,
 } from "./components/BestSellingProductsCard";
@@ -131,111 +128,50 @@ const bestSellingProducts: BestSellingProduct[] = [
 ];
 
 export default function AdminDashboard() {
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(false);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(min-width: 768px)");
-
-    const updateScreenSize = () => {
-      setIsDesktop(mediaQuery.matches);
-    };
-
-    updateScreenSize();
-    mediaQuery.addEventListener("change", updateScreenSize);
-
-    return () => {
-      mediaQuery.removeEventListener("change", updateScreenSize);
-    };
-  }, []);
-
   return (
-    <div
-      className="admin-dashboard-shell"
-      style={{
-        minHeight: "100vh",
-        background: "#f6fafe",
-        color: "#0f172a",
-        fontFamily: "var(--font-inter), Arial, sans-serif",
-        fontSize: 14,
-        lineHeight: "20px",
-      }}
-    >
-      <AdminSidebar
-        isDesktop={isDesktop}
-        mobileOpen={mobileSidebarOpen}
-        onClose={() => setMobileSidebarOpen(false)}
-      />
-      <AdminTopbar
-        isDesktop={isDesktop}
-        onMenuClick={() => setMobileSidebarOpen(true)}
-      />
+    <>
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-headline-lg-mobile font-extrabold leading-8 text-text-main md:text-headline-lg">
+            Tổng quan vận hành
+          </h2>
+          <p className="mt-1 max-w-2xl text-text-secondary">
+            Theo dõi số liệu doanh thu, đơn hàng, thiết kế, sản xuất và tồn kho theo thời gian.
+          </p>
+        </div>
+      </section>
 
-      <div
-        className="admin-content-area"
-        style={{
-          width: "100%",
-          minHeight: "100vh",
-          paddingLeft: isDesktop ? 260 : 0,
-        }}
-      >
-        <main
-          className="admin-main"
-          style={{
-            width: "100%",
-            maxWidth: 1600,
-            marginLeft: "auto",
-            marginRight: "auto",
-            paddingTop: 88,
-            paddingRight: isDesktop ? 24 : 16,
-            paddingBottom: 48,
-            paddingLeft: isDesktop ? 24 : 16,
-          }}
-        >
-          <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2 className="text-headline-lg-mobile font-extrabold leading-8 text-text-main md:text-headline-lg">
-                Tổng quan vận hành
-              </h2>
-              <p className="mt-1 max-w-2xl text-text-secondary">
-                Theo dõi số liệu doanh thu, đơn hàng, thiết kế, sản xuất và tồn kho theo thời gian.
-              </p>
-            </div>
-          </section>
+      <DashboardFilterToolbar />
 
-          <DashboardFilterToolbar />
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {metrics.map((metric) => (
+          <MetricCard
+            key={metric.label}
+            label={metric.label}
+            value={metric.value}
+            icon={metric.icon}
+            iconClassName={metric.iconClassName}
+            valueClassName={metric.valueClassName}
+          />
+        ))}
+      </section>
 
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            {metrics.map((metric) => (
-              <MetricCard
-                key={metric.label}
-                label={metric.label}
-                value={metric.value}
-                icon={metric.icon}
-                iconClassName={metric.iconClassName}
-                valueClassName={metric.valueClassName}
-              />
-            ))}
-          </section>
+      <RevenueOverviewChart />
 
-          <RevenueOverviewChart />
+      <section className="admin-card overflow-hidden">
+        <div className="flex flex-col gap-4 border-b border-border p-6 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-card-title font-bold text-text-main">
+            Thiết kế cần xử lý
+          </h3>
+          <SegmentedTabs tabs={reviewTabs} activeKey="all" />
+        </div>
+        <DesignReviewTable orders={designOrders} />
+      </section>
 
-          <section className="admin-card overflow-hidden">
-            <div className="flex flex-col gap-4 border-b border-border p-6 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-card-title font-bold text-text-main">
-                Thiết kế cần xử lý
-              </h3>
-              <SegmentedTabs tabs={reviewTabs} activeKey="all" />
-            </div>
-            <DesignReviewTable orders={designOrders} />
-          </section>
-
-          <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <InventoryWarningCard items={inventoryItems} />
-            <BestSellingProductsCard products={bestSellingProducts} />
-          </section>
-        </main>
-      </div>
-    </div>
+      <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <InventoryWarningCard items={inventoryItems} />
+        <BestSellingProductsCard products={bestSellingProducts} />
+      </section>
+    </>
   );
 }

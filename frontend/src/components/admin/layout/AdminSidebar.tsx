@@ -11,6 +11,7 @@ import {
   ShoppingCartOutlined,
   ToolOutlined,
 } from "@ant-design/icons";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -85,14 +86,14 @@ function SidebarContent({
 
             return (
               <li key={item.href}>
-                <a
+                <Link
                   href={item.href}
                   onClick={onClose} // Đóng menu mobile khi chọn mục
                   className={`mx-2 flex items-center gap-3 rounded-[8px] px-4 py-2 text-sidebar-item font-semibold transition-colors ${itemClass}`}
                 >
                   <span className="flex text-[22px] leading-none">{item.icon}</span>
                   <span>{item.label}</span>
-                </a>
+                </Link>
               </li>
             );
           })}
@@ -103,11 +104,9 @@ function SidebarContent({
 }
 
 export default function AdminSidebar({
-  isDesktop,
   mobileOpen,
   onClose,
 }: {
-  isDesktop: boolean;
   mobileOpen: boolean;
   onClose: () => void;
 }) {
@@ -115,20 +114,6 @@ export default function AdminSidebar({
     <>
       <aside
         className="admin-sidebar-desktop"
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          zIndex: 30,
-          display: isDesktop ? "flex" : "none",
-          width: 260,
-          height: "100vh",
-          flexDirection: "column",
-          borderRight: "1px solid #e2e8f0",
-          background: "#ffffff",
-          paddingTop: 24,
-          paddingBottom: 24,
-        }}
       >
         <SidebarContent />
       </aside>

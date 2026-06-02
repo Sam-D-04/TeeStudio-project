@@ -10,8 +10,8 @@ import InventoryClient from "@/components/admin/inventory/InventoryClient";
  * - Khai báo metadata (title, description) cho SEO.
  * - Giảm lượng JavaScript gửi về client.
  *
- * Toàn bộ layout (Sidebar + Topbar + nội dung) nằm trong InventoryClient,
- * giống với cấu trúc của trang Đơn hàng (OrdersClient).
+ * Layout admin dùng chung nằm ở app/admin/layout.tsx.
+ * Nội dung và logic tương tác của trang nằm trong InventoryClient/InventoryPage.
  */
 
 // Metadata SEO cho trang quản lý kho hàng
@@ -22,6 +22,5 @@ export const metadata: Metadata = {
 };
 
 export default function KhoHangPage() {
-  // InventoryClient đã bao gồm Sidebar + Topbar + InventoryPage bên trong
   return <InventoryClient />;
 }

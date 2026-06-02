@@ -259,8 +259,8 @@ export default function InventoryPage() {
   const nhapThang = 860; // Dữ liệu tháng này – sẽ lấy từ API
 
   return (
-    // Vùng nội dung chính: padding đều 24px, nền xám nhạt
-    <div className="space-y-6 p-6">
+    // Vùng nội dung chính: padding nằm ở AdminShell dùng chung.
+    <div className="space-y-6">
 
       {/* ===== TIÊU ĐỀ TRANG + NÚT HÀNH ĐỘNG ===== */}
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">

@@ -1,6 +1,8 @@
+"use client";
+
 import { CloseOutlined, DownloadOutlined } from "@ant-design/icons";
+import { Drawer } from "antd";
 import type { Order } from "./OrderTable";
-import OrderStatusBadge from "./OrderStatusBadge";
 
 /**
  * OrderDetailDrawer – ngăn kéo chi tiết đơn hàng.
@@ -60,16 +62,20 @@ export default function OrderDetailDrawer({ order, onClose }: OrderDetailDrawerP
   if (!order) return null;
 
   return (
-    <>
-      {/* ---- Lớp phủ mờ phía sau ngăn kéo ---- */}
-      {/* Bấm vào lớp phủ cũng đóng ngăn kéo */}
-      <div
-        className="fixed inset-0 z-50 bg-slate-900/20 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
+    <Drawer
+      open={Boolean(order)}
+      onClose={onClose}
+      size={600}
+      closable={false}
+      title={null}
+      styles={{
+        body: { padding: 0 },
+        wrapper: { boxShadow: "none" },
+      }}
+      style={{ borderLeft: "1px solid #e2e8f0" }}
+    >
       {/* ---- Ngăn kéo chính (trượt từ phải sang) ---- */}
-      <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-[600px] flex-col border-l border-border bg-surface shadow-2xl">
+      <div className="flex h-full flex-col bg-surface">
 
         {/* ======== Phần đầu ngăn kéo ======== */}
         <div className="flex items-center justify-between border-b border-border bg-surface-alt px-6 py-5">
@@ -327,6 +333,6 @@ export default function OrderDetailDrawer({ order, onClose }: OrderDetailDrawerP
           </button>
         </div>
       </div>
-    </>
+    </Drawer>
   );
 }

@@ -15,8 +15,8 @@ export const metadata: Metadata = {
  * Trang Quản lý đơn hàng.
  * Route: /admin/don-hang
  *
- * Đây là Server Component (không có "use client") nên chỉ chứa
- * metadata và render component con. Logic tương tác nằm trong OrdersClient.
+ * Layout admin dùng chung nằm ở app/admin/layout.tsx.
+ * Logic tương tác của trang nằm trong OrdersClient/OrdersPage.
  */
 export default function AdminOrdersPage() {
   return <OrdersClient />;
