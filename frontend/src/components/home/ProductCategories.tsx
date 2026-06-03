@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "antd";
+import { useRouter } from "next/navigation";
 
 /* ─────────────────────────────────────────
    SVG Vectors cho từng loại áo
@@ -146,6 +147,8 @@ const categories = [
 ];
 
 export default function ProductCategories() {
+  const router = useRouter();
+
   return (
     <section style={{ background: "#ffffff", paddingTop: 80 }}>
       <div className="container-main" style={{ padding: "40px 24px 56px" }}>
@@ -308,6 +311,7 @@ export default function ProductCategories() {
 
                     <Button
                       type="primary"
+                      onClick={() => router.push(`/design-studio?shirt=${cat.id}`)}
                       style={{
                         background:   cat.accentColor,
                         border:       "none",
