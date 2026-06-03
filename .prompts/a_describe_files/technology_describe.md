@@ -11,7 +11,7 @@ Dưới đây là bản Đặc tả Công nghệ & Tiêu chuẩn Đồng bộ (T
 •	Giao tiếp API: Axios kết hợp với React Query (@tanstack/react-query) để tự động quản lý bộ nhớ đệm (cache) phía client và xử lý trạng thái loading/error gọn gàng.
 2. Backend: Trái tim Xử lý Logic & Báo giá động
 •	Core Framework: Node.js chạy trên nền Express.js: Môi trường thực thi và framework mã nguồn mở được sử dụng để xây dựng các dịch vụ RESTful API. Phân hệ này chịu trách nhiệm kiểm soát luồng nghiệp vụ kinh doanh, bao gồm thuật toán tính toán báo giá động (Dynamic Pricing) và điều phối luồng dữ liệu giữa Client và Database.
-•	Giao tiếp Cơ sở dữ liệu (ORM): thống nhất sử dụng Prisma ORM. Prisma hiện tại rất mạnh trong việc tự động sinh ra Type an toàn và thao tác với dữ liệu JSON trong MySQL cực kỳ trực quan.
+•	Giao tiếp Cơ sở dữ liệu (ORM): thống nhất sử dụng mysql2. 
 •	Bảo mật & Phân quyền:
 o	Xác thực: Sử dụng JSON Web Token (JWT) để cấp quyền truy cập.
 o	Mã hóa: Dùng Bcrypt.js để băm (hash) mật khẩu người dùng trước khi lưu vào database.
