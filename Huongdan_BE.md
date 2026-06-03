@@ -712,3 +712,567 @@ CREATE TABLE pricing_formula (
 
 ---
 
+
+## Module 18: Thiết kế & In ấn (`/admin/thiet-ke`)
+
+> **Tổng quan:** Đây là module cốt lõi của hệ thống TeeStudio. Admin sử dụng trang này để xem xét, duyệt hoặc yêu cầu chỉnh sửa thiết kế mà khách hàng đã tạo trên Design Studio. Sau khi duyệt, admin sẽ gửi đơn đến xưởng in. Module cũng cho phép cấu hình sticker và vị trí in.
+
+---
+
+### 18.1. Tổng quan màn hình
+
+Trang gồm các khu vực chính:
+
+1. **Tiêu đề trang** – 3 nút hành động: "Thêm sticker", "Thêm vị trí in", "Xuất thông số in"
+2. **4 thẻ KPI** – Thống kê tổng quan tình trạng thiết kế và đơn in
+3. **Panel chính** – 3 tab điều hướng:
+   - **Tab 1:** Thiết kế khách hàng (bảng chính)
+   - **Tab 2:** Đơn cần in (bảng đơn đã duyệt chờ gửi xưởng)
+   - **Tab 3:** Tài nguyên thiết kế / Vị trí in (sticker + cấu hình vị trí)
+
+---
+
+### 18.2. Cấu trúc file Frontend
+
+```
+frontend/src/
+├── app/admin/thiet-ke/
+│   └── page.tsx                          ← Server Component, khai báo metadata SEO
+└── components/admin/designs/
+    ├── DesignClient.tsx                  ← Client wrapper ("use client")
+    ├── DesignPage.tsx                    ← Orchestrator chính (quản lý state & lắp ghép layout)
+    ├── DesignStatCard.tsx                ← Thẻ KPI thống kê (4 thẻ đầu trang)
+    ├── DesignStatusBadge.tsx             ← Badge trạng thái thiết kế
+    ├── DesignFilterBar.tsx               ← Thanh lọc bảng thiết kế
+    ├── DesignTable.tsx                   ← Bảng danh sách thiết kế khách hàng
+    ├── DesignPreview.tsx                 ← Ô thumbnail xem trước thiết kế
+    ├── PrintOrderTab.tsx                 ← Tab "Đơn cần in"
+    └── DesignResourceTab.tsx             ← Tab "Tài nguyên / Vị trí in"
+```
+
+---
+
+### 18.3. Các trạng thái thiết kế (DesignStatus)
+
+| Giá trị (Backend ENUM) | Hiển thị FE        | Màu nền badge | Màu chữ badge |
+|------------------------|--------------------|---------------|---------------|
+| `cho_kiem_tra`         | Chờ kiểm tra       | `#fef3c7`     | `#d97706`     |
+| `can_chinh_sua`        | Cần chỉnh sửa      | `#ffedd5`     | `#ea580c`     |
+| `da_duyet`             | Đã duyệt           | `#dcfce7`     | `#10b981`     |
+
+---
+
+### 18.4. API – Thẻ KPI thống kê (4 thẻ đầu trang)
+
+```
+GET /api/admin/designs/stats
+```
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Response mong đợi (HTTP 200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "soChoKiemTra": 9,
+    "soCanChinhSua": 5,
+    "soDonChoGuiXuong": 14,
+    "soDangIn": 12
+  }
+}
+```
+
+**Giải thích các trường KPI:**
+
+| Trường              | Mô tả                                                              |
+|---------------------|--------------------------------------------------------------------|
+| `soChoKiemTra`      | Số thiết kế có `trang_thai = 'cho_kiem_tra'`                      |
+| `soCanChinhSua`     | Số thiết kế có `trang_thai = 'can_chinh_sua'`                     |
+| `soDonChoGuiXuong`  | Số đơn cần in có `trang_thai = 'cho_gui_xuong'`                   |
+| `soDangIn`          | Số đơn cần in có `trang_thai = 'dang_in'`                         |
+
+---
+
+### 18.5. API – Tab "Thiết kế khách hàng"
+
+#### 18.5.1. Lấy danh sách thiết kế
+
+```
+GET /api/admin/designs
+```
+
+**Query Parameters (tùy chọn):**
+
+| Tham số       | Kiểu   | Mô tả                                                          |
+|---------------|--------|----------------------------------------------------------------|
+| `page`        | number | Trang hiện tại (mặc định: 1)                                   |
+| `limit`       | number | Số bản ghi mỗi trang (mặc định: 10)                            |
+| `tu_khoa`     | string | Tìm theo mã TK hoặc tên khách (LIKE %keyword%)                |
+| `trang_thai`  | string | Lọc: `cho_kiem_tra`, `can_chinh_sua`, `da_duyet`               |
+| `vi_tri_in`   | string | Lọc: `nguc_trai`, `nguc_phai`, `sau_lung`, `tay_trai`, `tay_phai` |
+
+**Response mong đợi (HTTP 200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "danhSach": [
+      {
+        "id": 1,
+        "maThietKe": "TK-2024",
+        "urlPreview": "https://res.cloudinary.com/teestudio/...",
+        "mauAo": "#000000",
+        "tenKhachHang": "Nguyễn Văn A",
+        "soDienThoai": "0901234567",
+        "tenSanPham": "Áo thun Basic",
+        "tenMauAo": "Đen",
+        "viTriIn": "Ngực trái",
+        "trangThai": "cho_kiem_tra",
+        "ngayGui": "03/06/2026"
+      }
+    ],
+    "tongSo": 42,
+    "trang": 1,
+    "soTrangMoiTrang": 10,
+    "tongSoTrang": 5
+  }
+}
+```
+
+**Giải thích các trường:**
+
+| Trường          | Kiểu          | Mô tả                                                               |
+|-----------------|---------------|---------------------------------------------------------------------|
+| `id`            | number        | Khóa chính – dùng để gọi API cập nhật trạng thái                  |
+| `maThietKe`     | string        | Mã thiết kế dạng "TK-XXXX" – hiển thị ở cột đầu bảng             |
+| `urlPreview`    | string\|null  | URL ảnh preview trên Cloudinary (null nếu chưa render)             |
+| `mauAo`         | string        | Mã màu HEX áo, ví dụ "#000000" – dùng để hiển thị chấm màu       |
+| `tenKhachHang`  | string        | Tên đầy đủ của khách đặt thiết kế                                  |
+| `soDienThoai`   | string\|null  | Số điện thoại khách (tùy chọn)                                     |
+| `tenSanPham`    | string        | Tên loại áo, ví dụ "Áo thun Basic"                                 |
+| `tenMauAo`      | string        | Tên màu tiếng Việt, ví dụ "Đen" – hiển thị bên cạnh chấm màu    |
+| `viTriIn`       | string        | Tên vị trí in tiếng Việt, ví dụ "Ngực trái"                       |
+| `trangThai`     | string (ENUM) | Trạng thái (xem bảng 18.3)                                         |
+| `ngayGui`       | string        | Ngày khách gửi thiết kế, format `DD/MM/YYYY`                       |
+
+---
+
+#### 18.5.2. Duyệt thiết kế
+
+```
+PATCH /api/admin/designs/:id/duyet
+```
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Request Body:**
+```json
+{
+  "trangThai": "da_duyet"
+}
+```
+
+**Response (HTTP 200):**
+```json
+{
+  "success": true,
+  "message": "Đã duyệt thiết kế thành công",
+  "data": {
+    "id": 1,
+    "maThietKe": "TK-2024",
+    "trangThai": "da_duyet"
+  }
+}
+```
+
+> **Lưu ý quan trọng:** Khi thiết kế được duyệt (`da_duyet`), hệ thống nên tự động tạo một bản ghi trong bảng `don_can_in` với `trang_thai = 'cho_gui_xuong'` để hiển thị ở Tab 2.
+
+---
+
+#### 18.5.3. Yêu cầu khách chỉnh sửa
+
+```
+PATCH /api/admin/designs/:id/yeu-cau-chinh-sua
+```
+
+**Request Body:**
+```json
+{
+  "trangThai": "can_chinh_sua",
+  "ghiChu": "Logo bị mờ, vui lòng upload lại file có độ phân giải cao hơn"
+}
+```
+
+**Response (HTTP 200):**
+```json
+{
+  "success": true,
+  "message": "Đã gửi yêu cầu chỉnh sửa đến khách hàng",
+  "data": {
+    "id": 1,
+    "trangThai": "can_chinh_sua"
+  }
+}
+```
+
+> **Ghi chú:** Khi chuyển sang `can_chinh_sua`, hệ thống nên gửi thông báo (email hoặc notification) cho khách hàng biết cần vào sửa lại thiết kế. Backend có thể dùng event/queue để xử lý.
+
+---
+
+### 18.6. API – Tab "Đơn cần in"
+
+#### 18.6.1. Lấy danh sách đơn cần in
+
+```
+GET /api/admin/designs/don-can-in
+```
+
+**Query Parameters (tùy chọn):**
+
+| Tham số       | Kiểu   | Mô tả                                                          |
+|---------------|--------|----------------------------------------------------------------|
+| `page`        | number | Trang hiện tại (mặc định: 1)                                   |
+| `limit`       | number | Số bản ghi mỗi trang (mặc định: 10)                            |
+| `trang_thai`  | string | Lọc: `cho_gui_xuong`, `dang_in`, `da_in_xong`                 |
+
+**Response mong đợi (HTTP 200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "danhSach": [
+      {
+        "id": 1,
+        "maDon": "DH-1045",
+        "maThietKe": "TK-2023",
+        "urlPreview": "https://res.cloudinary.com/teestudio/...",
+        "mauAo": "#ffffff",
+        "tenKhachHang": "Trần Thị B",
+        "soLuong": 50,
+        "viTriIn": "Sau lưng to",
+        "trangThai": "cho_gui_xuong",
+        "ngayTao": "01/06/2026"
+      }
+    ],
+    "tongSo": 14,
+    "trang": 1,
+    "soTrangMoiTrang": 10,
+    "tongSoTrang": 2
+  }
+}
+```
+
+**Các trạng thái đơn in:**
+
+| Giá trị (ENUM)    | Hiển thị FE      | Màu nền    | Màu chữ    |
+|-------------------|------------------|------------|------------|
+| `cho_gui_xuong`   | Chờ gửi xưởng   | `#e0f2fe`  | `#0ea5e9`  |
+| `dang_in`         | Đang in          | `#dcfce7`  | `#10b981`  |
+| `da_in_xong`      | Đã in xong       | `#e4e9ed`  | `#6e7881`  |
+
+---
+
+#### 18.6.2. Gửi đơn đến xưởng in
+
+```
+PATCH /api/admin/designs/don-can-in/:id/gui-xuong
+```
+
+**Request Body:**
+```json
+{
+  "trangThai": "dang_in"
+}
+```
+
+**Response (HTTP 200):**
+```json
+{
+  "success": true,
+  "message": "Đã gửi đơn đến xưởng in thành công",
+  "data": {
+    "id": 1,
+    "maDon": "DH-1045",
+    "trangThai": "dang_in",
+    "ngayGuiXuong": "03/06/2026"
+  }
+}
+```
+
+---
+
+### 18.7. API – Tab "Tài nguyên thiết kế"
+
+#### 18.7.1. Lấy danh sách sticker
+
+```
+GET /api/admin/designs/stickers
+```
+
+**Response (HTTP 200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "ten": "Logo TeeStudio",
+      "urlAnh": "https://res.cloudinary.com/teestudio/stickers/logo.png",
+      "loai": "logo"
+    },
+    {
+      "id": 2,
+      "ten": "Ngôi sao",
+      "urlAnh": "https://res.cloudinary.com/teestudio/stickers/star.png",
+      "loai": "hinh_ve"
+    }
+  ]
+}
+```
+
+**Các loại sticker (trường `loai`):**
+
+| Giá trị      | Mô tả                      |
+|--------------|----------------------------|
+| `logo`       | Logo thương hiệu            |
+| `hinh_ve`    | Hình vẽ minh họa            |
+| `chu_viet`   | Chữ viết / typography       |
+
+#### 18.7.2. Thêm sticker mới
+
+```
+POST /api/admin/designs/stickers
+```
+
+**Request:** Dạng `multipart/form-data` (upload file ảnh)
+
+| Trường   | Kiểu   | Mô tả                          |
+|----------|--------|--------------------------------|
+| `file`   | File   | File ảnh sticker (PNG, SVG)    |
+| `ten`    | string | Tên hiển thị của sticker       |
+| `loai`   | string | Loại: `logo`/`hinh_ve`/`chu_viet` |
+
+> **Lưu ý:** Backend upload file lên Cloudinary, lưu URL vào DB, trả về object sticker đã tạo.
+
+**Response (HTTP 201):**
+```json
+{
+  "success": true,
+  "message": "Thêm sticker thành công",
+  "data": { "id": 7, "ten": "Hoa mai", "urlAnh": "https://...", "loai": "hinh_ve" }
+}
+```
+
+#### 18.7.3. Xóa sticker
+
+```
+DELETE /api/admin/designs/stickers/:id
+```
+
+> **Lưu ý:** Xóa file trên Cloudinary trước, sau đó xóa bản ghi trong DB.
+
+---
+
+#### 18.7.4. Lấy danh sách vị trí in
+
+```
+GET /api/admin/designs/vi-tri-in
+```
+
+**Response (HTTP 200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "ten": "Ngực trái",
+      "moTa": "Tối đa 10x10 cm",
+      "dangHoatDong": true
+    },
+    {
+      "id": 2,
+      "ten": "Sau lưng to",
+      "moTa": "Tối đa 30x40 cm",
+      "dangHoatDong": true
+    }
+  ]
+}
+```
+
+#### 18.7.5. Thêm vị trí in mới
+
+```
+POST /api/admin/designs/vi-tri-in
+```
+
+**Request Body:**
+```json
+{
+  "ten": "Cổ sau",
+  "moTa": "Tối đa 5x5 cm",
+  "dangHoatDong": true
+}
+```
+
+#### 18.7.6. Bật/tắt vị trí in
+
+```
+PATCH /api/admin/designs/vi-tri-in/:id
+```
+
+**Request Body:** `{ "dangHoatDong": false }`
+
+> **Lưu ý quan trọng:** Khi một vị trí in bị tắt (`dangHoatDong: false`), khách hàng trên giao diện Design Studio **sẽ không thể** chọn vị trí đó. Backend cần đồng bộ dữ liệu này với API công khai phục vụ Design Studio.
+
+#### 18.7.7. Xóa vị trí in
+
+```
+DELETE /api/admin/designs/vi-tri-in/:id
+```
+
+> **Cảnh báo:** Chỉ xóa khi không có thiết kế nào đang dùng vị trí này. Nên kiểm tra ràng buộc khóa ngoại trước khi xóa và trả lỗi 409 nếu đang có thiết kế liên quan.
+
+---
+
+### 18.8. API – Xuất thông số in
+
+```
+POST /api/admin/designs/xuat-thong-so-in
+```
+
+**Mô tả:** Sinh file PDF/Excel chứa thông số kỹ thuật để gửi cho xưởng in. Thông số bao gồm: kích thước vùng in (cm), vị trí in, màu in, số lượng mỗi size.
+
+**Request Body:**
+```json
+{
+  "danhSachDonId": [1, 2, 3]
+}
+```
+
+**Response (HTTP 200):**
+```json
+{
+  "success": true,
+  "urlFile": "https://res.cloudinary.com/teestudio/exports/thong-so-in-2026-06-03.pdf",
+  "message": "Xuất thông số in thành công"
+}
+```
+
+> **Quy trình tính thông số:** Frontend lưu tọa độ (x, y) và kích thước (width, height) theo đơn vị pixel canvas. Backend cần chuyển đổi sang đơn vị thực (cm) dựa trên tỉ lệ DPI đã cấu hình (thường là 96dpi).
+
+---
+
+### 18.9. Bảng Database liên quan
+
+```sql
+-- Bảng thiết kế của khách hàng
+CREATE TABLE designs (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  ma_thiet_ke     VARCHAR(20)   NOT NULL UNIQUE,      -- Dạng "TK-XXXX", tự sinh
+  order_id        INT           NULL,                  -- Liên kết với bảng orders
+  user_id         INT           NOT NULL,              -- Liên kết với bảng users (khách hàng)
+  san_pham_id     INT           NOT NULL,              -- Liên kết với bảng products
+  mau_ao          VARCHAR(7)    NOT NULL,              -- Mã HEX màu áo, ví dụ "#000000"
+  ten_mau_ao      VARCHAR(50)   NOT NULL,              -- Tên màu tiếng Việt
+  vi_tri_in_id    INT           NOT NULL,              -- Liên kết bảng vi_tri_in
+  du_lieu_thiet_ke JSON         NOT NULL,              -- Tọa độ, kích thước từ Konva.js
+  url_preview     VARCHAR(500)  NULL,                  -- URL ảnh preview trên Cloudinary
+  trang_thai      ENUM('cho_kiem_tra', 'can_chinh_sua', 'da_duyet') NOT NULL DEFAULT 'cho_kiem_tra',
+  ghi_chu_admin   TEXT          NULL,                  -- Ghi chú khi yêu cầu chỉnh sửa
+  ngay_gui        DATETIME      DEFAULT NOW(),
+  created_at      DATETIME      DEFAULT NOW(),
+  updated_at      DATETIME      DEFAULT NOW() ON UPDATE NOW()
+);
+
+-- Bảng đơn cần in (tự động tạo khi thiết kế được duyệt)
+CREATE TABLE don_can_in (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  design_id       INT           NOT NULL,              -- Liên kết với bảng designs
+  order_id        INT           NOT NULL,              -- Liên kết với bảng orders
+  so_luong        INT           NOT NULL DEFAULT 1,    -- Số lượng áo cần in
+  trang_thai      ENUM('cho_gui_xuong', 'dang_in', 'da_in_xong') NOT NULL DEFAULT 'cho_gui_xuong',
+  ngay_gui_xuong  DATETIME      NULL,                  -- Ngày admin gửi xưởng
+  created_at      DATETIME      DEFAULT NOW(),
+  updated_at      DATETIME      DEFAULT NOW() ON UPDATE NOW()
+);
+
+-- Bảng sticker có sẵn để khách dùng trong Design Studio
+CREATE TABLE stickers (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  ten             VARCHAR(100)  NOT NULL,
+  url_anh         VARCHAR(500)  NOT NULL,              -- URL trên Cloudinary
+  loai            ENUM('logo', 'hinh_ve', 'chu_viet') NOT NULL DEFAULT 'hinh_ve',
+  created_at      DATETIME      DEFAULT NOW()
+);
+
+-- Bảng vị trí in (cấu hình vùng in trên áo)
+CREATE TABLE vi_tri_in (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  ten             VARCHAR(100)  NOT NULL,              -- Ví dụ: "Ngực trái"
+  mo_ta           VARCHAR(200)  NULL,                  -- Ví dụ: "Tối đa 10x10 cm"
+  dang_hoat_dong  TINYINT(1)    NOT NULL DEFAULT 1,    -- 1 = bật, 0 = tắt
+  created_at      DATETIME      DEFAULT NOW(),
+  updated_at      DATETIME      DEFAULT NOW() ON UPDATE NOW()
+);
+```
+
+**Giải thích cột quan trọng:**
+
+| Bảng         | Cột                | Mô tả chi tiết                                                       |
+|--------------|--------------------|----------------------------------------------------------------------|
+| `designs`    | `du_lieu_thiet_ke` | JSON từ Konva.js: `{"objects": [...], "canvasWidth": 400, ...}`     |
+| `designs`    | `url_preview`      | Null ban đầu; được điền sau khi render canvas thành ảnh             |
+| `designs`    | `ghi_chu_admin`    | Admin nhập khi chuyển sang `can_chinh_sua`, gửi email cho khách     |
+| `don_can_in` | `design_id`        | JOIN với `designs` để lấy thông tin chi tiết thiết kế               |
+
+---
+
+### 18.10. Luồng nghiệp vụ quan trọng
+
+```
+Khách tạo thiết kế → Lưu designs (trang_thai='cho_kiem_tra')
+       ↓
+Admin xem bảng "Thiết kế khách hàng"
+       ↓
+[Option A] Admin duyệt → designs.trang_thai = 'da_duyet'
+           → Tự động tạo don_can_in (trang_thai='cho_gui_xuong')
+       ↓
+Admin xem Tab "Đơn cần in" → Nhấn "Gửi xưởng"
+           → don_can_in.trang_thai = 'dang_in'
+           → Xưởng in nhận thông số và tiến hành in
+
+[Option B] Admin yêu cầu chỉnh sửa → designs.trang_thai = 'can_chinh_sua'
+           → Gửi thông báo cho khách
+           → Khách vào Design Studio sửa lại → trang_thai quay về 'cho_kiem_tra'
+```
+
+---
+
+### 18.11. Lưu ý quan trọng cho Backend
+
+1. **Mã thiết kế (`ma_thiet_ke`)** phải tự sinh theo pattern `TK-{timestamp_4_chu_so}` hoặc tự tăng. Frontend hiển thị nguyên văn giá trị này.
+
+2. **URL Preview:** Khi thiết kế được gửi từ Design Studio, nên render canvas thành ảnh PNG (dùng `canvas.toDataURL()`) và upload lên Cloudinary ngay lập tức. URL được lưu vào `url_preview`. Nếu null, component `DesignPreview` sẽ tự vẽ mockup màu sắc thay thế.
+
+3. **Dữ liệu JSON thiết kế (`du_lieu_thiet_ke`):** Đây là dữ liệu từ Konva.js, cần lưu nguyên vẹn và trả lại nguyên vẹn cho frontend. Backend **không được** parse hay biến đổi nội dung này.
+
+4. **Vị trí in công khai:** API `GET /api/admin/designs/vi-tri-in` cũng cần được expose ra endpoint công khai `GET /api/vi-tri-in` cho giao diện Design Studio của khách hàng (chỉ trả vị trí có `dang_hoat_dong = 1`).
+
+5. **Sticker công khai:** Tương tự, `GET /api/admin/designs/stickers` cũng cần endpoint công khai `GET /api/stickers` cho Design Studio.
+
+6. **Phân quyền:** Tất cả API `/api/admin/designs/*` yêu cầu JWT token. Chỉ các vai trò `admin` và `san_xuat` mới được duyệt và gửi xưởng. Vai trò `kho` không có quyền truy cập module này.
+
+7. **Xuất thông số in:** Khi admin nhấn "Xuất thông số in", backend cần đọc `du_lieu_thiet_ke` từ DB, tính toán kích thước thật (pixel → cm theo DPI), và sinh file PDF. Đây là tính năng phức tạp, có thể dùng thư viện `pdfkit` hoặc `puppeteer` để render HTML → PDF.
