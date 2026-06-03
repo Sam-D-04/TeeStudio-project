@@ -38,3 +38,17 @@ Phân Hệ 4: Quản Lý Phân Loại Sản Phẩm & Phân Quyền Người Dùn
 Quản lý kho thông minh: Hệ thống phân loại và theo dõi chính xác số lượng áo tồn kho dựa trên sự kết hợp của các yếu tố: Mẫu mã, Màu sắc và Kích cỡ (Size).
 
 Phân loại bộ lọc người dùng: Hệ thống nhận diện loại tài khoản đăng nhập. Khách hàng thông thường chỉ thấy giá bán lẻ; trong khi khách hàng doanh nghiệp hoặc đại lý (sau khi được xác minh) sẽ nhìn thấy giao diện đặt hàng sỉ riêng biệt với mức giá ưu đãi dành cho đại lý.
+
+
+
+
+
+
+
+
+
+
+
+
+
+powershell -ExecutionPolicy Bypass -Command "npm run dev"
