@@ -193,13 +193,20 @@ CREATE TABLE IF NOT EXISTS `CustomDesign` (
 	`canvasData` JSON NOT NULL,
 	`previewUrl` VARCHAR(500) NOT NULL,
 	`designFee` DECIMAL(15,2) NOT NULL DEFAULT 0,
-	`status` VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+	-- Các giá trị status hợp lệ:
+	-- 'DRAFT'          = Khách đang soạn (chưa gửi)
+	-- 'PENDING_REVIEW' = Chờ admin kiểm tra
+	-- 'NEEDS_REVISION' = Admin yêu cầu khách chỉnh sửa
+	-- 'APPROVED'       = Admin đã duyệt
+	`status` VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
+	`adminNote` TEXT NULL COMMENT 'Ghi chú của admin khi yêu cầu khách chỉnh sửa thiết kế',
 	`createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	PRIMARY KEY (`id`),
 	KEY `idx_custom_design_user_id` (`userId`),
 	KEY `idx_custom_design_product_id` (`productId`),
 	KEY `idx_custom_design_variant_id` (`variantId`),
+	KEY `idx_custom_design_status` (`status`),
 	CONSTRAINT `fk_custom_design_user`
 		FOREIGN KEY (`userId`) REFERENCES `Account` (`id`)
 		ON UPDATE NO ACTION ON DELETE RESTRICT,
@@ -450,3 +457,25 @@ CREATE TABLE IF NOT EXISTS `PromotionUsage` (
 		FOREIGN KEY (`orderId`) REFERENCES `CustomerOrder` (`id`)
 		ON UPDATE NO ACTION ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- =====================================================================
+-- MIGRATION: Cập nhật bảng CustomDesign cho luồng Admin duyệt thiết kế
+-- Chạy script này nếu bạn đang nâng cấp database đã có
+-- (Nếu import database mới từ đầu, các lệnh ALTER này không cần thiết
+--  vì CREATE TABLE IF NOT EXISTS ở trên đã bao gồm các cột mới)
+-- =====================================================================
+
+-- Bước 1: Mở rộng cột status từ VARCHAR(20) sang VARCHAR(30)
+-- ALTER TABLE `CustomDesign` MODIFY COLUMN `status` VARCHAR(30) NOT NULL DEFAULT 'DRAFT';
+
+-- Bước 2: Thêm cột adminNote để lưu ghi chú khi admin yêu cầu chỉnh sửa
+-- ALTER TABLE `CustomDesign`
+--   ADD COLUMN `adminNote` TEXT NULL COMMENT 'Ghi chú của admin khi yêu cầu khách chỉnh sửa thiết kế'
+--   AFTER `status`;
+
+-- Bước 3: Thêm index cho cột status để tăng tốc truy vấn lọc theo trạng thái
+-- ALTER TABLE `CustomDesign` ADD KEY `idx_custom_design_status` (`status`);
+
+-- Bước 4: Chuyển các bản ghi DRAFT đang chờ admin sang PENDING_REVIEW (nếu cần)
+-- UPDATE `CustomDesign` SET `status` = 'PENDING_REVIEW' WHERE `status` = 'DRAFT';

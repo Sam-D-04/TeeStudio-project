@@ -48,6 +48,7 @@ type DesignTableProps = {
   onXem: (id: number) => void;
   onYeuCauChinhSua: (id: number) => void;
   onDuyet: (id: number) => void;
+  dangXuLy?: boolean;  // true khi đang có mutation chạy → disable nút
 };
 
 export default function DesignTable({
@@ -55,6 +56,7 @@ export default function DesignTable({
   onXem,
   onYeuCauChinhSua,
   onDuyet,
+  dangXuLy = false,
 }: DesignTableProps) {
   // Trường hợp không có dữ liệu
   if (danhSach.length === 0) {
@@ -123,6 +125,7 @@ export default function DesignTable({
               onXem={onXem}
               onYeuCauChinhSua={onYeuCauChinhSua}
               onDuyet={onDuyet}
+              dangXuLy={dangXuLy}
             />
           ))}
         </tbody>
@@ -140,11 +143,13 @@ function HangThietKe({
   onXem,
   onYeuCauChinhSua,
   onDuyet,
+  dangXuLy = false,
 }: {
   thietKe: ThietKe;
   onXem: (id: number) => void;
   onYeuCauChinhSua: (id: number) => void;
   onDuyet: (id: number) => void;
+  dangXuLy?: boolean;
 }) {
   // Xác định có nên hiển thị nút "Duyệt" không
   // Chỉ hiện khi thiết kế đang ở trạng thái "Chờ kiểm tra"
@@ -241,8 +246,8 @@ function HangThietKe({
             alignItems: "center",
             justifyContent: "flex-end",
             gap: 6,
-            opacity: 0,                         // Ẩn mặc định
-            transition: "opacity 0.15s ease",   // Hiện mượt mà khi hover hàng
+            opacity: 0,
+            transition: "opacity 0.15s ease",
           }}
         >
           {/* Nút Xem */}
@@ -250,6 +255,7 @@ function HangThietKe({
             icon={<EyeOutlined />}
             title="Xem chi tiết thiết kế"
             onClick={() => onXem(thietKe.id)}
+            disabled={dangXuLy}
           />
 
           {/* Nút Yêu cầu chỉnh sửa – chỉ hiện khi đang "Chờ kiểm tra" */}
@@ -259,6 +265,7 @@ function HangThietKe({
               title="Yêu cầu khách chỉnh sửa"
               onClick={() => onYeuCauChinhSua(thietKe.id)}
               mauHover="#ea580c"
+              disabled={dangXuLy}
             />
           )}
 
@@ -268,7 +275,8 @@ function HangThietKe({
               icon={<CheckOutlined />}
               title="Duyệt thiết kế"
               onClick={() => onDuyet(thietKe.id)}
-              laNutChinh   // Nút chính: nền xanh
+              laNutChinh
+              disabled={dangXuLy}
             />
           )}
         </div>
@@ -286,12 +294,14 @@ function NutThaoTac({
   onClick,
   laNutChinh = false,
   mauHover,
+  disabled = false,
 }: {
   icon: React.ReactNode;
   title: string;
   onClick: () => void;
-  laNutChinh?: boolean;   // true → nền xanh primary
-  mauHover?: string;      // Màu icon khi hover (nút phụ)
+  laNutChinh?: boolean;
+  mauHover?: string;
+  disabled?: boolean;
 }) {
   // Kiểu dáng nút chính (nền xanh) và nút phụ (nền xám nhạt)
   const styleCoban: React.CSSProperties = laNutChinh
@@ -328,8 +338,10 @@ function NutThaoTac({
     <button
       title={title}
       onClick={onClick}
-      style={styleCoban}
+      disabled={disabled}
+      style={{ ...styleCoban, ...(disabled ? { opacity: 0.5, cursor: "not-allowed" } : {}) }}
       onMouseEnter={(e) => {
+        if (disabled) return;
         if (laNutChinh) {
           (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0284c7";
         } else {
@@ -342,6 +354,7 @@ function NutThaoTac({
         }
       }}
       onMouseLeave={(e) => {
+        if (disabled) return;
         if (laNutChinh) {
           (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0ea5e9";
         } else {

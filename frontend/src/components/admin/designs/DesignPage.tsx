@@ -11,123 +11,40 @@
  *     - Tab 2: Đơn cần in → PrintOrderTab
  *     - Tab 3: Tài nguyên thiết kế / Vị trí in → DesignResourceTab
  *
- * Ghi chú kiến trúc:
- *  - Tất cả state quản lý tại file này, truyền xuống component con qua props.
- *  - Dữ liệu hiển thị là dữ liệu tĩnh (mock data) – thực tế sẽ fetch từ API.
- *  - Không dùng Tailwind vì đây là admin module, dùng inline style theo pattern
- *    đã thống nhất trong các module khác (Orders, Promotions, Settings...).
+ * Kiến trúc:
+ *  - Dữ liệu lấy từ API thật qua React Query (useQuery/useMutation).
+ *  - State quản lý UI (tab, filter, phân trang) tại file này.
+ *  - Component con nhận dữ liệu qua props.
  */
 
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   HighlightOutlined,
   PrinterOutlined,
   AppstoreOutlined,
   FieldTimeOutlined,
   ExportOutlined,
-  PlusOutlined,
-  EnvironmentOutlined,
-  PictureOutlined,
   DownloadOutlined,
+  PictureOutlined,
+  EnvironmentOutlined,
+  LoadingOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
+
+// Service gọi API
+import * as designService from "@/services/admin/designService";
 
 // Import các component con
 import DesignStatCard from "./DesignStatCard";
 import DesignFilterBar, { type BoDucThietKe } from "./DesignFilterBar";
-import DesignTable, { type ThietKe } from "./DesignTable";
+import DesignTable from "./DesignTable";
 import PrintOrderTab from "./PrintOrderTab";
 import DesignResourceTab from "./DesignResourceTab";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Dữ liệu mẫu thiết kế khách hàng
-// Thực tế: thay bằng gọi API GET /api/admin/designs
+// Cấu hình tab điều hướng
 // ─────────────────────────────────────────────────────────────────────────────
-const DU_LIEU_MAU_THIET_KE: ThietKe[] = [
-  {
-    id: 1,
-    maThietKe: "TK-2024",
-    mauAo: "#000000",
-    tenKhachHang: "Nguyễn Văn A",
-    soDienThoai: "0901234567",
-    tenSanPham: "Áo thun Basic",
-    tenMauAo: "Đen",
-    viTriIn: "Ngực trái",
-    trangThai: "cho_kiem_tra",
-    ngayGui: "03/06/2026",
-  },
-  {
-    id: 2,
-    maThietKe: "TK-2023",
-    mauAo: "#ffffff",
-    tenKhachHang: "Trần Thị B",
-    soDienThoai: "0912345678",
-    tenSanPham: "Áo Polo",
-    tenMauAo: "Trắng",
-    viTriIn: "Sau lưng to",
-    trangThai: "da_duyet",
-    ngayGui: "02/06/2026",
-  },
-  {
-    id: 3,
-    maThietKe: "TK-2022",
-    mauAo: "#dc2626",
-    tenKhachHang: "Lê Hoàng Nam",
-    soDienThoai: "0933456789",
-    tenSanPham: "Áo thun Oversize",
-    tenMauAo: "Đỏ",
-    viTriIn: "Ngực phải",
-    trangThai: "can_chinh_sua",
-    ngayGui: "01/06/2026",
-  },
-  {
-    id: 4,
-    maThietKe: "TK-2021",
-    mauAo: "#1e293b",
-    tenKhachHang: "Công ty TNHH ABC",
-    soDienThoai: "0944567890",
-    tenSanPham: "Áo thun Corporate",
-    tenMauAo: "Xanh navy",
-    viTriIn: "Ngực trái",
-    trangThai: "cho_kiem_tra",
-    ngayGui: "01/06/2026",
-  },
-  {
-    id: 5,
-    maThietKe: "TK-2020",
-    mauAo: "#0ea5e9",
-    tenKhachHang: "Phạm Minh Tuấn",
-    tenSanPham: "Áo thun Basic",
-    tenMauAo: "Xanh sky",
-    viTriIn: "Sau lưng",
-    trangThai: "cho_kiem_tra",
-    ngayGui: "31/05/2026",
-  },
-  {
-    id: 6,
-    maThietKe: "TK-2019",
-    mauAo: "#16a34a",
-    tenKhachHang: "Hội sinh viên ĐHBK",
-    soDienThoai: "0955678901",
-    tenSanPham: "Áo thun Basic",
-    tenMauAo: "Xanh lá",
-    viTriIn: "Ngực trái",
-    trangThai: "da_duyet",
-    ngayGui: "30/05/2026",
-  },
-  {
-    id: 7,
-    maThietKe: "TK-2018",
-    mauAo: "#7c3aed",
-    tenKhachHang: "Nguyễn Thị Lan",
-    tenSanPham: "Áo Polo",
-    tenMauAo: "Tím",
-    viTriIn: "Tay trái",
-    trangThai: "can_chinh_sua",
-    ngayGui: "30/05/2026",
-  },
-];
-
-// Tên các tab điều hướng
 const DANH_SACH_TAB = [
   { key: "thiet_ke_khach_hang", nhan: "Thiết kế khách hàng", icon: <HighlightOutlined /> },
   { key: "don_can_in", nhan: "Đơn cần in", icon: <PrinterOutlined /> },
@@ -140,11 +57,13 @@ type TenTab = (typeof DANH_SACH_TAB)[number]["key"];
 // Component chính
 // ─────────────────────────────────────────────────────────────────────────────
 export default function DesignPage() {
+  const queryClient = useQueryClient();
+
   // ── State điều hướng tab ──
   const [tabDangChon, setTabDangChon] = useState<TenTab>("thiet_ke_khach_hang");
 
-  // ── State dữ liệu thiết kế ──
-  const [danhSachThietKe, setDanhSachThietKe] = useState<ThietKe[]>(DU_LIEU_MAU_THIET_KE);
+  // ── State phân trang bảng thiết kế ──
+  const [trangHienTai, setTrangHienTai] = useState(1);
 
   // ── State bộ lọc bảng thiết kế ──
   const [boDuc, setBoDuc] = useState<BoDucThietKe>({
@@ -153,76 +72,102 @@ export default function DesignPage() {
     viTriIn: "",
   });
 
-  // ── Tính thống kê KPI ──
-  const soChoKiemTra = danhSachThietKe.filter((tk) => tk.trangThai === "cho_kiem_tra").length;
-  const soCanChinhSua = danhSachThietKe.filter((tk) => tk.trangThai === "can_chinh_sua").length;
-  // Số liệu "Đơn chờ gửi xưởng" và "Đang in" trong thực tế lấy từ API riêng
-  // Ở đây dùng giá trị tĩnh để minh họa
-  const soDonChoGuiXuong = 14;
-  const soDangIn = 12;
-
-  // ── Lọc danh sách thiết kế theo bộ lọc ──
-  const danhSachDaLoc = danhSachThietKe.filter((tk) => {
-    // Lọc theo từ khóa (mã TK hoặc tên khách)
-    if (boDuc.tuKhoa) {
-      const tuKhoaLower = boDuc.tuKhoa.toLowerCase();
-      const khopMa = tk.maThietKe.toLowerCase().includes(tuKhoaLower);
-      const khopTen = tk.tenKhachHang.toLowerCase().includes(tuKhoaLower);
-      if (!khopMa && !khopTen) return false;
-    }
-    // Lọc theo trạng thái
-    if (boDuc.trangThai && tk.trangThai !== boDuc.trangThai) return false;
-    // Lọc theo vị trí in (so sánh chuỗi đơn giản)
-    if (boDuc.viTriIn) {
-      // Ánh xạ giá trị dropdown sang nhãn tiếng Việt để so sánh
-      const APDUNG_VI_TRI: Record<string, string> = {
-        nguc_trai: "ngực trái",
-        nguc_phai: "ngực phải",
-        sau_lung: "sau lưng",
-        tay_trai: "tay trái",
-        tay_phai: "tay phải",
-      };
-      const viTriCan = APDUNG_VI_TRI[boDuc.viTriIn] || boDuc.viTriIn;
-      if (!tk.viTriIn.toLowerCase().includes(viTriCan)) return false;
-    }
-    return true;
+  // ─── Fetch dữ liệu KPI thống kê ─────────────────────────────────────────
+  const {
+    data: thongKe,
+    isLoading: dangTaiThongKe,
+  } = useQuery({
+    queryKey: ["thiet-ke-thong-ke"],
+    queryFn: designService.layThongKeThietKe,
+    staleTime: 30_000,  // 30 giây
   });
 
-  // ── Xử lý duyệt thiết kế ──
+  // ─── Fetch danh sách thiết kế ───────────────────────────────────────────
+  const {
+    data: ketQuaThietKe,
+    isLoading: dangTaiThietKe,
+    isError: loiThietKe,
+  } = useQuery({
+    queryKey: ["thiet-ke-danh-sach", trangHienTai, boDuc],
+    queryFn: () =>
+      designService.layDanhSachThietKe({
+        page: trangHienTai,
+        limit: 10,
+        tu_khoa: boDuc.tuKhoa,
+        trang_thai: boDuc.trangThai,
+        vi_tri_in: boDuc.viTriIn,
+      }),
+    staleTime: 15_000,
+  });
+
+  // ─── Mutation: Duyệt thiết kế ───────────────────────────────────────────
+  const mutationDuyet = useMutation({
+    mutationFn: (id: number) => designService.duyetThietKe(id),
+    onSuccess: () => {
+      // Reload lại cả danh sách và KPI
+      queryClient.invalidateQueries({ queryKey: ["thiet-ke-danh-sach"] });
+      queryClient.invalidateQueries({ queryKey: ["thiet-ke-thong-ke"] });
+    },
+    onError: (err: Error) => {
+      alert(`Lỗi khi duyệt thiết kế: ${err.message}`);
+    },
+  });
+
+  // ─── Mutation: Yêu cầu chỉnh sửa ────────────────────────────────────────
+  const mutationChinhSua = useMutation({
+    mutationFn: ({ id, ghiChu }: { id: number; ghiChu?: string }) =>
+      designService.yeuCauChinhSua(id, ghiChu),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["thiet-ke-danh-sach"] });
+      queryClient.invalidateQueries({ queryKey: ["thiet-ke-thong-ke"] });
+    },
+    onError: (err: Error) => {
+      alert(`Lỗi khi gửi yêu cầu chỉnh sửa: ${err.message}`);
+    },
+  });
+
+  // ─── Xử lý thay đổi bộ lọc: reset về trang 1 ──────────────────────────
+  function xuLyThayDoiBoDuc(boDucMoi: BoDucThietKe) {
+    setBoDuc(boDucMoi);
+    setTrangHienTai(1);
+  }
+
+  // ─── Xử lý duyệt thiết kế ──────────────────────────────────────────────
   function xuLyDuyetThietKe(id: number) {
-    if (window.confirm("Bạn có chắc muốn duyệt thiết kế này?")) {
-      // Thực tế: gọi API PATCH /api/admin/designs/:id { trangThai: "da_duyet" }
-      setDanhSachThietKe((ds) =>
-        ds.map((tk) =>
-          tk.id === id ? { ...tk, trangThai: "da_duyet" as const } : tk
-        )
-      );
+    if (window.confirm("Bạn có chắc muốn duyệt thiết kế này?\nSau khi duyệt, đơn in sẽ được tạo tự động.")) {
+      mutationDuyet.mutate(id);
     }
   }
 
-  // ── Xử lý yêu cầu chỉnh sửa ──
+  // ─── Xử lý yêu cầu chỉnh sửa ──────────────────────────────────────────
   function xuLyYeuCauChinhSua(id: number) {
-    if (window.confirm("Bạn có chắc muốn yêu cầu khách chỉnh sửa thiết kế này?")) {
-      // Thực tế: gọi API PATCH /api/admin/designs/:id { trangThai: "can_chinh_sua" }
-      setDanhSachThietKe((ds) =>
-        ds.map((tk) =>
-          tk.id === id ? { ...tk, trangThai: "can_chinh_sua" as const } : tk
-        )
-      );
+    const ghiChu = window.prompt(
+      "Nhập ghi chú cho khách hàng (lý do cần chỉnh sửa):",
+      ""
+    );
+    if (ghiChu !== null) {
+      // null = nhấn Cancel; chuỗi rỗng = không nhập ghi chú nhưng vẫn gửi
+      mutationChinhSua.mutate({ id, ghiChu: ghiChu || undefined });
     }
   }
 
-  // ── Xử lý xem chi tiết ──
+  // ─── Xử lý xem chi tiết ────────────────────────────────────────────────
   function xuLyXemChiTiet(id: number) {
-    const tk = danhSachThietKe.find((t) => t.id === id);
-    if (tk) {
-      alert(`Xem chi tiết thiết kế: ${tk.maThietKe}\nKhách: ${tk.tenKhachHang}`);
-      // Thực tế: mở drawer/modal xem chi tiết thiết kế
-    }
+    alert(`Chức năng xem chi tiết thiết kế #${id} sẽ mở drawer trong phiên bản tiếp theo.`);
   }
+
+  // ─── Dữ liệu hiển thị ──────────────────────────────────────────────────
+  const danhSachThietKe = ketQuaThietKe?.danhSach ?? [];
+  const tongSo = ketQuaThietKe?.tongSo ?? 0;
+  const tongSoTrang = ketQuaThietKe?.tongSoTrang ?? 1;
+
+  // Giá trị KPI
+  const soChoKiemTra = thongKe?.soChoKiemTra ?? 0;
+  const soCanChinhSua = thongKe?.soCanChinhSua ?? 0;
+  const soDonChoGuiXuong = thongKe?.soDonChoGuiXuong ?? 0;
+  const soDangIn = thongKe?.soDangIn ?? 0;
 
   return (
-    // Container tổng thể – khoảng cách giữa các khối
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
       {/* ═══════════════════════════════════════════════════════════════ */}
@@ -267,10 +212,7 @@ export default function DesignPage() {
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
           {/* Nút phụ 1: Thêm sticker */}
           <button
-            onClick={() => {
-              setTabDangChon("tai_nguyen");
-              alert("Vui lòng dùng nút 'Thêm sticker' trong tab Tài nguyên thiết kế");
-            }}
+            onClick={() => setTabDangChon("tai_nguyen")}
             style={{
               height: 40,
               padding: "0 16px",
@@ -303,10 +245,7 @@ export default function DesignPage() {
 
           {/* Nút phụ 2: Thêm vị trí in */}
           <button
-            onClick={() => {
-              setTabDangChon("tai_nguyen");
-              alert("Vui lòng dùng nút 'Thêm vị trí in' trong tab Tài nguyên thiết kế");
-            }}
+            onClick={() => setTabDangChon("tai_nguyen")}
             style={{
               height: 40,
               padding: "0 16px",
@@ -379,10 +318,9 @@ export default function DesignPage() {
           gap: 16,
         }}
       >
-        {/* Thẻ 1: Thiết kế chờ kiểm tra */}
         <DesignStatCard
           nhan="Thiết kế chờ kiểm tra"
-          giaTri={soChoKiemTra}
+          giaTri={dangTaiThongKe ? "..." : soChoKiemTra}
           icon={<FieldTimeOutlined style={{ fontSize: 20 }} />}
           mauNenIcon="#fef3c7"
           mauIcon="#d97706"
@@ -391,10 +329,9 @@ export default function DesignPage() {
           mauChuBadge="#d97706"
         />
 
-        {/* Thẻ 2: Thiết kế cần chỉnh sửa */}
         <DesignStatCard
           nhan="Thiết kế cần khách chỉnh sửa"
-          giaTri={soCanChinhSua}
+          giaTri={dangTaiThongKe ? "..." : soCanChinhSua}
           icon={<ExportOutlined style={{ fontSize: 20 }} />}
           mauNenIcon="#f8fafc"
           mauIcon="#ea580c"
@@ -403,10 +340,9 @@ export default function DesignPage() {
           mauChuBadge="#475569"
         />
 
-        {/* Thẻ 3: Đơn chờ gửi xưởng */}
         <DesignStatCard
           nhan="Đơn chờ gửi xưởng in"
-          giaTri={soDonChoGuiXuong}
+          giaTri={dangTaiThongKe ? "..." : soDonChoGuiXuong}
           icon={<ExportOutlined style={{ fontSize: 20 }} />}
           mauNenIcon="#e0f2fe"
           mauIcon="#0ea5e9"
@@ -415,10 +351,9 @@ export default function DesignPage() {
           mauChuBadge="#0ea5e9"
         />
 
-        {/* Thẻ 4: Đơn đang in */}
         <DesignStatCard
           nhan="Đơn đang in tại xưởng"
-          giaTri={soDangIn}
+          giaTri={dangTaiThongKe ? "..." : soDangIn}
           icon={<PrinterOutlined style={{ fontSize: 20 }} />}
           mauNenIcon="#dcfce7"
           mauIcon="#10b981"
@@ -471,7 +406,7 @@ export default function DesignPage() {
                   color: dangDuocChon ? "#0ea5e9" : "#475569",
                   transition: "all 0.15s ease",
                   whiteSpace: "nowrap",
-                  marginBottom: -1,   // Che đường viền bên dưới container
+                  marginBottom: -1,
                 }}
                 onMouseEnter={(e) => {
                   if (!dangDuocChon) {
@@ -495,99 +430,151 @@ export default function DesignPage() {
         {tabDangChon === "thiet_ke_khach_hang" && (
           <div>
             {/* Thanh lọc */}
-            <DesignFilterBar boDuc={boDuc} onThayDoi={setBoDuc} />
+            <DesignFilterBar boDuc={boDuc} onThayDoi={xuLyThayDoiBoDuc} />
+
+            {/* Trạng thái đang tải */}
+            {dangTaiThietKe && (
+              <div
+                style={{
+                  padding: "48px 0",
+                  textAlign: "center",
+                  color: "#94a3b8",
+                  fontSize: 14,
+                }}
+              >
+                <LoadingOutlined style={{ fontSize: 24, marginBottom: 8, display: "block" }} />
+                Đang tải danh sách thiết kế...
+              </div>
+            )}
+
+            {/* Trạng thái lỗi */}
+            {loiThietKe && !dangTaiThietKe && (
+              <div
+                style={{
+                  padding: "48px 0",
+                  textAlign: "center",
+                  color: "#ef4444",
+                  fontSize: 14,
+                }}
+              >
+                <WarningOutlined style={{ fontSize: 24, marginBottom: 8, display: "block" }} />
+                Không thể tải dữ liệu. Vui lòng thử lại sau.
+              </div>
+            )}
 
             {/* Bảng dữ liệu */}
-            <DesignTable
-              danhSach={danhSachDaLoc}
-              onXem={xuLyXemChiTiet}
-              onYeuCauChinhSua={xuLyYeuCauChinhSua}
-              onDuyet={xuLyDuyetThietKe}
-            />
+            {!dangTaiThietKe && !loiThietKe && (
+              <DesignTable
+                danhSach={danhSachThietKe}
+                onXem={xuLyXemChiTiet}
+                onYeuCauChinhSua={xuLyYeuCauChinhSua}
+                onDuyet={xuLyDuyetThietKe}
+                dangXuLy={mutationDuyet.isPending || mutationChinhSua.isPending}
+              />
+            )}
 
             {/* Phân trang */}
-            <div
-              style={{
-                padding: "12px 20px",
-                borderTop: "1px solid #e2e8f0",
-                backgroundColor: "#f8fafc",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <span style={{ fontSize: 13, color: "#475569" }}>
-                Hiển thị 1–{danhSachDaLoc.length} của {danhSachThietKe.length} thiết kế
-              </span>
+            {!dangTaiThietKe && !loiThietKe && (
+              <div
+                style={{
+                  padding: "12px 20px",
+                  borderTop: "1px solid #e2e8f0",
+                  backgroundColor: "#f8fafc",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span style={{ fontSize: 13, color: "#475569" }}>
+                  Tổng cộng {tongSo} thiết kế
+                </span>
 
-              <div style={{ display: "flex", gap: 4 }}>
-                {/* Nút trang trước (disabled ở trang 1) */}
-                <button
-                  disabled
-                  style={{
-                    width: 32,
-                    height: 32,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 6,
-                    background: "#ffffff",
-                    color: "#94a3b8",
-                    cursor: "not-allowed",
-                    fontSize: 16,
-                  }}
-                >
-                  ‹
-                </button>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {/* Nút trang trước */}
+                  <button
+                    disabled={trangHienTai <= 1}
+                    onClick={() => setTrangHienTai((t) => Math.max(1, t - 1))}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 6,
+                      background: "#ffffff",
+                      color: trangHienTai <= 1 ? "#94a3b8" : "#0f172a",
+                      cursor: trangHienTai <= 1 ? "not-allowed" : "pointer",
+                      fontSize: 16,
+                    }}
+                  >
+                    ‹
+                  </button>
 
-                {/* Trang hiện tại */}
-                <button
-                  style={{
-                    width: 32,
-                    height: 32,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    border: "1px solid #0ea5e9",
-                    borderRadius: 6,
-                    background: "#0ea5e9",
-                    color: "#ffffff",
-                    cursor: "default",
-                    fontSize: 14,
-                    fontWeight: 600,
-                  }}
-                >
-                  1
-                </button>
+                  {/* Các nút trang */}
+                  {Array.from({ length: tongSoTrang }, (_, i) => i + 1)
+                    .filter(
+                      (p) =>
+                        p === 1 ||
+                        p === tongSoTrang ||
+                        Math.abs(p - trangHienTai) <= 1
+                    )
+                    .map((p, idx, arr) => (
+                      <>
+                        {idx > 0 && arr[idx - 1] !== p - 1 && (
+                          <span
+                            key={`ellipsis-${p}`}
+                            style={{ display: "flex", alignItems: "center", padding: "0 4px", color: "#94a3b8" }}
+                          >
+                            …
+                          </span>
+                        )}
+                        <button
+                          key={p}
+                          onClick={() => setTrangHienTai(p)}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            border: p === trangHienTai ? "1px solid #0ea5e9" : "1px solid #e2e8f0",
+                            borderRadius: 6,
+                            background: p === trangHienTai ? "#0ea5e9" : "#ffffff",
+                            color: p === trangHienTai ? "#ffffff" : "#0f172a",
+                            cursor: "pointer",
+                            fontSize: 14,
+                            fontWeight: p === trangHienTai ? 600 : 400,
+                          }}
+                        >
+                          {p}
+                        </button>
+                      </>
+                    ))}
 
-                {/* Nút trang sau */}
-                <button
-                  style={{
-                    width: 32,
-                    height: 32,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 6,
-                    background: "#ffffff",
-                    color: "#0f172a",
-                    cursor: "pointer",
-                    fontSize: 16,
-                    transition: "background-color 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#f8fafc";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#ffffff";
-                  }}
-                >
-                  ›
-                </button>
+                  {/* Nút trang sau */}
+                  <button
+                    disabled={trangHienTai >= tongSoTrang}
+                    onClick={() => setTrangHienTai((t) => Math.min(tongSoTrang, t + 1))}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 6,
+                      background: "#ffffff",
+                      color: trangHienTai >= tongSoTrang ? "#94a3b8" : "#0f172a",
+                      cursor: trangHienTai >= tongSoTrang ? "not-allowed" : "pointer",
+                      fontSize: 16,
+                    }}
+                  >
+                    ›
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
