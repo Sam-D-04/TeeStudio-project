@@ -1,7 +1,7 @@
 "use client";
 
-import { CloseOutlined, DownloadOutlined, LoadingOutlined } from "@ant-design/icons";
-import { Drawer } from "antd";
+import { CloseOutlined, LoadingOutlined } from "@ant-design/icons";
+import { Drawer, Modal } from "antd";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Order } from "./OrderTable";
@@ -30,9 +30,7 @@ export type OrderDetail = Order & {
   subTotalVnd: number;
   designFeeVnd: number;
   shippingFeeVnd: number;
-  printPosition?: string;
-  printSizeCm?: string;
-  printFileUrl?: string;
+  designPreviewUrl?: string;
   timeline: TimelineStep[];
 };
 
@@ -76,6 +74,9 @@ export default function OrderDetailDrawer({
   const [lyDoHuy, setLyDoHuy] = useState("");
   const [dangHuy, setDangHuy] = useState(false);
 
+  // State lightbox xem trước thiết kế
+  const [showDesignPreview, setShowDesignPreview] = useState(false);
+
   // Thông báo kết quả
   const [thongBao, setThongBao] = useState<{ loai: "success" | "error"; noi_dung: string } | null>(null);
 
@@ -115,7 +116,7 @@ export default function OrderDetailDrawer({
       setThongBao({ loai: "success", noi_dung: "Đã hủy đơn hàng thành công!" });
       setShowHuy(false);
       setLyDoHuy("");
-      onClose(); // Đóng drawer sau khi hủy
+      handleClose(); // Đóng drawer sau khi hủy
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setThongBao({ loai: "error", noi_dung: msg || "Hủy đơn thất bại. Vui lòng thử lại." });
@@ -127,20 +128,29 @@ export default function OrderDetailDrawer({
 
   // Xác định drawer có mở không: mở khi đang loading HOẶC đã có dữ liệu
   const isOpen = isLoading || Boolean(order);
+  const coAnhXemTruocThietKe = Boolean(
+    order?.product.type === "custom_design" && order.designPreviewUrl
+  );
+
+  function handleClose() {
+    setShowDesignPreview(false);
+    onClose();
+  }
 
   return (
-    <Drawer
-      open={isOpen}
-      onClose={onClose}
-      size={600}
-      closable={false}
-      title={null}
-      styles={{
-        body: { padding: 0 },
-        wrapper: { boxShadow: "none" },
-      }}
-      style={{ borderLeft: "1px solid #e2e8f0" }}
-    >
+    <>
+      <Drawer
+        open={isOpen}
+        onClose={handleClose}
+        size={600}
+        closable={false}
+        title={null}
+        styles={{
+          body: { padding: 0 },
+          wrapper: { boxShadow: "none" },
+        }}
+        style={{ borderLeft: "1px solid #e2e8f0" }}
+      >
       <div className="flex h-full flex-col bg-surface">
 
         {/* ======== Phần đầu ngăn kéo ======== */}
@@ -156,7 +166,7 @@ export default function OrderDetailDrawer({
           <button
             type="button"
             aria-label="Đóng ngăn kéo"
-            onClick={onClose}
+            onClick={handleClose}
             className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface transition-colors hover:bg-surface-dim"
           >
             <CloseOutlined />
@@ -231,71 +241,62 @@ export default function OrderDetailDrawer({
                 <h4 className="mb-3 border-b border-border pb-1 text-label-bold font-bold uppercase text-text-secondary">
                   Sản phẩm
                 </h4>
-                <div className="flex gap-4 rounded-lg border border-border bg-surface-alt p-3">
-                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded border border-border bg-surface">
-                    {order.product.imageUrl ? (
-                      <img
-                        src={order.product.imageUrl}
-                        alt={order.product.name}
-                        className="h-full w-full rounded object-cover"
-                      />
-                    ) : (
-                      <span className="text-xs text-text-muted">Ảnh</span>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between">
-                      <h5 className="font-medium text-text-main">{order.product.name}</h5>
-                      <span className="font-medium text-text-main">
-                        {formatCurrency(order.subTotalVnd)}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-text-secondary">Cỡ: {order.product.sizes}</p>
-                    {order.product.type === "custom_design" && (
-                      <div className="mt-2 inline-block rounded bg-[#c9e6ff] px-2 py-1 text-[10px] font-bold uppercase text-[#004c6e]">
-                        Thiết kế tùy chỉnh
+                <div className="rounded-lg border border-border bg-surface-alt p-3">
+                  <div className="flex items-start gap-3">
+                    <button
+                      type="button"
+                      disabled={!coAnhXemTruocThietKe}
+                      onClick={() => {
+                        if (coAnhXemTruocThietKe) setShowDesignPreview(true);
+                      }}
+                      className={`flex h-[50px] w-[50px] shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-surface ${
+                        coAnhXemTruocThietKe
+                          ? "cursor-zoom-in transition-colors hover:border-[#006591]"
+                          : "cursor-default"
+                      }`}
+                      aria-label={coAnhXemTruocThietKe ? "Xem thiết kế" : undefined}
+                    >
+                      {(order.designPreviewUrl || order.product.imageUrl) ? (
+                        <img
+                          src={order.designPreviewUrl || order.product.imageUrl}
+                          alt={order.designPreviewUrl ? "Xem trước thiết kế" : order.product.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-xs text-text-muted">Ảnh</span>
+                      )}
+                    </button>
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between">
+                        <h5 className="font-medium text-text-main">{order.product.name}</h5>
+                        <span className="font-medium text-text-main">
+                          {formatCurrency(order.subTotalVnd)}
+                        </span>
                       </div>
-                    )}
+                      <p className="mt-1 text-sm text-text-secondary">Cỡ: {order.product.sizes}</p>
+                      {order.product.type === "custom_design" && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className="inline-block rounded bg-[#c9e6ff] px-2 py-1 text-[10px] font-bold uppercase text-[#004c6e]">
+                            Thiết kế tùy chỉnh
+                          </span>
+                        <button
+                          type="button"
+                          disabled={!coAnhXemTruocThietKe}
+                          onClick={() => setShowDesignPreview(true)}
+                          title={coAnhXemTruocThietKe ? "Xem thiết kế" : "Chưa có ảnh thiết kế"}
+                          className="rounded border border-border bg-surface px-2 py-1 text-xs font-semibold text-[#006591] transition-colors hover:bg-surface-dim disabled:cursor-not-allowed disabled:text-text-muted disabled:opacity-60 disabled:hover:bg-surface"
+                        >
+                          Xem thiết kế
+                        </button>
+                        {!coAnhXemTruocThietKe && (
+                          <span className="text-xs text-text-muted">Chưa có ảnh thiết kế</span>
+                        )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-
-              {/* ---- Xem trước thiết kế (chỉ với custom_design) ---- */}
-              {order.product.type === "custom_design" && (
-                <div>
-                  <h4 className="mb-3 border-b border-border pb-1 text-label-bold font-bold uppercase text-text-secondary">
-                    Thiết kế in
-                  </h4>
-                  <div className="rounded-lg border border-border bg-surface p-4 text-center">
-                    <div className="mb-3 flex aspect-[4/3] items-center justify-center rounded border border-dashed border-border bg-surface-container-low overflow-hidden">
-                      {order.printFileUrl ? (
-                        <img
-                          src={order.printFileUrl}
-                          alt="Xem trước thiết kế"
-                          className="h-full w-full object-contain"
-                        />
-                      ) : (
-                        <span className="text-sm text-text-secondary">
-                          Vùng xem trước thiết kế
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="text-left text-text-secondary">
-                        {order.printPosition && <p>Vị trí: {order.printPosition}</p>}
-                        {order.printSizeCm && <p>Kích thước in: {order.printSizeCm}</p>}
-                      </div>
-                      <button
-                        type="button"
-                        className="flex h-8 items-center gap-1 rounded bg-[#006398] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#006591]"
-                      >
-                        <DownloadOutlined />
-                        Tải file in
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* ---- Bảng tính tiền ---- */}
               <div>
@@ -444,14 +445,6 @@ export default function OrderDetailDrawer({
               </button>
             )}
 
-            {/* Nút in hóa đơn */}
-            <button
-              type="button"
-              className="flex h-control-h items-center gap-2 rounded-lg border border-border bg-surface px-4 text-button-text font-semibold text-text-secondary transition-colors hover:bg-surface-alt"
-            >
-              🖨 In hóa đơn
-            </button>
-
             {/* Nút cập nhật trạng thái (chính, xanh) */}
             {order.status !== "da_huy" && order.status !== "hoan_tat" && (
               <button
@@ -465,6 +458,24 @@ export default function OrderDetailDrawer({
           </div>
         )}
       </div>
-    </Drawer>
+      </Drawer>
+      <Modal
+        open={showDesignPreview}
+        title="Xem thiết kế"
+        centered
+        footer={null}
+        width={760}
+        onCancel={() => setShowDesignPreview(false)}
+        mask={{ closable: true }}
+      >
+        {order?.designPreviewUrl && (
+          <img
+            src={order.designPreviewUrl}
+            alt="Xem trước thiết kế"
+            className="max-h-[70vh] w-full rounded object-contain"
+          />
+        )}
+      </Modal>
+    </>
   );
 }

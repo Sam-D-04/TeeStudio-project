@@ -104,9 +104,7 @@ function chuyenDoiSangOrderDetail(chi: ChiTietDonHang) {
     hasPrintSpec: chi.daXuatThongSoIn,
     shippingAddress: chi.diaChiGiaoHang,
     shippingCarrier: chi.donViVanChuyen,
-    printPosition: chi.viTriIn ?? undefined,
-    printSizeCm: undefined,
-    printFileUrl: chi.anhXemTruocThietKe ?? undefined,
+    designPreviewUrl: chi.anhXemTruocThietKe ?? undefined,
     timeline: chi.thoiGianXuLy.map((b) => ({
       description: b.moTa,
       time: b.thoiGian,

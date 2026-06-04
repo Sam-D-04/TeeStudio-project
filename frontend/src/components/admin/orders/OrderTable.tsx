@@ -1,4 +1,4 @@
-import { EyeOutlined, PrinterOutlined } from "@ant-design/icons";
+import { EyeOutlined } from "@ant-design/icons";
 import type { OrderStatus } from "./OrderStatusBadge";
 import OrderStatusBadge from "./OrderStatusBadge";
 
@@ -11,7 +11,7 @@ import OrderStatusBadge from "./OrderStatusBadge";
  * - Hình ảnh sản phẩm, tên sản phẩm, loại đơn, size
  * - Tổng tiền + trạng thái thanh toán
  * - Badge trạng thái xử lý đơn
- * - Các nút thao tác (ẩn, chỉ hiện khi hover)
+ * - Nút thao tác ở cột cuối
  *
  * Khi bấm vào hàng → gọi onRowClick để mở Drawer chi tiết.
  */
@@ -78,7 +78,7 @@ export default function OrderTable({ orders, onRowClick }: OrderTableProps) {
             <tr
               key={order.id}
               // Khi hover: nền xám rất nhạt, con trỏ dạng bàn tay
-              className="group cursor-pointer border-b border-border transition-colors hover:bg-surface-alt"
+              className="cursor-pointer border-b border-border transition-colors hover:bg-surface-alt"
               onClick={() => onRowClick(order)}
             >
               {/* Cột 1: Mã đơn + ngày tạo */}
@@ -168,9 +168,9 @@ export default function OrderTable({ orders, onRowClick }: OrderTableProps) {
                 )}
               </td>
 
-              {/* Cột 6: Nút thao tác (chỉ hiện khi hover vào hàng) */}
+              {/* Cột 6: Nút thao tác */}
               <td className="p-4 align-top text-right">
-                <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="flex items-center justify-end gap-2">
                   {/* Nút xem chi tiết */}
                   <button
                     type="button"
@@ -183,18 +183,6 @@ export default function OrderTable({ orders, onRowClick }: OrderTableProps) {
                   >
                     <EyeOutlined style={{ fontSize: 18 }} />
                   </button>
-
-                  {/* Nút xuất thông số in (chỉ hiện với đơn custom design) */}
-                  {order.product.type === "custom_design" && (
-                    <button
-                      type="button"
-                      title="Xuất thông số in"
-                      onClick={(e) => e.stopPropagation()}
-                      className="rounded p-1.5 text-text-secondary transition-colors hover:bg-surface-dim hover:text-[#006591]"
-                    >
-                      <PrinterOutlined style={{ fontSize: 18 }} />
-                    </button>
-                  )}
                 </div>
               </td>
             </tr>
