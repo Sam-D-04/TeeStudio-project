@@ -91,6 +91,8 @@ export type ThamSoLocDonHang = {
   trangThai?: string;
   thanhToan?: string;
   thoiGian?: string;
+  tuNgay?: string;
+  denNgay?: string;
   loai?: string;
   tuKhoa?: string;
 };
@@ -125,6 +127,8 @@ export async function layDanhSachDonHang(
   if (thamSo.trangThai && thamSo.trangThai !== "tat_ca") params.trangThai = thamSo.trangThai;
   if (thamSo.thanhToan && thamSo.thanhToan !== "tat_ca") params.thanhToan = thamSo.thanhToan;
   if (thamSo.thoiGian && thamSo.thoiGian !== "tat_ca") params.thoiGian = thamSo.thoiGian;
+  if (thamSo.tuNgay) params.tuNgay = thamSo.tuNgay;
+  if (thamSo.denNgay) params.denNgay = thamSo.denNgay;
   if (thamSo.loai && thamSo.loai !== "tat_ca") params.loai = thamSo.loai;
   if (thamSo.tuKhoa && thamSo.tuKhoa.trim()) params.tuKhoa = thamSo.tuKhoa.trim();
 

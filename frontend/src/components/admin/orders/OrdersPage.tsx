@@ -2,19 +2,18 @@
 
 import {
   CheckCircleOutlined,
-  DownloadOutlined,
   PlusOutlined,
   ShoppingCartOutlined,
   SyncOutlined,
   WalletOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
 import type { ChiTietDonHang } from "@/services/admin/orderService";
 import AdminSearchInput from "../common/AdminSearchInput";
 import OrderDetailDrawer from "./OrderDetailDrawer";
-import OrderFilterBar from "./OrderFilterBar";
+import OrderFilterBar, { type DateRange } from "./OrderFilterBar";
 import OrderPagination from "./OrderPagination";
 import OrderStatCard from "./OrderStatCard";
 import OrderTable, { type Order } from "./OrderTable";
@@ -123,9 +122,10 @@ export default function OrdersPage() {
   // ---- State bộ lọc ----
   const [activeTab, setActiveTab] = useState("tat_ca");
   const [paymentFilter, setPaymentFilter] = useState("tat_ca");
-  const [timeFilter, setTimeFilter] = useState("tat_ca");
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [typeFilter, setTypeFilter] = useState("tat_ca");
   const [tuKhoa, setTuKhoa] = useState("");
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---- State phân trang ----
   const [currentPage, setCurrentPage] = useState(1);
@@ -133,6 +133,9 @@ export default function OrdersPage() {
   // ---- State drawer ----
   // Lưu ID đơn đang mở drawer (null = không mở)
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+
+  const tuNgay = dateRange?.[0].format("YYYY-MM-DD") ?? "";
+  const denNgay = dateRange?.[1].format("YYYY-MM-DD") ?? "";
 
   // ======================================================
   // REACT QUERY: Lấy thống kê KPI
@@ -162,7 +165,8 @@ export default function OrdersPage() {
       currentPage,
       activeTab,
       paymentFilter,
-      timeFilter,
+      tuNgay,
+      denNgay,
       typeFilter,
       tuKhoa,
     ],
@@ -172,7 +176,8 @@ export default function OrdersPage() {
         soMoiTrang: SO_MOI_TRANG,
         trangThai: activeTab,
         thanhToan: paymentFilter,
-        thoiGian: timeFilter,
+        tuNgay,
+        denNgay,
         loai: typeFilter,
         tuKhoa,
       }),
@@ -208,7 +213,7 @@ export default function OrdersPage() {
     setCurrentPage(1);
   }
   function handlePaymentChange(v: string) { setPaymentFilter(v); setCurrentPage(1); }
-  function handleTimeChange(v: string) { setTimeFilter(v); setCurrentPage(1); }
+  function handleDateRangeChange(v: DateRange | null) { setDateRange(v); setCurrentPage(1); }
   function handleTypeChange(v: string) { setTypeFilter(v); setCurrentPage(1); }
 
   // Chuyển đổi dữ liệu từ API sang kiểu FE
@@ -235,13 +240,6 @@ export default function OrdersPage() {
         </div>
 
         <div className="flex gap-3">
-          <button
-            type="button"
-            className="flex h-control-h items-center gap-2 rounded-[10px] border border-border bg-surface px-4 text-button-text font-semibold text-text-secondary transition-colors hover:bg-surface-alt"
-          >
-            <DownloadOutlined />
-            Xuất danh sách
-          </button>
           <button
             type="button"
             className="flex h-control-h items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-4 text-button-text font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7]"
@@ -278,8 +276,10 @@ export default function OrdersPage() {
             onChange={(e) => {
               const val = (e.target as HTMLInputElement).value;
               // Tạm dùng setTimeout đơn giản để debounce
-              clearTimeout((window as any).__searchTimeout);
-              (window as any).__searchTimeout = setTimeout(() => {
+              if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+              }
+              searchTimeoutRef.current = setTimeout(() => {
                 setTuKhoa(val);
                 setCurrentPage(1);
               }, 500);
@@ -293,8 +293,8 @@ export default function OrdersPage() {
           onTabChange={handleTabChange}
           paymentFilter={paymentFilter}
           onPaymentFilterChange={handlePaymentChange}
-          timeFilter={timeFilter}
-          onTimeFilterChange={handleTimeChange}
+          dateRange={dateRange}
+          onDateRangeChange={handleDateRangeChange}
           typeFilter={typeFilter}
           onTypeFilterChange={handleTypeChange}
         />

@@ -23,7 +23,7 @@ const getThongKe = async (req, res, next) => {
  * Lấy danh sách đơn hàng có phân trang và lọc.
  *
  * Query params:
- *   trang, soMoiTrang, trangThai, thanhToan, thoiGian, loai, tuKhoa
+ *   trang, soMoiTrang, trangThai, thanhToan, thoiGian, tuNgay, denNgay, loai, tuKhoa
  */
 const getDanhSachDonHang = async (req, res, next) => {
   try {

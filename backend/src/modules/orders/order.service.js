@@ -38,6 +38,21 @@ function formatNgayGio(date) {
   return `${gio}:${phut}, ${ngay}/${thang}/${nam}`;
 }
 
+function laNgayLocHopLe(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [nam, thang, ngay] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(nam, thang - 1, ngay));
+
+  return (
+    date.getUTCFullYear() === nam &&
+    date.getUTCMonth() === thang - 1 &&
+    date.getUTCDate() === ngay
+  );
+}
+
 /**
  * Xây dựng timeline lịch sử xử lý đơn từ các cột thời gian trong DB.
  * DB không có bảng lịch sử riêng, nên tái tạo từ các mốc thời gian có sẵn.
@@ -162,7 +177,17 @@ async function layThongKe() {
 // =====================================================================
 // SERVICE 2: Lấy danh sách đơn hàng (phân trang + lọc)
 // =====================================================================
-async function layDanhSachDonHang({ trang, soMoiTrang, trangThai, thanhToan, thoiGian, loai, tuKhoa }) {
+async function layDanhSachDonHang({
+  trang,
+  soMoiTrang,
+  trangThai,
+  thanhToan,
+  thoiGian,
+  tuNgay,
+  denNgay,
+  loai,
+  tuKhoa,
+}) {
   const trangHienTai = parseInt(trang) || 1;
   const soMoi = parseInt(soMoiTrang) || 10;
   const offset = (trangHienTai - 1) * soMoi;
@@ -192,8 +217,24 @@ async function layDanhSachDonHang({ trang, soMoiTrang, trangThai, thanhToan, tho
     dieuKien.push("p.status = 'PENDING'");
   }
 
-  // Lọc theo thời gian
-  if (thoiGian === "hom_nay") {
+  // Lọc theo thời gian. Ưu tiên khoảng ngày cụ thể từ RangePicker.
+  const tuNgayHopLe = laNgayLocHopLe(tuNgay) ? tuNgay : null;
+  const denNgayHopLe = laNgayLocHopLe(denNgay) ? denNgay : null;
+  if (tuNgayHopLe && denNgayHopLe) {
+    const [ngayBatDau, ngayKetThuc] =
+      tuNgayHopLe <= denNgayHopLe
+        ? [tuNgayHopLe, denNgayHopLe]
+        : [denNgayHopLe, tuNgayHopLe];
+
+    dieuKien.push("co.createdAt >= ? AND co.createdAt < DATE_ADD(?, INTERVAL 1 DAY)");
+    thamSo.push(ngayBatDau, ngayKetThuc);
+  } else if (tuNgayHopLe) {
+    dieuKien.push("co.createdAt >= ?");
+    thamSo.push(tuNgayHopLe);
+  } else if (denNgayHopLe) {
+    dieuKien.push("co.createdAt < DATE_ADD(?, INTERVAL 1 DAY)");
+    thamSo.push(denNgayHopLe);
+  } else if (thoiGian === "hom_nay") {
     dieuKien.push("DATE(co.createdAt) = CURDATE()");
   } else if (thoiGian === "tuan_nay") {
     dieuKien.push("YEARWEEK(co.createdAt, 1) = YEARWEEK(CURDATE(), 1)");
