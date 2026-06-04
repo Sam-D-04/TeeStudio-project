@@ -575,4 +575,613 @@ module.exports = {
   layChiTietDonHang,
   capNhatTrangThai,
   huyDonHang,
+  // ── Service hỗ trợ form Tạo đơn mới ──
+  timKiemKhachHang,
+  layDiaChiKhachHang,
+  timKiemSanPham,
+  timKiemThietKe,
+  layDanhSachKhuyenMai,
+  taoMoiDonHang,
 };
+
+// =====================================================================
+// SERVICE 6: Tìm kiếm khách hàng (dùng cho form Tạo đơn mới)
+// GET /api/admin/orders/search/customers?q=<keyword>
+// =====================================================================
+/**
+ * Tìm kiếm Account theo tên / SĐT / email.
+ * Trả về tối đa 20 kết quả để điền vào Select dropdown.
+ */
+async function timKiemKhachHang(keyword) {
+  const q = `%${(keyword || "").trim()}%`;
+  const [rows] = await db.pool.query(
+    `SELECT id, fullName, phone, email
+     FROM Account
+     WHERE role = 'CUSTOMER'
+       AND status = 'ACTIVE'
+       AND (fullName LIKE ? OR phone LIKE ? OR email LIKE ?)
+     ORDER BY fullName
+     LIMIT 20`,
+    [q, q, q]
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    hoTen: r.fullName,
+    soDienThoai: r.phone,
+    email: r.email,
+  }));
+}
+
+// =====================================================================
+// SERVICE 7: Lấy danh sách địa chỉ của một khách hàng
+// GET /api/admin/orders/customers/:userId/addresses
+// =====================================================================
+/**
+ * Lấy tất cả UserAddress của userId.
+ * Địa chỉ mặc định (isDefault = 1) sẽ được đặt lên đầu.
+ */
+async function layDiaChiKhachHang(userId) {
+  const [rows] = await db.pool.query(
+    `SELECT id, recipientName, phone, addressLine, ward, district, city, isDefault
+     FROM UserAddress
+     WHERE userId = ?
+     ORDER BY isDefault DESC, id ASC`,
+    [userId]
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    tenNguoiNhan: r.recipientName,
+    soDienThoai: r.phone,
+    diaChiCuThe: r.addressLine,
+    phuong: r.ward,
+    quan: r.district,
+    thanhPho: r.city,
+    laMacDinh: !!r.isDefault,
+    // Ghép chuỗi địa chỉ đầy đủ để hiển thị
+    diaChiDayDu: [r.addressLine, r.ward, r.district, r.city]
+      .filter(Boolean)
+      .join(", "),
+  }));
+}
+
+// =====================================================================
+// SERVICE 8: Tìm kiếm sản phẩm + biến thể (dùng cho form Tạo đơn mới)
+// GET /api/admin/orders/search/products?q=<keyword>
+// =====================================================================
+/**
+ * Tìm kiếm Product theo tên, trả kèm:
+ *   - Danh sách ProductVariant (color, size, stockQty)
+ *   - Danh sách BulkPricing của sản phẩm đó
+ * Frontend dùng để hiển thị tồn kho và preview BulkPricing.
+ */
+async function timKiemSanPham(keyword) {
+  const q = `%${(keyword || "").trim()}%`;
+
+  // Lấy sản phẩm đang ACTIVE
+  const [products] = await db.pool.query(
+    `SELECT p.id, p.name, p.basePrice, p.material, p.form,
+            pi.imageUrl AS anhUrl
+     FROM Product p
+     LEFT JOIN ProductImage pi ON pi.productId = p.id AND pi.isPrimary = 1
+     WHERE p.status = 'ACTIVE' AND p.name LIKE ?
+     ORDER BY p.name
+     LIMIT 20`,
+    [q]
+  );
+
+  if (products.length === 0) return [];
+
+  const productIds = products.map((p) => p.id);
+  const placeholders = productIds.map(() => "?").join(",");
+
+  // Lấy tất cả variants của các sản phẩm đó
+  const [variants] = await db.pool.query(
+    `SELECT id, productId, color, size, sku, stockQty
+     FROM ProductVariant
+     WHERE productId IN (${placeholders})
+     ORDER BY productId, color, size`,
+    productIds
+  );
+
+  // Lấy tất cả BulkPricing của các sản phẩm đó
+  const [bulkPricings] = await db.pool.query(
+    `SELECT id, productId, minQty, discountPercent
+     FROM BulkPricing
+     WHERE productId IN (${placeholders})
+     ORDER BY productId, minQty ASC`,
+    productIds
+  );
+
+  // Ghép dữ liệu theo productId
+  return products.map((p) => ({
+    id: p.id,
+    ten: p.name,
+    giaGoc: Number(p.basePrice),
+    chatLieu: p.material,
+    dang: p.form,
+    anhUrl: p.anhUrl || null,
+    bienThe: variants
+      .filter((v) => v.productId === p.id)
+      .map((v) => ({
+        id: v.id,
+        mau: v.color,
+        kichCo: v.size,
+        sku: v.sku,
+        tonKho: v.stockQty,
+      })),
+    bangGiaSi: bulkPricings
+      .filter((b) => b.productId === p.id)
+      .map((b) => ({
+        id: b.id,
+        soLuongToiThieu: b.minQty,
+        phanTramGiam: Number(b.discountPercent),
+        // Preview giá sau giảm
+        giaPreview: Number(p.basePrice) * (1 - Number(b.discountPercent) / 100),
+      })),
+  }));
+}
+
+// =====================================================================
+// SERVICE 9: Tìm kiếm thiết kế của khách hàng (dùng cho form Tạo đơn POD)
+// GET /api/admin/orders/search/designs?userId=<id>&q=<keyword>
+// =====================================================================
+/**
+ * Lấy danh sách CustomDesign đã APPROVED của khách hàng.
+ * Admin chỉ có thể gán thiết kế đã được duyệt vào đơn mới.
+ */
+async function timKiemThietKe(userId, keyword) {
+  const params = [userId];
+  let extraCondition = "";
+
+  if (keyword && keyword.trim()) {
+    extraCondition = " AND cd.id LIKE ?";
+    params.push(`%${keyword.trim()}%`);
+  }
+
+  const [rows] = await db.pool.query(
+    `SELECT cd.id, cd.productId, cd.variantId, cd.baseColor,
+            cd.previewUrl, cd.designFee, cd.status, cd.createdAt,
+            p.name AS tenSanPham
+     FROM CustomDesign cd
+     JOIN Product p ON p.id = cd.productId
+     WHERE cd.userId = ?
+       AND cd.status = 'APPROVED'
+       ${extraCondition}
+     ORDER BY cd.createdAt DESC
+     LIMIT 30`,
+    params
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    productId: r.productId,
+    variantId: r.variantId,
+    tenSanPham: r.tenSanPham,
+    mauNen: r.baseColor,
+    anhXemTruoc: r.previewUrl,
+    phiThietKe: Number(r.designFee),
+    trangThai: r.status,
+    ngayTao: r.createdAt,
+  }));
+}
+
+// =====================================================================
+// SERVICE 10: Lấy danh sách khuyến mãi còn hiệu lực
+// GET /api/admin/orders/promotions
+// =====================================================================
+/**
+ * Trả về các Promotion đang ACTIVE, còn trong thời hạn, chưa hết lượt dùng.
+ */
+async function layDanhSachKhuyenMai() {
+  const now = new Date();
+  const [rows] = await db.pool.query(
+    `SELECT id, code, discountType, discountValue, minOrderAmount,
+            startDate, endDate, usageLimit, usedCount
+     FROM Promotion
+     WHERE status = 'ACTIVE'
+       AND startDate <= ?
+       AND endDate >= ?
+       AND usedCount < usageLimit
+     ORDER BY endDate ASC
+     LIMIT 50`,
+    [now, now]
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    ma: r.code,
+    loaiGiam: r.discountType,       // PERCENT | FIXED
+    giaTriGiam: Number(r.discountValue),
+    donHangToiThieu: Number(r.minOrderAmount),
+    ngayKetThuc: r.endDate,
+    daUsed: r.usedCount,
+    usageLimit: r.usageLimit,
+  }));
+}
+
+// =====================================================================
+// SERVICE 11: Tạo đơn hàng mới (Admin tạo thay cho khách)
+// POST /api/admin/orders
+// =====================================================================
+/**
+ * Tạo đơn hàng trong MySQL Transaction.
+ *
+ * Các bước:
+ *  1. Validate business logic (user, address, variants, design, promotion)
+ *  2. Tính giá backend: BulkPricing, designFee, discountAmount, totalAmount
+ *  3. BEGIN transaction
+ *  4. INSERT CustomerOrder
+ *  5. INSERT OrderItem (mỗi item)
+ *  6. INSERT OrderProduction (nếu item có designId)
+ *  7. INSERT Payment
+ *  8. INSERT PromotionUsage + UPDATE Promotion.usedCount (nếu có)
+ *  9. COMMIT
+ *
+ * Nghiệp vụ kho:
+ *  - Chỉ kiểm tra stockQty >= quantity, KHÔNG giảm kho khi tạo đơn PENDING.
+ *  - Kho chỉ giảm khi đơn được CONFIRM (xử lý ở capNhatTrangThai).
+ *
+ * @param {Object} data - dữ liệu từ request body đã validated
+ */
+async function taoMoiDonHang(data) {
+  const {
+    userId,
+    addressId,
+    items,
+    paymentMethod,
+    paymentType = "FULL",
+    shippingFee: shippingFeeInput = 0,
+    promotionId = null,
+  } = data;
+
+  // ─────────────────────────────────────────────
+  // BƯỚC 1: Validate business logic (ngoài transaction)
+  // ─────────────────────────────────────────────
+
+  // 1a. Kiểm tra userId tồn tại và còn ACTIVE
+  const [rowsUser] = await db.pool.query(
+    "SELECT id, fullName FROM Account WHERE id = ? AND status = 'ACTIVE' LIMIT 1",
+    [userId]
+  );
+  if (rowsUser.length === 0) {
+    const err = new Error("Khách hàng không tồn tại hoặc đã bị vô hiệu hóa");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // 1b. Kiểm tra addressId thuộc đúng userId
+  const [rowsAddr] = await db.pool.query(
+    "SELECT id FROM UserAddress WHERE id = ? AND userId = ? LIMIT 1",
+    [addressId, userId]
+  );
+  if (rowsAddr.length === 0) {
+    const err = new Error("Địa chỉ giao hàng không hợp lệ hoặc không thuộc khách hàng này");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // 1c. Validate từng item: variant tồn tại + đủ tồn kho
+  const itemsEnriched = []; // sẽ chứa thông tin đầy đủ để tính giá
+
+  for (const item of items) {
+    const [rowsVariant] = await db.pool.query(
+      `SELECT pv.id AS variantId, pv.productId, pv.color, pv.size, pv.stockQty,
+              p.name AS tenSanPham, p.basePrice
+       FROM ProductVariant pv
+       JOIN Product p ON p.id = pv.productId
+       WHERE pv.id = ? AND p.status = 'ACTIVE'
+       LIMIT 1`,
+      [item.variantId]
+    );
+    if (rowsVariant.length === 0) {
+      const err = new Error(`Biến thể sản phẩm ID=${item.variantId} không tồn tại`);
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const variant = rowsVariant[0];
+
+    // Kiểm tra tồn kho (chỉ cảnh báo khi tạo PENDING – không block)
+    if (variant.stockQty < item.quantity) {
+      const err = new Error(
+        `Sản phẩm "${variant.tenSanPham}" (${variant.color}/${variant.size}) chỉ còn ${variant.stockQty} trong kho, không đủ ${item.quantity} sản phẩm`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // ── Tính đơn giá theo BulkPricing ──
+    // Chọn mức BulkPricing có minQty lớn nhất nhưng <= quantity của item này
+    const [rowsBulk] = await db.pool.query(
+      `SELECT discountPercent
+       FROM BulkPricing
+       WHERE productId = ? AND minQty <= ?
+       ORDER BY minQty DESC
+       LIMIT 1`,
+      [variant.productId, item.quantity]
+    );
+
+    let unitPrice;
+    if (rowsBulk.length > 0) {
+      // Áp dụng BulkPricing: unitPrice = basePrice * (1 - discountPercent/100)
+      unitPrice = Number(variant.basePrice) * (1 - Number(rowsBulk[0].discountPercent) / 100);
+    } else {
+      // Không có BulkPricing phù hợp → giữ nguyên basePrice
+      unitPrice = Number(variant.basePrice);
+    }
+
+    // Làm tròn 2 chữ số thập phân
+    unitPrice = Math.round(unitPrice * 100) / 100;
+
+    itemsEnriched.push({
+      variantId: item.variantId,
+      productId: variant.productId,
+      tenSanPham: variant.tenSanPham,
+      color: variant.color,
+      size: variant.size,
+      quantity: item.quantity,
+      unitPrice,
+      designId: item.designId || null,
+      designFee: 0, // sẽ cập nhật nếu có designId
+    });
+  }
+
+  // 1d. Validate designId (nếu có) và lấy designFee
+  for (const enriched of itemsEnriched) {
+    if (!enriched.designId) continue;
+
+    const [rowsDesign] = await db.pool.query(
+      `SELECT id, userId AS designUserId, productId, designFee, status
+       FROM CustomDesign
+       WHERE id = ? LIMIT 1`,
+      [enriched.designId]
+    );
+
+    if (rowsDesign.length === 0) {
+      const err = new Error(`Thiết kế ID=${enriched.designId} không tồn tại`);
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const design = rowsDesign[0];
+
+    // Thiết kế phải thuộc đúng khách hàng đang đặt đơn
+    if (design.designUserId !== userId) {
+      const err = new Error(`Thiết kế ID=${enriched.designId} không thuộc khách hàng này`);
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Thiết kế phải đã được APPROVED
+    if (design.status !== "APPROVED") {
+      const err = new Error(
+        `Thiết kế ID=${enriched.designId} chưa được duyệt (trạng thái: ${design.status}). Chỉ thiết kế APPROVED mới được gán vào đơn`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Gán designFee từ DB
+    enriched.designFee = Number(design.designFee);
+  }
+
+  // ─────────────────────────────────────────────
+  // BƯỚC 2: Tính giá tổng đơn hàng
+  // ─────────────────────────────────────────────
+
+  // subtotal = tổng (unitPrice * quantity) của tất cả items (không gồm designFee và shippingFee)
+  const subtotal = itemsEnriched.reduce(
+    (tong, item) => tong + item.unitPrice * item.quantity,
+    0
+  );
+
+  // Tổng phí thiết kế (nếu là đơn POD)
+  const tongDesignFee = itemsEnriched.reduce(
+    (tong, item) => tong + item.designFee,
+    0
+  );
+
+  const shippingFee = Math.max(0, Number(shippingFeeInput) || 0);
+
+  // Tính discountAmount từ promotion (nếu có)
+  let discountAmount = 0;
+  let promotionData = null;
+
+  if (promotionId) {
+    const now = new Date();
+    const [rowsPromo] = await db.pool.query(
+      `SELECT id, code, discountType, discountValue, minOrderAmount,
+              usageLimit, usedCount, startDate, endDate, status
+       FROM Promotion
+       WHERE id = ? LIMIT 1`,
+      [promotionId]
+    );
+
+    if (rowsPromo.length === 0) {
+      const err = new Error("Mã khuyến mãi không tồn tại");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const promo = rowsPromo[0];
+
+    // Kiểm tra ACTIVE
+    if (promo.status !== "ACTIVE") {
+      const err = new Error("Mã khuyến mãi không còn hiệu lực");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Kiểm tra thời hạn
+    if (new Date(promo.startDate) > now || new Date(promo.endDate) < now) {
+      const err = new Error("Mã khuyến mãi đã hết hạn hoặc chưa đến ngày áp dụng");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Kiểm tra số lượt dùng
+    if (promo.usedCount >= promo.usageLimit) {
+      const err = new Error("Mã khuyến mãi đã hết lượt sử dụng");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Kiểm tra đơn hàng đạt minOrderAmount
+    // minOrderAmount tính trên subtotal (giá gốc sản phẩm), không gồm ship
+    const orderBaseAmount = subtotal + tongDesignFee;
+    if (orderBaseAmount < Number(promo.minOrderAmount)) {
+      const err = new Error(
+        `Đơn hàng cần tối thiểu ${Number(promo.minOrderAmount).toLocaleString("vi-VN")}₫ để áp dụng mã khuyến mãi này`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Kiểm tra khách hàng đã dùng mã này chưa (unique constraint promotionId + userId)
+    const [rowsUsed] = await db.pool.query(
+      "SELECT id FROM PromotionUsage WHERE promotionId = ? AND userId = ? LIMIT 1",
+      [promotionId, userId]
+    );
+    if (rowsUsed.length > 0) {
+      const err = new Error(
+        `Khách hàng này đã sử dụng mã khuyến mãi "${promo.code}" trước đó. Mỗi khách chỉ được dùng mỗi mã 1 lần`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Tính giá trị giảm
+    if (promo.discountType === "PERCENT") {
+      discountAmount = orderBaseAmount * (Number(promo.discountValue) / 100);
+    } else {
+      // FIXED
+      discountAmount = Number(promo.discountValue);
+    }
+    discountAmount = Math.min(discountAmount, orderBaseAmount); // không giảm quá tổng đơn
+    discountAmount = Math.round(discountAmount * 100) / 100;
+
+    promotionData = promo;
+  }
+
+  // Tổng tiền cuối cùng
+  const totalAmount = Math.max(
+    0,
+    Math.round((subtotal + tongDesignFee + shippingFee - discountAmount) * 100) / 100
+  );
+
+  // ─────────────────────────────────────────────
+  // BƯỚC 3-9: Thực hiện trong MySQL Transaction
+  // ─────────────────────────────────────────────
+
+  // Lấy connection riêng để dùng transaction
+  const conn = await db.pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    // ── Bước 3.1: Sinh orderCode duy nhất ──
+    // Format: TS-YYYYMMDD-XXXXXX (X = random hex)
+    const now = new Date();
+    const dateStr = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0"),
+    ].join("");
+    const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const orderCode = `TS-${dateStr}-${randomPart}`;
+
+    // ── Bước 3.2: INSERT CustomerOrder ──
+    const [resultOrder] = await conn.query(
+      `INSERT INTO CustomerOrder
+         (orderCode, userId, promotionId, addressId,
+          subtotal, discountAmount, shippingFee,
+          totalAmount, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')`,
+      [
+        orderCode,
+        userId,
+        promotionId || null,
+        addressId,
+        Math.round(subtotal * 100) / 100,
+        discountAmount,
+        shippingFee,
+        totalAmount,
+      ]
+    );
+    const orderId = resultOrder.insertId;
+
+    // ── Bước 3.3: INSERT OrderItem và OrderProduction ──
+    for (const item of itemsEnriched) {
+      // lineTotal = (unitPrice * quantity) + designFee của item này
+      const lineTotal = Math.round(
+        (item.unitPrice * item.quantity + item.designFee) * 100
+      ) / 100;
+
+      const [resultItem] = await conn.query(
+        `INSERT INTO OrderItem
+           (orderId, variantId, designId, quantity,
+            unitPrice, designFee, lineTotal, productionStatus)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          orderId,
+          item.variantId,
+          item.designId,
+          item.quantity,
+          item.unitPrice,
+          item.designFee,
+          lineTotal,
+          item.designId ? "WAITING_DESIGN_APPROVAL" : "WAITING_DESIGN_APPROVAL",
+        ]
+      );
+      const orderItemId = resultItem.insertId;
+
+      // Nếu item có thiết kế POD → tạo OrderProduction
+      if (item.designId) {
+        await conn.query(
+          `INSERT INTO OrderProduction (orderItemId, designId, status)
+           VALUES (?, ?, 'WAITING_DESIGN_APPROVAL')`,
+          [orderItemId, item.designId]
+        );
+      }
+    }
+
+    // ── Bước 3.4: INSERT Payment ──
+    await conn.query(
+      `INSERT INTO Payment (orderId, amount, paymentMethod, paymentType, status)
+       VALUES (?, ?, ?, ?, 'PENDING')`,
+      [orderId, totalAmount, paymentMethod, paymentType]
+    );
+
+    // ── Bước 3.5: Ghi nhận PromotionUsage và tăng usedCount ──
+    if (promotionId && promotionData) {
+      // INSERT PromotionUsage
+      await conn.query(
+        `INSERT INTO PromotionUsage (promotionId, userId, orderId)
+         VALUES (?, ?, ?)`,
+        [promotionId, userId, orderId]
+      );
+
+      // Tăng usedCount +1
+      await conn.query(
+        "UPDATE Promotion SET usedCount = usedCount + 1 WHERE id = ?",
+        [promotionId]
+      );
+    }
+
+    // ── COMMIT ──
+    await conn.commit();
+
+    return {
+      id: orderId,
+      orderCode,
+      totalAmount,
+    };
+  } catch (error) {
+    // ── ROLLBACK nếu có lỗi ──
+    await conn.rollback();
+    throw error;
+  } finally {
+    // Trả connection về pool dù thành công hay thất bại
+    conn.release();
+  }
+}
+

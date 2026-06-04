@@ -179,3 +179,180 @@ export async function huyDonHang(
   }>(`/admin/orders/${id}/cancel`, { lyDo });
   return res.data.data;
 }
+
+// =====================================================================
+// TYPES & FUNCTIONS CHO FORM TẠO ĐƠN MỚI
+// =====================================================================
+
+/** Thông tin khách hàng (kết quả search) */
+export type KhachHang = {
+  id: number;
+  hoTen: string;
+  soDienThoai: string;
+  email: string;
+};
+
+/** Địa chỉ giao hàng của khách */
+export type DiaChiGiaoHang = {
+  id: number;
+  tenNguoiNhan: string;
+  soDienThoai: string;
+  diaChiCuThe: string;
+  phuong: string;
+  quan: string;
+  thanhPho: string;
+  laMacDinh: boolean;
+  diaChiDayDu: string;
+};
+
+/** Biến thể sản phẩm (màu, size, tồn kho) */
+export type BienTheSanPham = {
+  id: number;
+  mau: string;
+  kichCo: string;
+  sku: string;
+  tonKho: number;
+};
+
+/** Mức giá sỉ (BulkPricing) */
+export type MucGiaSi = {
+  id: number;
+  soLuongToiThieu: number;
+  phanTramGiam: number;
+  giaPreview: number;
+};
+
+/** Sản phẩm kết quả tìm kiếm (gồm biến thể + giá sỉ) */
+export type SanPhamTimKiem = {
+  id: number;
+  ten: string;
+  giaGoc: number;
+  chatLieu: string;
+  dang: string;
+  anhUrl: string | null;
+  bienThe: BienTheSanPham[];
+  bangGiaSi: MucGiaSi[];
+};
+
+/** Thiết kế đã APPROVED của khách */
+export type ThietKe = {
+  id: number;
+  productId: number;
+  variantId: number | null;
+  tenSanPham: string;
+  mauNen: string;
+  anhXemTruoc: string;
+  phiThietKe: number;
+  trangThai: string;
+  ngayTao: string;
+};
+
+/** Mã khuyến mãi còn hiệu lực */
+export type KhuyenMai = {
+  id: number;
+  ma: string;
+  loaiGiam: "PERCENT" | "FIXED";
+  giaTriGiam: number;
+  donHangToiThieu: number;
+  ngayKetThuc: string;
+  daUsed: number;
+  usageLimit: number;
+};
+
+/** Một dòng item trong đơn (payload gửi lên backend) */
+export type OrderItemInput = {
+  variantId: number;
+  quantity: number;
+  designId?: number | null;
+};
+
+/** Payload tạo đơn mới */
+export type TaoMoiDonHangInput = {
+  userId: number;
+  addressId: number;
+  items: OrderItemInput[];
+  paymentMethod: "COD" | "VNPAY" | "CASH";
+  paymentType: "FULL" | "DEPOSIT";
+  shippingFee: number;
+  promotionId?: number | null;
+};
+
+/** Kết quả trả về sau khi tạo đơn thành công */
+export type KetQuaTaoMoiDonHang = {
+  id: number;
+  orderCode: string;
+  totalAmount: number;
+};
+
+/**
+ * Tìm kiếm khách hàng theo tên / SĐT / email.
+ * GET /api/admin/orders/search/customers?q=<keyword>
+ */
+export async function timKiemKhachHang(keyword: string): Promise<KhachHang[]> {
+  const res = await apiClient.get<{ success: boolean; data: KhachHang[] }>(
+    "/admin/orders/search/customers",
+    { params: { q: keyword } }
+  );
+  return res.data.data;
+}
+
+/**
+ * Lấy danh sách địa chỉ giao hàng của khách.
+ * GET /api/admin/orders/customers/:userId/addresses
+ */
+export async function layDiaChiKhachHang(userId: number): Promise<DiaChiGiaoHang[]> {
+  const res = await apiClient.get<{ success: boolean; data: DiaChiGiaoHang[] }>(
+    `/admin/orders/customers/${userId}/addresses`
+  );
+  return res.data.data;
+}
+
+/**
+ * Tìm kiếm sản phẩm (kèm biến thể + BulkPricing).
+ * GET /api/admin/orders/search/products?q=<keyword>
+ */
+export async function timKiemSanPham(keyword: string): Promise<SanPhamTimKiem[]> {
+  const res = await apiClient.get<{ success: boolean; data: SanPhamTimKiem[] }>(
+    "/admin/orders/search/products",
+    { params: { q: keyword } }
+  );
+  return res.data.data;
+}
+
+/**
+ * Tìm thiết kế APPROVED của khách.
+ * GET /api/admin/orders/search/designs?userId=<id>&q=<keyword>
+ */
+export async function timKiemThietKe(userId: number, keyword?: string): Promise<ThietKe[]> {
+  const res = await apiClient.get<{ success: boolean; data: ThietKe[] }>(
+    "/admin/orders/search/designs",
+    { params: { userId, q: keyword || "" } }
+  );
+  return res.data.data;
+}
+
+/**
+ * Lấy danh sách mã khuyến mãi còn hiệu lực.
+ * GET /api/admin/orders/promotions
+ */
+export async function layDanhSachKhuyenMai(): Promise<KhuyenMai[]> {
+  const res = await apiClient.get<{ success: boolean; data: KhuyenMai[] }>(
+    "/admin/orders/promotions"
+  );
+  return res.data.data;
+}
+
+/**
+ * Tạo đơn hàng mới.
+ * POST /api/admin/orders
+ */
+export async function taoMoiDonHang(
+  payload: TaoMoiDonHangInput
+): Promise<KetQuaTaoMoiDonHang> {
+  const res = await apiClient.post<{
+    success: boolean;
+    message: string;
+    data: KetQuaTaoMoiDonHang;
+  }>("/admin/orders", payload);
+  return res.data.data;
+}

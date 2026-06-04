@@ -4,8 +4,12 @@
  * Tất cả route đều đi qua:
  *   1. verifyToken  – xác thực JWT (bypass tạm thời)
  *   2. requireAdmin – kiểm tra quyền ADMIN
- *   3. validate     – kiểm tra dữ liệu đầu vào
+ *   3. validate     – kiểm tra dữ liệu đầu vào (nếu có)
  *   4. controller   – xử lý request
+ *
+ * LƯU Ý THỨ TỰ ROUTE:
+ *   - Các route /search/... và /promotions phải đặt TRƯỚC /:id
+ *     để tránh Express nhầm "search" hoặc "promotions" là :id.
  */
 
 const router = require("express").Router();
@@ -13,7 +17,60 @@ const router = require("express").Router();
 const { verifyToken, requireAdmin } = require("../../common/middlewares/auth.middleware");
 const validate = require("../../common/middlewares/validate.middleware");
 const orderController = require("./order.controller");
-const { updateStatusSchema, cancelOrderSchema } = require("./order.validation");
+const {
+  updateStatusSchema,
+  cancelOrderSchema,
+  createOrderSchema,
+} = require("./order.validation");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROUTE HỖ TRỢ FORM TẠO ĐƠN MỚI
+// (Đặt trước /:id để tránh bị Express hiểu nhầm path segment)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/admin/orders/search/customers?q=<keyword>
+router.get(
+  "/search/customers",
+  verifyToken,
+  requireAdmin,
+  orderController.timKhachHang
+);
+
+// GET /api/admin/orders/customers/:userId/addresses
+router.get(
+  "/customers/:userId/addresses",
+  verifyToken,
+  requireAdmin,
+  orderController.layDiaChi
+);
+
+// GET /api/admin/orders/search/products?q=<keyword>
+router.get(
+  "/search/products",
+  verifyToken,
+  requireAdmin,
+  orderController.timSanPham
+);
+
+// GET /api/admin/orders/search/designs?userId=<id>&q=<keyword>
+router.get(
+  "/search/designs",
+  verifyToken,
+  requireAdmin,
+  orderController.timThietKe
+);
+
+// GET /api/admin/orders/promotions
+router.get(
+  "/promotions",
+  verifyToken,
+  requireAdmin,
+  orderController.layKhuyenMai
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROUTE DANH SÁCH / THỐNG KÊ / TẠO ĐƠN
+// ─────────────────────────────────────────────────────────────────────────────
 
 // GET /api/admin/orders/stats – Lấy thống kê KPI
 // Đặt trước /:id để tránh bị nhầm thành route chi tiết với id = "stats"
@@ -31,6 +88,19 @@ router.get(
   requireAdmin,
   orderController.getDanhSachDonHang
 );
+
+// POST /api/admin/orders – Tạo đơn hàng mới
+router.post(
+  "/",
+  verifyToken,
+  requireAdmin,
+  validate(createOrderSchema),
+  orderController.taoMoiDonHang
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROUTE CHI TIẾT / CẬP NHẬT (có :id)
+// ─────────────────────────────────────────────────────────────────────────────
 
 // GET /api/admin/orders/:id – Lấy chi tiết 1 đơn hàng
 router.get(

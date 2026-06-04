@@ -8,6 +8,7 @@ import {
   WalletOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
 import type { ChiTietDonHang } from "@/services/admin/orderService";
@@ -117,6 +118,8 @@ function chuyenDoiSangOrderDetail(chi: ChiTietDonHang) {
 const SO_MOI_TRANG = 10;
 
 export default function OrdersPage() {
+  const router = useRouter();
+
   // ---- State bộ lọc ----
   const [activeTab, setActiveTab] = useState("tat_ca");
   const [paymentFilter, setPaymentFilter] = useState("tat_ca");
@@ -240,6 +243,7 @@ export default function OrdersPage() {
         <div className="flex gap-3">
           <button
             type="button"
+            onClick={() => router.push("/admin/don-hang/tao-moi")}
             className="flex h-control-h items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-4 text-button-text font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7]"
           >
             <PlusOutlined />

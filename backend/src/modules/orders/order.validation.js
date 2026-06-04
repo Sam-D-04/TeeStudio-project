@@ -118,10 +118,72 @@ const updateOrderStatusSchema = {
   },
 };
 
+/**
+ * Schema tạo đơn hàng mới (Admin tạo thay cho khách).
+ * POST /api/admin/orders
+ *
+ * Backend sẽ tự tính lại giá từ DB – frontend chỉ gửi variantId, quantity, designId.
+ */
+const createOrderSchema = {
+  body: {
+    userId: {
+      required: true,
+      type: "integer",
+      min: 1,
+    },
+    addressId: {
+      required: true,
+      type: "integer",
+      min: 1,
+    },
+    items: {
+      required: true,
+      type: "array",
+      custom: (items) => {
+        if (!Array.isArray(items) || items.length === 0) {
+          return "Đơn hàng phải có ít nhất 1 sản phẩm";
+        }
+        for (const item of items) {
+          if (!item.variantId || typeof item.variantId !== "number" || item.variantId < 1) {
+            return "variantId không hợp lệ";
+          }
+          if (!item.quantity || typeof item.quantity !== "number" || item.quantity < 1) {
+            return "quantity phải là số nguyên dương";
+          }
+          if (item.designId !== undefined && item.designId !== null) {
+            if (typeof item.designId !== "number" || item.designId < 1) {
+              return "designId không hợp lệ";
+            }
+          }
+        }
+        return true;
+      },
+    },
+    paymentMethod: {
+      required: true,
+      type: "string",
+      enum: ["COD", "VNPAY", "CASH"],
+    },
+    paymentType: {
+      type: "string",
+      enum: ["FULL", "DEPOSIT"],
+    },
+    shippingFee: {
+      type: "number",
+      min: 0,
+    },
+    promotionId: {
+      type: "integer",
+      min: 1,
+    },
+  },
+};
+
 module.exports = {
   // Admin schemas
   updateStatusSchema,
   cancelOrderSchema,
+  createOrderSchema,
   // Customer schemas (giữ lại)
   checkoutSchema,
   updateOrderStatusSchema,
