@@ -1,13 +1,16 @@
 import { SearchOutlined } from "@ant-design/icons";
+import type { ChangeEventHandler } from "react";
 
 type AdminSearchInputProps = {
   placeholder: string;
   className?: string;
+  onChange?: ChangeEventHandler<HTMLInputElement>;
 };
 
 export default function AdminSearchInput({
   placeholder,
   className = "",
+  onChange,
 }: AdminSearchInputProps) {
   return (
     <label
@@ -17,8 +20,10 @@ export default function AdminSearchInput({
       <input
         type="search"
         placeholder={placeholder}
+        onChange={onChange}
         className="h-full w-full bg-transparent text-body-md text-text-main outline-none placeholder:text-text-muted"
       />
     </label>
   );
 }
+

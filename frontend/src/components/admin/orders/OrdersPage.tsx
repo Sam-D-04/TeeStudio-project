@@ -8,9 +8,11 @@ import {
   SyncOutlined,
   WalletOutlined,
 } from "@ant-design/icons";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import * as orderService from "@/services/admin/orderService";
+import type { ChiTietDonHang } from "@/services/admin/orderService";
 import AdminSearchInput from "../common/AdminSearchInput";
-import type { OrderDetail } from "./OrderDetailDrawer";
 import OrderDetailDrawer from "./OrderDetailDrawer";
 import OrderFilterBar from "./OrderFilterBar";
 import OrderPagination from "./OrderPagination";
@@ -18,180 +20,206 @@ import OrderStatCard from "./OrderStatCard";
 import OrderTable, { type Order } from "./OrderTable";
 
 /**
- * OrdersPage – trang quản lý đơn hàng (nội dung chính, không bao gồm sidebar/topbar).
+ * OrdersPage – Trang quản lý đơn hàng (đã kết nối API thực tế).
  *
- * Component này là "trang" thật sự. Nó:
- * 1. Hiển thị tiêu đề và các nút hành động đầu trang.
- * 2. Hiển thị 4 thẻ KPI thống kê.
- * 3. Hiển thị bảng đơn hàng với filter và phân trang.
- * 4. Khi bấm vào hàng → mở ngăn kéo chi tiết.
- *
- * Dữ liệu mẫu (mock data) được dùng tạm thời. Sau khi Backend hoàn thành,
- * nhóm FE sẽ thay các mảng dữ liệu này bằng API call (xem Huongdan_BE.md).
+ * Dùng React Query để tự động quản lý cache, loading, error.
+ * Không còn mock data – tất cả dữ liệu lấy từ Backend qua orderService.
  */
 
-// ===== DỮ LIỆU MẪU (MOCK DATA) =====
-// Phần này sẽ được thay bằng dữ liệu từ API thực tế sau này
-
-// 4 thẻ KPI đầu trang
-const STAT_CARDS = [
+// Cấu hình icon cho 4 thẻ KPI (phần style/icon không thay đổi)
+const KPI_CONFIG = [
   {
+    key: "donMoi" as const,
     label: "Đơn mới",
-    value: 24,
     iconWrapperClassName: "bg-[#cce5ff] text-[#0284c7]",
     icon: <ShoppingCartOutlined />,
   },
   {
+    key: "dangXuLyIn" as const,
     label: "Đang xử lý in",
-    value: 18,
     iconWrapperClassName: "bg-[#cce5ff] text-[#0284c7]",
     icon: <SyncOutlined spin />,
   },
   {
+    key: "choThanhToan" as const,
     label: "Chờ thanh toán",
-    value: 7,
     iconWrapperClassName: "bg-[#ffdad6] text-[#ea580c]",
     icon: <WalletOutlined />,
   },
   {
+    key: "hoanTatHomNay" as const,
     label: "Hoàn tất hôm nay",
-    value: 31,
     iconWrapperClassName: "bg-[#dcfce7] text-[#059669]",
     icon: <CheckCircleOutlined />,
   },
 ];
 
-// Dữ liệu mẫu bảng đơn hàng
-const MOCK_ORDERS: Order[] = [
-  {
-    id: 1,
-    orderCode: "#TS-2026-00128",
-    createdAt: "10:24, 24/10/2023",
-    customerName: "Nguyễn Minh Anh",
-    customerPhone: "0901234567",
+// Hàm chuyển đổi dữ liệu từ service sang kiểu Order của OrderTable
+function chuyenDoiSangOrder(don: orderService.DonHang): Order {
+  return {
+    id: don.id,
+    orderCode: don.maDonHang,
+    createdAt: don.ngayTao,
+    customerName: don.tenKhachHang,
+    customerPhone: don.sdtKhachHang,
     product: {
-      name: "Áo thun oversize trắng",
-      type: "custom_design",
-      sizes: "Cỡ L, XL",
+      name: don.sanPham.ten,
+      type: don.sanPham.loai,
+      sizes: don.sanPham.sizes,
+      imageUrl: don.sanPham.anhUrl ?? undefined,
     },
-    totalAmountVnd: 429000,
-    payment: { method: "VNPAY", isPaid: true },
-    status: "dang_san_xuat",
-    hasPrintSpec: true,
-  },
-  {
-    id: 2,
-    orderCode: "#TS-2026-00129",
-    createdAt: "11:05, 24/10/2023",
-    customerName: "Trần Văn Cường",
-    customerPhone: "0987654321",
-    product: {
-      name: "Áo Hoodie đen basic",
-      type: "ao_mau",
-      sizes: "Cỡ M",
+    totalAmountVnd: don.tongTienVnd,
+    payment: {
+      method: don.thanhToan.phuongThuc,
+      isPaid: don.thanhToan.daThanh,
     },
-    totalAmountVnd: 350000,
-    payment: { method: "COD", isPaid: false },
-    status: "cho_xac_nhan",
-  },
-  {
-    id: 3,
-    orderCode: "#TS-2026-00130",
-    createdAt: "13:40, 24/10/2023",
-    customerName: "Lê Thị Hoa",
-    customerPhone: "0912345678",
-    product: {
-      name: "Áo polo nhóm đồng phục",
-      type: "custom_design",
-      sizes: "Cỡ S, M, L",
-    },
-    totalAmountVnd: 1250000,
-    payment: { method: "Chuyển khoản", isPaid: true },
-    status: "cho_giao",
-    hasPrintSpec: true,
-  },
-  {
-    id: 4,
-    orderCode: "#TS-2026-00131",
-    createdAt: "15:20, 24/10/2023",
-    customerName: "Phạm Quốc Bảo",
-    customerPhone: "0934567890",
-    product: {
-      name: "Áo thun cotton trơn",
-      type: "ao_mau",
-      sizes: "Cỡ XL",
-    },
-    totalAmountVnd: 180000,
-    payment: { method: "VNPAY", isPaid: true },
-    status: "hoan_tat",
-  },
-];
-
-// Chi tiết mẫu của đơn đầu tiên (dùng cho drawer)
-const MOCK_ORDER_DETAIL: OrderDetail = {
-  ...MOCK_ORDERS[0],
-  customerEmail: "minhanh@email.com",
-  shippingAddress: "123 Đường Nguyễn Trãi, Phường Bến Thành, Quận 1, TP.HCM",
-  shippingCarrier: "GHTK – Tiêu chuẩn",
-  subTotalVnd: 250000,
-  designFeeVnd: 150000,
-  shippingFeeVnd: 29000,
-  printPosition: "Mặt trước (Ngực giữa)",
-  printSizeCm: "20×28 cm",
-  timeline: [
-    {
-      description: "Đang xử lý in – Đã xuất thông số",
-      time: "14:30, 24/10/2023",
-      actor: "Admin",
-      isActive: true,
-    },
-    {
-      description: "Đã xác nhận thanh toán",
-      time: "10:35, 24/10/2023",
-      actor: "Hệ thống",
-    },
-    {
-      description: "Tạo đơn hàng mới",
-      time: "10:24, 24/10/2023",
-      actor: "Khách hàng",
-    },
-  ],
-};
-// ===== KẾT THÚC DỮ LIỆU MẪU =====
-
-function khopTrangThaiDonHang(order: Order, activeTab: string): boolean {
-  if (activeTab === "tat_ca") return true;
-  if (activeTab === "dang_xu_ly_in") {
-    return order.status === "dang_san_xuat" || order.status === "dang_in";
-  }
-  return order.status === activeTab;
+    status: don.trangThai as Order["status"],
+    hasPrintSpec: don.daXuatThongSoIn,
+  };
 }
 
-export default function OrdersPage() {
-  // State lưu đơn hàng đang được xem chi tiết (null = không mở ngăn kéo)
-  const [selectedOrder, setSelectedOrder] = useState<OrderDetail | null>(null);
+// Hàm chuyển đổi chi tiết đơn hàng sang kiểu OrderDetail của Drawer
+function chuyenDoiSangOrderDetail(chi: ChiTietDonHang) {
+  return {
+    id: chi.id,
+    orderCode: chi.maDonHang,
+    createdAt: chi.ngayTao,
+    customerName: chi.tenKhachHang,
+    customerPhone: chi.sdtKhachHang,
+    customerEmail: chi.emailKhachHang,
+    product: {
+      name: chi.sanPham.ten,
+      type: chi.sanPham.loai,
+      sizes: chi.sanPham.sizes,
+      imageUrl: chi.sanPham.anhUrl ?? undefined,
+    },
+    totalAmountVnd: chi.tongTienVnd,
+    subTotalVnd: chi.tamTinhVnd,
+    designFeeVnd: chi.phiThietKeVnd,
+    shippingFeeVnd: chi.phiVanChuyenVnd,
+    payment: {
+      method: chi.thanhToan.phuongThuc,
+      isPaid: chi.thanhToan.daThanh,
+    },
+    status: chi.trangThai as Order["status"],
+    hasPrintSpec: chi.daXuatThongSoIn,
+    shippingAddress: chi.diaChiGiaoHang,
+    shippingCarrier: chi.donViVanChuyen,
+    printPosition: chi.viTriIn ?? undefined,
+    printSizeCm: undefined,
+    printFileUrl: chi.anhXemTruocThietKe ?? undefined,
+    timeline: chi.thoiGianXuLy.map((b) => ({
+      description: b.moTa,
+      time: b.thoiGian,
+      actor: b.nguoiThucHien,
+      isActive: b.laDangHienTai,
+    })),
+  };
+}
 
-  // State của các bộ lọc
-  const [activeTab, setActiveTab] = useState<string>("tat_ca");
+const SO_MOI_TRANG = 10;
+
+export default function OrdersPage() {
+  // ---- State bộ lọc ----
+  const [activeTab, setActiveTab] = useState("tat_ca");
   const [paymentFilter, setPaymentFilter] = useState("tat_ca");
   const [timeFilter, setTimeFilter] = useState("tat_ca");
   const [typeFilter, setTypeFilter] = useState("tat_ca");
+  const [tuKhoa, setTuKhoa] = useState("");
 
-  // State phân trang
+  // ---- State phân trang ----
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
-  const TOTAL_ITEMS = 128; // Sẽ thay bằng giá trị thực từ API
-  const ordersDaLoc = MOCK_ORDERS.filter((order) =>
-    khopTrangThaiDonHang(order, activeTab),
-  );
 
-  // Hàm xử lý khi bấm vào hàng đơn hàng → mở ngăn kéo
-  // Trong thực tế sẽ gọi API /api/admin/orders/:id để lấy chi tiết
+  // ---- State drawer ----
+  // Lưu ID đơn đang mở drawer (null = không mở)
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+
+  // ======================================================
+  // REACT QUERY: Lấy thống kê KPI
+  // ======================================================
+  const {
+    data: thongKe,
+    isLoading: isLoadingThongKe,
+  } = useQuery({
+    queryKey: ["admin-order-stats"],
+    queryFn: orderService.layThongKeDonHang,
+    // Cache 2 phút trước khi coi là "cũ" và refetch
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // ======================================================
+  // REACT QUERY: Lấy danh sách đơn hàng
+  // Khi bất kỳ filter nào thay đổi → queryKey thay đổi → React Query tự refetch
+  // ======================================================
+  const {
+    data: ketQuaDanhSach,
+    isLoading: isLoadingDanh,
+    isError: isErrorDanh,
+    error: errorDanh,
+  } = useQuery({
+    queryKey: [
+      "admin-orders",
+      currentPage,
+      activeTab,
+      paymentFilter,
+      timeFilter,
+      typeFilter,
+      tuKhoa,
+    ],
+    queryFn: () =>
+      orderService.layDanhSachDonHang({
+        trang: currentPage,
+        soMoiTrang: SO_MOI_TRANG,
+        trangThai: activeTab,
+        thanhToan: paymentFilter,
+        thoiGian: timeFilter,
+        loai: typeFilter,
+        tuKhoa,
+      }),
+  });
+
+  // ======================================================
+  // REACT QUERY: Lấy chi tiết đơn hàng (khi click hàng)
+  // enabled: false → chỉ fetch khi có selectedOrderId
+  // ======================================================
+  const {
+    data: chiTietDonHang,
+    isLoading: isLoadingChiTiet,
+  } = useQuery({
+    queryKey: ["admin-order-detail", selectedOrderId],
+    queryFn: () => orderService.layChiTietDonHang(selectedOrderId!),
+    enabled: selectedOrderId !== null, // Chỉ gọi khi có ID
+    staleTime: 30 * 1000, // Cache 30 giây (detail hay thay đổi hơn list)
+  });
+
+  // Hàm xử lý khi click hàng đơn hàng
   function handleRowClick(order: Order) {
-    // Hiện tại dùng dữ liệu mẫu MOCK_ORDER_DETAIL cho tất cả đơn
-    // Sau này: setSelectedOrder(await fetchOrderDetail(order.id))
-    setSelectedOrder({ ...MOCK_ORDER_DETAIL, ...order });
+    setSelectedOrderId(order.id);
   }
+
+  // Hàm đóng drawer
+  function handleCloseDrawer() {
+    setSelectedOrderId(null);
+  }
+
+  // Hàm xử lý khi filter thay đổi → reset về trang 1
+  function handleTabChange(key: string) {
+    setActiveTab(key);
+    setCurrentPage(1);
+  }
+  function handlePaymentChange(v: string) { setPaymentFilter(v); setCurrentPage(1); }
+  function handleTimeChange(v: string) { setTimeFilter(v); setCurrentPage(1); }
+  function handleTypeChange(v: string) { setTypeFilter(v); setCurrentPage(1); }
+
+  // Chuyển đổi dữ liệu từ API sang kiểu FE
+  const danhSachOrder: Order[] = (ketQuaDanhSach?.danhSach ?? []).map(chuyenDoiSangOrder);
+  const tongSo = ketQuaDanhSach?.tongSo ?? 0;
+  const tongSoTrang = ketQuaDanhSach?.tongSoTrang ?? 1;
+
+  // Chuẩn bị dữ liệu drawer: dùng chi tiết nếu đã load, fallback về dữ liệu list
+  const orderDetailData = chiTietDonHang
+    ? chuyenDoiSangOrderDetail(chiTietDonHang)
+    : null;
 
   return (
     <div>
@@ -206,9 +234,7 @@ export default function OrdersPage() {
           </p>
         </div>
 
-        {/* Các nút đầu trang */}
         <div className="flex gap-3">
-          {/* Nút phụ: Xuất danh sách */}
           <button
             type="button"
             className="flex h-control-h items-center gap-2 rounded-[10px] border border-border bg-surface px-4 text-button-text font-semibold text-text-secondary transition-colors hover:bg-surface-alt"
@@ -216,8 +242,6 @@ export default function OrdersPage() {
             <DownloadOutlined />
             Xuất danh sách
           </button>
-
-          {/* Nút chính: Tạo đơn mới */}
           <button
             type="button"
             className="flex h-control-h items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-4 text-button-text font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7]"
@@ -230,61 +254,97 @@ export default function OrdersPage() {
 
       {/* ======== 4 thẻ KPI thống kê ======== */}
       <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {STAT_CARDS.map((card) => (
+        {KPI_CONFIG.map((kpi) => (
           <OrderStatCard
-            key={card.label}
-            label={card.label}
-            value={card.value}
-            icon={card.icon}
-            iconWrapperClassName={card.iconWrapperClassName}
+            key={kpi.key}
+            label={kpi.label}
+            // Hiển thị "--" khi đang tải, hoặc số thực từ API
+            value={isLoadingThongKe ? "--" : (thongKe?.[kpi.key] ?? 0)}
+            icon={kpi.icon}
+            iconWrapperClassName={kpi.iconWrapperClassName}
           />
         ))}
       </section>
 
-      {/* ======== Bảng đơn hàng chính (Card trắng) ======== */}
+      {/* ======== Bảng đơn hàng chính ======== */}
       <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
 
-        {/* Thanh tìm kiếm nhanh bên trong bảng */}
+        {/* Thanh tìm kiếm */}
         <div className="flex items-center gap-4 border-b border-border px-4 py-3">
           <AdminSearchInput
             placeholder="Tìm mã đơn hàng, tên khách hàng..."
             className="max-w-sm"
+            // Gọi search sau 500ms người dùng ngừng gõ (debounce đơn giản)
+            onChange={(e) => {
+              const val = (e.target as HTMLInputElement).value;
+              // Tạm dùng setTimeout đơn giản để debounce
+              clearTimeout((window as any).__searchTimeout);
+              (window as any).__searchTimeout = setTimeout(() => {
+                setTuKhoa(val);
+                setCurrentPage(1);
+              }, 500);
+            }}
           />
         </div>
 
-        {/* Thanh filter (pill tabs + select boxes) */}
+        {/* Thanh filter */}
         <OrderFilterBar
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={handleTabChange}
           paymentFilter={paymentFilter}
-          onPaymentFilterChange={setPaymentFilter}
+          onPaymentFilterChange={handlePaymentChange}
           timeFilter={timeFilter}
-          onTimeFilterChange={setTimeFilter}
+          onTimeFilterChange={handleTimeChange}
           typeFilter={typeFilter}
-          onTypeFilterChange={setTypeFilter}
+          onTypeFilterChange={handleTypeChange}
         />
 
-        {/* Bảng dữ liệu đơn hàng */}
-        <OrderTable
-          orders={ordersDaLoc}
-          onRowClick={handleRowClick}
-        />
+        {/* Trạng thái lỗi */}
+        {isErrorDanh && (
+          <div className="py-16 text-center text-red-500">
+            <p className="font-medium">Không thể tải danh sách đơn hàng</p>
+            <p className="mt-1 text-sm text-text-secondary">
+              {(errorDanh as Error)?.message || "Vui lòng thử lại sau"}
+            </p>
+          </div>
+        )}
 
-        {/* Phân trang cuối bảng */}
-        <OrderPagination
-          currentPage={currentPage}
-          totalPages={Math.ceil(TOTAL_ITEMS / ITEMS_PER_PAGE)}
-          totalItems={TOTAL_ITEMS}
-          itemsPerPage={ITEMS_PER_PAGE}
-          onPageChange={setCurrentPage}
-        />
+        {/* Bảng dữ liệu – hiển thị overlay loading khi đang tải */}
+        {!isErrorDanh && (
+          <div className="relative">
+            {/* Overlay loading mờ khi refetch */}
+            {isLoadingDanh && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60">
+                <span className="text-sm text-text-secondary">Đang tải...</span>
+              </div>
+            )}
+            <OrderTable orders={danhSachOrder} onRowClick={handleRowClick} />
+          </div>
+        )}
+
+        {/* Phân trang */}
+        {!isErrorDanh && (
+          <OrderPagination
+            currentPage={currentPage}
+            totalPages={tongSoTrang}
+            totalItems={tongSo}
+            itemsPerPage={SO_MOI_TRANG}
+            onPageChange={setCurrentPage}
+          />
+        )}
       </section>
 
       {/* ======== Ngăn kéo chi tiết đơn hàng ======== */}
-      {/* Hiển thị khi selectedOrder !== null */}
       <OrderDetailDrawer
-        order={selectedOrder}
-        onClose={() => setSelectedOrder(null)}
+        order={orderDetailData}
+        isLoading={isLoadingChiTiet && selectedOrderId !== null}
+        onClose={handleCloseDrawer}
+        onCapNhatTrangThai={async (id, trangThai) => {
+          await orderService.capNhatTrangThaiDonHang(id, trangThai);
+        }}
+        onHuyDon={async (id, lyDo) => {
+          await orderService.huyDonHang(id, lyDo);
+        }}
       />
     </div>
   );
