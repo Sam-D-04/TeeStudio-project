@@ -31,7 +31,6 @@ const updateStatusSchema = {
         "cho_xac_nhan",
         "da_xac_nhan",
         "dang_san_xuat",
-        "dang_in",
         "cho_giao",
         "dang_giao",
         "hoan_tat",

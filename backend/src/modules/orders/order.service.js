@@ -515,8 +515,11 @@ async function capNhatTrangThai(id, trangThaiFE) {
     capNhatThem.deliveredAt = new Date();
   }
 
+  const cotCapNhatThem = Object.keys(capNhatThem);
+  const setClause = ["status = ?", ...cotCapNhatThem.map((k) => `${k} = ?`)].join(", ");
+
   await db.pool.query(
-    `UPDATE CustomerOrder SET status = ?, ${Object.keys(capNhatThem).map((k) => `${k} = ?`).join(", ")} WHERE id = ?`,
+    `UPDATE CustomerOrder SET ${setClause} WHERE id = ?`,
     [trangThaiDB, ...Object.values(capNhatThem), id]
   );
 

@@ -39,11 +39,12 @@ const TRANG_THAI_CO_THE_CHON = [
   { value: "cho_xac_nhan", label: "Chờ xác nhận" },
   { value: "da_xac_nhan", label: "Đã xác nhận" },
   { value: "dang_san_xuat", label: "Đang xử lý in" },
-  { value: "dang_in", label: "Đang in" },
   { value: "cho_giao", label: "Chờ giao hàng" },
   { value: "dang_giao", label: "Đang giao hàng" },
   { value: "hoan_tat", label: "Hoàn tất" },
 ];
+
+const TRANG_THAI_CO_THE_HUY = ["cho_xac_nhan", "da_xac_nhan"];
 
 type OrderDetailDrawerProps = {
   order: OrderDetail | null;
@@ -65,20 +66,24 @@ export default function OrderDetailDrawer({
   onHuyDon,
 }: OrderDetailDrawerProps) {
   // State modal cập nhật trạng thái
-  const [showCapNhat, setShowCapNhat] = useState(false);
+  const [capNhatOrderId, setCapNhatOrderId] = useState<number | null>(null);
   const [trangThaiMoi, setTrangThaiMoi] = useState("");
   const [dangCapNhat, setDangCapNhat] = useState(false);
 
   // State modal hủy đơn
-  const [showHuy, setShowHuy] = useState(false);
+  const [huyOrderId, setHuyOrderId] = useState<number | null>(null);
   const [lyDoHuy, setLyDoHuy] = useState("");
   const [dangHuy, setDangHuy] = useState(false);
 
   // State lightbox xem trước thiết kế
-  const [showDesignPreview, setShowDesignPreview] = useState(false);
+  const [designPreviewOrderId, setDesignPreviewOrderId] = useState<number | null>(null);
 
   // Thông báo kết quả
-  const [thongBao, setThongBao] = useState<{ loai: "success" | "error"; noi_dung: string } | null>(null);
+  const [thongBao, setThongBao] = useState<{
+    loai: "success" | "error";
+    noi_dung: string;
+    orderId: number;
+  } | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -92,11 +97,19 @@ export default function OrderDetailDrawer({
       await queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       await queryClient.invalidateQueries({ queryKey: ["admin-order-detail", order.id] });
       await queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] });
-      setThongBao({ loai: "success", noi_dung: "Cập nhật trạng thái thành công!" });
-      setShowCapNhat(false);
+      setThongBao({
+        loai: "success",
+        noi_dung: "Cập nhật trạng thái thành công!",
+        orderId: order.id,
+      });
+      setCapNhatOrderId(null);
       setTrangThaiMoi("");
     } catch {
-      setThongBao({ loai: "error", noi_dung: "Cập nhật thất bại. Vui lòng thử lại." });
+      setThongBao({
+        loai: "error",
+        noi_dung: "Cập nhật thất bại. Vui lòng thử lại.",
+        orderId: order.id,
+      });
     } finally {
       setDangCapNhat(false);
       // Ẩn thông báo sau 3 giây
@@ -106,20 +119,28 @@ export default function OrderDetailDrawer({
 
   // Hàm xử lý hủy đơn
   async function handleHuy() {
-    if (!order || !lyDoHuy.trim()) return;
+    if (!order || !lyDoHuyHopLe) return;
     setDangHuy(true);
     try {
-      await onHuyDon(order.id, lyDoHuy.trim());
+      await onHuyDon(order.id, lyDoHuyDaNhap);
       await queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       await queryClient.invalidateQueries({ queryKey: ["admin-order-detail", order.id] });
       await queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] });
-      setThongBao({ loai: "success", noi_dung: "Đã hủy đơn hàng thành công!" });
-      setShowHuy(false);
+      setThongBao({
+        loai: "success",
+        noi_dung: "Đã hủy đơn hàng thành công!",
+        orderId: order.id,
+      });
+      setHuyOrderId(null);
       setLyDoHuy("");
       handleClose(); // Đóng drawer sau khi hủy
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setThongBao({ loai: "error", noi_dung: msg || "Hủy đơn thất bại. Vui lòng thử lại." });
+      setThongBao({
+        loai: "error",
+        noi_dung: msg || "Hủy đơn thất bại. Vui lòng thử lại.",
+        orderId: order.id,
+      });
     } finally {
       setDangHuy(false);
       setTimeout(() => setThongBao(null), 3000);
@@ -131,9 +152,30 @@ export default function OrderDetailDrawer({
   const coAnhXemTruocThietKe = Boolean(
     order?.product.type === "custom_design" && order.designPreviewUrl
   );
+  const coTheHuyDon = Boolean(
+    order && TRANG_THAI_CO_THE_HUY.includes(order.status)
+  );
+  const coTheThaoTacDon = Boolean(
+    order && order.status !== "da_huy" && order.status !== "hoan_tat"
+  );
+  const lyDoHuyDaNhap = lyDoHuy.trim();
+  const lyDoHuyHopLe = lyDoHuyDaNhap.length >= 5;
+
+  function dongModalCapNhat() {
+    setCapNhatOrderId(null);
+    setTrangThaiMoi("");
+  }
+
+  function dongModalHuy() {
+    setHuyOrderId(null);
+    setLyDoHuy("");
+  }
 
   function handleClose() {
-    setShowDesignPreview(false);
+    setDesignPreviewOrderId(null);
+    dongModalCapNhat();
+    dongModalHuy();
+    setThongBao(null);
     onClose();
   }
 
@@ -187,7 +229,7 @@ export default function OrderDetailDrawer({
           )}
 
           {/* Thông báo kết quả thao tác */}
-          {thongBao && (
+          {thongBao && order && thongBao.orderId === order.id && (
             <div
               className={`mx-4 mt-4 rounded-lg p-3 text-sm font-medium ${
                 thongBao.loai === "success"
@@ -247,7 +289,7 @@ export default function OrderDetailDrawer({
                       type="button"
                       disabled={!coAnhXemTruocThietKe}
                       onClick={() => {
-                        if (coAnhXemTruocThietKe) setShowDesignPreview(true);
+                        if (coAnhXemTruocThietKe) setDesignPreviewOrderId(order.id);
                       }}
                       className={`flex h-[50px] w-[50px] shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-surface ${
                         coAnhXemTruocThietKe
@@ -282,7 +324,7 @@ export default function OrderDetailDrawer({
                         <button
                           type="button"
                           disabled={!coAnhXemTruocThietKe}
-                          onClick={() => setShowDesignPreview(true)}
+                          onClick={() => setDesignPreviewOrderId(order.id)}
                           title={coAnhXemTruocThietKe ? "Xem thiết kế" : "Chưa có ảnh thiết kế"}
                           className="rounded border border-border bg-surface px-2 py-1 text-xs font-semibold text-[#006591] transition-colors hover:bg-surface-dim disabled:cursor-not-allowed disabled:text-text-muted disabled:opacity-60 disabled:hover:bg-surface"
                         >
@@ -359,74 +401,6 @@ export default function OrderDetailDrawer({
                 </div>
               </div>
 
-              {/* ---- Modal nhập trạng thái mới ---- */}
-              {showCapNhat && (
-                <div className="rounded-lg border border-[#0ea5e9]/30 bg-blue-50 p-4">
-                  <p className="mb-2 text-sm font-medium text-text-main">Chọn trạng thái mới:</p>
-                  <div className="relative mb-3">
-                    <select
-                      value={trangThaiMoi}
-                      onChange={(e) => setTrangThaiMoi(e.target.value)}
-                      className="w-full appearance-none rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main outline-none"
-                    >
-                      <option value="">-- Chọn trạng thái --</option>
-                      {TRANG_THAI_CO_THE_CHON.map((tt) => (
-                        <option key={tt.value} value={tt.value}>
-                          {tt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={!trangThaiMoi || dangCapNhat}
-                      onClick={handleCapNhat}
-                      className="rounded-lg bg-[#0ea5e9] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-[#0284c7]"
-                    >
-                      {dangCapNhat ? "Đang lưu..." : "Xác nhận"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowCapNhat(false); setTrangThaiMoi(""); }}
-                      className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-surface-alt"
-                    >
-                      Hủy bỏ
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ---- Modal nhập lý do hủy ---- */}
-              {showHuy && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                  <p className="mb-2 text-sm font-medium text-red-700">Nhập lý do hủy đơn:</p>
-                  <textarea
-                    value={lyDoHuy}
-                    onChange={(e) => setLyDoHuy(e.target.value)}
-                    placeholder="Ví dụ: Khách yêu cầu hủy, không liên hệ được khách hàng..."
-                    rows={3}
-                    className="mb-3 w-full rounded-lg border border-border bg-surface p-3 text-sm text-text-main outline-none resize-none"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={!lyDoHuy.trim() || dangHuy}
-                      onClick={handleHuy}
-                      className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-red-600"
-                    >
-                      {dangHuy ? "Đang hủy..." : "Xác nhận hủy"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowHuy(false); setLyDoHuy(""); }}
-                      className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-surface-alt"
-                    >
-                      Quay lại
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -435,24 +409,39 @@ export default function OrderDetailDrawer({
         {order && (
           <div className="flex flex-wrap items-center gap-3 border-t border-border bg-surface p-4">
             {/* Nút hủy đơn (trái, đỏ) – chỉ hiện khi chưa hủy/hoàn tất */}
-            {order.status !== "da_huy" && order.status !== "hoan_tat" && (
+            {coTheThaoTacDon && (
               <button
                 type="button"
-                onClick={() => { setShowHuy(!showHuy); setShowCapNhat(false); }}
-                className="mr-auto h-control-h rounded-lg border border-[#ea580c]/30 bg-surface px-4 text-button-text font-semibold text-[#ea580c] transition-colors hover:bg-[#ffdad6]"
+                disabled={!coTheHuyDon}
+                title={
+                  coTheHuyDon
+                    ? "Hủy đơn hàng"
+                    : "Chỉ có thể hủy đơn đang chờ xác nhận hoặc đã xác nhận"
+                }
+                onClick={() => {
+                  if (!coTheHuyDon) return;
+                  setLyDoHuy("");
+                  setHuyOrderId(order.id);
+                  setCapNhatOrderId(null);
+                }}
+                className="mr-auto h-control-h rounded-lg border border-[#ea580c]/30 bg-surface px-4 text-button-text font-semibold text-[#ea580c] transition-colors hover:bg-[#ffdad6] disabled:cursor-not-allowed disabled:border-border disabled:text-text-muted disabled:hover:bg-surface"
               >
-                {showHuy ? "Đóng" : "Hủy đơn"}
+                Hủy đơn
               </button>
             )}
 
             {/* Nút cập nhật trạng thái (chính, xanh) */}
-            {order.status !== "da_huy" && order.status !== "hoan_tat" && (
+            {coTheThaoTacDon && (
               <button
                 type="button"
-                onClick={() => { setShowCapNhat(!showCapNhat); setShowHuy(false); }}
+                onClick={() => {
+                  setTrangThaiMoi("");
+                  setCapNhatOrderId(order.id);
+                  setHuyOrderId(null);
+                }}
                 className="flex h-control-h items-center gap-2 rounded-lg bg-[#0ea5e9] px-4 text-button-text font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7]"
               >
-                {showCapNhat ? "Đóng" : "Cập nhật trạng thái"}
+                Cập nhật trạng thái
               </button>
             )}
           </div>
@@ -460,12 +449,115 @@ export default function OrderDetailDrawer({
       </div>
       </Drawer>
       <Modal
-        open={showDesignPreview}
+        open={Boolean(order && capNhatOrderId === order.id)}
+        title="Cập nhật trạng thái"
+        centered
+        footer={null}
+        width={460}
+        onCancel={dongModalCapNhat}
+        mask={{ closable: true }}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-text-main">
+              Trạng thái mới
+            </label>
+            <select
+              value={trangThaiMoi}
+              onChange={(e) => setTrangThaiMoi(e.target.value)}
+              className="w-full appearance-none rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-main outline-none focus:border-primary-container"
+            >
+              <option value="">-- Chọn trạng thái --</option>
+              {TRANG_THAI_CO_THE_CHON.map((tt) => (
+                <option key={tt.value} value={tt.value}>
+                  {tt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={dongModalCapNhat}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-surface-alt"
+            >
+              Đóng
+            </button>
+            <button
+              type="button"
+              disabled={!trangThaiMoi || dangCapNhat}
+              onClick={handleCapNhat}
+              className="rounded-lg bg-[#0ea5e9] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0284c7] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {dangCapNhat ? "Đang lưu..." : "Xác nhận"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(order && huyOrderId === order.id)}
+        title="Hủy đơn hàng"
+        centered
+        footer={null}
+        width={520}
+        onCancel={dongModalHuy}
+        mask={{ closable: true }}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-red-700">
+              Lý do hủy
+            </label>
+            <textarea
+              value={lyDoHuy}
+              onChange={(e) => setLyDoHuy(e.target.value)}
+              placeholder="Ví dụ: Khách yêu cầu hủy, không liên hệ được khách hàng..."
+              rows={4}
+              maxLength={500}
+              className="w-full resize-none rounded-lg border border-border bg-surface p-3 text-sm text-text-main outline-none focus:border-red-300"
+            />
+            <div className="mt-1 flex items-center justify-between text-xs">
+              <span className="text-text-muted">Tối thiểu 5 ký tự.</span>
+              <span className={lyDoHuyDaNhap.length > 0 && !lyDoHuyHopLe ? "text-red-600" : "text-text-muted"}>
+                {lyDoHuyDaNhap.length}/500
+              </span>
+            </div>
+            {lyDoHuyDaNhap.length > 0 && !lyDoHuyHopLe && (
+              <p className="mt-1 text-xs font-medium text-red-600">
+                Lý do hủy cần ít nhất 5 ký tự.
+              </p>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={dongModalHuy}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-secondary hover:bg-surface-alt"
+            >
+              Đóng
+            </button>
+            <button
+              type="button"
+              disabled={!lyDoHuyHopLe || dangHuy}
+              onClick={handleHuy}
+              className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {dangHuy ? "Đang hủy..." : "Xác nhận hủy"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(order && designPreviewOrderId === order.id && order.designPreviewUrl)}
         title="Xem thiết kế"
         centered
         footer={null}
         width={760}
-        onCancel={() => setShowDesignPreview(false)}
+        onCancel={() => setDesignPreviewOrderId(null)}
         mask={{ closable: true }}
       >
         {order?.designPreviewUrl && (
