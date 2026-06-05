@@ -67,6 +67,8 @@ function chuyenDoiSangOrder(don: orderService.DonHang): Order {
       type: don.sanPham.loai,
       sizes: don.sanPham.sizes,
       imageUrl: don.sanPham.anhUrl ?? undefined,
+      extraCount: don.sanPham.soSanPhamKhac ?? 0,
+      totalQuantity: don.sanPham.tongSoLuong ?? undefined,
     },
     totalAmountVnd: don.tongTienVnd,
     payment: {
@@ -80,6 +82,11 @@ function chuyenDoiSangOrder(don: orderService.DonHang): Order {
 
 // Hàm chuyển đổi chi tiết đơn hàng sang kiểu OrderDetail của Drawer
 function chuyenDoiSangOrderDetail(chi: ChiTietDonHang) {
+  const designPreviewUrl =
+    chi.items?.find((item) => item.anhXemTruocThietKe)?.anhXemTruocThietKe ??
+    chi.anhXemTruocThietKe ??
+    undefined;
+
   return {
     id: chi.id,
     orderCode: chi.maDonHang,
@@ -105,7 +112,8 @@ function chuyenDoiSangOrderDetail(chi: ChiTietDonHang) {
     hasPrintSpec: chi.daXuatThongSoIn,
     shippingAddress: chi.diaChiGiaoHang,
     shippingCarrier: chi.donViVanChuyen,
-    designPreviewUrl: chi.anhXemTruocThietKe ?? undefined,
+    designPreviewUrl,
+    items: chi.items,
     timeline: chi.thoiGianXuLy.map((b) => ({
       description: b.moTa,
       time: b.thoiGian,

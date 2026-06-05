@@ -644,8 +644,8 @@ function ProductsSection({
 }) {
   return (
     <SectionPanel
-      title="2. Chọn sản phẩm"
-      description="Giá sỉ BulkPricing chỉ preview phần phôi áo, backend sẽ tính lại chính xác khi lưu."
+      title="2. Chọn sản phẩm & thiết kế POD"
+      description="Chọn thiết kế đã duyệt ngay trong từng dòng sản phẩm nếu đơn là áo POD. Giá sỉ BulkPricing chỉ preview phần phôi áo."
     >
       <Form.List
         name="items"
@@ -707,7 +707,7 @@ function ProductsSection({
 
 function PaymentSection() {
   return (
-    <SectionPanel title="4. Thanh toán">
+    <SectionPanel title="3. Thanh toán">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Form.Item
           label="Phương thức thanh toán"
@@ -740,6 +740,40 @@ function PaymentSection() {
   );
 }
 
+function ShippingFeeInput({
+  value,
+  onChange,
+  id,
+}: {
+  value?: number;
+  onChange?: (value: number | null) => void;
+  id?: string;
+}) {
+  return (
+    <Space.Compact className="w-full">
+      <InputNumber<number>
+        id={id}
+        value={value}
+        onChange={onChange}
+        className="w-full"
+        min={0}
+        step={1000}
+        formatter={(inputValue) =>
+          `${inputValue ?? 0}`.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+        }
+        parser={(inputValue) => Number((inputValue ?? "").replace(/[^\d]/g, ""))}
+      />
+      <Button
+        disabled
+        tabIndex={-1}
+        className="h-10 min-w-16 rounded-l-none rounded-r-[8px] border-border bg-surface-alt font-semibold text-text-secondary"
+      >
+        VND
+      </Button>
+    </Space.Compact>
+  );
+}
+
 function ShippingSection({
   promotions,
   isLoadingPromotions,
@@ -750,7 +784,7 @@ function ShippingSection({
   preview: OrderPreview;
 }) {
   return (
-    <SectionPanel title="5. Vận chuyển & khuyến mãi">
+    <SectionPanel title="4. Vận chuyển & khuyến mãi">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Form.Item
           label="Phí giao hàng"
@@ -763,16 +797,7 @@ function ShippingSection({
             },
           ]}
         >
-          <InputNumber<number>
-            className="w-full"
-            min={0}
-            step={1000}
-            formatter={(value) =>
-              `${value ?? 0}`.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
-            }
-            parser={(value) => Number((value ?? "").replace(/[^\d]/g, ""))}
-            addonAfter="VND"
-          />
+          <ShippingFeeInput />
         </Form.Item>
 
         <Form.Item label="Mã khuyến mãi" name="promotionId">
@@ -815,7 +840,15 @@ function ShippingSection({
   );
 }
 
-function OrderSummary({ preview }: { preview: OrderPreview }) {
+function OrderSummary({
+  preview,
+  isSubmitting,
+  onCancel,
+}: {
+  preview: OrderPreview;
+  isSubmitting: boolean;
+  onCancel: () => void;
+}) {
   const rows = [
     ["Tạm tính", preview.subtotal],
     ["Phí thiết kế", preview.designFee],
@@ -826,7 +859,7 @@ function OrderSummary({ preview }: { preview: OrderPreview }) {
   return (
     <aside className="sticky top-5 rounded-xl border border-border bg-surface p-5 shadow-admin-card">
       <div className="mb-4">
-        <h3 className="text-card-title text-text-main">6. Tóm tắt giá</h3>
+        <h3 className="text-card-title text-text-main">5. Tóm tắt giá</h3>
         <p className="mt-1 text-body-sm text-text-secondary">
           Số tiền này chỉ là preview, backend sẽ tự tính lại từ database.
         </p>
@@ -888,6 +921,26 @@ function OrderSummary({ preview }: { preview: OrderPreview }) {
           ))}
         </div>
       ) : null}
+
+      <Divider className="my-4" />
+
+      <div className="flex flex-col gap-3">
+        <Button
+          className="h-10 rounded-[10px] font-semibold"
+          onClick={onCancel}
+        >
+          Hủy
+        </Button>
+        <Button
+          type="primary"
+          htmlType="submit"
+          icon={<PlusOutlined />}
+          loading={isSubmitting}
+          className="h-10 rounded-[10px] font-semibold"
+        >
+          Tạo đơn hàng
+        </Button>
+      </div>
     </aside>
   );
 }
@@ -896,6 +949,7 @@ export default function CreateOrderPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [form] = Form.useForm<CreateOrderFormValues>();
+  const [messageApi, messageContextHolder] = message.useMessage();
 
   const [customerKeyword, setCustomerKeyword] = useState("");
   const [productKeyword, setProductKeyword] = useState("");
@@ -1003,7 +1057,7 @@ export default function CreateOrderPage() {
   const createOrderMutation = useMutation({
     mutationFn: orderService.taoMoiDonHang,
     onSuccess: async (result) => {
-      message.success("Tạo đơn hàng thành công");
+      messageApi.success("Tạo đơn hàng thành công");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] }),
@@ -1011,7 +1065,7 @@ export default function CreateOrderPage() {
       router.push(`/admin/don-hang/${result.id}`);
     },
     onError: (error) => {
-      message.error(getApiErrorMessage(error));
+      messageApi.error(getApiErrorMessage(error));
     },
   });
 
@@ -1081,7 +1135,7 @@ export default function CreateOrderPage() {
 
   async function handleFinish(valuesToSubmit: CreateOrderFormValues) {
     if (preview.promotionNotEligible && preview.selectedPromotion) {
-      message.error(
+      messageApi.error(
         `Đơn chưa đạt điều kiện tối thiểu của mã ${preview.selectedPromotion.ma}`
       );
       return;
@@ -1092,6 +1146,8 @@ export default function CreateOrderPage() {
 
   return (
     <div>
+      {messageContextHolder}
+
       <section className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
         <div>
           <Button
@@ -1170,30 +1226,17 @@ export default function CreateOrderPage() {
               />
             ) : null}
 
-            <div className="flex flex-col-reverse gap-3 rounded-xl border border-border bg-surface p-4 shadow-admin-card sm:flex-row sm:justify-end">
-              <Button
-                className="h-10 rounded-[10px] font-semibold"
-                onClick={() => router.push("/admin/don-hang")}
-              >
-                Hủy
-              </Button>
-              <Button
-                type="primary"
-                htmlType="submit"
-                icon={<PlusOutlined />}
-                loading={createOrderMutation.isPending}
-                className="h-10 rounded-[10px] font-semibold"
-              >
-                Tạo đơn hàng
-              </Button>
-            </div>
           </div>
 
           <div>
             {productOptions.length === 0 && isSearchingProducts ? (
               <Skeleton active paragraph={{ rows: 6 }} />
             ) : preview.lines.length > 0 ? (
-              <OrderSummary preview={preview} />
+              <OrderSummary
+                preview={preview}
+                isSubmitting={createOrderMutation.isPending}
+                onCancel={() => router.push("/admin/don-hang")}
+              />
             ) : (
               <aside className="rounded-xl border border-border bg-surface p-5 shadow-admin-card">
                 <Empty description="Chưa có sản phẩm trong đơn" />

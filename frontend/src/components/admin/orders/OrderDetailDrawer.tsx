@@ -5,6 +5,7 @@ import { Drawer, Modal } from "antd";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Order } from "./OrderTable";
+import type { ChiTietDonHangItem } from "@/services/admin/orderService";
 
 /**
  * OrderDetailDrawer – Ngăn kéo chi tiết đơn hàng (đã kết nối API thực tế).
@@ -24,6 +25,7 @@ type TimelineStep = {
 };
 
 export type OrderDetail = Order & {
+  items?: ChiTietDonHangItem[];
   customerEmail: string;
   shippingAddress: string;
   shippingCarrier: string;
@@ -58,6 +60,121 @@ function formatCurrency(amount: number): string {
   return amount.toLocaleString("vi-VN") + "đ";
 }
 
+function OrderItemsCompactTable({
+  order,
+  onPreviewDesign,
+}: {
+  order: OrderDetail;
+  onPreviewDesign: (previewUrl?: string | null) => void;
+}) {
+  const items = order.items?.length
+    ? order.items
+    : [
+        {
+          id: order.id,
+          productId: 0,
+          variantId: 0,
+          designId: null,
+          tenSanPham: order.product.name,
+          mauSac: "",
+          kichCo: order.product.sizes,
+          sku: "",
+          soLuong: 1,
+          donGiaVnd: order.subTotalVnd,
+          phiThietKeVnd: order.designFeeVnd,
+          thanhTienVnd: order.subTotalVnd + order.designFeeVnd,
+          loai: order.product.type,
+          anhUrl: order.product.imageUrl ?? null,
+          anhXemTruocThietKe: order.designPreviewUrl ?? null,
+          viTriIn: null,
+          phuongPhapIn: null,
+        },
+      ];
+
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border bg-surface-alt">
+      <table className="w-full min-w-[560px] border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-border bg-surface text-xs font-bold uppercase text-text-secondary">
+            <th className="p-2 text-left">Sản phẩm</th>
+            <th className="p-2 text-left">Phân loại</th>
+            <th className="p-2 text-center">SL</th>
+            <th className="p-2 text-right">Thành tiền</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => {
+            const imageUrl = item.anhXemTruocThietKe || item.anhUrl;
+            const coAnhThietKe = Boolean(item.anhXemTruocThietKe);
+
+            return (
+              <tr key={item.id} className="border-b border-border last:border-b-0">
+                <td className="p-2 align-top">
+                  <div className="flex items-start gap-2">
+                    <button
+                      type="button"
+                      disabled={!coAnhThietKe}
+                      onClick={() => onPreviewDesign(item.anhXemTruocThietKe)}
+                      className={`h-11 w-11 shrink-0 overflow-hidden rounded border border-border bg-surface ${
+                        coAnhThietKe ? "cursor-zoom-in" : "cursor-default"
+                      }`}
+                    >
+                      {imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={imageUrl}
+                          alt={item.tenSanPham}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-xs text-text-muted">
+                          Ảnh
+                        </span>
+                      )}
+                    </button>
+                    <div className="min-w-0">
+                      <div className="max-w-[180px] truncate font-semibold text-text-main">
+                        {item.tenSanPham}
+                      </div>
+                      {item.designId ? (
+                        <button
+                          type="button"
+                          onClick={() => onPreviewDesign(item.anhXemTruocThietKe)}
+                          className="mt-1 text-xs font-semibold text-[#006591] disabled:text-text-muted"
+                          disabled={!coAnhThietKe}
+                        >
+                          Design #{item.designId}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </td>
+                <td className="p-2 align-top text-xs text-text-secondary">
+                  <div>
+                    {item.mauSac || "Chưa có màu"} / {item.kichCo || "Chưa có size"}
+                  </div>
+                  {item.sku ? <div className="text-text-muted">SKU: {item.sku}</div> : null}
+                </td>
+                <td className="p-2 text-center align-top font-bold text-text-main">
+                  {item.soLuong}
+                </td>
+                <td className="p-2 text-right align-top">
+                  <div className="font-bold text-text-main">
+                    {formatCurrency(item.thanhTienVnd)}
+                  </div>
+                  <div className="text-xs text-text-secondary">
+                    {formatCurrency(item.donGiaVnd)} / áo
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function OrderDetailDrawer({
   order,
   isLoading = false,
@@ -76,7 +193,7 @@ export default function OrderDetailDrawer({
   const [dangHuy, setDangHuy] = useState(false);
 
   // State lightbox xem trước thiết kế
-  const [designPreviewOrderId, setDesignPreviewOrderId] = useState<number | null>(null);
+  const [designPreviewUrlDangXem, setDesignPreviewUrlDangXem] = useState<string | null>(null);
 
   // Thông báo kết quả
   const [thongBao, setThongBao] = useState<{
@@ -149,9 +266,6 @@ export default function OrderDetailDrawer({
 
   // Xác định drawer có mở không: mở khi đang loading HOẶC đã có dữ liệu
   const isOpen = isLoading || Boolean(order);
-  const coAnhXemTruocThietKe = Boolean(
-    order?.product.type === "custom_design" && order.designPreviewUrl
-  );
   const coTheHuyDon = Boolean(
     order && TRANG_THAI_CO_THE_HUY.includes(order.status)
   );
@@ -172,7 +286,7 @@ export default function OrderDetailDrawer({
   }
 
   function handleClose() {
-    setDesignPreviewOrderId(null);
+    setDesignPreviewUrlDangXem(null);
     dongModalCapNhat();
     dongModalHuy();
     setThongBao(null);
@@ -283,61 +397,12 @@ export default function OrderDetailDrawer({
                 <h4 className="mb-3 border-b border-border pb-1 text-label-bold font-bold uppercase text-text-secondary">
                   Sản phẩm
                 </h4>
-                <div className="rounded-lg border border-border bg-surface-alt p-3">
-                  <div className="flex items-start gap-3">
-                    <button
-                      type="button"
-                      disabled={!coAnhXemTruocThietKe}
-                      onClick={() => {
-                        if (coAnhXemTruocThietKe) setDesignPreviewOrderId(order.id);
-                      }}
-                      className={`flex h-[50px] w-[50px] shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-surface ${
-                        coAnhXemTruocThietKe
-                          ? "cursor-zoom-in transition-colors hover:border-[#006591]"
-                          : "cursor-default"
-                      }`}
-                      aria-label={coAnhXemTruocThietKe ? "Xem thiết kế" : undefined}
-                    >
-                      {(order.designPreviewUrl || order.product.imageUrl) ? (
-                        <img
-                          src={order.designPreviewUrl || order.product.imageUrl}
-                          alt={order.designPreviewUrl ? "Xem trước thiết kế" : order.product.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-xs text-text-muted">Ảnh</span>
-                      )}
-                    </button>
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between">
-                        <h5 className="font-medium text-text-main">{order.product.name}</h5>
-                        <span className="font-medium text-text-main">
-                          {formatCurrency(order.subTotalVnd)}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-sm text-text-secondary">Cỡ: {order.product.sizes}</p>
-                      {order.product.type === "custom_design" && (
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="inline-block rounded bg-[#c9e6ff] px-2 py-1 text-[10px] font-bold uppercase text-[#004c6e]">
-                            Thiết kế tùy chỉnh
-                          </span>
-                        <button
-                          type="button"
-                          disabled={!coAnhXemTruocThietKe}
-                          onClick={() => setDesignPreviewOrderId(order.id)}
-                          title={coAnhXemTruocThietKe ? "Xem thiết kế" : "Chưa có ảnh thiết kế"}
-                          className="rounded border border-border bg-surface px-2 py-1 text-xs font-semibold text-[#006591] transition-colors hover:bg-surface-dim disabled:cursor-not-allowed disabled:text-text-muted disabled:opacity-60 disabled:hover:bg-surface"
-                        >
-                          Xem thiết kế
-                        </button>
-                        {!coAnhXemTruocThietKe && (
-                          <span className="text-xs text-text-muted">Chưa có ảnh thiết kế</span>
-                        )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <OrderItemsCompactTable
+                  order={order}
+                  onPreviewDesign={(previewUrl) => {
+                    if (previewUrl) setDesignPreviewUrlDangXem(previewUrl);
+                  }}
+                />
               </div>
 
               {/* ---- Bảng tính tiền ---- */}
@@ -385,12 +450,11 @@ export default function OrderDetailDrawer({
                 </h4>
                 <div className="relative ml-2 space-y-4 border-l-2 border-border pl-6">
                   {order.timeline.map((step, index) => (
-                    <div key={index} className={step.isActive ? "" : "opacity-60"}>
+                    <div key={`${step.time}-${index}`} className={`relative ${step.isActive ? "" : "opacity-60"}`}>
                       <span
-                        className={`absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 ${
+                        className={`absolute -left-[33px] top-1 h-4 w-4 rounded-full border-2 ${
                           step.isActive ? "border-[#0ea5e9] bg-surface" : "bg-border"
                         }`}
-                        style={{ marginTop: index * 64 + "px" }}
                       />
                       <p className="text-sm font-medium text-text-main">{step.description}</p>
                       <p className="text-xs text-text-secondary">
@@ -552,17 +616,17 @@ export default function OrderDetailDrawer({
       </Modal>
 
       <Modal
-        open={Boolean(order && designPreviewOrderId === order.id && order.designPreviewUrl)}
+        open={Boolean(designPreviewUrlDangXem)}
         title="Xem thiết kế"
         centered
         footer={null}
         width={760}
-        onCancel={() => setDesignPreviewOrderId(null)}
+        onCancel={() => setDesignPreviewUrlDangXem(null)}
         mask={{ closable: true }}
       >
-        {order?.designPreviewUrl && (
+        {designPreviewUrlDangXem && (
           <img
-            src={order.designPreviewUrl}
+            src={designPreviewUrlDangXem}
             alt="Xem trước thiết kế"
             className="max-h-[70vh] w-full rounded object-contain"
           />

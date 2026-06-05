@@ -28,6 +28,8 @@ export type OrderProductSummary = {
   type: "custom_design" | "ao_mau"; // Loại đơn
   sizes: string;       // Ví dụ: "Size L, XL"
   imageUrl?: string;   // URL ảnh (nếu có từ Cloudinary)
+  extraCount?: number;  // Số dòng sản phẩm khác ngoài dòng đại diện
+  totalQuantity?: number; // Tổng số lượng áo trong đơn
 };
 
 // Kiểu dữ liệu cho một đơn hàng (hiển thị trong bảng)
@@ -114,9 +116,16 @@ export default function OrderTable({ orders, onRowClick }: OrderTableProps) {
                     )}
                   </div>
 
-                  <div>
+                  <div className="min-w-0">
                     {/* Tên sản phẩm */}
-                    <div className="font-medium text-text-main">{order.product.name}</div>
+                    <div className="max-w-[220px] truncate font-medium text-text-main">
+                      {order.product.name}
+                    </div>
+                    {order.product.extraCount && order.product.extraCount > 0 ? (
+                      <div className="mt-1 text-xs font-semibold text-[#006591]">
+                        + {order.product.extraCount} sản phẩm khác
+                      </div>
+                    ) : null}
                     <div className="mt-1 flex items-center gap-2">
                       {/* Nhãn loại đơn: "Thiết kế tùy chỉnh" hoặc "Áo mẫu" */}
                       {order.product.type === "custom_design" ? (
@@ -131,6 +140,11 @@ export default function OrderTable({ orders, onRowClick }: OrderTableProps) {
                       {/* Kích cỡ */}
                       <span className="text-xs text-text-secondary">{order.product.sizes}</span>
                     </div>
+                    {order.product.totalQuantity && order.product.totalQuantity > 0 ? (
+                      <div className="mt-1 text-xs text-text-muted">
+                        Tổng SL: {order.product.totalQuantity}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </td>

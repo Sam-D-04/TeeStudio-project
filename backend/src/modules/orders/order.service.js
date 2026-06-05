@@ -24,6 +24,90 @@ const MAP_TRANG_THAI_FE_SANG_DB = Object.fromEntries(
   Object.entries(MAP_TRANG_THAI_DB_SANG_FE).map(([db, fe]) => [fe, db])
 );
 
+const MAP_TEN_TRANG_THAI_DB = {
+  PENDING: "Chờ xác nhận",
+  CONFIRMED: "Đã xác nhận",
+  PROCESSING: "Đang sản xuất",
+  PRINTING: "Đang in",
+  READY_TO_SHIP: "Chờ giao hàng",
+  SHIPPING: "Đang giao hàng",
+  COMPLETED: "Hoàn tất",
+  CANCELLED: "Đã hủy",
+};
+
+function layTenTrangThai(status) {
+  return MAP_TEN_TRANG_THAI_DB[status] || status || "Không rõ";
+}
+
+function taoActorHistory(actor, fallbackName = "Hệ thống") {
+  return {
+    actorId: null,
+    actorRole: actor?.role || "SYSTEM",
+    actorName: actor?.fullName || actor?.email || fallbackName,
+  };
+}
+
+function taoMoTaHistory({ action, fromStatus, toStatus, note }) {
+  if (note) return note;
+
+  if (action === "CREATED") {
+    return "Tạo đơn hàng mới – Chờ xác nhận";
+  }
+
+  if (action === "CANCELLED") {
+    return `Đã hủy đơn hàng${fromStatus ? ` từ trạng thái ${layTenTrangThai(fromStatus)}` : ""}`;
+  }
+
+  if (action === "STATUS_CHANGED") {
+    return `Cập nhật trạng thái: ${layTenTrangThai(fromStatus)} → ${layTenTrangThai(toStatus)}`;
+  }
+
+  return layTenTrangThai(toStatus);
+}
+
+async function ghiOrderHistory(
+  executor,
+  { orderId, fromStatus = null, toStatus, action, actor, note = null }
+) {
+  const actorInfo = taoActorHistory(actor);
+
+  await executor.query(
+    `INSERT INTO OrderHistory
+       (orderId, fromStatus, toStatus, action, actorId, actorRole, actorName, note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      orderId,
+      fromStatus,
+      toStatus,
+      action,
+      actorInfo.actorId,
+      actorInfo.actorRole,
+      actorInfo.actorName,
+      note,
+    ]
+  );
+}
+
+function xayDungTimelineTuHistory(rowsHistory, trangThaiHienTai, donHang = null) {
+  const timeline = rowsHistory.map((row, index) => ({
+    moTa: taoMoTaHistory(row),
+    thoiGian: formatNgayGio(row.createdAt),
+    nguoiThucHien: row.actorName || row.actorRole || "Hệ thống",
+    laDangHienTai: index === 0 && row.toStatus === trangThaiHienTai,
+  }));
+
+  if (donHang && !rowsHistory.some((row) => row.action === "CREATED")) {
+    timeline.push({
+      moTa: "Tạo đơn hàng mới",
+      thoiGian: formatNgayGio(donHang.createdAt),
+      nguoiThucHien: "Hệ thống",
+      laDangHienTai: false,
+    });
+  }
+
+  return timeline;
+}
+
 /**
  * Hàm định dạng ngày giờ sang chuỗi "HH:mm, DD/MM/YYYY"
  */
@@ -54,8 +138,8 @@ function laNgayLocHopLe(value) {
 }
 
 /**
- * Xây dựng timeline lịch sử xử lý đơn từ các cột thời gian trong DB.
- * DB không có bảng lịch sử riêng, nên tái tạo từ các mốc thời gian có sẵn.
+ * Fallback cho đơn hàng cũ chưa có record trong OrderHistory.
+ * Đơn mới/cập nhật mới sẽ dùng OrderHistory để hiển thị lịch sử thật.
  */
 function xayDungTimeline(donHang, thanhToan) {
   const timeline = [];
@@ -244,9 +328,13 @@ async function layDanhSachDonHang({
 
   // Lọc theo loại đơn (custom_design hay ao_mau)
   if (loai === "custom_design") {
-    dieuKien.push("oi.designId IS NOT NULL");
+    dieuKien.push(
+      "EXISTS (SELECT 1 FROM OrderItem oiLoai WHERE oiLoai.orderId = co.id AND oiLoai.designId IS NOT NULL)"
+    );
   } else if (loai === "ao_mau") {
-    dieuKien.push("oi.designId IS NULL");
+    dieuKien.push(
+      "NOT EXISTS (SELECT 1 FROM OrderItem oiLoai WHERE oiLoai.orderId = co.id AND oiLoai.designId IS NOT NULL)"
+    );
   }
 
   // Tìm kiếm theo từ khóa (mã đơn hoặc tên khách)
@@ -284,24 +372,55 @@ async function layDanhSachDonHang({
       p.status         AS trangThaiThanhToan,
       p.paidAt,
       -- Lấy sản phẩm đầu tiên trong đơn (đơn thường chỉ có 1 loại áo)
-      pr.name          AS tenSanPham,
-      pv.color         AS mauSac,
-      pv.size          AS kichCo,
+      prFirst.name          AS tenSanPham,
+      pvFirst.color         AS mauSac,
+      pvFirst.size          AS kichCo,
       pi_img.imageUrl  AS anhUrl,
-      oi.designId,
+      oiFirst.designId,
       -- Kiểm tra đơn có nhiều size không
-      GROUP_CONCAT(DISTINCT pv.size ORDER BY pv.size SEPARATOR ', ') AS tatCaSize,
-      op.status        AS trangThaiSanXuat
+      (
+        SELECT GROUP_CONCAT(DISTINCT pvSize.size ORDER BY pvSize.size SEPARATOR ', ')
+        FROM OrderItem oiSize
+        JOIN ProductVariant pvSize ON pvSize.id = oiSize.variantId
+        WHERE oiSize.orderId = co.id
+      ) AS tatCaSize,
+      (
+        SELECT COUNT(*)
+        FROM OrderItem oiCount
+        WHERE oiCount.orderId = co.id
+      ) AS soDongSanPham,
+      (
+        SELECT COALESCE(SUM(oiQty.quantity), 0)
+        FROM OrderItem oiQty
+        WHERE oiQty.orderId = co.id
+      ) AS tongSoLuongSanPham,
+      EXISTS (
+        SELECT 1
+        FROM OrderItem oiCustom
+        WHERE oiCustom.orderId = co.id AND oiCustom.designId IS NOT NULL
+      ) AS coThietKe,
+      EXISTS (
+        SELECT 1
+        FROM OrderItem oiSpec
+        LEFT JOIN OrderProduction opSpec ON opSpec.orderItemId = oiSpec.id
+        WHERE oiSpec.orderId = co.id
+          AND (oiSpec.productionStatus IN ('PRINTING', 'PRINTED')
+               OR opSpec.status IN ('PRINTING', 'PRINTED'))
+      ) AS daXuatThongSoIn
     FROM CustomerOrder co
     JOIN Account a ON a.id = co.userId
     LEFT JOIN Payment p ON p.orderId = co.id
-    LEFT JOIN OrderItem oi ON oi.orderId = co.id
-    LEFT JOIN ProductVariant pv ON pv.id = oi.variantId
-    LEFT JOIN Product pr ON pr.id = pv.productId
-    LEFT JOIN ProductImage pi_img ON pi_img.productId = pr.id AND pi_img.isPrimary = 1
-    LEFT JOIN OrderProduction op ON op.orderItemId = oi.id
+    LEFT JOIN OrderItem oiFirst ON oiFirst.id = (
+      SELECT oi2.id
+      FROM OrderItem oi2
+      WHERE oi2.orderId = co.id
+      ORDER BY oi2.id ASC
+      LIMIT 1
+    )
+    LEFT JOIN ProductVariant pvFirst ON pvFirst.id = oiFirst.variantId
+    LEFT JOIN Product prFirst ON prFirst.id = pvFirst.productId
+    LEFT JOIN ProductImage pi_img ON pi_img.productId = prFirst.id AND pi_img.isPrimary = 1
     ${menh_de_where}
-    GROUP BY co.id, p.id
     ORDER BY co.createdAt DESC
     LIMIT ? OFFSET ?
   `;
@@ -309,8 +428,9 @@ async function layDanhSachDonHang({
 
   // Định dạng dữ liệu trả về cho Frontend
   const danhSach = rows.map((row) => {
-    const loaiDon = row.designId ? "custom_design" : "ao_mau";
+    const loaiDon = row.coThietKe ? "custom_design" : "ao_mau";
     const daThanh = row.trangThaiThanhToan === "COMPLETED";
+    const soDongSanPham = Number(row.soDongSanPham || 0);
 
     return {
       id: row.id,
@@ -323,6 +443,8 @@ async function layDanhSachDonHang({
         loai: loaiDon,
         sizes: row.tatCaSize ? `Cỡ ${row.tatCaSize}` : `Cỡ ${row.kichCo || ""}`,
         anhUrl: row.anhUrl || null,
+        soSanPhamKhac: Math.max(0, soDongSanPham - 1),
+        tongSoLuong: Number(row.tongSoLuongSanPham || 0),
       },
       tongTienVnd: Number(row.totalAmount),
       thanhToan: {
@@ -330,7 +452,7 @@ async function layDanhSachDonHang({
         daThanh: daThanh,
       },
       trangThai: MAP_TRANG_THAI_DB_SANG_FE[row.status] || "cho_xac_nhan",
-      daXuatThongSoIn: row.trangThaiSanXuat === "PRINTING" || row.trangThaiSanXuat === "PRINTED",
+      daXuatThongSoIn: Boolean(row.daXuatThongSoIn),
     };
   });
 
@@ -390,30 +512,41 @@ async function layChiTietDonHang(id) {
        oi.lineTotal,
        oi.productionStatus,
        oi.designId,
+       oi.variantId,
+       pv.productId,
        pv.color,
        pv.size,
+       pv.sku,
        pr.name AS tenSanPham,
        pi_img.imageUrl AS anhUrl,
        cd.previewUrl AS anhXemTruocThietKe,
        cd.baseColor,
-       pp.name AS viTriIn,
-       pm.name AS phuongPhapIn
+       (
+         SELECT GROUP_CONCAT(DISTINCT pp2.name ORDER BY pp2.name SEPARATOR ', ')
+         FROM DesignPrintPosition dpp2
+         JOIN PrintPosition pp2 ON pp2.id = dpp2.printPositionId
+         WHERE dpp2.designId = cd.id
+       ) AS viTriIn,
+       (
+         SELECT GROUP_CONCAT(DISTINCT pm2.name ORDER BY pm2.name SEPARATOR ', ')
+         FROM DesignPrintMethod dpm2
+         JOIN PrintMethod pm2 ON pm2.id = dpm2.printMethodId
+         WHERE dpm2.designId = cd.id
+       ) AS phuongPhapIn
      FROM OrderItem oi
      JOIN ProductVariant pv ON pv.id = oi.variantId
      JOIN Product pr ON pr.id = pv.productId
      LEFT JOIN ProductImage pi_img ON pi_img.productId = pr.id AND pi_img.isPrimary = 1
      LEFT JOIN CustomDesign cd ON cd.id = oi.designId
-     LEFT JOIN DesignPrintPosition dpp ON dpp.designId = cd.id
-     LEFT JOIN PrintPosition pp ON pp.id = dpp.printPositionId
-     LEFT JOIN DesignPrintMethod dpm ON dpm.designId = cd.id
-     LEFT JOIN PrintMethod pm ON pm.id = dpm.printMethodId
-     WHERE oi.orderId = ?`,
+     WHERE oi.orderId = ?
+     ORDER BY oi.id ASC`,
     [id]
   );
 
   // Lấy item đầu tiên để hiển thị thông tin sản phẩm chính
   const itemDau = rowsItems[0] || {};
-  const loaiDon = itemDau.designId ? "custom_design" : "ao_mau";
+  const coThietKe = rowsItems.some((item) => Boolean(item.designId));
+  const loaiDon = coThietKe ? "custom_design" : "ao_mau";
 
   // Ghép địa chỉ giao hàng
   const diaChiGiaoHang = donHang.addressLine
@@ -428,6 +561,25 @@ async function layChiTietDonHang(id) {
   // Tính tạm tính (subtotal = tổng unitPrice * quantity của các item)
   const tamTinh = rowsItems.reduce((tong, item) => tong + Number(item.unitPrice) * item.quantity, 0);
   const tongPhiThietKe = rowsItems.reduce((tong, item) => tong + Number(item.designFee || 0), 0);
+  const items = rowsItems.map((item) => ({
+    id: item.id,
+    productId: item.productId,
+    variantId: item.variantId,
+    designId: item.designId || null,
+    tenSanPham: item.tenSanPham || "Sản phẩm",
+    mauSac: item.color || "",
+    kichCo: item.size || "",
+    sku: item.sku || "",
+    soLuong: Number(item.quantity || 0),
+    donGiaVnd: Number(item.unitPrice || 0),
+    phiThietKeVnd: Number(item.designFee || 0),
+    thanhTienVnd: Number(item.lineTotal || 0),
+    loai: item.designId ? "custom_design" : "ao_mau",
+    anhUrl: item.anhUrl || null,
+    anhXemTruocThietKe: item.anhXemTruocThietKe || null,
+    viTriIn: item.viTriIn || null,
+    phuongPhapIn: item.phuongPhapIn || null,
+  }));
 
   const thanhToan = {
     phuongThuc: donHang.paymentMethod || "COD",
@@ -436,7 +588,16 @@ async function layChiTietDonHang(id) {
     status: donHang.trangThaiThanhToan,
   };
 
-  const timeline = xayDungTimeline(donHang, thanhToan);
+  const [rowsHistory] = await db.pool.query(
+    `SELECT id, orderId, fromStatus, toStatus, action, actorRole, actorName, note, createdAt
+     FROM OrderHistory
+     WHERE orderId = ?
+     ORDER BY createdAt DESC, id DESC`,
+    [id]
+  );
+  const timeline = rowsHistory.length > 0
+    ? xayDungTimelineTuHistory(rowsHistory, donHang.status, donHang)
+    : xayDungTimeline(donHang, thanhToan);
 
   return {
     id: donHang.id,
@@ -450,7 +611,10 @@ async function layChiTietDonHang(id) {
       loai: loaiDon,
       sizes: tatCaSize ? `Cỡ ${tatCaSize}` : "",
       anhUrl: itemDau.anhUrl || null,
+      soSanPhamKhac: Math.max(0, items.length - 1),
+      tongSoLuong: items.reduce((tong, item) => tong + item.soLuong, 0),
     },
+    items,
     tongTienVnd: Number(donHang.totalAmount),
     tamTinhVnd: tamTinh,
     phiThietKeVnd: tongPhiThietKe,
@@ -472,7 +636,7 @@ async function layChiTietDonHang(id) {
 // =====================================================================
 // SERVICE 4: Cập nhật trạng thái đơn hàng
 // =====================================================================
-async function capNhatTrangThai(id, trangThaiFE) {
+async function capNhatTrangThai(id, trangThaiFE, actor) {
   // Chuyển từ FE key sang DB status
   const trangThaiDB = MAP_TRANG_THAI_FE_SANG_DB[trangThaiFE];
   if (!trangThaiDB) {
@@ -493,6 +657,9 @@ async function capNhatTrangThai(id, trangThaiFE) {
   }
 
   const donHienTai = rows[0];
+  if (donHienTai.status === trangThaiDB) {
+    return { id: Number(id), trangThai: trangThaiFE };
+  }
 
   // Không cho phép cập nhật đơn đã hủy hoặc đã hoàn tất
   if (donHienTai.status === "CANCELLED") {
@@ -506,7 +673,6 @@ async function capNhatTrangThai(id, trangThaiFE) {
     throw err;
   }
 
-  // Cập nhật trạng thái
   const capNhatThem = {};
   if (trangThaiDB === "SHIPPING") {
     capNhatThem.shippedAt = new Date();
@@ -518,17 +684,39 @@ async function capNhatTrangThai(id, trangThaiFE) {
   const cotCapNhatThem = Object.keys(capNhatThem);
   const setClause = ["status = ?", ...cotCapNhatThem.map((k) => `${k} = ?`)].join(", ");
 
-  await db.pool.query(
-    `UPDATE CustomerOrder SET ${setClause} WHERE id = ?`,
-    [trangThaiDB, ...Object.values(capNhatThem), id]
-  );
+  const conn = await db.pool.getConnection();
 
-  // Cập nhật productionStatus trong OrderItem nếu cần
-  if (["PROCESSING", "PRINTING"].includes(trangThaiDB)) {
-    await db.pool.query(
-      "UPDATE OrderItem SET productionStatus = ? WHERE orderId = ?",
-      [trangThaiDB, id]
+  try {
+    await conn.beginTransaction();
+
+    await conn.query(
+      `UPDATE CustomerOrder SET ${setClause} WHERE id = ?`,
+      [trangThaiDB, ...Object.values(capNhatThem), id]
     );
+
+    // Cập nhật productionStatus trong OrderItem nếu cần
+    if (["PROCESSING", "PRINTING"].includes(trangThaiDB)) {
+      await conn.query(
+        "UPDATE OrderItem SET productionStatus = ? WHERE orderId = ?",
+        [trangThaiDB, id]
+      );
+    }
+
+    await ghiOrderHistory(conn, {
+      orderId: Number(id),
+      fromStatus: donHienTai.status,
+      toStatus: trangThaiDB,
+      action: "STATUS_CHANGED",
+      actor,
+      note: `Cập nhật trạng thái: ${layTenTrangThai(donHienTai.status)} → ${layTenTrangThai(trangThaiDB)}`,
+    });
+
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
   }
 
   return { id: Number(id), trangThai: trangThaiFE };
@@ -537,7 +725,7 @@ async function capNhatTrangThai(id, trangThaiFE) {
 // =====================================================================
 // SERVICE 5: Hủy đơn hàng
 // =====================================================================
-async function huyDonHang(id, lyDo) {
+async function huyDonHang(id, lyDo, actor) {
   // Kiểm tra đơn hàng tồn tại
   const [rows] = await db.pool.query(
     "SELECT id, status FROM CustomerOrder WHERE id = ?",
@@ -561,10 +749,33 @@ async function huyDonHang(id, lyDo) {
     throw err;
   }
 
-  await db.pool.query(
-    "UPDATE CustomerOrder SET status = 'CANCELLED', cancelReason = ? WHERE id = ?",
-    [lyDo || "Không có lý do", id]
-  );
+  const lyDoHuy = lyDo || "Không có lý do";
+  const conn = await db.pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    await conn.query(
+      "UPDATE CustomerOrder SET status = 'CANCELLED', cancelReason = ? WHERE id = ?",
+      [lyDoHuy, id]
+    );
+
+    await ghiOrderHistory(conn, {
+      orderId: Number(id),
+      fromStatus: donHienTai.status,
+      toStatus: "CANCELLED",
+      action: "CANCELLED",
+      actor,
+      note: `Đã hủy đơn hàng – Lý do: ${lyDoHuy}`,
+    });
+
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 
   return { id: Number(id), trangThai: "da_huy" };
 }
@@ -822,7 +1033,7 @@ async function layDanhSachKhuyenMai() {
  *
  * @param {Object} data - dữ liệu từ request body đã validated
  */
-async function taoMoiDonHang(data) {
+async function taoMoiDonHang(data, actor) {
   const {
     userId,
     addressId,
@@ -1109,6 +1320,15 @@ async function taoMoiDonHang(data) {
     );
     const orderId = resultOrder.insertId;
 
+    await ghiOrderHistory(conn, {
+      orderId,
+      fromStatus: null,
+      toStatus: "PENDING",
+      action: "CREATED",
+      actor,
+      note: "Tạo đơn hàng mới – Chờ xác nhận",
+    });
+
     // ── Bước 3.3: INSERT OrderItem và OrderProduction ──
     for (const item of itemsEnriched) {
       // lineTotal = (unitPrice * quantity) + designFee của item này
@@ -1184,4 +1404,3 @@ async function taoMoiDonHang(data) {
     conn.release();
   }
 }
-

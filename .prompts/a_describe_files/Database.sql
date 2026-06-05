@@ -369,6 +369,33 @@ CREATE TABLE IF NOT EXISTS `OrderItem` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+-- CHANGE 2026-06-05:
+-- Bổ sung bảng OrderHistory để lưu lịch sử trạng thái thật của đơn hàng.
+-- Trước đây backend chỉ dựng timeline từ CustomerOrder.status/updatedAt nên mỗi lần đổi trạng thái
+-- sẽ ghi đè mốc hiện tại, không thể hiển thị đầy đủ quá trình xử lý đơn.
+CREATE TABLE IF NOT EXISTS `OrderHistory` (
+	`id` INT NOT NULL AUTO_INCREMENT,
+	`orderId` INT NOT NULL,
+	`fromStatus` VARCHAR(30) NULL,
+	`toStatus` VARCHAR(30) NOT NULL,
+	`action` VARCHAR(50) NOT NULL,
+	`actorId` INT NULL,
+	`actorRole` VARCHAR(30) NOT NULL DEFAULT 'SYSTEM',
+	`actorName` VARCHAR(255) NOT NULL DEFAULT 'Hệ thống',
+	`note` TEXT NULL,
+	`createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (`id`),
+	KEY `idx_order_history_order_id_created_at` (`orderId`, `createdAt`),
+	KEY `idx_order_history_actor_id` (`actorId`),
+	CONSTRAINT `fk_order_history_order`
+		FOREIGN KEY (`orderId`) REFERENCES `CustomerOrder` (`id`)
+		ON UPDATE NO ACTION ON DELETE CASCADE,
+	CONSTRAINT `fk_order_history_actor`
+		FOREIGN KEY (`actorId`) REFERENCES `Account` (`id`)
+		ON UPDATE NO ACTION ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 CREATE TABLE IF NOT EXISTS `OrderProduction` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`orderItemId` INT NOT NULL,

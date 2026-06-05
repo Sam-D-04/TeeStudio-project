@@ -3,7 +3,6 @@
 import {
   ArrowLeftOutlined,
   PlusOutlined,
-  PrinterOutlined,
   ShoppingCartOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
@@ -49,6 +48,111 @@ function PriceRow({ label, value }: { label: string; value: number }) {
       >
         {value < 0 ? `-${formatCurrency(Math.abs(value))}` : formatCurrency(value)}
       </span>
+    </div>
+  );
+}
+
+function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
+  const items = order.items?.length
+    ? order.items
+    : [
+        {
+          id: order.id,
+          productId: 0,
+          variantId: 0,
+          designId: null,
+          tenSanPham: order.sanPham.ten,
+          mauSac: "",
+          kichCo: order.sanPham.sizes,
+          sku: "",
+          soLuong: 1,
+          donGiaVnd: order.tamTinhVnd,
+          phiThietKeVnd: order.phiThietKeVnd,
+          thanhTienVnd: order.tamTinhVnd + order.phiThietKeVnd,
+          loai: order.sanPham.loai,
+          anhUrl: order.sanPham.anhUrl,
+          anhXemTruocThietKe: order.anhXemTruocThietKe,
+          viTriIn: order.viTriIn,
+          phuongPhapIn: order.phuongPhapIn,
+        },
+      ];
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-border">
+      <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+        <thead>
+          <tr className="border-b border-border bg-surface-alt text-xs font-bold uppercase text-text-secondary">
+            <th className="p-3">Hình ảnh</th>
+            <th className="p-3">Tên áo</th>
+            <th className="p-3">Phân loại</th>
+            <th className="p-3 text-center">Số lượng</th>
+            <th className="p-3 text-right">Đơn giá</th>
+            <th className="p-3 text-right">Thành tiền</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => {
+            const imageUrl = item.anhXemTruocThietKe || item.anhUrl;
+
+            return (
+              <tr key={item.id} className="border-b border-border last:border-b-0">
+                <td className="p-3 align-top">
+                  <div className="h-14 w-14 overflow-hidden rounded-lg border border-border bg-surface-alt">
+                    {imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={imageUrl}
+                        alt={item.tenSanPham}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xs text-text-muted">
+                        Ảnh
+                      </div>
+                    )}
+                  </div>
+                </td>
+                <td className="p-3 align-top">
+                  <div className="font-semibold text-text-main">{item.tenSanPham}</div>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {item.loai === "custom_design" ? (
+                      <Tag color="blue" className="m-0">
+                        Áo POD
+                      </Tag>
+                    ) : (
+                      <Tag className="m-0">Áo mẫu</Tag>
+                    )}
+                    {item.designId ? (
+                      <Tag color="geekblue" className="m-0">
+                        Design #{item.designId}
+                      </Tag>
+                    ) : null}
+                  </div>
+                </td>
+                <td className="p-3 align-top text-text-secondary">
+                  <div>Màu: {item.mauSac || "Chưa có"}</div>
+                  <div>Size: {item.kichCo || "Chưa có"}</div>
+                  {item.sku ? <div className="text-xs text-text-muted">SKU: {item.sku}</div> : null}
+                </td>
+                <td className="p-3 text-center align-top font-bold text-text-main">
+                  {item.soLuong}
+                </td>
+                <td className="p-3 text-right align-top text-text-main">
+                  <div className="font-semibold">{formatCurrency(item.donGiaVnd)}</div>
+                  {item.phiThietKeVnd > 0 ? (
+                    <div className="mt-1 text-xs text-text-secondary">
+                      Phí TK: {formatCurrency(item.phiThietKeVnd)}
+                    </div>
+                  ) : null}
+                </td>
+                <td className="p-3 text-right align-top font-bold text-primary-container">
+                  {formatCurrency(item.thanhTienVnd)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -105,7 +209,7 @@ function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
             <div>
               <h3 className="text-card-title text-text-main">Sản phẩm</h3>
               <p className="mt-1 text-body-sm text-text-secondary">
-                Thông tin tóm tắt từ backend cho đơn hàng này.
+                Danh sách đầy đủ để nhân viên kho nhặt hàng và đóng gói chính xác.
               </p>
             </div>
             {order.daXuatThongSoIn ? (
@@ -119,24 +223,7 @@ function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
             )}
           </div>
 
-          <div className="rounded-xl border border-border bg-surface-alt p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#e0f2fe] text-xl text-primary-container">
-                <PrinterOutlined />
-              </div>
-              <div className="min-w-0">
-                <h4 className="truncate text-sm font-bold text-text-main">
-                  {order.sanPham.ten}
-                </h4>
-                <p className="mt-1 text-sm text-text-secondary">
-                  Size/màu: {order.sanPham.sizes || "Chưa có"}
-                </p>
-                <p className="mt-1 text-xs text-text-muted">
-                  Loại: {order.sanPham.loai === "custom_design" ? "Áo POD" : "Áo mẫu"}
-                </p>
-              </div>
-            </div>
-          </div>
+          <OrderItemsTable order={order} />
         </section>
 
         <section className="rounded-xl border border-border bg-surface p-5 shadow-admin-card">

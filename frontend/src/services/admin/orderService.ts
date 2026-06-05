@@ -26,6 +26,29 @@ export type SanPhamTomTat = {
   loai: "custom_design" | "ao_mau";
   sizes: string;
   anhUrl: string | null;
+  soSanPhamKhac?: number;
+  tongSoLuong?: number;
+};
+
+/** Một dòng sản phẩm trong chi tiết đơn hàng */
+export type ChiTietDonHangItem = {
+  id: number;
+  productId: number;
+  variantId: number;
+  designId: number | null;
+  tenSanPham: string;
+  mauSac: string;
+  kichCo: string;
+  sku: string;
+  soLuong: number;
+  donGiaVnd: number;
+  phiThietKeVnd: number;
+  thanhTienVnd: number;
+  loai: "custom_design" | "ao_mau";
+  anhUrl: string | null;
+  anhXemTruocThietKe: string | null;
+  viTriIn: string | null;
+  phuongPhapIn: string | null;
 };
 
 /** Một đơn hàng trong danh sách */
@@ -52,6 +75,7 @@ export type BuocTimeline = {
 
 /** Chi tiết đầy đủ của 1 đơn hàng (dùng cho Drawer) */
 export type ChiTietDonHang = DonHang & {
+  items: ChiTietDonHangItem[];
   emailKhachHang: string;
   tamTinhVnd: number;
   phiThietKeVnd: number;

@@ -57,7 +57,7 @@ const capNhatTrangThai = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
     const { trangThai } = req.body;
-    const data = await orderService.capNhatTrangThai(id, trangThai);
+    const data = await orderService.capNhatTrangThai(id, trangThai, req.user);
     res.json({ success: true, message: "Cập nhật trạng thái thành công", data });
   } catch (error) {
     next(error);
@@ -72,7 +72,7 @@ const huyDonHang = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
     const { lyDo } = req.body;
-    const data = await orderService.huyDonHang(id, lyDo);
+    const data = await orderService.huyDonHang(id, lyDo, req.user);
     res.json({ success: true, message: "Đã hủy đơn hàng", data });
   } catch (error) {
     next(error);
@@ -166,7 +166,7 @@ const layKhuyenMai = async (req, res, next) => {
  */
 const taoMoiDonHang = async (req, res, next) => {
   try {
-    const data = await orderService.taoMoiDonHang(req.body);
+    const data = await orderService.taoMoiDonHang(req.body, req.user);
     res.status(201).json({
       success: true,
       message: "Tạo đơn hàng thành công",
