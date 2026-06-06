@@ -56,9 +56,10 @@ export default function RootLayout({
     <html
       lang="vi"
       data-scroll-behavior="smooth"
+      suppressHydrationWarning
       className={`${inter.variable} h-full antialiased`}
     >
-      <body suppressHydrationWarning={true} className="min-h-full flex flex-col bg-[#f1f5f9]">
+      <body className="min-h-full flex flex-col bg-[#f1f5f9]">
         <QueryProvider>
           <AntdRegistry>
             <ConfigProvider theme={antdTheme} locale={viVN}>

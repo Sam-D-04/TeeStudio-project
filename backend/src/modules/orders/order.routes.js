@@ -98,6 +98,14 @@ router.post(
   orderController.taoMoiDonHang
 );
 
+// POST /api/admin/orders/:id/vnpay/recreate – Tạo lại mã VNPAY đã hết hạn
+router.post(
+  "/:id/vnpay/recreate",
+  verifyToken,
+  requireAdmin,
+  orderController.taoLaiMaThanhToanVnpay
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTE CHI TIẾT / CẬP NHẬT (có :id)
 // ─────────────────────────────────────────────────────────────────────────────

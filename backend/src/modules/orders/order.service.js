@@ -4,6 +4,41 @@
  */
 
 const db = require("../../database/mysql");
+const {
+  taoLinkThanhToanVnpay,
+  taoMaGiaoDichVnpayMoi,
+} = require("../payments/vnpay.service");
+
+const DEPOSIT_PERCENT = 50;
+const ACTION_CUSTOMER_CREATED = "Khách hàng đặt đơn";
+const ACTION_ADMIN_CREATED = "Tạo đơn cho khách";
+const CREATION_ACTIONS = new Set([
+  "CREATED",
+  ACTION_CUSTOMER_CREATED,
+  ACTION_ADMIN_CREATED,
+]);
+
+function tinhThongTinThanhToan(totalAmount, paymentMethod, paymentType) {
+  const depositAmount =
+    paymentType === "DEPOSIT"
+      ? Math.round(totalAmount * (DEPOSIT_PERCENT / 100))
+      : 0;
+  const codAmount =
+    paymentMethod === "COD" ? Math.max(0, totalAmount - depositAmount) : 0;
+  const paymentAmount =
+    paymentMethod === "COD"
+      ? codAmount
+      : paymentType === "DEPOSIT"
+        ? depositAmount
+        : totalAmount;
+
+  return {
+    depositPercent: DEPOSIT_PERCENT,
+    depositAmount,
+    codAmount,
+    paymentAmount,
+  };
+}
 
 // =====================================================================
 // MAP TRẠNG THÁI: DB (tiếng Anh) → Frontend (tiếng Việt snake_case)
@@ -47,11 +82,35 @@ function taoActorHistory(actor, fallbackName = "Hệ thống") {
   };
 }
 
+function taoLichSuTaoDon(actor) {
+  const action =
+    actor?.role === "CUSTOMER"
+      ? ACTION_CUSTOMER_CREATED
+      : ACTION_ADMIN_CREATED;
+
+  return { action, note: action };
+}
+
+function laHanhDongTaoDon(action) {
+  return CREATION_ACTIONS.has(action);
+}
+
+function parseGatewayResponse(gatewayResponse) {
+  if (!gatewayResponse) return {};
+  if (typeof gatewayResponse === "object") return gatewayResponse;
+
+  try {
+    return JSON.parse(gatewayResponse);
+  } catch {
+    return {};
+  }
+}
+
 function taoMoTaHistory({ action, fromStatus, toStatus, note }) {
   if (note) return note;
 
-  if (action === "CREATED") {
-    return "Tạo đơn hàng mới – Chờ xác nhận";
+  if (laHanhDongTaoDon(action)) {
+    return action === "CREATED" ? "Tạo đơn hàng mới" : action;
   }
 
   if (action === "CANCELLED") {
@@ -96,7 +155,7 @@ function xayDungTimelineTuHistory(rowsHistory, trangThaiHienTai, donHang = null)
     laDangHienTai: index === 0 && row.toStatus === trangThaiHienTai,
   }));
 
-  if (donHang && !rowsHistory.some((row) => row.action === "CREATED")) {
+  if (donHang && !rowsHistory.some((row) => laHanhDongTaoDon(row.action))) {
     timeline.push({
       moTa: "Tạo đơn hàng mới",
       thoiGian: formatNgayGio(donHang.createdAt),
@@ -192,9 +251,9 @@ function xayDungTimeline(donHang, thanhToan) {
   } else {
     // PENDING
     timeline.push({
-      moTa: "Đơn hàng mới – Chờ xác nhận",
+      moTa: ACTION_CUSTOMER_CREATED,
       thoiGian: formatNgayGio(donHang.createdAt),
-      nguoiThucHien: "Hệ thống",
+      nguoiThucHien: "Khách hàng",
       laDangHienTai: true,
     });
   }
@@ -209,13 +268,14 @@ function xayDungTimeline(donHang, thanhToan) {
     });
   }
 
-  // Mốc tạo đơn luôn ở cuối timeline
-  timeline.push({
-    moTa: "Tạo đơn hàng mới",
-    thoiGian: formatNgayGio(donHang.createdAt),
-    nguoiThucHien: "Khách hàng",
-    laDangHienTai: false,
-  });
+  if (trangThai !== "PENDING") {
+    timeline.push({
+      moTa: ACTION_CUSTOMER_CREATED,
+      thoiGian: formatNgayGio(donHang.createdAt),
+      nguoiThucHien: "Khách hàng",
+      laDangHienTai: false,
+    });
+  }
 
   return timeline;
 }
@@ -483,8 +543,12 @@ async function layChiTietDonHang(id) {
        ua.district,
        ua.city,
        p.paymentMethod,
+       p.paymentType,
+       p.amount      AS paymentAmount,
        p.status     AS trangThaiThanhToan,
-       p.paidAt
+       p.paidAt,
+       p.transactionId,
+       p.gatewayResponse
      FROM CustomerOrder co
      JOIN Account a ON a.id = co.userId
      LEFT JOIN UserAddress ua ON ua.id = co.addressId
@@ -581,11 +645,23 @@ async function layChiTietDonHang(id) {
     phuongPhapIn: item.phuongPhapIn || null,
   }));
 
+  const vnpayGatewayResponse = parseGatewayResponse(donHang.gatewayResponse);
   const thanhToan = {
     phuongThuc: donHang.paymentMethod || "COD",
+    loai: donHang.paymentType || "FULL",
+    soTienVnd: Number(donHang.paymentAmount || 0),
     daThanh: donHang.trangThaiThanhToan === "COMPLETED",
     paidAt: donHang.paidAt,
     status: donHang.trangThaiThanhToan,
+    transactionId: donHang.transactionId || null,
+    paymentUrl:
+      donHang.paymentMethod === "VNPAY"
+        ? vnpayGatewayResponse.paymentUrl || null
+        : null,
+    expiresAt:
+      donHang.paymentMethod === "VNPAY"
+        ? vnpayGatewayResponse.expiresAt || null
+        : null,
   };
 
   const [rowsHistory] = await db.pool.query(
@@ -620,6 +696,8 @@ async function layChiTietDonHang(id) {
     phiThietKeVnd: tongPhiThietKe,
     phiVanChuyenVnd: Number(donHang.shippingFee || 0),
     giamGiaVnd: Number(donHang.discountAmount || 0),
+    tienCocVnd: Number(donHang.depositAmount || 0),
+    tienThuHoCodVnd: Number(donHang.codAmount || 0),
     thanhToan,
     trangThai: MAP_TRANG_THAI_DB_SANG_FE[donHang.status] || "cho_xac_nhan",
     diaChiGiaoHang,
@@ -659,6 +737,12 @@ async function capNhatTrangThai(id, trangThaiFE, actor) {
   const donHienTai = rows[0];
   if (donHienTai.status === trangThaiDB) {
     return { id: Number(id), trangThai: trangThaiFE };
+  }
+
+  if (trangThaiDB === "CANCELLED") {
+    const err = new Error("Vui lòng sử dụng chức năng hủy đơn hàng");
+    err.statusCode = 400;
+    throw err;
   }
 
   // Không cho phép cập nhật đơn đã hủy hoặc đã hoàn tất
@@ -760,6 +844,14 @@ async function huyDonHang(id, lyDo, actor) {
       [lyDoHuy, id]
     );
 
+    await conn.query(
+      `UPDATE Payment
+       SET status = 'CANCELLED'
+       WHERE orderId = ?
+         AND status = 'PENDING'`,
+      [id]
+    );
+
     await ghiOrderHistory(conn, {
       orderId: Number(id),
       fromStatus: donHienTai.status,
@@ -780,12 +872,122 @@ async function huyDonHang(id, lyDo, actor) {
   return { id: Number(id), trangThai: "da_huy" };
 }
 
+async function taoLaiMaThanhToanVnpay(id, actor, ipAddress) {
+  const conn = await db.pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    const [rows] = await conn.query(
+      `SELECT
+         co.id,
+         co.orderCode,
+         co.status AS orderStatus,
+         p.id AS paymentId,
+         p.amount,
+         p.paymentMethod,
+         p.status AS paymentStatus,
+         p.gatewayResponse
+       FROM CustomerOrder co
+       JOIN Payment p ON p.orderId = co.id
+       WHERE co.id = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      const err = new Error("Không tìm thấy đơn hàng hoặc thông tin thanh toán");
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const payment = rows[0];
+    if (payment.paymentMethod !== "VNPAY") {
+      const err = new Error("Đơn hàng không sử dụng phương thức thanh toán VNPAY");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (payment.orderStatus === "CANCELLED") {
+      const err = new Error("Không thể tạo lại mã thanh toán cho đơn hàng đã hủy");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (payment.paymentStatus === "COMPLETED") {
+      const err = new Error("Đơn hàng đã thanh toán thành công");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (payment.paymentStatus !== "PENDING") {
+      const err = new Error("Mã thanh toán hiện tại không thể tạo lại");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const currentGatewayResponse = parseGatewayResponse(payment.gatewayResponse);
+    const currentExpiresAt = Date.parse(currentGatewayResponse.expiresAt || "");
+    if (Number.isFinite(currentExpiresAt) && currentExpiresAt > Date.now()) {
+      const err = new Error("Mã thanh toán VNPAY hiện tại vẫn còn hiệu lực");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const vnpayPayment = taoLinkThanhToanVnpay({
+      orderCode: payment.orderCode,
+      amount: Number(payment.amount),
+      ipAddress,
+      transactionRef: taoMaGiaoDichVnpayMoi(payment.orderCode),
+    });
+
+    await conn.query(
+      `UPDATE Payment
+       SET transactionId = ?,
+           gatewayResponse = ?,
+           status = 'PENDING',
+           paidAt = NULL
+       WHERE id = ?
+         AND status = 'PENDING'`,
+      [
+        vnpayPayment.transactionRef,
+        JSON.stringify(vnpayPayment),
+        payment.paymentId,
+      ]
+    );
+
+    await ghiOrderHistory(conn, {
+      orderId: Number(id),
+      fromStatus: payment.orderStatus,
+      toStatus: payment.orderStatus,
+      action: "VNPAY_PAYMENT_RECREATED",
+      actor,
+      note: "Admin đã khởi tạo lại mã thanh toán VNPAY",
+    });
+
+    await conn.commit();
+
+    return {
+      paymentUrl: vnpayPayment.paymentUrl,
+      paymentUrlExpiresAt: vnpayPayment.expiresAt,
+      transactionId: vnpayPayment.transactionRef,
+    };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
 module.exports = {
   layThongKe,
   layDanhSachDonHang,
   layChiTietDonHang,
   capNhatTrangThai,
   huyDonHang,
+  taoLaiMaThanhToanVnpay,
   // ── Service hỗ trợ form Tạo đơn mới ──
   timKiemKhachHang,
   layDiaChiKhachHang,
@@ -1033,7 +1235,7 @@ async function layDanhSachKhuyenMai() {
  *
  * @param {Object} data - dữ liệu từ request body đã validated
  */
-async function taoMoiDonHang(data, actor) {
+async function taoMoiDonHang(data, actor, ipAddress) {
   const {
     userId,
     addressId,
@@ -1278,6 +1480,18 @@ async function taoMoiDonHang(data, actor) {
     0,
     Math.round((subtotal + tongDesignFee + shippingFee - discountAmount) * 100) / 100
   );
+  const {
+    depositPercent,
+    depositAmount,
+    codAmount,
+    paymentAmount,
+  } = tinhThongTinThanhToan(totalAmount, paymentMethod, paymentType);
+
+  if (paymentMethod === "VNPAY" && paymentAmount <= 0) {
+    const err = new Error("Số tiền thanh toán VNPAY phải lớn hơn 0");
+    err.statusCode = 400;
+    throw err;
+  }
 
   // ─────────────────────────────────────────────
   // BƯỚC 3-9: Thực hiện trong MySQL Transaction
@@ -1299,14 +1513,22 @@ async function taoMoiDonHang(data, actor) {
     ].join("");
     const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
     const orderCode = `TS-${dateStr}-${randomPart}`;
+    const vnpayPayment =
+      paymentMethod === "VNPAY"
+        ? taoLinkThanhToanVnpay({
+            orderCode,
+            amount: paymentAmount,
+            ipAddress,
+          })
+        : null;
 
     // ── Bước 3.2: INSERT CustomerOrder ──
     const [resultOrder] = await conn.query(
       `INSERT INTO CustomerOrder
          (orderCode, userId, promotionId, addressId,
           subtotal, discountAmount, shippingFee,
-          totalAmount, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')`,
+          totalAmount, depositAmount, codAmount, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')`,
       [
         orderCode,
         userId,
@@ -1316,17 +1538,20 @@ async function taoMoiDonHang(data, actor) {
         discountAmount,
         shippingFee,
         totalAmount,
+        depositAmount,
+        codAmount,
       ]
     );
     const orderId = resultOrder.insertId;
+    const creationHistory = taoLichSuTaoDon(actor);
 
     await ghiOrderHistory(conn, {
       orderId,
       fromStatus: null,
       toStatus: "PENDING",
-      action: "CREATED",
+      action: creationHistory.action,
       actor,
-      note: "Tạo đơn hàng mới – Chờ xác nhận",
+      note: creationHistory.note,
     });
 
     // ── Bước 3.3: INSERT OrderItem và OrderProduction ──
@@ -1366,9 +1591,17 @@ async function taoMoiDonHang(data, actor) {
 
     // ── Bước 3.4: INSERT Payment ──
     await conn.query(
-      `INSERT INTO Payment (orderId, amount, paymentMethod, paymentType, status)
-       VALUES (?, ?, ?, ?, 'PENDING')`,
-      [orderId, totalAmount, paymentMethod, paymentType]
+      `INSERT INTO Payment
+         (orderId, amount, paymentMethod, paymentType, status, transactionId, gatewayResponse)
+       VALUES (?, ?, ?, ?, 'PENDING', ?, ?)`,
+      [
+        orderId,
+        paymentAmount,
+        paymentMethod,
+        paymentType,
+        vnpayPayment?.transactionRef || null,
+        vnpayPayment ? JSON.stringify(vnpayPayment) : null,
+      ]
     );
 
     // ── Bước 3.5: Ghi nhận PromotionUsage và tăng usedCount ──
@@ -1394,6 +1627,12 @@ async function taoMoiDonHang(data, actor) {
       id: orderId,
       orderCode,
       totalAmount,
+      depositPercent,
+      depositAmount,
+      codAmount,
+      paymentAmount,
+      paymentUrl: vnpayPayment?.paymentUrl || null,
+      paymentUrlExpiresAt: vnpayPayment?.expiresAt || null,
     };
   } catch (error) {
     // ── ROLLBACK nếu có lỗi ──

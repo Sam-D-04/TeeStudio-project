@@ -323,6 +323,8 @@ CREATE TABLE IF NOT EXISTS `CustomerOrder` (
 	`deliveredAt` DATETIME NULL,
 	`cancelReason` TEXT NULL,
 	`totalAmount` DECIMAL(15,2) NOT NULL,
+	`depositAmount` DECIMAL(15,2) NOT NULL DEFAULT 0,
+	`codAmount` DECIMAL(15,2) NOT NULL DEFAULT 0,
 	`status` VARCHAR(30) NOT NULL DEFAULT 'PENDING',
 	`createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -373,6 +375,8 @@ CREATE TABLE IF NOT EXISTS `OrderItem` (
 -- Bổ sung bảng OrderHistory để lưu lịch sử trạng thái thật của đơn hàng.
 -- Trước đây backend chỉ dựng timeline từ CustomerOrder.status/updatedAt nên mỗi lần đổi trạng thái
 -- sẽ ghi đè mốc hiện tại, không thể hiển thị đầy đủ quá trình xử lý đơn.
+-- Quy tắc tạo đơn: mỗi đơn chỉ có một mốc. Khách tạo dùng action='Khách hàng đặt đơn',
+-- actorRole='CUSTOMER'; Admin tạo thay khách dùng action='Tạo đơn cho khách', actorRole='ADMIN'.
 CREATE TABLE IF NOT EXISTS `OrderHistory` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`orderId` INT NOT NULL,

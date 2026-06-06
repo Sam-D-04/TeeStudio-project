@@ -230,7 +230,33 @@ VALUES
  '2026-05-30 08:00:00', '2026-06-03 14:00:00');
 
 -- ============================================================
--- 14. CHI TIẾT TỪNG MỤC TRONG ĐƠN HÀNG
+-- 14. LỊCH SỬ ĐƠN HÀNG
+-- Mỗi đơn có đúng một mốc tạo đơn. Đơn đã xử lý có thêm mốc trạng thái hiện tại.
+-- ============================================================
+INSERT INTO `OrderHistory`
+  (orderId, fromStatus, toStatus, action, actorId, actorRole, actorName, note, createdAt)
+VALUES
+(1,  NULL,      'PENDING',       'Khách hàng đặt đơn', 1, 'CUSTOMER', 'Nguyễn Minh Anh',   'Khách hàng đặt đơn', '2026-06-03 08:24:00'),
+(1,  'PENDING', 'PROCESSING',    'STATUS_CHANGED',      9, 'ADMIN',    'Quản Trị Viên',      NULL,                  '2026-06-03 10:30:00'),
+(2,  NULL,      'PENDING',       'Khách hàng đặt đơn', 2, 'CUSTOMER', 'Trần Văn Cường',     'Khách hàng đặt đơn', '2026-06-03 09:05:00'),
+(3,  NULL,      'PENDING',       'Khách hàng đặt đơn', 3, 'CUSTOMER', 'Lê Thị Hoa',         'Khách hàng đặt đơn', '2026-06-02 13:40:00'),
+(3,  'PENDING', 'READY_TO_SHIP', 'STATUS_CHANGED',      9, 'ADMIN',    'Quản Trị Viên',      NULL,                  '2026-06-03 09:00:00'),
+(4,  NULL,      'PENDING',       'Khách hàng đặt đơn', 4, 'CUSTOMER', 'Phạm Quốc Bảo',      'Khách hàng đặt đơn', '2026-05-31 15:20:00'),
+(4,  'PENDING', 'COMPLETED',     'STATUS_CHANGED',      9, 'ADMIN',    'Quản Trị Viên',      NULL,                  '2026-06-03 10:20:00'),
+(5,  NULL,      'PENDING',       'Khách hàng đặt đơn', 5, 'CUSTOMER', 'Nguyễn Thị Lan',     'Khách hàng đặt đơn', '2026-06-03 10:15:00'),
+(5,  'PENDING', 'CONFIRMED',     'STATUS_CHANGED',      9, 'ADMIN',    'Quản Trị Viên',      NULL,                  '2026-06-03 11:00:00'),
+(6,  NULL,      'PENDING',       'Khách hàng đặt đơn', 6, 'CUSTOMER', 'Hoàng Văn Đức',      'Khách hàng đặt đơn', '2026-06-02 14:30:00'),
+(6,  'PENDING', 'PRINTING',      'STATUS_CHANGED',      9, 'ADMIN',    'Quản Trị Viên',      NULL,                  '2026-06-03 08:00:00'),
+(7,  NULL,      'PENDING',       'Khách hàng đặt đơn', 7, 'CUSTOMER', 'Võ Thị Thu',         'Khách hàng đặt đơn', '2026-06-01 16:45:00'),
+(7,  'PENDING', 'SHIPPING',      'STATUS_CHANGED',      9, 'ADMIN',    'Quản Trị Viên',      NULL,                  '2026-06-02 16:00:00'),
+(8,  NULL,      'PENDING',       'Khách hàng đặt đơn', 8, 'CUSTOMER', 'Đinh Văn Nam',       'Khách hàng đặt đơn', '2026-06-01 09:00:00'),
+(8,  'PENDING', 'CANCELLED',     'CANCELLED',           9, 'ADMIN',    'Quản Trị Viên',      'Đã hủy đơn hàng – Lý do: Khách hàng yêu cầu hủy, không có nhu cầu nữa', '2026-06-01 10:30:00'),
+(9,  NULL,      'PENDING',       'Khách hàng đặt đơn', 1, 'CUSTOMER', 'Nguyễn Minh Anh',   'Khách hàng đặt đơn', '2026-06-03 11:00:00'),
+(10, NULL,      'PENDING',       'Khách hàng đặt đơn', 2, 'CUSTOMER', 'Trần Văn Cường',     'Khách hàng đặt đơn', '2026-05-30 08:00:00'),
+(10, 'PENDING', 'COMPLETED',     'STATUS_CHANGED',      9, 'ADMIN',    'Quản Trị Viên',      NULL,                  '2026-06-03 14:00:00');
+
+-- ============================================================
+-- 15. CHI TIẾT TỪNG MỤC TRONG ĐƠN HÀNG
 -- ============================================================
 INSERT INTO `OrderItem` (orderId, variantId, designId, quantity, unitPrice, designFee, lineTotal, productionStatus) VALUES
 -- ĐH1: Áo oversize trắng L + custom design (designId=1)
@@ -264,7 +290,7 @@ INSERT INTO `OrderItem` (orderId, variantId, designId, quantity, unitPrice, desi
 (10, 6, NULL, 5, 120000, 0, 600000, 'COMPLETED');
 
 -- ============================================================
--- 15. TIẾN TRÌNH SẢN XUẤT
+-- 16. TIẾN TRÌNH SẢN XUẤT
 -- ============================================================
 INSERT INTO `OrderProduction` (orderItemId, designId, status, note, approvedAt, printedAt, packedAt) VALUES
 -- ĐH1: Đang xử lý in
@@ -284,29 +310,29 @@ INSERT INTO `OrderProduction` (orderItemId, designId, status, note, approvedAt, 
  'Đang in lụa, dự kiến xong chiều nay', '2026-06-02 15:00:00', NULL, NULL);
 
 -- ============================================================
--- 16. THANH TOÁN
+-- 17. THANH TOÁN
 -- ============================================================
 INSERT INTO `Payment` (orderId, amount, paymentMethod, paymentType, status, transactionId, paidAt) VALUES
 -- ĐH1: VNPAY đã thanh toán
-(1,  705000, 'VNPAY',          'ONLINE', 'COMPLETED', 'VNP20260603001', '2026-06-03 08:30:00'),
+(1,  705000, 'VNPAY',          'FULL', 'COMPLETED', 'VNP20260603001', '2026-06-03 08:30:00'),
 -- ĐH2: COD chờ thanh toán
-(2,  380000, 'COD',            'OFFLINE','PENDING',   NULL, NULL),
+(2,  380000, 'COD',            'FULL','PENDING',   NULL, NULL),
 -- ĐH3: Chuyển khoản đã thanh toán
-(3,  2400000,'BANK_TRANSFER',  'ONLINE', 'COMPLETED', 'CK20260602001', '2026-06-02 14:00:00'),
+(3,  2400000,'BANK_TRANSFER',  'FULL', 'COMPLETED', 'CK20260602001', '2026-06-02 14:00:00'),
 -- ĐH4: VNPAY đã thanh toán
-(4,  510000, 'VNPAY',          'ONLINE', 'COMPLETED', 'VNP20260531001', '2026-05-31 15:30:00'),
+(4,  510000, 'VNPAY',          'FULL', 'COMPLETED', 'VNP20260531001', '2026-05-31 15:30:00'),
 -- ĐH5: COD chờ thanh toán
-(5,  450000, 'COD',            'OFFLINE','PENDING',   NULL, NULL),
+(5,  450000, 'COD',            'FULL','PENDING',   NULL, NULL),
 -- ĐH6: VNPAY đã thanh toán
-(6,  510000, 'VNPAY',          'ONLINE', 'COMPLETED', 'VNP20260602001', '2026-06-02 14:35:00'),
+(6,  510000, 'VNPAY',          'FULL', 'COMPLETED', 'VNP20260602001', '2026-06-02 14:35:00'),
 -- ĐH7: COD chờ thanh toán
-(7,  390000, 'COD',            'OFFLINE','PENDING',   NULL, NULL),
+(7,  390000, 'COD',            'FULL','PENDING',   NULL, NULL),
 -- ĐH8: Đã hủy nên không thanh toán
-(8,  270000, 'COD',            'OFFLINE','CANCELLED', NULL, NULL),
+(8,  270000, 'COD',            'FULL','CANCELLED', NULL, NULL),
 -- ĐH9: COD chờ thanh toán
-(9,  330000, 'COD',            'OFFLINE','PENDING',   NULL, NULL),
+(9,  330000, 'COD',            'FULL','PENDING',   NULL, NULL),
 -- ĐH10: VNPAY đã thanh toán
-(10, 550000, 'VNPAY',          'ONLINE', 'COMPLETED', 'VNP20260530001', '2026-05-30 08:15:00');
+(10, 550000, 'VNPAY',          'FULL', 'COMPLETED', 'VNP20260530001', '2026-05-30 08:15:00');
 
 SET FOREIGN_KEY_CHECKS = 1;
 
@@ -320,6 +346,8 @@ UNION ALL
 SELECT 'ProductVariant', COUNT(*) FROM ProductVariant
 UNION ALL
 SELECT 'CustomerOrder',  COUNT(*) FROM CustomerOrder
+UNION ALL
+SELECT 'OrderHistory',    COUNT(*) FROM OrderHistory
 UNION ALL
 SELECT 'OrderItem',      COUNT(*) FROM OrderItem
 UNION ALL

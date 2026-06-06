@@ -3,6 +3,7 @@ const router = require("express").Router();
 const pricingRoutes = require("../modules/pricing/pricing.routes");
 const adminOrderRoutes = require("../modules/orders/order.routes");
 const adminDesignRoutes = require("../modules/designs/design.routes");
+const paymentRoutes = require("../modules/payments/payment.routes");
 
 // Import controller cho 2 public endpoints (vi-tri-in, stickers dành cho Design Studio)
 const designController = require("../modules/designs/design.controller");
@@ -23,6 +24,9 @@ router.get("/vi-tri-in", designController.getDanhSachViTriInCongKhai);
 
 // GET /api/stickers → chỉ trả sticker đang bật
 router.get("/stickers", designController.getDanhSachSticker);
+
+// Xác thực Return URL và nhận IPN từ VNPAY.
+router.use("/payments", paymentRoutes);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Route dành cho Admin

@@ -13,12 +13,14 @@ import OrderStatusBadge from "./OrderStatusBadge";
  * - Badge trạng thái xử lý đơn
  * - Nút thao tác ở cột cuối
  *
- * Khi bấm vào hàng → gọi onRowClick để mở Drawer chi tiết.
+ * Khi bấm vào hàng → gọi onRowClick để chuyển sang trang chi tiết theo ID.
  */
 
 // Kiểu dữ liệu cho một mục thanh toán
 export type PaymentInfo = {
   method: string;   // Phương thức: "VNPAY", "COD", "Chuyển khoản"
+  type?: string;
+  amountVnd?: number;
   isPaid: boolean;  // Đã thanh toán hay chưa
 };
 
@@ -48,7 +50,7 @@ export type Order = {
 
 type OrderTableProps = {
   orders: Order[];
-  onRowClick: (order: Order) => void;  // Gọi khi bấm vào hàng để xem chi tiết
+  onRowClick: (order: Order) => void;
 };
 
 // Hàm định dạng số tiền VND: 429000 → "429.000đ"
@@ -103,6 +105,7 @@ export default function OrderTable({ orders, onRowClick }: OrderTableProps) {
                   {/* Ô thumbnail ảnh sản phẩm (48x48px) */}
                   <div className="h-12 w-12 shrink-0 overflow-hidden rounded border border-border bg-surface-container">
                     {order.product.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={order.product.imageUrl}
                         alt={order.product.name}
@@ -190,7 +193,7 @@ export default function OrderTable({ orders, onRowClick }: OrderTableProps) {
                     type="button"
                     title="Xem chi tiết"
                     onClick={(e) => {
-                      e.stopPropagation(); // Không để sự kiện lan ra hàng
+                      e.stopPropagation();
                       onRowClick(order);
                     }}
                     className="rounded p-1.5 text-text-secondary transition-colors hover:bg-surface-dim hover:text-[#006591]"

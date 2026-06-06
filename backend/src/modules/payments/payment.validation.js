@@ -35,7 +35,7 @@ const updatePaymentStatusSchema = {
     status: {
       required: true,
       type: "string",
-      enum: ["PENDING", "PAID", "FAILED", "CANCELLED", "REFUNDED"],
+      enum: ["PENDING", "COMPLETED", "FAILED", "CANCELLED", "REFUNDED"],
     },
   },
 };

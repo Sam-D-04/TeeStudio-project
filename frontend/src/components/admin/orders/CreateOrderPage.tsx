@@ -84,6 +84,23 @@ const initialValues: CreateOrderFormValues = {
   shippingFee: 0,
 };
 
+const DEPOSIT_PERCENT = 50;
+
+function getPaymentBreakdown(
+  totalAmount: number,
+  paymentMethod: TaoMoiDonHangInput["paymentMethod"] = "COD",
+  paymentType: TaoMoiDonHangInput["paymentType"] = "FULL"
+) {
+  const depositAmount =
+    paymentType === "DEPOSIT"
+      ? Math.round(totalAmount * (DEPOSIT_PERCENT / 100))
+      : 0;
+  const codAmount =
+    paymentMethod === "COD" ? Math.max(0, totalAmount - depositAmount) : 0;
+
+  return { depositAmount, codAmount };
+}
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -328,14 +345,6 @@ function CustomerSection({
         </Form.Item>
       </div>
 
-      {!isLoadingAddresses && addresses.length === 0 ? (
-        <Alert
-          showIcon
-          type="info"
-          className="mt-1"
-          title="Sau khi chọn khách hàng, hệ thống sẽ tải địa chỉ giao hàng từ backend."
-        />
-      ) : null}
     </SectionPanel>
   );
 }
@@ -705,7 +714,21 @@ function ProductsSection({
   );
 }
 
-function PaymentSection() {
+function PaymentSection({
+  preview,
+  paymentMethod,
+  paymentType,
+}: {
+  preview: OrderPreview;
+  paymentMethod?: TaoMoiDonHangInput["paymentMethod"];
+  paymentType?: TaoMoiDonHangInput["paymentType"];
+}) {
+  const { depositAmount, codAmount } = getPaymentBreakdown(
+    preview.totalAmount,
+    paymentMethod,
+    paymentType
+  );
+
   return (
     <SectionPanel title="3. Thanh toán">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -716,9 +739,9 @@ function PaymentSection() {
         >
           <Radio.Group>
             <Space wrap>
-              <Radio.Button value="COD">COD</Radio.Button>
-              <Radio.Button value="VNPAY">VNPAY</Radio.Button>
-              <Radio.Button value="CASH">CASH</Radio.Button>
+              <Radio.Button value="COD">COD (Thu hộ)</Radio.Button>
+              <Radio.Button value="VNPAY">VNPAY (Online)</Radio.Button>
+              <Radio.Button value="CASH">CASH (Tiền mặt)</Radio.Button>
             </Space>
           </Radio.Group>
         </Form.Item>
@@ -730,12 +753,58 @@ function PaymentSection() {
         >
           <Radio.Group>
             <Space wrap>
-              <Radio.Button value="FULL">FULL</Radio.Button>
-              <Radio.Button value="DEPOSIT">DEPOSIT</Radio.Button>
+              <Radio.Button value="FULL">FULL (Thanh toán đủ)</Radio.Button>
+              <Radio.Button value="DEPOSIT">DEPOSIT (Đặt cọc)</Radio.Button>
             </Space>
           </Radio.Group>
         </Form.Item>
       </div>
+
+      {paymentType === "DEPOSIT" ? (
+        <div className="rounded-xl border border-primary-container/25 bg-sky-50 p-4">
+          <div className="mb-3">
+            <div className="font-bold text-text-main">
+              Thông tin đặt cọc ({DEPOSIT_PERCENT}% tổng đơn)
+            </div>
+            <p className="mt-1 text-xs text-text-secondary">
+              Dùng số tiền này để thông báo ngay cho khách hàng.
+            </p>
+          </div>
+
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-text-secondary">
+                Số tiền cần thanh toán trước (Cọc)
+              </span>
+              <strong className="text-base text-primary-container">
+                {formatCurrency(depositAmount)}
+              </strong>
+            </div>
+
+            {paymentMethod === "COD" ? (
+              <div className="flex items-center justify-between gap-4 border-t border-primary-container/15 pt-2">
+                <span className="text-text-secondary">
+                  Số tiền thu hộ (COD) khi giao hàng
+                </span>
+                <strong className="text-base text-text-main">
+                  {formatCurrency(codAmount)}
+                </strong>
+              </div>
+            ) : null}
+          </div>
+
+          {paymentMethod === "VNPAY" ? (
+            <Alert
+              className="mt-3"
+              showIcon
+              type="info"
+              title={`Link VNPAY sẽ yêu cầu khách thanh toán tiền cọc ${formatCurrency(
+                depositAmount
+              )}.`}
+            />
+          ) : null}
+        </div>
+      ) : null}
     </SectionPanel>
   );
 }
@@ -1210,7 +1279,11 @@ export default function CreateOrderPage() {
               onDesignSearch={setDesignKeyword}
             />
 
-            <PaymentSection />
+            <PaymentSection
+              preview={preview}
+              paymentMethod={values.paymentMethod}
+              paymentType={values.paymentType}
+            />
 
             <ShippingSection
               promotions={promotions}

@@ -11,9 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
-import type { ChiTietDonHang } from "@/services/admin/orderService";
 import AdminSearchInput from "../common/AdminSearchInput";
-import OrderDetailDrawer from "./OrderDetailDrawer";
 import OrderFilterBar, { type DateRange } from "./OrderFilterBar";
 import OrderPagination from "./OrderPagination";
 import OrderStatCard from "./OrderStatCard";
@@ -73,53 +71,12 @@ function chuyenDoiSangOrder(don: orderService.DonHang): Order {
     totalAmountVnd: don.tongTienVnd,
     payment: {
       method: don.thanhToan.phuongThuc,
+      type: don.thanhToan.loai,
+      amountVnd: don.thanhToan.soTienVnd,
       isPaid: don.thanhToan.daThanh,
     },
     status: don.trangThai as Order["status"],
     hasPrintSpec: don.daXuatThongSoIn,
-  };
-}
-
-// Hàm chuyển đổi chi tiết đơn hàng sang kiểu OrderDetail của Drawer
-function chuyenDoiSangOrderDetail(chi: ChiTietDonHang) {
-  const designPreviewUrl =
-    chi.items?.find((item) => item.anhXemTruocThietKe)?.anhXemTruocThietKe ??
-    chi.anhXemTruocThietKe ??
-    undefined;
-
-  return {
-    id: chi.id,
-    orderCode: chi.maDonHang,
-    createdAt: chi.ngayTao,
-    customerName: chi.tenKhachHang,
-    customerPhone: chi.sdtKhachHang,
-    customerEmail: chi.emailKhachHang,
-    product: {
-      name: chi.sanPham.ten,
-      type: chi.sanPham.loai,
-      sizes: chi.sanPham.sizes,
-      imageUrl: chi.sanPham.anhUrl ?? undefined,
-    },
-    totalAmountVnd: chi.tongTienVnd,
-    subTotalVnd: chi.tamTinhVnd,
-    designFeeVnd: chi.phiThietKeVnd,
-    shippingFeeVnd: chi.phiVanChuyenVnd,
-    payment: {
-      method: chi.thanhToan.phuongThuc,
-      isPaid: chi.thanhToan.daThanh,
-    },
-    status: chi.trangThai as Order["status"],
-    hasPrintSpec: chi.daXuatThongSoIn,
-    shippingAddress: chi.diaChiGiaoHang,
-    shippingCarrier: chi.donViVanChuyen,
-    designPreviewUrl,
-    items: chi.items,
-    timeline: chi.thoiGianXuLy.map((b) => ({
-      description: b.moTa,
-      time: b.thoiGian,
-      actor: b.nguoiThucHien,
-      isActive: b.laDangHienTai,
-    })),
   };
 }
 
@@ -138,10 +95,6 @@ export default function OrdersPage() {
 
   // ---- State phân trang ----
   const [currentPage, setCurrentPage] = useState(1);
-
-  // ---- State drawer ----
-  // Lưu ID đơn đang mở drawer (null = không mở)
-  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
 
   const tuNgay = dateRange?.[0].format("YYYY-MM-DD") ?? "";
   const denNgay = dateRange?.[1].format("YYYY-MM-DD") ?? "";
@@ -192,28 +145,9 @@ export default function OrdersPage() {
       }),
   });
 
-  // ======================================================
-  // REACT QUERY: Lấy chi tiết đơn hàng (khi click hàng)
-  // enabled: false → chỉ fetch khi có selectedOrderId
-  // ======================================================
-  const {
-    data: chiTietDonHang,
-    isLoading: isLoadingChiTiet,
-  } = useQuery({
-    queryKey: ["admin-order-detail", selectedOrderId],
-    queryFn: () => orderService.layChiTietDonHang(selectedOrderId!),
-    enabled: selectedOrderId !== null, // Chỉ gọi khi có ID
-    staleTime: 30 * 1000, // Cache 30 giây (detail hay thay đổi hơn list)
-  });
-
-  // Hàm xử lý khi click hàng đơn hàng
+  // Mỗi đơn chỉ có một trang chi tiết chính thức theo ID.
   function handleRowClick(order: Order) {
-    setSelectedOrderId(order.id);
-  }
-
-  // Hàm đóng drawer
-  function handleCloseDrawer() {
-    setSelectedOrderId(null);
+    router.push(`/admin/don-hang/${order.id}`);
   }
 
   // Hàm xử lý khi filter thay đổi → reset về trang 1
@@ -229,11 +163,6 @@ export default function OrdersPage() {
   const danhSachOrder: Order[] = (ketQuaDanhSach?.danhSach ?? []).map(chuyenDoiSangOrder);
   const tongSo = ketQuaDanhSach?.tongSo ?? 0;
   const tongSoTrang = ketQuaDanhSach?.tongSoTrang ?? 1;
-
-  // Chuẩn bị dữ liệu drawer: dùng chi tiết nếu đã load, fallback về dữ liệu list
-  const orderDetailData = chiTietDonHang
-    ? chuyenDoiSangOrderDetail(chiTietDonHang)
-    : null;
 
   return (
     <div>
@@ -344,18 +273,6 @@ export default function OrdersPage() {
         )}
       </section>
 
-      {/* ======== Ngăn kéo chi tiết đơn hàng ======== */}
-      <OrderDetailDrawer
-        order={orderDetailData}
-        isLoading={isLoadingChiTiet && selectedOrderId !== null}
-        onClose={handleCloseDrawer}
-        onCapNhatTrangThai={async (id, trangThai) => {
-          await orderService.capNhatTrangThaiDonHang(id, trangThai);
-        }}
-        onHuyDon={async (id, lyDo) => {
-          await orderService.huyDonHang(id, lyDo);
-        }}
-      />
     </div>
   );
 }

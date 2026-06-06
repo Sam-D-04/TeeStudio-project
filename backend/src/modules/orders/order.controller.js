@@ -79,6 +79,24 @@ const huyDonHang = async (req, res, next) => {
   }
 };
 
+const taoLaiMaThanhToanVnpay = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    const data = await orderService.taoLaiMaThanhToanVnpay(
+      id,
+      req.user,
+      req.ip
+    );
+    res.json({
+      success: true,
+      message: "Đã tạo lại mã thanh toán VNPAY",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // =====================================================================
 // CONTROLLER HỖ TRỢ FORM TẠO ĐƠN MỚI
 // =====================================================================
@@ -166,7 +184,7 @@ const layKhuyenMai = async (req, res, next) => {
  */
 const taoMoiDonHang = async (req, res, next) => {
   try {
-    const data = await orderService.taoMoiDonHang(req.body, req.user);
+    const data = await orderService.taoMoiDonHang(req.body, req.user, req.ip);
     res.status(201).json({
       success: true,
       message: "Tạo đơn hàng thành công",
@@ -183,6 +201,7 @@ module.exports = {
   getChiTietDonHang,
   capNhatTrangThai,
   huyDonHang,
+  taoLaiMaThanhToanVnpay,
   // Hỗ trợ form Tạo đơn mới
   timKhachHang,
   layDiaChi,

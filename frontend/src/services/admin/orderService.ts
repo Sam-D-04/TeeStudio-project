@@ -17,7 +17,14 @@ import apiClient from "@/lib/apiClient";
 /** Thông tin thanh toán trong đơn hàng */
 export type ThanhToanInfo = {
   phuongThuc: string;
+  loai?: string;
+  soTienVnd?: number;
   daThanh: boolean;
+  status?: string | null;
+  paidAt?: string | null;
+  transactionId?: string | null;
+  paymentUrl?: string | null;
+  expiresAt?: string | null;
 };
 
 /** Thông tin sản phẩm tóm tắt (dùng trong bảng) */
@@ -81,6 +88,8 @@ export type ChiTietDonHang = DonHang & {
   phiThietKeVnd: number;
   phiVanChuyenVnd: number;
   giamGiaVnd: number;
+  tienCocVnd: number;
+  tienThuHoCodVnd: number;
   diaChiGiaoHang: string;
   donViVanChuyen: string;
   maVanDon: string | null;
@@ -204,6 +213,26 @@ export async function huyDonHang(
   return res.data.data;
 }
 
+export type KetQuaTaoLaiMaVnpay = {
+  paymentUrl: string;
+  paymentUrlExpiresAt: string;
+  transactionId: string;
+};
+
+/**
+ * Tạo lại mã thanh toán VNPAY đã hết hạn.
+ * POST /api/admin/orders/:id/vnpay/recreate
+ */
+export async function taoLaiMaThanhToanVnpay(
+  id: number
+): Promise<KetQuaTaoLaiMaVnpay> {
+  const res = await apiClient.post<{
+    success: boolean;
+    data: KetQuaTaoLaiMaVnpay;
+  }>(`/admin/orders/${id}/vnpay/recreate`);
+  return res.data.data;
+}
+
 // =====================================================================
 // TYPES & FUNCTIONS CHO FORM TẠO ĐƠN MỚI
 // =====================================================================
@@ -306,6 +335,12 @@ export type KetQuaTaoMoiDonHang = {
   id: number;
   orderCode: string;
   totalAmount: number;
+  depositPercent: number;
+  depositAmount: number;
+  codAmount: number;
+  paymentAmount: number;
+  paymentUrl: string | null;
+  paymentUrlExpiresAt: string | null;
 };
 
 /**

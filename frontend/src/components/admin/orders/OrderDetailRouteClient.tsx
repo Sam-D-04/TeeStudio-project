@@ -2,12 +2,33 @@
 
 import {
   ArrowLeftOutlined,
+  CheckCircleFilled,
+  CopyOutlined,
+  EditOutlined,
   PlusOutlined,
+  ReloadOutlined,
   ShoppingCartOutlined,
+  StopOutlined,
 } from "@ant-design/icons";
-import { useQuery } from "@tanstack/react-query";
-import { Alert, Button, Descriptions, Divider, Skeleton, Tag } from "antd";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Alert,
+  Button,
+  Descriptions,
+  Divider,
+  Input,
+  Modal,
+  QRCode,
+  Select,
+  Skeleton,
+  Space,
+  Tag,
+  Tooltip,
+  message,
+} from "antd";
+import { isAxiosError } from "axios";
 import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
 import type { ChiTietDonHang } from "@/services/admin/orderService";
 
@@ -22,12 +43,49 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   da_huy: { label: "Đã hủy", color: "red" },
 };
 
+const ORDER_STATUS_OPTIONS = [
+  { value: "cho_xac_nhan", label: "Chờ xác nhận" },
+  { value: "da_xac_nhan", label: "Đã xác nhận" },
+  { value: "dang_san_xuat", label: "Đang sản xuất" },
+  { value: "dang_in", label: "Đang in" },
+  { value: "cho_giao", label: "Chờ giao hàng" },
+  { value: "dang_giao", label: "Đang giao hàng" },
+  { value: "hoan_tat", label: "Hoàn tất" },
+];
+
+const CANCELLABLE_STATUSES = new Set(["cho_xac_nhan", "da_xac_nhan"]);
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
     currency: "VND",
     maximumFractionDigits: 0,
   }).format(Math.round(Number(value) || 0));
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "";
+
+  return new Intl.DateTimeFormat("vi-VN", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function formatExpiryTime(value?: string | null) {
+  if (!value) return "";
+
+  return new Intl.DateTimeFormat("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function getApiErrorMessage(error: unknown) {
+  if (isAxiosError(error)) {
+    return error.response?.data?.message || error.message;
+  }
+  return error instanceof Error ? error.message : "Đã xảy ra lỗi";
 }
 
 function StatusTag({ status }: { status: string }) {
@@ -157,6 +215,145 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
   );
 }
 
+function VnpayPaymentPanel({ order }: { order: ChiTietDonHang }) {
+  const queryClient = useQueryClient();
+  const [messageApi, messageContextHolder] = message.useMessage();
+  const [now, setNow] = useState<number | null>(null);
+  const payment = order.thanhToan;
+  const expiresAtMs = Date.parse(payment.expiresAt || "");
+  const isCancelled = order.trangThai === "da_huy";
+  const isPaid = payment.status === "COMPLETED";
+  const isPending = payment.status === "PENDING";
+  const hasValidExpiry = Number.isFinite(expiresAtMs);
+  const isExpired =
+    now !== null && isPending && (!hasValidExpiry || now >= expiresAtMs);
+  const isActive =
+    now !== null &&
+    isPending &&
+    !isCancelled &&
+    Boolean(payment.paymentUrl) &&
+    hasValidExpiry &&
+    now < expiresAtMs;
+
+  useEffect(() => {
+    if (!isPending || isCancelled) return;
+
+    const initialTimer = window.setTimeout(() => setNow(Date.now()), 0);
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
+  }, [isCancelled, isPending, payment.expiresAt]);
+
+  const recreateMutation = useMutation({
+    mutationFn: () => orderService.taoLaiMaThanhToanVnpay(order.id),
+    onSuccess: async () => {
+      messageApi.success("Đã tạo lại mã thanh toán VNPAY");
+      await queryClient.invalidateQueries({
+        queryKey: ["admin-order-detail", order.id],
+      });
+    },
+    onError: (error) => {
+      messageApi.error(getApiErrorMessage(error));
+    },
+  });
+
+  async function copyPaymentLink() {
+    if (!payment.paymentUrl) return;
+
+    try {
+      await navigator.clipboard.writeText(payment.paymentUrl);
+      messageApi.success("Đã sao chép link thanh toán VNPAY");
+    } catch {
+      messageApi.error("Không thể sao chép tự động");
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-border bg-surface p-5 shadow-admin-card">
+      {messageContextHolder}
+      <div className="mb-4">
+        <h3 className="text-card-title text-text-main">Thanh toán VNPAY</h3>
+        <p className="mt-1 text-body-sm text-text-secondary">
+          Gửi link hoặc mã QR này cho khách hàng để hoàn tất thanh toán.
+        </p>
+      </div>
+
+      {isCancelled ? (
+        <Alert
+          showIcon
+          type="error"
+          title="Đơn hàng đã bị hủy"
+          description="Mã thanh toán VNPAY đã được ẩn vĩnh viễn."
+        />
+      ) : isPaid ? (
+        <div className="rounded-xl border border-green-200 bg-green-50 p-5 text-center">
+          <CheckCircleFilled className="text-5xl text-green-600" />
+          <p className="mt-3 text-lg font-extrabold text-green-700">
+            Đã thanh toán thành công
+          </p>
+          <p className="mt-1 text-sm font-semibold text-green-700">
+            Lúc {formatDateTime(payment.paidAt)}
+          </p>
+        </div>
+      ) : isExpired ? (
+        <div className="space-y-4">
+          <Alert
+            showIcon
+            type="error"
+            title="Mã thanh toán đã hết hạn"
+            description="Hãy tạo lại mã mới trước khi gửi cho khách hàng."
+          />
+          <Button
+            type="primary"
+            danger
+            icon={<ReloadOutlined />}
+            loading={recreateMutation.isPending}
+            onClick={() => recreateMutation.mutate()}
+          >
+            Tạo lại mã thanh toán VNPAY
+          </Button>
+        </div>
+      ) : isActive && payment.paymentUrl ? (
+        <div className="grid gap-5 md:grid-cols-[260px_minmax(0,1fr)] md:items-center">
+          <div className="flex justify-center rounded-xl border border-border bg-white p-4">
+            <QRCode value={payment.paymentUrl} size={220} />
+          </div>
+          <div>
+            <Tag color="processing" className="m-0 rounded-full px-3 py-1 font-bold">
+              Mã QR đang hoạt động
+            </Tag>
+            <p className="mt-4 text-sm text-text-secondary">
+              Mã thanh toán sẽ hết hạn vào lúc:{" "}
+              <strong className="text-text-main">
+                {formatExpiryTime(payment.expiresAt)}
+              </strong>
+            </p>
+            <Space wrap className="mt-4">
+              <Button icon={<CopyOutlined />} onClick={copyPaymentLink}>
+                Sao chép link
+              </Button>
+              <Button href={payment.paymentUrl} target="_blank">
+                Mở link VNPAY
+              </Button>
+            </Space>
+          </div>
+        </div>
+      ) : now === null && isPending ? (
+        <Skeleton active paragraph={{ rows: 3 }} />
+      ) : (
+        <Alert
+          showIcon
+          type="warning"
+          title="Không có mã thanh toán VNPAY khả dụng"
+          description={`Trạng thái thanh toán hiện tại: ${payment.status || "Không xác định"}.`}
+        />
+      )}
+    </section>
+  );
+}
+
 function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
   return (
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -189,7 +386,7 @@ function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
               {order.emailKhachHang || "Chưa có"}
             </Descriptions.Item>
             <Descriptions.Item label="Thanh toán">
-              {order.thanhToan.phuongThuc} ·{" "}
+              {order.thanhToan.phuongThuc} · {order.thanhToan.loai || "FULL"} ·{" "}
               {order.thanhToan.daThanh ? "Đã thanh toán" : "Chờ thanh toán"}
             </Descriptions.Item>
             <Descriptions.Item label="Địa chỉ giao hàng" span={2}>
@@ -203,6 +400,10 @@ function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
             </Descriptions.Item>
           </Descriptions>
         </section>
+
+        {order.thanhToan.phuongThuc === "VNPAY" ? (
+          <VnpayPaymentPanel order={order} />
+        ) : null}
 
         <section className="rounded-xl border border-border bg-surface p-5 shadow-admin-card">
           <div className="mb-4 flex items-center justify-between gap-3">
@@ -268,6 +469,20 @@ function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
           </span>
         </div>
 
+        {order.tienCocVnd > 0 || order.tienThuHoCodVnd > 0 ? (
+          <>
+            <Divider className="my-4" />
+            <div className="space-y-3 rounded-lg border border-primary-container/20 bg-sky-50 p-3">
+              {order.tienCocVnd > 0 ? (
+                <PriceRow label="Thanh toán trước (Cọc)" value={order.tienCocVnd} />
+              ) : null}
+              {order.tienThuHoCodVnd > 0 ? (
+                <PriceRow label="Thu hộ COD khi giao" value={order.tienThuHoCodVnd} />
+              ) : null}
+            </div>
+          </>
+        ) : null}
+
         {order.lyDoHuy ? (
           <Alert
             showIcon
@@ -284,8 +499,14 @@ function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
 
 export default function OrderDetailRouteClient() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const params = useParams<{ id: string }>();
   const orderId = Number(params.id);
+  const [messageApi, messageContextHolder] = message.useMessage();
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [newStatus, setNewStatus] = useState("");
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const {
     data: order,
@@ -296,10 +517,65 @@ export default function OrderDetailRouteClient() {
     queryKey: ["admin-order-detail", orderId],
     queryFn: () => orderService.layChiTietDonHang(orderId),
     enabled: Number.isFinite(orderId) && orderId > 0,
+    refetchInterval: (query) => {
+      const currentOrder = query.state.data;
+      const shouldPoll =
+        currentOrder?.thanhToan.phuongThuc === "VNPAY" &&
+        currentOrder?.thanhToan.status === "PENDING" &&
+        currentOrder?.trangThai !== "da_huy";
+
+      return shouldPoll ? 3000 : false;
+    },
   });
+
+  async function refreshOrderData() {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: ["admin-order-detail", orderId],
+      }),
+      queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
+      queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] }),
+    ]);
+  }
+
+  const updateStatusMutation = useMutation({
+    mutationFn: (status: string) =>
+      orderService.capNhatTrangThaiDonHang(orderId, status),
+    onSuccess: async () => {
+      setIsUpdateModalOpen(false);
+      setNewStatus("");
+      messageApi.success("Cập nhật trạng thái đơn hàng thành công");
+      await refreshOrderData();
+    },
+    onError: (mutationError) => {
+      messageApi.error(getApiErrorMessage(mutationError));
+    },
+  });
+
+  const cancelOrderMutation = useMutation({
+    mutationFn: (reason: string) => orderService.huyDonHang(orderId, reason),
+    onSuccess: async () => {
+      setIsCancelModalOpen(false);
+      setCancelReason("");
+      messageApi.success("Đã hủy đơn hàng thành công");
+      await refreshOrderData();
+    },
+    onError: (mutationError) => {
+      messageApi.error(getApiErrorMessage(mutationError));
+    },
+  });
+
+  const canUpdateOrder = Boolean(
+    order && order.trangThai !== "da_huy" && order.trangThai !== "hoan_tat"
+  );
+  const canCancelOrder = Boolean(
+    order && CANCELLABLE_STATUSES.has(order.trangThai)
+  );
+  const trimmedCancelReason = cancelReason.trim();
 
   return (
     <div>
+      {messageContextHolder}
       <section className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
         <div>
           <Button
@@ -315,14 +591,45 @@ export default function OrderDetailRouteClient() {
           </p>
         </div>
 
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          className="h-10 rounded-[10px] font-semibold"
-          onClick={() => router.push("/admin/don-hang/tao-moi")}
-        >
-          Tạo đơn khác
-        </Button>
+        <Space wrap>
+          {canUpdateOrder ? (
+            <>
+              <Tooltip
+                title={
+                  canCancelOrder
+                    ? "Hủy đơn hàng"
+                    : "Chỉ có thể hủy đơn đang chờ xác nhận hoặc đã xác nhận"
+                }
+              >
+                <Button
+                  danger
+                  icon={<StopOutlined />}
+                  disabled={!canCancelOrder}
+                  className="h-10 rounded-[10px] font-semibold"
+                  onClick={() => setIsCancelModalOpen(true)}
+                >
+                  Hủy đơn
+                </Button>
+              </Tooltip>
+              <Button
+                icon={<EditOutlined />}
+                className="h-10 rounded-[10px] font-semibold"
+                onClick={() => setIsUpdateModalOpen(true)}
+              >
+                Cập nhật trạng thái
+              </Button>
+            </>
+          ) : null}
+
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            className="h-10 rounded-[10px] font-semibold"
+            onClick={() => router.push("/admin/don-hang/tao-moi")}
+          >
+            Tạo đơn khác
+          </Button>
+        </Space>
       </section>
 
       {isLoading ? <Skeleton active paragraph={{ rows: 12 }} /> : null}
@@ -337,6 +644,73 @@ export default function OrderDetailRouteClient() {
       ) : null}
 
       {!isLoading && !isError && order ? <OrderDetailContent order={order} /> : null}
+
+      <Modal
+        open={isUpdateModalOpen}
+        title="Cập nhật trạng thái đơn hàng"
+        okText="Xác nhận"
+        cancelText="Đóng"
+        confirmLoading={updateStatusMutation.isPending}
+        okButtonProps={{ disabled: !newStatus }}
+        mask={{ closable: true }}
+        onCancel={() => {
+          setIsUpdateModalOpen(false);
+          setNewStatus("");
+        }}
+        onOk={() => {
+          if (newStatus) updateStatusMutation.mutate(newStatus);
+        }}
+      >
+        <p className="mb-2 text-sm font-semibold text-text-main">
+          Trạng thái mới
+        </p>
+        <Select
+          value={newStatus || undefined}
+          placeholder="Chọn trạng thái"
+          className="w-full"
+          options={ORDER_STATUS_OPTIONS.filter(
+            (status) => status.value !== order?.trangThai
+          )}
+          onChange={setNewStatus}
+        />
+      </Modal>
+
+      <Modal
+        open={isCancelModalOpen}
+        title="Hủy đơn hàng"
+        okText="Xác nhận hủy"
+        cancelText="Đóng"
+        okButtonProps={{
+          danger: true,
+          disabled: trimmedCancelReason.length < 5,
+        }}
+        confirmLoading={cancelOrderMutation.isPending}
+        mask={{ closable: true }}
+        onCancel={() => {
+          setIsCancelModalOpen(false);
+          setCancelReason("");
+        }}
+        onOk={() => {
+          if (trimmedCancelReason.length >= 5) {
+            cancelOrderMutation.mutate(trimmedCancelReason);
+          }
+        }}
+      >
+        <p className="mb-2 text-sm font-semibold text-text-main">Lý do hủy</p>
+        <Input.TextArea
+          value={cancelReason}
+          rows={4}
+          maxLength={500}
+          showCount
+          placeholder="Ví dụ: Khách hàng yêu cầu hủy đơn..."
+          onChange={(event) => setCancelReason(event.target.value)}
+        />
+        {trimmedCancelReason.length > 0 && trimmedCancelReason.length < 5 ? (
+          <p className="mt-2 text-xs font-semibold text-red-600">
+            Lý do hủy cần ít nhất 5 ký tự.
+          </p>
+        ) : null}
+      </Modal>
     </div>
   );
 }
