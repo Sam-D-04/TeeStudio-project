@@ -32,10 +32,10 @@ import DesignPreview from "./DesignPreview";
 export type ThietKe = {
   id: number;
   maThietKe: string;        // Mã dạng "TK-2024"
-  urlPreview?: string;      // URL ảnh preview trên Cloudinary (có thể null khi chưa có)
+  urlPreview?: string | null;      // URL ảnh preview trên Cloudinary (có thể null khi chưa có)
   mauAo: string;            // Mã hex màu áo, ví dụ "#000000"
   tenKhachHang: string;     // Tên khách đặt thiết kế
-  soDienThoai?: string;     // Số điện thoại khách (tùy chọn)
+  soDienThoai?: string | null;     // Số điện thoại khách (tùy chọn)
   tenSanPham: string;       // Ví dụ "Áo thun Basic"
   tenMauAo: string;         // Ví dụ "Đen"
   viTriIn: string;          // Ví dụ "Ngực trái"

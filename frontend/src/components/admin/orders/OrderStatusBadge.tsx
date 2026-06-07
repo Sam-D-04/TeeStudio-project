@@ -9,9 +9,10 @@
 export type OrderStatus =
   | "cho_xac_nhan"   // Chờ xác nhận
   | "da_xac_nhan"    // Đã xác nhận
-  | "dang_san_xuat"  // Đang xử lý in
-  | "dang_in"        // Đang xử lý in
-  | "cho_giao"       // Chờ giao hàng
+  | "dang_xu_ly_in"  // Đang xử lý in
+  | "dang_san_xuat"  // Đang xử lý in (legacy)
+  | "dang_in"        // Đang xử lý in (legacy)
+  | "cho_giao"       // Chờ giao
   | "dang_giao"      // Đang giao hàng
   | "hoan_tat"       // Hoàn tất
   | "da_huy";        // Đã hủy
@@ -32,9 +33,14 @@ const statusConfig: Record<OrderStatus, { label: string; className: string }> = 
     // Nền xanh dương rất nhạt, chữ xanh dương
     className: "bg-[#cce5ff] text-[#004b73]",
   },
-  dang_san_xuat: {
+  dang_xu_ly_in: {
     label: "Đang xử lý in",
     // Nền xanh sky nhạt, chữ xanh sky đậm
+    className: "bg-[#e0f2fe] text-[#0284c7]",
+  },
+  dang_san_xuat: {
+    label: "Đang xử lý in",
+    // Gộp cùng cách hiển thị với trạng thái đang sản xuất cũ
     className: "bg-[#e0f2fe] text-[#0284c7]",
   },
   dang_in: {
@@ -43,7 +49,7 @@ const statusConfig: Record<OrderStatus, { label: string; className: string }> = 
     className: "bg-[#e0f2fe] text-[#0284c7]",
   },
   cho_giao: {
-    label: "Chờ giao hàng",
+    label: "Chờ giao",
     // Nền vàng nhạt, chữ vàng đậm
     className: "bg-[#fef3c7] text-[#d97706]",
   },

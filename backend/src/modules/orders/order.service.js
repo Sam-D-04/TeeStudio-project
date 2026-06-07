@@ -46,8 +46,8 @@ function tinhThongTinThanhToan(totalAmount, paymentMethod, paymentType) {
 const MAP_TRANG_THAI_DB_SANG_FE = {
   PENDING: "cho_xac_nhan",
   CONFIRMED: "da_xac_nhan",
-  PROCESSING: "dang_san_xuat",
-  PRINTING: "dang_in",
+  PROCESSING: "dang_xu_ly_in",
+  PRINTING: "dang_xu_ly_in",
   READY_TO_SHIP: "cho_giao",
   SHIPPING: "dang_giao",
   COMPLETED: "hoan_tat",
@@ -55,16 +55,22 @@ const MAP_TRANG_THAI_DB_SANG_FE = {
 };
 
 // MAP ngược lại: Frontend → DB (dùng khi nhận request cập nhật)
-const MAP_TRANG_THAI_FE_SANG_DB = Object.fromEntries(
-  Object.entries(MAP_TRANG_THAI_DB_SANG_FE).map(([db, fe]) => [fe, db])
-);
+const MAP_TRANG_THAI_FE_SANG_DB = {
+  cho_xac_nhan: "PENDING",
+  da_xac_nhan: "CONFIRMED",
+  dang_xu_ly_in: "PROCESSING",
+  cho_giao: "READY_TO_SHIP",
+  dang_giao: "SHIPPING",
+  hoan_tat: "COMPLETED",
+  da_huy: "CANCELLED",
+};
 
 const MAP_TEN_TRANG_THAI_DB = {
   PENDING: "Chờ xác nhận",
   CONFIRMED: "Đã xác nhận",
-  PROCESSING: "Đang sản xuất",
-  PRINTING: "Đang in",
-  READY_TO_SHIP: "Chờ giao hàng",
+  PROCESSING: "Đang xử lý in",
+  PRINTING: "Đang xử lý in",
+  READY_TO_SHIP: "Chờ giao",
   SHIPPING: "Đang giao hàng",
   COMPLETED: "Hoàn tất",
   CANCELLED: "Đã hủy",

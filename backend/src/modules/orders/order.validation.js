@@ -30,8 +30,7 @@ const updateStatusSchema = {
       enum: [
         "cho_xac_nhan",
         "da_xac_nhan",
-        "dang_san_xuat",
-        "dang_in",
+        "dang_xu_ly_in",
         "cho_giao",
         "dang_giao",
         "hoan_tat",

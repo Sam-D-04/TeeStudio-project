@@ -26,7 +26,7 @@ function getWeekRange(): DateRange {
 
 // Danh sách các tab lọc trạng thái (pill)
 export type FilterTab = {
-  key: OrderStatus | "tat_ca" | "dang_xu_ly_in"; // "tat_ca" = Tất cả
+  key: OrderStatus | "tat_ca"; // "tat_ca" = Tất cả
   label: string;
 };
 
@@ -36,7 +36,7 @@ const FILTER_TABS: FilterTab[] = [
   { key: "da_xac_nhan",   label: "Đã xác nhận" },
   { key: "dang_xu_ly_in", label: "Đang xử lý in" },
   { key: "cho_giao",      label: "Chờ giao" },
-  { key: "dang_giao",     label: "Đang giao" },
+  { key: "dang_giao",     label: "Đang giao hàng" },
   { key: "hoan_tat",      label: "Hoàn tất" },
   { key: "da_huy",        label: "Đã hủy" },
 ];

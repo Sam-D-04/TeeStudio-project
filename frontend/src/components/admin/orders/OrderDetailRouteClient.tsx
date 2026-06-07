@@ -35,10 +35,11 @@ import type { ChiTietDonHang } from "@/services/admin/orderService";
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   cho_xac_nhan: { label: "Chờ xác nhận", color: "gold" },
   da_xac_nhan: { label: "Đã xác nhận", color: "blue" },
-  dang_san_xuat: { label: "Đang sản xuất", color: "cyan" },
-  dang_in: { label: "Đang in", color: "purple" },
+  dang_xu_ly_in: { label: "Đang xử lý in", color: "cyan" },
+  dang_san_xuat: { label: "Đang xử lý in (cũ)", color: "cyan" },
+  dang_in: { label: "Đang xử lý in (cũ)", color: "purple" },
   cho_giao: { label: "Chờ giao", color: "geekblue" },
-  dang_giao: { label: "Đang giao", color: "processing" },
+  dang_giao: { label: "Đang giao hàng", color: "processing" },
   hoan_tat: { label: "Hoàn tất", color: "green" },
   da_huy: { label: "Đã hủy", color: "red" },
 };
@@ -46,9 +47,8 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 const ORDER_STATUS_OPTIONS = [
   { value: "cho_xac_nhan", label: "Chờ xác nhận" },
   { value: "da_xac_nhan", label: "Đã xác nhận" },
-  { value: "dang_san_xuat", label: "Đang sản xuất" },
-  { value: "dang_in", label: "Đang in" },
-  { value: "cho_giao", label: "Chờ giao hàng" },
+  { value: "dang_xu_ly_in", label: "Đang xử lý in" },
+  { value: "cho_giao", label: "Chờ giao" },
   { value: "dang_giao", label: "Đang giao hàng" },
   { value: "hoan_tat", label: "Hoàn tất" },
 ];
