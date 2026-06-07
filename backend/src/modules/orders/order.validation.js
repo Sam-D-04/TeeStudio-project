@@ -36,6 +36,14 @@ const updateStatusSchema = {
         "hoan_tat",
       ],
     },
+    shippingCarrier: {
+      type: "string",
+      required: false,
+    },
+    trackingCode: {
+      type: "string",
+      required: false,
+    },
   },
 };
 

@@ -187,14 +187,21 @@ export async function layChiTietDonHang(id: number): Promise<ChiTietDonHang> {
  * Cập nhật trạng thái đơn hàng.
  * PATCH /api/admin/orders/:id/status
  */
-export async function capNhatTrangThaiDonHang(
-  id: number,
-  trangThai: string
-): Promise<{ id: number; trangThai: string }> {
+export async function capNhatTrangThaiDonHang({
+  id,
+  trangThai,
+  shippingCarrier,
+  trackingCode,
+}: {
+  id: number;
+  trangThai: string;
+  shippingCarrier?: string;
+  trackingCode?: string;
+}): Promise<{ id: number; trangThai: string }> {
   const res = await apiClient.patch<{
     success: boolean;
     data: { id: number; trangThai: string };
-  }>(`/admin/orders/${id}/status`, { trangThai });
+  }>(`/admin/orders/${id}/status`, { trangThai, shippingCarrier, trackingCode });
   return res.data.data;
 }
 

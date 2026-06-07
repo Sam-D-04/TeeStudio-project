@@ -56,8 +56,8 @@ const getChiTietDonHang = async (req, res, next) => {
 const capNhatTrangThai = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
-    const { trangThai } = req.body;
-    const data = await orderService.capNhatTrangThai(id, trangThai, req.user);
+    const { trangThai, shippingCarrier, trackingCode } = req.body;
+    const data = await orderService.capNhatTrangThai(id, trangThai, req.user, { shippingCarrier, trackingCode });
     res.json({ success: true, message: "Cập nhật trạng thái thành công", data });
   } catch (error) {
     next(error);

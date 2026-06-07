@@ -720,7 +720,7 @@ async function layChiTietDonHang(id) {
 // =====================================================================
 // SERVICE 4: Cập nhật trạng thái đơn hàng
 // =====================================================================
-async function capNhatTrangThai(id, trangThaiFE, actor) {
+async function capNhatTrangThai(id, trangThaiFE, actor, shippingInfo = {}) {
   // Chuyển từ FE key sang DB status
   const trangThaiDB = MAP_TRANG_THAI_FE_SANG_DB[trangThaiFE];
   if (!trangThaiDB) {
@@ -766,6 +766,12 @@ async function capNhatTrangThai(id, trangThaiFE, actor) {
   const capNhatThem = {};
   if (trangThaiDB === "SHIPPING") {
     capNhatThem.shippedAt = new Date();
+    if (shippingInfo.shippingCarrier) {
+      capNhatThem.shippingCarrier = shippingInfo.shippingCarrier;
+    }
+    if (shippingInfo.trackingCode) {
+      capNhatThem.trackingCode = shippingInfo.trackingCode;
+    }
   }
   if (trangThaiDB === "COMPLETED") {
     capNhatThem.deliveredAt = new Date();
@@ -792,13 +798,22 @@ async function capNhatTrangThai(id, trangThaiFE, actor) {
       );
     }
 
+    let noteString = `Cập nhật trạng thái: ${layTenTrangThai(donHienTai.status)} → ${layTenTrangThai(trangThaiDB)}`;
+    if (trangThaiDB === "SHIPPING" && capNhatThem.shippingCarrier) {
+      noteString += ` (ĐVVC: ${capNhatThem.shippingCarrier}`;
+      if (capNhatThem.trackingCode) {
+        noteString += ` - Mã: ${capNhatThem.trackingCode}`;
+      }
+      noteString += `)`;
+    }
+
     await ghiOrderHistory(conn, {
       orderId: Number(id),
       fromStatus: donHienTai.status,
       toStatus: trangThaiDB,
       action: "STATUS_CHANGED",
       actor,
-      note: `Cập nhật trạng thái: ${layTenTrangThai(donHienTai.status)} → ${layTenTrangThai(trangThaiDB)}`,
+      note: noteString,
     });
 
     await conn.commit();

@@ -13,6 +13,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
+  AutoComplete,
   Button,
   Descriptions,
   Divider,
@@ -505,6 +506,8 @@ export default function OrderDetailRouteClient() {
   const [messageApi, messageContextHolder] = message.useMessage();
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [newStatus, setNewStatus] = useState("");
+  const [shippingCarrier, setShippingCarrier] = useState<string | undefined>(undefined);
+  const [trackingCode, setTrackingCode] = useState("");
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
 
@@ -539,11 +542,16 @@ export default function OrderDetailRouteClient() {
   }
 
   const updateStatusMutation = useMutation({
-    mutationFn: (status: string) =>
-      orderService.capNhatTrangThaiDonHang(orderId, status),
+    mutationFn: (payload: { trangThai: string; shippingCarrier?: string; trackingCode?: string }) =>
+      orderService.capNhatTrangThaiDonHang({
+        id: orderId,
+        ...payload,
+      }),
     onSuccess: async () => {
       setIsUpdateModalOpen(false);
       setNewStatus("");
+      setShippingCarrier(undefined);
+      setTrackingCode("");
       messageApi.success("Cập nhật trạng thái đơn hàng thành công");
       await refreshOrderData();
     },
@@ -656,9 +664,23 @@ export default function OrderDetailRouteClient() {
         onCancel={() => {
           setIsUpdateModalOpen(false);
           setNewStatus("");
+          setShippingCarrier(undefined);
+          setTrackingCode("");
         }}
         onOk={() => {
-          if (newStatus) updateStatusMutation.mutate(newStatus);
+          if (newStatus === "dang_giao") {
+            if (!shippingCarrier) {
+              messageApi.error("Vui lòng chọn hoặc nhập đơn vị vận chuyển");
+              return;
+            }
+          }
+          if (newStatus) {
+            updateStatusMutation.mutate({
+              trangThai: newStatus,
+              shippingCarrier: newStatus === "dang_giao" ? shippingCarrier : undefined,
+              trackingCode: newStatus === "dang_giao" ? trackingCode : undefined,
+            });
+          }
         }}
       >
         <p className="mb-2 text-sm font-semibold text-text-main">
@@ -673,6 +695,37 @@ export default function OrderDetailRouteClient() {
           )}
           onChange={setNewStatus}
         />
+        {newStatus === "dang_giao" && (
+          <div className="mt-4 space-y-3 rounded-lg border border-border bg-surface-alt p-4">
+            <div>
+              <p className="mb-1 text-sm font-semibold text-text-main">
+                Đơn vị vận chuyển <span className="text-red-500">*</span>
+              </p>
+              <AutoComplete
+                value={shippingCarrier}
+                options={[
+                  { value: "GHTK" },
+                  { value: "Viettel Post" },
+                  { value: "J&T Express" },
+                  { value: "Ahamove" },
+                  { value: "Lalamove" },
+                  { value: "VNPost" },
+                ]}
+                placeholder="Chọn hoặc nhập ĐVVC"
+                className="w-full"
+                onChange={setShippingCarrier}
+              />
+            </div>
+            <div>
+              <p className="mb-1 text-sm font-semibold text-text-main">Mã vận đơn</p>
+              <Input
+                value={trackingCode}
+                placeholder="Nhập mã vận đơn (nếu có)"
+                onChange={(e) => setTrackingCode(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
       </Modal>
 
       <Modal
