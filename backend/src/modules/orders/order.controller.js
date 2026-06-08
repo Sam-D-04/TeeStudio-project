@@ -79,6 +79,20 @@ const huyDonHang = async (req, res, next) => {
   }
 };
 
+/**
+ * PATCH /api/admin/orders/:id/shipping-address
+ * Cập nhật địa chỉ giao hàng của đơn.
+ */
+const capNhatDiaChiGiaoHang = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    const data = await orderService.capNhatDiaChiGiaoHang(id, req.body, req.user);
+    res.json({ success: true, message: "Cập nhật địa chỉ giao hàng thành công", data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const taoLaiMaThanhToanVnpay = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
@@ -201,6 +215,7 @@ module.exports = {
   getChiTietDonHang,
   capNhatTrangThai,
   huyDonHang,
+  capNhatDiaChiGiaoHang,
   taoLaiMaThanhToanVnpay,
   // Hỗ trợ form Tạo đơn mới
   timKhachHang,

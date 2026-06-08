@@ -21,6 +21,7 @@ const {
   updateStatusSchema,
   cancelOrderSchema,
   createOrderSchema,
+  updateShippingAddressSchema,
 } = require("./order.validation");
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -134,6 +135,15 @@ router.patch(
   requireAdmin,
   validate(cancelOrderSchema),
   orderController.huyDonHang
+);
+
+// PATCH /api/admin/orders/:id/shipping-address – Cập nhật địa chỉ giao hàng
+router.patch(
+  "/:id/shipping-address",
+  verifyToken,
+  requireAdmin,
+  validate(updateShippingAddressSchema),
+  orderController.capNhatDiaChiGiaoHang
 );
 
 module.exports = router;

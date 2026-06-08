@@ -90,6 +90,9 @@ export type ChiTietDonHang = DonHang & {
   tienCocVnd: number;
   tienThuHoCodVnd: number;
   diaChiGiaoHang: string;
+  tenNguoiNhanGiaoHang: string;
+  sdtNguoiNhan: string;
+  addressLineRaw: string;
   donViVanChuyen: string;
   maVanDon: string | null;
   lyDoHuy: string | null;
@@ -219,6 +222,28 @@ export async function huyDonHang(
   return res.data.data;
 }
 
+/**
+ * Cập nhật địa chỉ giao hàng.
+ * PATCH /api/admin/orders/:id/shipping-address
+ */
+export async function capNhatDiaChiDonHang({
+  id,
+  recipientName,
+  phone,
+  addressLine,
+}: {
+  id: number;
+  recipientName: string;
+  phone: string;
+  addressLine: string;
+}): Promise<{ id: number; addressId: number }> {
+  const res = await apiClient.patch<{
+    success: boolean;
+    data: { id: number; addressId: number };
+  }>(`/admin/orders/${id}/shipping-address`, { recipientName, phone, addressLine });
+  return res.data.data;
+}
+
 export type KetQuaTaoLaiMaVnpay = {
   paymentUrl: string;
   paymentUrlExpiresAt: string;
@@ -328,9 +353,11 @@ export type OrderItemInput = {
 /** Payload tạo đơn mới */
 export type TaoMoiDonHangInput = {
   userId: number;
-  addressId: number;
+  recipientName: string;
+  phone: string;
+  addressLine: string;
   items: OrderItemInput[];
-  paymentMethod: "COD" | "VNPAY" | "CASH";
+  paymentMethod: "COD" | "VNPAY";
   paymentType: "FULL" | "DEPOSIT";
   shippingFee: number;
   promotionId?: number | null;

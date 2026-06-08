@@ -65,6 +65,32 @@ const ALLOWED_NEXT_STATUS: Record<string, string[]> = {
 };
 
 const CANCELLABLE_STATUSES = new Set(["cho_xac_nhan", "da_xac_nhan", "dang_xu_ly_in", "cho_giao", "dang_giao"]);
+const EDITABLE_ADDRESS_STATUSES = new Set([
+  "cho_xac_nhan",
+  "da_xac_nhan",
+  "dang_xu_ly_in",
+  "cho_giao",
+]);
+
+function hasCustomDesignOrder(order?: ChiTietDonHang | null) {
+  if (!order) return false;
+
+  return Boolean(
+    order.items?.some((item) => item.loai === "custom_design" || Boolean(item.designId)) ||
+      order.sanPham?.loai === "custom_design" ||
+      order.anhXemTruocThietKe
+  );
+}
+
+function getAllowedNextStatuses(order?: ChiTietDonHang | null) {
+  if (!order) return [];
+
+  if (order.trangThai === "da_xac_nhan" && !hasCustomDesignOrder(order)) {
+    return ["cho_giao"];
+  }
+
+  return ALLOWED_NEXT_STATUS[order.trangThai] ?? [];
+}
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("vi-VN", {
@@ -512,6 +538,10 @@ export default function OrderDetailRouteClient() {
   const [trackingCode, setTrackingCode] = useState("");
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [addrRecipientName, setAddrRecipientName] = useState("");
+  const [addrPhone, setAddrPhone] = useState("");
+  const [addrLine, setAddrLine] = useState("");
 
   const {
     data: order,
@@ -575,11 +605,27 @@ export default function OrderDetailRouteClient() {
     },
   });
 
+  const updateAddressMutation = useMutation({
+    mutationFn: (payload: { recipientName: string; phone: string; addressLine: string }) =>
+      orderService.capNhatDiaChiDonHang({ id: orderId, ...payload }),
+    onSuccess: async () => {
+      setIsAddressModalOpen(false);
+      messageApi.success("Cập nhật địa chỉ giao hàng thành công");
+      await refreshOrderData();
+    },
+    onError: (mutationError) => {
+      messageApi.error(getApiErrorMessage(mutationError));
+    },
+  });
+
   const canUpdateOrder = Boolean(
     order && order.trangThai !== "da_huy" && order.trangThai !== "hoan_tat"
   );
   const canCancelOrder = Boolean(
     order && CANCELLABLE_STATUSES.has(order.trangThai)
+  );
+  const canEditAddress = Boolean(
+    order && EDITABLE_ADDRESS_STATUSES.has(order.trangThai)
   );
   const trimmedCancelReason = cancelReason.trim();
 
@@ -622,6 +668,22 @@ export default function OrderDetailRouteClient() {
                   Hủy đơn
                 </Button>
               </Tooltip>
+              {canEditAddress ? (
+                <Button
+                  icon={<EditOutlined />}
+                  className="h-10 rounded-[10px] font-semibold"
+                  onClick={() => {
+                    if (order) {
+                      setAddrRecipientName(order.tenNguoiNhanGiaoHang || order.tenKhachHang || "");
+                      setAddrPhone(order.sdtNguoiNhan || "");
+                      setAddrLine(order.diaChiGiaoHang || order.addressLineRaw || "");
+                    }
+                    setIsAddressModalOpen(true);
+                  }}
+                >
+                  Sửa địa chỉ
+                </Button>
+              ) : null}
               <Button
                 icon={<EditOutlined />}
                 className="h-10 rounded-[10px] font-semibold"
@@ -715,7 +777,7 @@ export default function OrderDetailRouteClient() {
           placeholder="Chọn trạng thái"
           className="w-full"
           options={ORDER_STATUS_OPTIONS.filter(
-            (status) => order?.trangThai && ALLOWED_NEXT_STATUS[order.trangThai]?.includes(status.value)
+            (status) => getAllowedNextStatuses(order).includes(status.value)
           )}
           onChange={setNewStatus}
         />
@@ -789,6 +851,69 @@ export default function OrderDetailRouteClient() {
             Lý do hủy cần ít nhất 5 ký tự.
           </p>
         ) : null}
+      </Modal>
+
+      <Modal
+        open={isAddressModalOpen}
+        title="Sửa địa chỉ giao hàng"
+        okText="Lưu thay đổi"
+        cancelText="Đóng"
+        okButtonProps={{
+          disabled: !addrRecipientName.trim() || !addrPhone.trim() || !addrLine.trim(),
+        }}
+        confirmLoading={updateAddressMutation.isPending}
+        mask={{ closable: true }}
+        onCancel={() => setIsAddressModalOpen(false)}
+        onOk={() => {
+          const recipientName = addrRecipientName.trim();
+          const phone = addrPhone.trim();
+          const address = addrLine.trim();
+          if (!recipientName || !phone || !address) return;
+          updateAddressMutation.mutate({ recipientName, phone, addressLine: address });
+        }}
+      >
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-text-secondary">
+            Chỉ có thể sửa địa chỉ khi đơn đang ở trạng thái{" "}
+            <span className="font-semibold text-text-main">Chờ xác nhận</span>,{" "}
+            <span className="font-semibold text-text-main">Đã xác nhận</span>,{" "}
+            <span className="font-semibold text-text-main">Đang xử lý in</span> hoặc{" "}
+            <span className="font-semibold text-text-main">Chờ giao</span>.
+          </p>
+          <div>
+            <p className="mb-1 text-sm font-semibold text-text-main">
+              Số điện thoại <span className="text-red-500">*</span>
+            </p>
+            <Input
+              value={addrPhone}
+              placeholder="Nhập số điện thoại..."
+              onChange={(e) => setAddrPhone(e.target.value)}
+            />
+          </div>
+          <div>
+            <p className="mb-1 text-sm font-semibold text-text-main">
+              Địa chỉ giao hàng <span className="text-red-500">*</span>
+            </p>
+            <Input.TextArea
+              value={addrLine}
+              rows={3}
+              placeholder="Ví dụ: 123 Đường ABC, Phường XYZ, Quận 1, TP HCM..."
+              onChange={(e) => setAddrLine(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="space-y-4 py-2">
+          <div>
+            <p className="mb-1 text-sm font-semibold text-text-main">
+              Tên người nhận <span className="text-red-500">*</span>
+            </p>
+            <Input
+              value={addrRecipientName}
+              placeholder="Nhập tên người nhận..."
+              onChange={(e) => setAddrRecipientName(e.target.value)}
+            />
+          </div>
+        </div>
       </Modal>
     </div>
   );

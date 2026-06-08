@@ -69,6 +69,36 @@ const cancelOrderSchema = {
   },
 };
 
+/**
+ * Schema cập nhật địa chỉ giao hàng của đơn.
+ * PATCH /api/admin/orders/:id/shipping-address
+ */
+const updateShippingAddressSchema = {
+  params: {
+    id: {
+      required: true,
+      type: "integer",
+      min: 1,
+    },
+  },
+  body: {
+    recipientName: {
+      required: true,
+      type: "string",
+      maxLength: 255,
+    },
+    phone: {
+      required: true,
+      type: "string",
+      maxLength: 20,
+    },
+    addressLine: {
+      required: true,
+      type: "string",
+    },
+  },
+};
+
 // =====================================================================
 // SCHEMA DÀNH CHO CUSTOMER (giữ lại từ file gốc, không xóa)
 // =====================================================================
@@ -138,10 +168,19 @@ const createOrderSchema = {
       type: "integer",
       min: 1,
     },
-    addressId: {
+    recipientName: {
       required: true,
-      type: "integer",
-      min: 1,
+      type: "string",
+      maxLength: 255,
+    },
+    phone: {
+      required: true,
+      type: "string",
+      maxLength: 20,
+    },
+    addressLine: {
+      required: true,
+      type: "string",
     },
     items: {
       required: true,
@@ -169,7 +208,7 @@ const createOrderSchema = {
     paymentMethod: {
       required: true,
       type: "string",
-      enum: ["COD", "VNPAY", "CASH"],
+      enum: ["COD", "VNPAY"],
     },
     paymentType: {
       type: "string",
@@ -191,6 +230,7 @@ module.exports = {
   updateStatusSchema,
   cancelOrderSchema,
   createOrderSchema,
+  updateShippingAddressSchema,
   // Customer schemas (giữ lại)
   checkoutSchema,
   updateOrderStatusSchema,

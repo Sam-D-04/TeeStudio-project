@@ -24,12 +24,14 @@ function tinhThongTinThanhToan(totalAmount, paymentMethod, paymentType) {
       ? Math.round(totalAmount * (DEPOSIT_PERCENT / 100))
       : 0;
   const codAmount =
-    paymentMethod === "COD" ? Math.max(0, totalAmount - depositAmount) : 0;
+    (paymentMethod === "COD" || paymentType === "DEPOSIT") 
+      ? Math.max(0, totalAmount - depositAmount) 
+      : 0;
   const paymentAmount =
-    paymentMethod === "COD"
-      ? codAmount
-      : paymentType === "DEPOSIT"
-        ? depositAmount
+    paymentType === "DEPOSIT"
+      ? depositAmount
+      : paymentMethod === "COD"
+        ? codAmount
         : totalAmount;
 
   return {
@@ -78,6 +80,19 @@ const MAP_TEN_TRANG_THAI_DB = {
 
 function layTenTrangThai(status) {
   return MAP_TEN_TRANG_THAI_DB[status] || status || "Không rõ";
+}
+
+function laPhanDiaChiTam(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "khac" || normalized === "kh\u00e1c";
+}
+
+function ghepDiaChiGiaoHang({ addressLine, ward, district, city }) {
+  const parts = [addressLine, ward, district, city]
+    .map((part) => String(part || "").trim())
+    .filter((part) => part && !laPhanDiaChiTam(part));
+
+  return parts.length > 0 ? parts.join(", ") : "Chưa có địa chỉ";
 }
 
 function taoActorHistory(actor, fallbackName = "Hệ thống") {
@@ -403,10 +418,10 @@ async function layDanhSachDonHang({
     );
   }
 
-  // Tìm kiếm theo từ khóa (mã đơn hoặc tên khách)
+  // Tìm kiếm theo từ khóa (mã đơn, tên tài khoản hoặc tên người nhận của đơn)
   if (tuKhoa && tuKhoa.trim()) {
-    dieuKien.push("(co.orderCode LIKE ? OR a.fullName LIKE ?)");
-    thamSo.push(`%${tuKhoa.trim()}%`, `%${tuKhoa.trim()}%`);
+    dieuKien.push("(co.orderCode LIKE ? OR a.fullName LIKE ? OR ua.recipientName LIKE ?)");
+    thamSo.push(`%${tuKhoa.trim()}%`, `%${tuKhoa.trim()}%`, `%${tuKhoa.trim()}%`);
   }
 
   const menh_de_where = dieuKien.length > 0 ? "WHERE " + dieuKien.join(" AND ") : "";
@@ -416,6 +431,7 @@ async function layDanhSachDonHang({
     SELECT COUNT(DISTINCT co.id) AS tong_so
     FROM CustomerOrder co
     JOIN Account a ON a.id = co.userId
+    LEFT JOIN UserAddress ua ON ua.id = co.addressId
     LEFT JOIN Payment p ON p.orderId = co.id
     LEFT JOIN OrderItem oi ON oi.orderId = co.id
     ${menh_de_where}
@@ -432,8 +448,8 @@ async function layDanhSachDonHang({
       co.totalAmount,
       co.status,
       co.shippedAt,
-      a.fullName       AS tenKhachHang,
-      a.phone          AS sdtKhachHang,
+      COALESCE(NULLIF(ua.recipientName, ''), a.fullName) AS tenKhachHang,
+      COALESCE(NULLIF(ua.phone, ''), a.phone)            AS sdtKhachHang,
       p.paymentMethod,
       p.status         AS trangThaiThanhToan,
       p.paidAt,
@@ -467,6 +483,7 @@ async function layDanhSachDonHang({
       ) AS coThietKe
     FROM CustomerOrder co
     JOIN Account a ON a.id = co.userId
+    LEFT JOIN UserAddress ua ON ua.id = co.addressId
     LEFT JOIN Payment p ON p.orderId = co.id
     LEFT JOIN OrderItem oiFirst ON oiFirst.id = (
       SELECT oi2.id
@@ -530,8 +547,8 @@ async function layChiTietDonHang(id) {
   const [rowsDonHang] = await db.pool.query(
     `SELECT
        co.*,
-       a.fullName   AS tenKhachHang,
-       a.phone      AS sdtKhachHang,
+       COALESCE(NULLIF(ua.recipientName, ''), a.fullName) AS tenKhachHang,
+       COALESCE(NULLIF(ua.phone, ''), a.phone)            AS sdtKhachHang,
        a.email      AS emailKhachHang,
        ua.recipientName,
        ua.phone     AS sdtNhanHang,
@@ -610,11 +627,7 @@ async function layChiTietDonHang(id) {
   const loaiDon = coThietKe ? "custom_design" : "ao_mau";
 
   // Ghép địa chỉ giao hàng
-  const diaChiGiaoHang = donHang.addressLine
-    ? [donHang.addressLine, donHang.ward, donHang.district, donHang.city]
-        .filter(Boolean)
-        .join(", ")
-    : "Chưa có địa chỉ";
+  const diaChiGiaoHang = ghepDiaChiGiaoHang(donHang);
 
   // Ghép sizes từ tất cả items
   const tatCaSize = [...new Set(rowsItems.map((i) => i.size).filter(Boolean))].join(", ");
@@ -698,6 +711,9 @@ async function layChiTietDonHang(id) {
     thanhToan,
     trangThai: MAP_TRANG_THAI_DB_SANG_FE[donHang.status] || "cho_xac_nhan",
     diaChiGiaoHang,
+    tenNguoiNhanGiaoHang: donHang.recipientName || "",
+    sdtNguoiNhan: donHang.sdtNhanHang || "",
+    addressLineRaw: donHang.addressLine || "",
     donViVanChuyen: donHang.shippingCarrier || "Chưa có thông tin",
     maVanDon: donHang.trackingCode || null,
     lyDoHuy: donHang.cancelReason || null,
@@ -822,33 +838,79 @@ async function capNhatTrangThai(id, trangThaiFE, actor, shippingInfo = {}) {
 // SERVICE 5: Hủy đơn hàng
 // =====================================================================
 async function huyDonHang(id, lyDo, actor) {
-  // Kiểm tra đơn hàng tồn tại
-  const [rows] = await db.pool.query(
-    "SELECT id, status FROM CustomerOrder WHERE id = ?",
-    [id]
-  );
-  if (!rows || rows.length === 0) {
-    const err = new Error("Không tìm thấy đơn hàng");
-    err.statusCode = 404;
-    throw err;
-  }
-
-  const donHienTai = rows[0];
-
-  const khongTheHuy = ["COMPLETED", "CANCELLED"].includes(donHienTai.status);
-  if (khongTheHuy) {
-    const err = new Error(
-      "Không thể hủy đơn hàng khi đã hoàn tất hoặc đã hủy"
-    );
-    err.statusCode = 400;
-    throw err;
-  }
-
   const lyDoHuy = lyDo || "Không có lý do";
   const conn = await db.pool.getConnection();
 
   try {
     await conn.beginTransaction();
+
+    const [rows] = await conn.query(
+      "SELECT id, status FROM CustomerOrder WHERE id = ? LIMIT 1 FOR UPDATE",
+      [id]
+    );
+    if (!rows || rows.length === 0) {
+      const err = new Error("Không tìm thấy đơn hàng");
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const donHienTai = rows[0];
+    const khongTheHuy = ["COMPLETED", "CANCELLED"].includes(donHienTai.status);
+    if (khongTheHuy) {
+      const err = new Error(
+        "Không thể hủy đơn hàng khi đã hoàn tất hoặc đã hủy"
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const [items] = await conn.query(
+      `SELECT variantId, designId, quantity
+       FROM OrderItem
+       WHERE orderId = ?
+       FOR UPDATE`,
+      [id]
+    );
+
+    const returnableStockByVariant = new Map();
+    for (const item of items) {
+      const quantity = Number(item.quantity || 0);
+      if (quantity <= 0) continue;
+
+      const isCustomDesignItem = Boolean(item.designId);
+      const shouldReturnStock = isCustomDesignItem
+        ? donHienTai.status === "PENDING"
+        : ["PENDING", "CONFIRMED", "PROCESSING", "PRINTING", "READY_TO_SHIP"].includes(
+            donHienTai.status
+          );
+
+      if (!shouldReturnStock) continue;
+
+      const variantId = Number(item.variantId);
+      returnableStockByVariant.set(
+        variantId,
+        (returnableStockByVariant.get(variantId) || 0) + quantity
+      );
+    }
+
+    for (const [variantId, quantityToReturn] of returnableStockByVariant.entries()) {
+      await conn.query(
+        "UPDATE ProductVariant SET stockQty = stockQty + ? WHERE id = ?",
+        [quantityToReturn, variantId]
+      );
+
+      await conn.query(
+        `INSERT INTO InventoryTransaction
+           (variantId, orderId, supplierId, quantityChanged, transactionType, reason)
+         VALUES (?, ?, NULL, ?, 'RETURN', ?)`,
+        [
+          variantId,
+          id,
+          quantityToReturn,
+          `Hoàn kho khi hủy đơn #${id}`.slice(0, 300),
+        ]
+      );
+    }
 
     await conn.query(
       "UPDATE CustomerOrder SET status = 'CANCELLED', cancelReason = ? WHERE id = ?",
@@ -881,6 +943,89 @@ async function huyDonHang(id, lyDo, actor) {
   }
 
   return { id: Number(id), trangThai: "da_huy" };
+}
+
+async function capNhatDiaChiGiaoHang(id, addressData, actor) {
+  const recipientName = String(addressData.recipientName || "").trim();
+  const phone = String(addressData.phone || "").trim();
+  const addressLine = String(addressData.addressLine || "").trim();
+  const conn = await db.pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    const [rowsOrder] = await conn.query(
+      `SELECT
+         co.userId,
+         co.status,
+         COALESCE(ua.recipientName, a.fullName) AS recipientName
+       FROM CustomerOrder co
+       JOIN Account a ON a.id = co.userId
+       LEFT JOIN UserAddress ua ON ua.id = co.addressId
+       WHERE co.id = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [id]
+    );
+
+    if (rowsOrder.length === 0) {
+      const err = new Error("Đơn hàng không tồn tại");
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const order = rowsOrder[0];
+
+    if (!phone || !addressLine || !recipientName) {
+      const err = new Error("Số điện thoại và địa chỉ giao hàng không được để trống");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const editableStatuses = new Set([
+      "PENDING",
+      "CONFIRMED",
+      "PROCESSING",
+      "PRINTING",
+      "READY_TO_SHIP",
+    ]);
+
+    if (!editableStatuses.has(order.status)) {
+      const err = new Error("Chỉ được sửa địa chỉ khi đơn ở trạng thái Chờ xác nhận hoặc Đã xác nhận");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const [resultAddress] = await conn.query(
+      `INSERT INTO UserAddress (userId, recipientName, phone, addressLine, city, district, ward)
+       VALUES (?, ?, ?, ?, '', '', '')`,
+      [order.userId, recipientName, phone, addressLine]
+    );
+    const newAddressId = resultAddress.insertId;
+
+    await conn.query(
+      `UPDATE CustomerOrder SET addressId = ? WHERE id = ?`,
+      [newAddressId, id]
+    );
+
+    await ghiOrderHistory(conn, {
+      orderId: id,
+      fromStatus: order.status,
+      toStatus: order.status,
+      action: "SHIPPING_ADDRESS_UPDATED",
+      actor,
+      note: `Cập nhật thông tin giao hàng: ${recipientName} - ${phone} - ${addressLine}`,
+    });
+
+    await conn.commit();
+
+    return { id: Number(id), addressId: newAddressId };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 }
 
 async function taoLaiMaThanhToanVnpay(id, actor, ipAddress) {
@@ -998,6 +1143,7 @@ module.exports = {
   layChiTietDonHang,
   capNhatTrangThai,
   huyDonHang,
+  capNhatDiaChiGiaoHang,
   taoLaiMaThanhToanVnpay,
   // ── Service hỗ trợ form Tạo đơn mới ──
   timKiemKhachHang,
@@ -1249,7 +1395,9 @@ async function layDanhSachKhuyenMai() {
 async function taoMoiDonHang(data, actor, ipAddress) {
   const {
     userId,
-    addressId,
+    recipientName,
+    phone,
+    addressLine,
     items,
     paymentMethod,
     paymentType = "FULL",
@@ -1272,16 +1420,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     throw err;
   }
 
-  // 1b. Kiểm tra addressId thuộc đúng userId
-  const [rowsAddr] = await db.pool.query(
-    "SELECT id FROM UserAddress WHERE id = ? AND userId = ? LIMIT 1",
-    [addressId, userId]
-  );
-  if (rowsAddr.length === 0) {
-    const err = new Error("Địa chỉ giao hàng không hợp lệ hoặc không thuộc khách hàng này");
-    err.statusCode = 400;
-    throw err;
-  }
+  // (Bỏ qua bước kiểm tra addressId vì frontend gửi trực tiếp thông tin địa chỉ mới)
 
   // 1c. Validate từng item: variant tồn tại + đủ tồn kho
   const itemsEnriched = []; // sẽ chứa thông tin đầy đủ để tính giá
@@ -1532,6 +1671,15 @@ async function taoMoiDonHang(data, actor, ipAddress) {
             ipAddress,
           })
         : null;
+
+    // ── Bước 3.1.5: INSERT UserAddress để lấy addressId mới ──
+    const [resultAddress] = await conn.query(
+      `INSERT INTO UserAddress (userId, recipientName, phone, addressLine, city, district, ward)
+       VALUES (?, ?, ?, ?, '', '', '')`,
+      [userId, recipientName, phone, addressLine]
+    );
+    const addressId = resultAddress.insertId;
+
 
     // ── Bước 3.2: INSERT CustomerOrder ──
     const [resultOrder] = await conn.query(

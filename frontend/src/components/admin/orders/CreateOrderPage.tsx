@@ -22,6 +22,7 @@ import {
   Tag,
   Tooltip,
   message,
+  Input,
 } from "antd";
 import { isAxiosError } from "axios";
 import { useRouter } from "next/navigation";
@@ -29,7 +30,6 @@ import { useEffect, useMemo, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
 import type {
   BienTheSanPham,
-  DiaChiGiaoHang,
   KhachHang,
   KhuyenMai,
   SanPhamTimKiem,
@@ -39,7 +39,9 @@ import type {
 
 type CreateOrderFormValues = {
   userId?: number;
-  addressId?: number;
+  recipientName?: string;
+  phone?: string;
+  addressLine?: string;
   items?: Array<{
     productId?: number;
     variantId?: number;
@@ -96,7 +98,9 @@ function getPaymentBreakdown(
       ? Math.round(totalAmount * (DEPOSIT_PERCENT / 100))
       : 0;
   const codAmount =
-    paymentMethod === "COD" ? Math.max(0, totalAmount - depositAmount) : 0;
+    (paymentMethod === "COD" || paymentType === "DEPOSIT") 
+      ? Math.max(0, totalAmount - depositAmount) 
+      : 0;
 
   return { depositAmount, codAmount };
 }
@@ -263,23 +267,19 @@ function SectionPanel({
 
 function CustomerSection({
   customers,
-  addresses,
   isSearchingCustomers,
-  isLoadingAddresses,
   onCustomerSearch,
   onCustomerChange,
 }: {
   customers: KhachHang[];
-  addresses: DiaChiGiaoHang[];
   isSearchingCustomers: boolean;
-  isLoadingAddresses: boolean;
   onCustomerSearch: (value: string) => void;
   onCustomerChange: (value?: number) => void;
 }) {
   return (
     <SectionPanel
-      title="1. Chọn khách hàng"
-      description="Tìm theo số điện thoại, tên hoặc email rồi chọn địa chỉ giao hàng của khách."
+      title="1. Chọn khách hàng & Địa chỉ giao hàng"
+      description="Tìm chọn khách hàng, form sẽ tự động điền địa chỉ mặc định. Admin có thể nhập thẳng địa chỉ mới trên form."
     >
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Form.Item
@@ -316,31 +316,31 @@ function CustomerSection({
         </Form.Item>
 
         <Form.Item
-          label="Địa chỉ giao hàng"
-          name="addressId"
-          rules={[{ required: true, message: "Vui lòng chọn địa chỉ giao hàng" }]}
+          label="Tên người nhận"
+          name="recipientName"
+          rules={[{ required: true, message: "Vui lòng nhập tên người nhận" }]}
         >
-          <Select
-            disabled={addresses.length === 0}
-            loading={isLoadingAddresses}
-            placeholder={
-              addresses.length > 0
-                ? "Chọn địa chỉ giao hàng"
-                : "Chọn khách hàng trước"
-            }
-            options={addresses.map((address) => ({
-              value: address.id,
-              label: (
-                <div className="flex flex-col py-1">
-                  <span className="font-semibold text-text-main">
-                    {address.tenNguoiNhan} · {address.soDienThoai}
-                  </span>
-                  <span className="text-xs text-text-secondary">
-                    {address.diaChiDayDu}
-                  </span>
-                </div>
-              ),
-            }))}
+          <Input placeholder="Nhập tên người nhận..." disabled={!customers.length} />
+        </Form.Item>
+
+        <Form.Item
+          label="Số điện thoại"
+          name="phone"
+          rules={[{ required: true, message: "Vui lòng nhập số điện thoại" }]}
+        >
+          <Input placeholder="Nhập số điện thoại..." disabled={!customers.length} />
+        </Form.Item>
+
+        <Form.Item
+          label="Địa chỉ giao hàng (Số nhà, Đường, Xã/Phường, Quận/Huyện, Tỉnh/TP)"
+          name="addressLine"
+          rules={[{ required: true, message: "Vui lòng nhập địa chỉ giao hàng" }]}
+          className="xl:col-span-2"
+        >
+          <Input.TextArea
+            rows={2}
+            placeholder="Ví dụ: 123 Đường ABC, Phường XYZ, Quận 1, TP HCM..."
+            disabled={!customers.length}
           />
         </Form.Item>
       </div>
@@ -718,10 +718,12 @@ function PaymentSection({
   preview,
   paymentMethod,
   paymentType,
+  hasCustomDesign,
 }: {
   preview: OrderPreview;
   paymentMethod?: TaoMoiDonHangInput["paymentMethod"];
   paymentType?: TaoMoiDonHangInput["paymentType"];
+  hasCustomDesign: boolean;
 }) {
   const { depositAmount, codAmount } = getPaymentBreakdown(
     preview.totalAmount,
@@ -739,9 +741,10 @@ function PaymentSection({
         >
           <Radio.Group>
             <Space wrap>
-              <Radio.Button value="COD">COD (Thu hộ)</Radio.Button>
+              <Tooltip title={hasCustomDesign ? "Áo POD bắt buộc thanh toán VNPAY" : ""}>
+                <Radio.Button value="COD" disabled={hasCustomDesign}>COD (Thu hộ)</Radio.Button>
+              </Tooltip>
               <Radio.Button value="VNPAY">VNPAY (Online)</Radio.Button>
-              <Radio.Button value="CASH">CASH (Tiền mặt)</Radio.Button>
             </Space>
           </Radio.Group>
         </Form.Item>
@@ -754,7 +757,9 @@ function PaymentSection({
           <Radio.Group>
             <Space wrap>
               <Radio.Button value="FULL">FULL (Thanh toán đủ)</Radio.Button>
-              <Radio.Button value="DEPOSIT">DEPOSIT (Đặt cọc)</Radio.Button>
+              <Tooltip title={!hasCustomDesign ? "Áo mẫu không yêu cầu đặt cọc" : ""}>
+                <Radio.Button value="DEPOSIT" disabled={!hasCustomDesign}>DEPOSIT (Đặt cọc)</Radio.Button>
+              </Tooltip>
             </Space>
           </Radio.Group>
         </Form.Item>
@@ -774,23 +779,21 @@ function PaymentSection({
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between gap-4">
               <span className="text-text-secondary">
-                Số tiền cần thanh toán trước (Cọc)
+                Số tiền cần thanh toán trước (Cọc qua VNPAY)
               </span>
               <strong className="text-base text-primary-container">
                 {formatCurrency(depositAmount)}
               </strong>
             </div>
 
-            {paymentMethod === "COD" ? (
-              <div className="flex items-center justify-between gap-4 border-t border-primary-container/15 pt-2">
-                <span className="text-text-secondary">
-                  Số tiền thu hộ (COD) khi giao hàng
-                </span>
-                <strong className="text-base text-text-main">
-                  {formatCurrency(codAmount)}
-                </strong>
-              </div>
-            ) : null}
+            <div className="flex items-center justify-between gap-4 border-t border-primary-container/15 pt-2">
+              <span className="text-text-secondary">
+                Số tiền thu hộ (COD) khi giao hàng
+              </span>
+              <strong className="text-base text-text-main">
+                {formatCurrency(codAmount)}
+              </strong>
+            </div>
           </div>
 
           {paymentMethod === "VNPAY" ? (
@@ -800,7 +803,7 @@ function PaymentSection({
               type="info"
               title={`Link VNPAY sẽ yêu cầu khách thanh toán tiền cọc ${formatCurrency(
                 depositAmount
-              )}.`}
+              )}. 50% còn lại sẽ mặc định thu COD khi giao hàng thành công.`}
             />
           ) : null}
         </div>
@@ -1052,7 +1055,6 @@ export default function CreateOrderPage() {
 
   const {
     data: addresses = [],
-    isFetching: isLoadingAddresses,
   } = useQuery({
     queryKey: ["admin-order-customer-addresses", userId],
     queryFn: () => orderService.layDiaChiKhachHang(userId!),
@@ -1113,14 +1115,42 @@ export default function CreateOrderPage() {
     [designById, productById, promotions, values]
   );
 
+  const hasCustomDesign = preview.lines.some((line) => Boolean(line.design));
+
+  useEffect(() => {
+    const newValues: Partial<CreateOrderFormValues> = {};
+
+    if (hasCustomDesign) {
+      if (values.paymentMethod !== "VNPAY") {
+        newValues.paymentMethod = "VNPAY";
+      }
+    } else {
+      if (values.paymentType !== "FULL") {
+        newValues.paymentType = "FULL";
+      }
+    }
+
+    if (Object.keys(newValues).length > 0) {
+      form.setFieldsValue(newValues);
+    }
+  }, [hasCustomDesign, values.paymentMethod, values.paymentType, form]);
+
   useEffect(() => {
     if (!userId || addresses.length === 0) return;
 
-    const currentAddressId = form.getFieldValue("addressId");
-    if (currentAddressId) return;
+    const currentName = form.getFieldValue("recipientName");
+    const currentPhone = form.getFieldValue("phone");
+    const currentAddress = form.getFieldValue("addressLine");
 
-    const defaultAddress = addresses.find((address) => address.laMacDinh);
-    form.setFieldValue("addressId", defaultAddress?.id ?? addresses[0].id);
+    if (currentName || currentPhone || currentAddress) return;
+
+    const defaultAddress = addresses.find((address) => address.laMacDinh) ?? addresses[0];
+    
+    form.setFieldsValue({
+      recipientName: defaultAddress.tenNguoiNhan,
+      phone: defaultAddress.soDienThoai,
+      addressLine: defaultAddress.diaChiDayDu,
+    });
   }, [addresses, form, userId]);
 
   const createOrderMutation = useMutation({
@@ -1153,7 +1183,9 @@ export default function CreateOrderPage() {
     const currentItems = (form.getFieldValue("items") ??
       []) as NonNullable<CreateOrderFormValues["items"]>;
     form.setFieldsValue({
-      addressId: undefined,
+      recipientName: undefined,
+      phone: undefined,
+      addressLine: undefined,
       items: currentItems.map((item) => ({ ...item, designId: undefined })),
     });
     setDesignKeyword("");
@@ -1184,7 +1216,9 @@ export default function CreateOrderPage() {
   function buildPayload(valuesToSubmit: CreateOrderFormValues): TaoMoiDonHangInput {
     const payload: TaoMoiDonHangInput = {
       userId: Number(valuesToSubmit.userId),
-      addressId: Number(valuesToSubmit.addressId),
+      recipientName: valuesToSubmit.recipientName || "",
+      phone: valuesToSubmit.phone || "",
+      addressLine: valuesToSubmit.addressLine || "",
       items: (valuesToSubmit.items ?? []).map((item) => ({
         variantId: Number(item.variantId),
         quantity: Number(item.quantity),
@@ -1211,6 +1245,27 @@ export default function CreateOrderPage() {
     }
 
     createOrderMutation.mutate(buildPayload(valuesToSubmit));
+  }
+
+  function handleFinishFailed({
+    errorFields,
+  }: {
+    errorFields: Array<{ name: Array<string | number> }>;
+  }) {
+    const firstError = errorFields[0];
+    if (!firstError) return;
+
+    window.setTimeout(() => {
+      form.scrollToField(firstError.name, {
+        behavior: "smooth",
+        block: "center",
+      });
+
+      const fieldInstance = form.getFieldInstance(firstError.name) as
+        | { focus?: () => void }
+        | undefined;
+      fieldInstance?.focus?.();
+    }, 0);
   }
 
   return (
@@ -1252,15 +1307,14 @@ export default function CreateOrderPage() {
         layout="vertical"
         initialValues={initialValues}
         onFinish={handleFinish}
+        onFinishFailed={handleFinishFailed}
         requiredMark={false}
       >
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-5">
             <CustomerSection
               customers={customers}
-              addresses={addresses}
               isSearchingCustomers={isSearchingCustomers}
-              isLoadingAddresses={isLoadingAddresses}
               onCustomerSearch={setCustomerKeyword}
               onCustomerChange={handleCustomerChange}
             />
@@ -1283,6 +1337,7 @@ export default function CreateOrderPage() {
               preview={preview}
               paymentMethod={values.paymentMethod}
               paymentType={values.paymentType}
+              hasCustomDesign={hasCustomDesign}
             />
 
             <ShippingSection
