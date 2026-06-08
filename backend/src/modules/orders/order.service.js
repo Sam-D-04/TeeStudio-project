@@ -116,6 +116,10 @@ function laHanhDongTaoDon(action) {
   return CREATION_ACTIONS.has(action);
 }
 
+function chuanHoaGiaTriSoSanh(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function parseGatewayResponse(gatewayResponse) {
   if (!gatewayResponse) return {};
   if (typeof gatewayResponse === "object") return gatewayResponse;
@@ -1311,9 +1315,13 @@ async function timKiemThietKe(userId, keyword) {
   const [rows] = await db.pool.query(
     `SELECT cd.id, cd.productId, cd.variantId, cd.baseColor,
             cd.previewUrl, cd.designFee, cd.status, cd.createdAt,
-            p.name AS tenSanPham
+            p.name AS tenSanPham, p.basePrice, p.material, p.form,
+            pi.imageUrl AS anhUrl,
+            pv.color AS mauSanPham
      FROM CustomDesign cd
      JOIN Product p ON p.id = cd.productId
+     LEFT JOIN ProductImage pi ON pi.productId = p.id AND pi.isPrimary = 1
+     LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
      WHERE cd.userId = ?
        AND cd.status = 'APPROVED'
        ${extraCondition}
@@ -1322,16 +1330,63 @@ async function timKiemThietKe(userId, keyword) {
     params
   );
 
+  if (rows.length === 0) return [];
+
+  const productIds = [...new Set(rows.map((r) => r.productId))];
+  const placeholders = productIds.map(() => "?").join(",");
+
+  const [variants] = await db.pool.query(
+    `SELECT id, productId, color, size, sku, stockQty
+     FROM ProductVariant
+     WHERE productId IN (${placeholders})
+     ORDER BY productId, color, size`,
+    productIds
+  );
+
+  const [bulkPricings] = await db.pool.query(
+    `SELECT id, productId, minQty, discountPercent
+     FROM BulkPricing
+     WHERE productId IN (${placeholders})
+     ORDER BY productId, minQty ASC`,
+    productIds
+  );
+
   return rows.map((r) => ({
     id: r.id,
     productId: r.productId,
     variantId: r.variantId,
     tenSanPham: r.tenSanPham,
     mauNen: r.baseColor,
+    mauSanPham: r.mauSanPham || r.baseColor,
     anhXemTruoc: r.previewUrl,
     phiThietKe: Number(r.designFee),
     trangThai: r.status,
     ngayTao: r.createdAt,
+    sanPham: {
+      id: r.productId,
+      ten: r.tenSanPham,
+      giaGoc: Number(r.basePrice),
+      chatLieu: r.material,
+      dang: r.form,
+      anhUrl: r.anhUrl || null,
+      bienThe: variants
+        .filter((v) => v.productId === r.productId)
+        .map((v) => ({
+          id: v.id,
+          mau: v.color,
+          kichCo: v.size,
+          sku: v.sku,
+          tonKho: v.stockQty,
+        })),
+      bangGiaSi: bulkPricings
+        .filter((b) => b.productId === r.productId)
+        .map((b) => ({
+          id: b.id,
+          soLuongToiThieu: b.minQty,
+          phanTramGiam: Number(b.discountPercent),
+          giaPreview: Number(r.basePrice) * (1 - Number(b.discountPercent) / 100),
+        })),
+    },
   }));
 }
 
@@ -1387,8 +1442,9 @@ async function layDanhSachKhuyenMai() {
  *  9. COMMIT
  *
  * Nghiệp vụ kho:
- *  - Chỉ kiểm tra stockQty >= quantity, KHÔNG giảm kho khi tạo đơn PENDING.
- *  - Kho chỉ giảm khi đơn được CONFIRM (xử lý ở capNhatTrangThai).
+ *  - Kiểm tra stockQty >= quantity trước khi tạo đơn.
+ *  - Trừ tồn kho ngay trong transaction tạo đơn để tránh admin tạo nhiều đơn vượt tồn.
+ *  - Nếu transaction tạo đơn lỗi, việc trừ kho sẽ rollback cùng đơn hàng.
  *
  * @param {Object} data - dữ liệu từ request body đã validated
  */
@@ -1443,7 +1499,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
 
     const variant = rowsVariant[0];
 
-    // Kiểm tra tồn kho (chỉ cảnh báo khi tạo PENDING – không block)
+    // Kiểm tra tồn kho trước khi tạo đơn.
     if (variant.stockQty < item.quantity) {
       const err = new Error(
         `Sản phẩm "${variant.tenSanPham}" (${variant.color}/${variant.size}) chỉ còn ${variant.stockQty} trong kho, không đủ ${item.quantity} sản phẩm`
@@ -1493,9 +1549,12 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     if (!enriched.designId) continue;
 
     const [rowsDesign] = await db.pool.query(
-      `SELECT id, userId AS designUserId, productId, designFee, status
-       FROM CustomDesign
-       WHERE id = ? LIMIT 1`,
+      `SELECT cd.id, cd.userId AS designUserId, cd.productId, cd.variantId,
+              cd.baseColor, cd.designFee, cd.status,
+              pv.color AS designColor
+       FROM CustomDesign cd
+       LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
+       WHERE cd.id = ? LIMIT 1`,
       [enriched.designId]
     );
 
@@ -1518,6 +1577,27 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     if (design.status !== "APPROVED") {
       const err = new Error(
         `Thiết kế ID=${enriched.designId} chưa được duyệt (trạng thái: ${design.status}). Chỉ thiết kế APPROVED mới được gán vào đơn`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Phôi áo và màu của item phải khớp với thiết kế đã duyệt.
+    if (design.productId !== enriched.productId) {
+      const err = new Error(
+        `Thiết kế ID=${enriched.designId} thuộc sản phẩm khác, không thể gán vào "${enriched.tenSanPham}"`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const designColor = design.designColor || design.baseColor;
+    if (
+      designColor &&
+      chuanHoaGiaTriSoSanh(designColor) !== chuanHoaGiaTriSoSanh(enriched.color)
+    ) {
+      const err = new Error(
+        `Thiết kế ID=${enriched.designId} chỉ được đặt với màu "${designColor}", không thể chọn màu "${enriched.color}"`
       );
       err.statusCode = 400;
       throw err;
@@ -1713,7 +1793,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
       note: creationHistory.note,
     });
 
-    // ── Bước 3.3: INSERT OrderItem và OrderProduction ──
+    // ── Bước 3.3: INSERT OrderItem, OrderProduction và giữ tồn kho ──
     for (const item of itemsEnriched) {
       // lineTotal = (unitPrice * quantity) + designFee của item này
       const lineTotal = Math.round(
@@ -1746,6 +1826,33 @@ async function taoMoiDonHang(data, actor, ipAddress) {
           [orderItemId, item.designId]
         );
       }
+
+      const [stockResult] = await conn.query(
+        `UPDATE ProductVariant
+         SET stockQty = stockQty - ?
+         WHERE id = ? AND stockQty >= ?`,
+        [item.quantity, item.variantId, item.quantity]
+      );
+
+      if (stockResult.affectedRows === 0) {
+        const err = new Error(
+          `Sản phẩm "${item.tenSanPham}" (${item.color}/${item.size}) không còn đủ tồn kho để tạo đơn`
+        );
+        err.statusCode = 400;
+        throw err;
+      }
+
+      await conn.query(
+        `INSERT INTO InventoryTransaction
+           (variantId, orderId, supplierId, quantityChanged, transactionType, reason)
+         VALUES (?, ?, NULL, ?, 'EXPORT', ?)`,
+        [
+          item.variantId,
+          orderId,
+          -item.quantity,
+          `Tạo đơn hàng ${orderCode} - giữ tồn kho ngay khi tạo đơn`,
+        ]
+      );
     }
 
     // ── Bước 3.4: INSERT Payment ──

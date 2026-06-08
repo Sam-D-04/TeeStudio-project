@@ -325,10 +325,12 @@ export type ThietKe = {
   variantId: number | null;
   tenSanPham: string;
   mauNen: string;
+  mauSanPham: string;
   anhXemTruoc: string;
   phiThietKe: number;
   trangThai: string;
   ngayTao: string;
+  sanPham: SanPhamTimKiem;
 };
 
 /** Mã khuyến mãi còn hiệu lực */

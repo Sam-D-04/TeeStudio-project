@@ -334,6 +334,139 @@ INSERT INTO `Payment` (orderId, amount, paymentMethod, paymentType, status, tran
 -- ĐH10: VNPAY đã thanh toán
 (10, 550000, 'VNPAY',          'FULL', 'COMPLETED', 'VNP20260530001', '2026-05-30 08:15:00');
 
+-- ============================================================
+-- 18. DỮ LIỆU TEST TỒN KHO KHI HỦY ĐƠN
+-- Mục tiêu:
+--   1) Tạo đơn áo mẫu: chọn biến thể SKU=TST-TONKHO-TRANG-M, không chọn thiết kế.
+--   2) Tạo đơn áo tùy chỉnh: chọn khách test và thiết kế APPROVED bên dưới.
+-- Sau đó hủy đơn ở từng trạng thái để kiểm tra ProductVariant.stockQty.
+-- ============================================================
+
+-- Bước 1: Category
+INSERT INTO `Category` (`name`)
+VALUES ('Áo Thun Trơn Test Tồn Kho')
+ON DUPLICATE KEY UPDATE `id` = LAST_INSERT_ID(`id`);
+SET @seed_inventory_category_id = LAST_INSERT_ID();
+
+-- Bước 2: Product/phôi áo
+INSERT INTO `Product`
+  (`categoryId`, `name`, `slug`, `basePrice`, `material`, `form`, `madeIn`, `description`, `status`)
+VALUES
+  (
+    @seed_inventory_category_id,
+    'Áo thun trơn test tồn kho',
+    'ao-thun-tron-test-ton-kho',
+    99000,
+    '100% Cotton test',
+    'Regular fit',
+    'Việt Nam',
+    'Phôi áo dùng riêng để test luồng trừ/cộng tồn kho khi tạo và hủy đơn hàng.',
+    'ACTIVE'
+  )
+ON DUPLICATE KEY UPDATE
+  `categoryId` = VALUES(`categoryId`),
+  `basePrice` = VALUES(`basePrice`),
+  `material` = VALUES(`material`),
+  `form` = VALUES(`form`),
+  `madeIn` = VALUES(`madeIn`),
+  `description` = VALUES(`description`),
+  `status` = VALUES(`status`),
+  `id` = LAST_INSERT_ID(`id`);
+SET @seed_inventory_product_id = LAST_INSERT_ID();
+
+-- Bước 3: ProductVariant/biến thể có tồn kho rõ ràng để quan sát
+INSERT INTO `ProductVariant`
+  (`productId`, `color`, `size`, `sku`, `stockQty`)
+VALUES
+  (@seed_inventory_product_id, 'Trắng', 'M', 'TST-TONKHO-TRANG-M', 20)
+ON DUPLICATE KEY UPDATE
+  `productId` = VALUES(`productId`),
+  `color` = VALUES(`color`),
+  `size` = VALUES(`size`),
+  `stockQty` = VALUES(`stockQty`),
+  `id` = LAST_INSERT_ID(`id`);
+SET @seed_inventory_variant_id = LAST_INSERT_ID();
+
+-- Bước 4: Account khách hàng test
+INSERT INTO `Account`
+  (`email`, `passwordHash`, `fullName`, `phone`, `role`, `status`)
+VALUES
+  (
+    'test.tonkho.customer@teestudio.vn',
+    '$2b$10$seedInventoryCustomerHash',
+    'Khách Test Tồn Kho',
+    '0900000999',
+    'CUSTOMER',
+    'ACTIVE'
+  )
+ON DUPLICATE KEY UPDATE
+  `fullName` = VALUES(`fullName`),
+  `phone` = VALUES(`phone`),
+  `role` = VALUES(`role`),
+  `status` = VALUES(`status`),
+  `id` = LAST_INSERT_ID(`id`);
+SET @seed_inventory_customer_id = LAST_INSERT_ID();
+
+-- Bổ sung địa chỉ để form tạo đơn tự điền thông tin giao hàng cho khách test.
+INSERT INTO `UserAddress`
+  (`userId`, `recipientName`, `phone`, `addressLine`, `city`, `district`, `ward`, `isDefault`)
+SELECT
+  @seed_inventory_customer_id,
+  'Khách Test Tồn Kho',
+  '0900000999',
+  '100 Đường Test Tồn Kho',
+  'TP. Hồ Chí Minh',
+  'Quận 1',
+  'Phường Bến Nghé',
+  1
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM `UserAddress`
+  WHERE `userId` = @seed_inventory_customer_id
+    AND `phone` = '0900000999'
+    AND `addressLine` = '100 Đường Test Tồn Kho'
+);
+
+-- Bước 5: CustomDesign APPROVED để Admin thấy trong dropdown khi tạo đơn tùy chỉnh.
+INSERT INTO `CustomDesign`
+  (`userId`, `productId`, `variantId`, `baseColor`, `canvasData`, `previewUrl`, `designFee`, `status`, `adminNote`)
+SELECT
+  @seed_inventory_customer_id,
+  @seed_inventory_product_id,
+  @seed_inventory_variant_id,
+  '#FFFFFF',
+  CAST('{"objects":[],"background":"#FFFFFF","seed":"inventory-cancel-flow"}' AS JSON),
+  'https://res.cloudinary.com/teestudio/image/upload/v1/previews/seed-inventory-approved-design.jpg',
+  50000,
+  'APPROVED',
+  'Thiết kế mẫu đã duyệt để test tồn kho khi hủy đơn áo tùy chỉnh.'
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM `CustomDesign`
+  WHERE `userId` = @seed_inventory_customer_id
+    AND `productId` = @seed_inventory_product_id
+    AND `variantId` = @seed_inventory_variant_id
+    AND `previewUrl` = 'https://res.cloudinary.com/teestudio/image/upload/v1/previews/seed-inventory-approved-design.jpg'
+);
+
+-- Ghi nhận tồn kho khởi tạo cho biến thể test để dễ đối chiếu khi xem lịch sử kho.
+INSERT INTO `InventoryTransaction`
+  (`variantId`, `orderId`, `supplierId`, `quantityChanged`, `transactionType`, `reason`)
+SELECT
+  @seed_inventory_variant_id,
+  NULL,
+  NULL,
+  20,
+  'IMPORT',
+  'Seed tồn kho ban đầu cho SKU TST-TONKHO-TRANG-M'
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM `InventoryTransaction`
+  WHERE `variantId` = @seed_inventory_variant_id
+    AND `transactionType` = 'IMPORT'
+    AND `reason` = 'Seed tồn kho ban đầu cho SKU TST-TONKHO-TRANG-M'
+);
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================================
@@ -344,6 +477,10 @@ UNION ALL
 SELECT 'Product',        COUNT(*) FROM Product
 UNION ALL
 SELECT 'ProductVariant', COUNT(*) FROM ProductVariant
+UNION ALL
+SELECT 'CustomDesign',   COUNT(*) FROM CustomDesign
+UNION ALL
+SELECT 'InventoryTransaction', COUNT(*) FROM InventoryTransaction
 UNION ALL
 SELECT 'CustomerOrder',  COUNT(*) FROM CustomerOrder
 UNION ALL

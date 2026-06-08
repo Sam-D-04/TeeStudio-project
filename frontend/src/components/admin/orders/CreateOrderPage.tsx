@@ -141,6 +141,86 @@ function uniqueById<T extends { id: number }>(items: T[]) {
   return Array.from(new Map(items.map((item) => [item.id, item])).values());
 }
 
+function normalizeComparableText(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getDesignColor(design?: ThietKe, product?: SanPhamTimKiem) {
+  if (!design) return "";
+
+  const designVariant = product?.bienThe.find((item) => item.id === design.variantId);
+  return designVariant?.mau || design.mauSanPham || design.mauNen || "";
+}
+
+function getDesignSizeOptions(
+  product: SanPhamTimKiem | undefined,
+  design: ThietKe | undefined
+) {
+  if (!product || !design) return [];
+
+  const lockedColor = normalizeComparableText(getDesignColor(design, product));
+  if (!lockedColor) return [];
+
+  return product.bienThe.filter(
+    (variant) => normalizeComparableText(variant.mau) === lockedColor
+  );
+}
+
+function deductStockFromProducts(
+  products: SanPhamTimKiem[],
+  items: TaoMoiDonHangInput["items"]
+) {
+  const quantityByVariantId = items.reduce<Record<number, number>>((acc, item) => {
+    acc[item.variantId] = (acc[item.variantId] || 0) + item.quantity;
+    return acc;
+  }, {});
+
+  let hasChanged = false;
+
+  const updatedProducts = products.map((product) => {
+    let productChanged = false;
+
+    const bienThe = product.bienThe.map((variant) => {
+      const deductedQuantity = quantityByVariantId[variant.id] || 0;
+      if (deductedQuantity <= 0) return variant;
+
+      productChanged = true;
+      hasChanged = true;
+
+      return {
+        ...variant,
+        tonKho: Math.max(0, variant.tonKho - deductedQuantity),
+      };
+    });
+
+    return productChanged ? { ...product, bienThe } : product;
+  });
+
+  return hasChanged ? updatedProducts : products;
+}
+
+function deductStockFromDesigns(
+  designs: ThietKe[],
+  items: TaoMoiDonHangInput["items"]
+) {
+  const updatedProducts = deductStockFromProducts(
+    designs.map((design) => design.sanPham),
+    items
+  );
+
+  let hasChanged = false;
+
+  const updatedDesigns = designs.map((design, index) => {
+    const updatedProduct = updatedProducts[index];
+    if (updatedProduct === design.sanPham) return design;
+
+    hasChanged = true;
+    return { ...design, sanPham: updatedProduct };
+  });
+
+  return hasChanged ? updatedDesigns : designs;
+}
+
 function tinhDonGiaPreview(product: SanPhamTimKiem | undefined, quantity: number) {
   if (!product) {
     return { unitPrice: 0, discountPercent: undefined, bulkMinQty: undefined };
@@ -352,27 +432,18 @@ function CustomerSection({
 function DesignPicker({
   rowIndex,
   userId,
-  productId,
-  variantId,
   designs,
   isLoadingDesigns,
   onDesignSearch,
+  onDesignChange,
 }: {
   rowIndex: number;
   userId?: number;
-  productId?: number;
-  variantId?: number;
   designs: ThietKe[];
   isLoadingDesigns: boolean;
   onDesignSearch: (value: string) => void;
+  onDesignChange: (rowIndex: number, designId?: number) => void;
 }) {
-  const compatibleDesigns = designs.filter((design) => {
-    if (!productId) return true;
-    if (design.productId !== productId) return false;
-    if (!variantId || design.variantId === null) return true;
-    return design.variantId === variantId;
-  });
-
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto]">
       <Form.Item
@@ -387,10 +458,11 @@ function DesignPicker({
           filterOption={false}
           loading={isLoadingDesigns}
           onSearch={onDesignSearch}
+          onChange={(value) => onDesignChange(rowIndex, value)}
           placeholder={
-            userId ? "Chọn thiết kế đã duyệt nếu là đơn POD" : "Chọn khách hàng trước"
+            userId ? "Chọn bản thiết kế đã duyệt của khách" : "Chọn khách hàng trước"
           }
-          options={compatibleDesigns.map((design) => ({
+          options={designs.map((design) => ({
             value: design.id,
             label: (
               <div className="flex items-center gap-3 py-1">
@@ -407,7 +479,8 @@ function DesignPicker({
                     Thiết kế #{design.id} · {design.tenSanPham}
                   </div>
                   <div className="text-xs text-text-secondary">
-                    Phí thiết kế {formatCurrency(design.phiThietKe)}
+                    Màu {getDesignColor(design, design.sanPham) || "Không rõ"} · Phí thiết kế{" "}
+                    {formatCurrency(design.phiThietKe)}
                   </div>
                 </div>
               </div>
@@ -438,7 +511,6 @@ function ProductItemRow({
   fieldName,
   canRemove,
   productOptions,
-  productById,
   userId,
   designs,
   isSearchingProducts,
@@ -448,12 +520,12 @@ function ProductItemRow({
   onProductChange,
   onVariantChange,
   onDesignSearch,
+  onDesignChange,
   onRemove,
 }: {
   fieldName: number;
   canRemove: boolean;
   productOptions: SanPhamTimKiem[];
-  productById: Record<number, SanPhamTimKiem>;
   userId?: number;
   designs: ThietKe[];
   isSearchingProducts: boolean;
@@ -463,14 +535,15 @@ function ProductItemRow({
   onProductChange: (rowIndex: number, productId?: number) => void;
   onVariantChange: (rowIndex: number) => void;
   onDesignSearch: (value: string) => void;
+  onDesignChange: (rowIndex: number, designId?: number) => void;
   onRemove: () => void;
 }) {
   const product = previewLine?.product;
   const variant = previewLine?.variant;
+  const selectedDesign = previewLine?.design;
   const selectedProductId = product?.id;
-  const availableVariants = selectedProductId
-    ? productById[selectedProductId]?.bienThe ?? []
-    : [];
+  const availableSizeVariants = getDesignSizeOptions(product, selectedDesign);
+  const lockedColor = getDesignColor(selectedDesign, product);
 
   return (
     <div className="rounded-xl border border-border bg-surface-alt p-4">
@@ -480,7 +553,7 @@ function ProductItemRow({
             Sản phẩm #{fieldName + 1}
           </h4>
           <p className="mt-1 text-xs text-text-secondary">
-            Chọn phôi áo, biến thể màu/size và số lượng đặt.
+            Chọn thiết kế trước; hệ thống tự khóa phôi áo và màu theo bản đã duyệt.
           </p>
         </div>
 
@@ -497,7 +570,16 @@ function ProductItemRow({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_1fr_150px]">
+      <DesignPicker
+        rowIndex={fieldName}
+        userId={userId}
+        designs={designs}
+        isLoadingDesigns={isLoadingDesigns}
+        onDesignSearch={onDesignSearch}
+        onDesignChange={onDesignChange}
+      />
+
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.8fr_0.8fr_150px]">
         <Form.Item
           label="Sản phẩm / phôi áo"
           name={[fieldName, "productId"]}
@@ -505,11 +587,12 @@ function ProductItemRow({
         >
           <Select
             showSearch
+            disabled
             filterOption={false}
             loading={isSearchingProducts}
             onSearch={onProductSearch}
             onChange={(value) => onProductChange(fieldName, value)}
-            placeholder="Tìm sản phẩm theo tên"
+            placeholder="Sẽ tự điền sau khi chọn thiết kế"
             suffixIcon={<SearchOutlined />}
             options={productOptions.map((item) => ({
               value: item.id,
@@ -541,21 +624,29 @@ function ProductItemRow({
           />
         </Form.Item>
 
+        <Form.Item label="Màu">
+          <Input
+            disabled
+            value={lockedColor}
+            placeholder="Tự điền theo thiết kế"
+          />
+        </Form.Item>
+
         <Form.Item
-          label="Màu / size"
+          label="Size"
           name={[fieldName, "variantId"]}
-          rules={[{ required: true, message: "Vui lòng chọn biến thể" }]}
+          rules={[{ required: true, message: "Vui lòng chọn size" }]}
         >
           <Select
-            disabled={!selectedProductId}
+            disabled={!selectedDesign || !selectedProductId}
             placeholder={
-              selectedProductId ? "Chọn màu và size" : "Chọn sản phẩm trước"
+              selectedDesign ? "Chọn size" : "Chọn thiết kế trước"
             }
             onChange={() => onVariantChange(fieldName)}
-            options={availableVariants.map((item) => ({
+            options={availableSizeVariants.map((item) => ({
               value: item.id,
               disabled: item.tonKho <= 0,
-              label: `${item.mau} / ${item.kichCo} · SKU ${item.sku} · Tồn ${item.tonKho}`,
+              label: `${item.kichCo} · SKU ${item.sku} · Tồn ${item.tonKho}`,
             }))}
           />
         </Form.Item>
@@ -588,23 +679,13 @@ function ProductItemRow({
         </Form.Item>
       </div>
 
-      <DesignPicker
-        rowIndex={fieldName}
-        userId={userId}
-        productId={selectedProductId}
-        variantId={variant?.id}
-        designs={designs}
-        isLoadingDesigns={isLoadingDesigns}
-        onDesignSearch={onDesignSearch}
-      />
-
       <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-xs text-text-secondary">
         {variant ? (
           <Tag color={variant.tonKho > 0 ? "blue" : "red"} className="m-0">
             Tồn kho hiện tại: {variant.tonKho}
           </Tag>
         ) : (
-          <span>Chọn biến thể để xem tồn kho.</span>
+          <span>Chọn size để xem tồn kho.</span>
         )}
 
         {previewLine?.discountPercent ? (
@@ -629,7 +710,6 @@ function ProductItemRow({
 function ProductsSection({
   userId,
   productOptions,
-  productById,
   designs,
   isSearchingProducts,
   isLoadingDesigns,
@@ -638,10 +718,10 @@ function ProductsSection({
   onProductChange,
   onVariantChange,
   onDesignSearch,
+  onDesignChange,
 }: {
   userId?: number;
   productOptions: SanPhamTimKiem[];
-  productById: Record<number, SanPhamTimKiem>;
   designs: ThietKe[];
   isSearchingProducts: boolean;
   isLoadingDesigns: boolean;
@@ -650,11 +730,12 @@ function ProductsSection({
   onProductChange: (rowIndex: number, productId?: number) => void;
   onVariantChange: (rowIndex: number) => void;
   onDesignSearch: (value: string) => void;
+  onDesignChange: (rowIndex: number, designId?: number) => void;
 }) {
   return (
     <SectionPanel
       title="2. Chọn sản phẩm & thiết kế POD"
-      description="Chọn thiết kế đã duyệt ngay trong từng dòng sản phẩm nếu đơn là áo POD. Giá sỉ BulkPricing chỉ preview phần phôi áo."
+      description="Ưu tiên chọn bản thiết kế đã duyệt. Phôi áo và màu sẽ tự điền, bị khóa chỉnh sửa; admin chỉ chọn size và số lượng."
     >
       <Form.List
         name="items"
@@ -679,7 +760,6 @@ function ProductsSection({
                         fieldName={field.name}
                         canRemove={fields.length > 1}
                         productOptions={productOptions}
-                        productById={productById}
                         userId={userId}
                         designs={designs}
                         isSearchingProducts={isSearchingProducts}
@@ -689,6 +769,7 @@ function ProductsSection({
                         onProductChange={onProductChange}
                         onVariantChange={onVariantChange}
                         onDesignSearch={onDesignSearch}
+                        onDesignChange={onDesignChange}
                         onRemove={() => remove(field.name)}
                       />
                     </div>
@@ -702,7 +783,22 @@ function ProductsSection({
             <Button
               type="dashed"
               icon={<PlusOutlined />}
-              onClick={() => add({ quantity: 1 })}
+              onClick={() => {
+                const sourceLine = [...preview.lines]
+                  .reverse()
+                  .find((line) => line.design && line.product);
+
+                add(
+                  sourceLine?.design && sourceLine.product
+                    ? {
+                        productId: sourceLine.product.id,
+                        designId: sourceLine.design.id,
+                        variantId: undefined,
+                        quantity: 1,
+                      }
+                    : { quantity: 1 }
+                );
+              }}
               className="h-10 w-full rounded-[10px] font-semibold"
             >
               Thêm dòng sản phẩm
@@ -1032,6 +1128,9 @@ export default function CreateOrderPage() {
   const [selectedProductById, setSelectedProductById] = useState<
     Record<number, SanPhamTimKiem>
   >({});
+  const [selectedDesignById, setSelectedDesignById] = useState<
+    Record<number, ThietKe>
+  >({});
 
   const debouncedCustomerKeyword = useDebouncedValue(customerKeyword);
   const debouncedProductKeyword = useDebouncedValue(productKeyword);
@@ -1069,9 +1168,29 @@ export default function CreateOrderPage() {
     queryFn: () => orderService.timKiemSanPham(debouncedProductKeyword),
   });
 
+  const {
+    data: foundDesigns = [],
+    isFetching: isLoadingDesigns,
+  } = useQuery({
+    queryKey: ["admin-order-design-search", userId, debouncedDesignKeyword],
+    queryFn: () =>
+      orderService.timKiemThietKe(userId!, debouncedDesignKeyword),
+    enabled: Boolean(userId),
+  });
+
+  const designs = useMemo(
+    () => uniqueById([...Object.values(selectedDesignById), ...foundDesigns]),
+    [foundDesigns, selectedDesignById]
+  );
+
   const productOptions = useMemo(
-    () => uniqueById([...Object.values(selectedProductById), ...foundProducts]),
-    [foundProducts, selectedProductById]
+    () =>
+      uniqueById([
+        ...foundProducts,
+        ...designs.map((design) => design.sanPham).filter(Boolean),
+        ...Object.values(selectedProductById),
+      ]),
+    [designs, foundProducts, selectedProductById]
   );
 
   const productById = useMemo(
@@ -1082,16 +1201,6 @@ export default function CreateOrderPage() {
       }, {}),
     [productOptions]
   );
-
-  const {
-    data: designs = [],
-    isFetching: isLoadingDesigns,
-  } = useQuery({
-    queryKey: ["admin-order-design-search", userId, debouncedDesignKeyword],
-    queryFn: () =>
-      orderService.timKiemThietKe(userId!, debouncedDesignKeyword),
-    enabled: Boolean(userId),
-  });
 
   const designById = useMemo(
     () =>
@@ -1153,13 +1262,47 @@ export default function CreateOrderPage() {
     });
   }, [addresses, form, userId]);
 
+  function syncStockAfterCreateOrder(items: TaoMoiDonHangInput["items"]) {
+    setSelectedProductById((current) => {
+      const updatedProducts = deductStockFromProducts(Object.values(current), items);
+      return updatedProducts.reduce<Record<number, SanPhamTimKiem>>((acc, product) => {
+        acc[product.id] = product;
+        return acc;
+      }, {});
+    });
+
+    queryClient.setQueriesData<SanPhamTimKiem[]>(
+      { queryKey: ["admin-order-product-search"] },
+      (currentProducts) =>
+        currentProducts ? deductStockFromProducts(currentProducts, items) : currentProducts
+    );
+
+    setSelectedDesignById((current) => {
+      const updatedDesigns = deductStockFromDesigns(Object.values(current), items);
+      return updatedDesigns.reduce<Record<number, ThietKe>>((acc, design) => {
+        acc[design.id] = design;
+        return acc;
+      }, {});
+    });
+
+    queryClient.setQueriesData<ThietKe[]>(
+      { queryKey: ["admin-order-design-search"] },
+      (currentDesigns) =>
+        currentDesigns ? deductStockFromDesigns(currentDesigns, items) : currentDesigns
+    );
+  }
+
   const createOrderMutation = useMutation({
     mutationFn: orderService.taoMoiDonHang,
-    onSuccess: async (result) => {
+    onSuccess: async (result, variables) => {
+      syncStockAfterCreateOrder(variables.items);
       messageApi.success("Tạo đơn hàng thành công");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-order-product-search"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-products"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-inventory"] }),
       ]);
       router.push(`/admin/don-hang/${result.id}`);
     },
@@ -1186,9 +1329,55 @@ export default function CreateOrderPage() {
       recipientName: undefined,
       phone: undefined,
       addressLine: undefined,
-      items: currentItems.map((item) => ({ ...item, designId: undefined })),
+      items: currentItems.map((item) => ({
+        ...item,
+        productId: undefined,
+        variantId: undefined,
+        designId: undefined,
+      })),
     });
     setDesignKeyword("");
+    setSelectedDesignById({});
+  }
+
+  function handleDesignChange(rowIndex: number, designId?: number) {
+    const selectedDesign = designs.find((design) => design.id === designId);
+    const currentItem =
+      (form.getFieldValue(["items", rowIndex]) as NonNullable<
+        CreateOrderFormValues["items"]
+      >[number]) ?? {};
+
+    if (!selectedDesign) {
+      form.setFieldValue(["items", rowIndex], {
+        ...currentItem,
+        productId: undefined,
+        variantId: undefined,
+        designId: undefined,
+        quantity: currentItem.quantity ?? 1,
+      });
+      return;
+    }
+
+    const syncedProduct = productById[selectedDesign.productId] ?? selectedDesign.sanPham;
+    const syncedDesign = { ...selectedDesign, sanPham: syncedProduct };
+
+    setSelectedDesignById((current) => ({
+      ...current,
+      [syncedDesign.id]: syncedDesign,
+    }));
+
+    setSelectedProductById((current) => ({
+      ...current,
+      [syncedProduct.id]: syncedProduct,
+    }));
+
+    form.setFieldValue(["items", rowIndex], {
+      ...currentItem,
+      productId: syncedDesign.productId,
+      variantId: undefined,
+      designId: syncedDesign.id,
+      quantity: currentItem.quantity ?? 1,
+    });
   }
 
   function handleProductChange(rowIndex: number, productId?: number) {
@@ -1209,8 +1398,8 @@ export default function CreateOrderPage() {
     );
   }
 
-  function handleVariantChange(rowIndex: number) {
-    form.setFieldValue(["items", rowIndex, "designId"], undefined);
+  function handleVariantChange() {
+    // Size được chọn trong cùng phôi/màu đã khóa theo thiết kế, không reset thiết kế.
   }
 
   function buildPayload(valuesToSubmit: CreateOrderFormValues): TaoMoiDonHangInput {
@@ -1296,6 +1485,8 @@ export default function CreateOrderPage() {
           onClick={() => {
             form.resetFields();
             setDesignKeyword("");
+            setSelectedDesignById({});
+            setSelectedProductById({});
           }}
         >
           Làm mới form
@@ -1322,7 +1513,6 @@ export default function CreateOrderPage() {
             <ProductsSection
               userId={userId}
               productOptions={productOptions}
-              productById={productById}
               designs={designs}
               isSearchingProducts={isSearchingProducts}
               isLoadingDesigns={isLoadingDesigns}
@@ -1331,6 +1521,7 @@ export default function CreateOrderPage() {
               onProductChange={handleProductChange}
               onVariantChange={handleVariantChange}
               onDesignSearch={setDesignKeyword}
+              onDesignChange={handleDesignChange}
             />
 
             <PaymentSection
