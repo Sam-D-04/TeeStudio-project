@@ -69,7 +69,6 @@ export type DonHang = {
   tongTienVnd: number;
   thanhToan: ThanhToanInfo;
   trangThai: string;
-  daXuatThongSoIn: boolean;
 };
 
 /** Một bước trong timeline lịch sử xử lý đơn */

@@ -76,7 +76,6 @@ function chuyenDoiSangOrder(don: orderService.DonHang): Order {
       isPaid: don.thanhToan.daThanh,
     },
     status: don.trangThai as Order["status"],
-    hasPrintSpec: don.daXuatThongSoIn,
   };
 }
 

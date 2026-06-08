@@ -45,7 +45,6 @@ export type Order = {
   totalAmountVnd: number;         // Tổng tiền (số nguyên VND)
   payment: PaymentInfo;           // Thông tin thanh toán
   status: OrderStatus;            // Trạng thái xử lý
-  hasPrintSpec?: boolean;         // Đã xuất thông số in chưa (cho đơn custom)
 };
 
 type OrderTableProps = {
@@ -177,12 +176,6 @@ export default function OrderTable({ orders, onRowClick }: OrderTableProps) {
               <td className="p-4 align-top">
                 <OrderStatusBadge status={order.status} />
 
-                {/* Nhãn nhỏ "Đã xuất thông số" nếu đơn custom đã in spec */}
-                {order.hasPrintSpec && (
-                  <div className="mt-1 inline-block rounded border border-border px-1.5 py-0.5 text-[10px] text-text-secondary">
-                    Đã xuất thông số
-                  </div>
-                )}
               </td>
 
               {/* Cột 6: Nút thao tác */}

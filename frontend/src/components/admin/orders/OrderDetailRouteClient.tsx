@@ -54,7 +54,17 @@ const ORDER_STATUS_OPTIONS = [
   { value: "hoan_tat", label: "Hoàn tất" },
 ];
 
-const CANCELLABLE_STATUSES = new Set(["cho_xac_nhan", "da_xac_nhan"]);
+const ALLOWED_NEXT_STATUS: Record<string, string[]> = {
+  cho_xac_nhan: ["da_xac_nhan"],
+  da_xac_nhan: ["dang_xu_ly_in"],
+  dang_xu_ly_in: ["cho_giao"],
+  cho_giao: ["dang_giao"],
+  dang_giao: ["hoan_tat"],
+  hoan_tat: [],
+  da_huy: [],
+};
+
+const CANCELLABLE_STATUSES = new Set(["cho_xac_nhan", "da_xac_nhan", "dang_xu_ly_in", "cho_giao", "dang_giao"]);
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("vi-VN", {
@@ -414,15 +424,6 @@ function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
                 Danh sách đầy đủ để nhân viên kho nhặt hàng và đóng gói chính xác.
               </p>
             </div>
-            {order.daXuatThongSoIn ? (
-              <Tag color="green" className="m-0">
-                Đã xuất thông số in
-              </Tag>
-            ) : (
-              <Tag color="gold" className="m-0">
-                Chưa xuất thông số in
-              </Tag>
-            )}
           </div>
 
           <OrderItemsTable order={order} />
@@ -504,6 +505,7 @@ export default function OrderDetailRouteClient() {
   const params = useParams<{ id: string }>();
   const orderId = Number(params.id);
   const [messageApi, messageContextHolder] = message.useMessage();
+  const [modal, modalContextHolder] = Modal.useModal();
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [newStatus, setNewStatus] = useState("");
   const [shippingCarrier, setShippingCarrier] = useState<string | undefined>(undefined);
@@ -584,6 +586,7 @@ export default function OrderDetailRouteClient() {
   return (
     <div>
       {messageContextHolder}
+      {modalContextHolder}
       <section className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
         <div>
           <Button
@@ -606,7 +609,7 @@ export default function OrderDetailRouteClient() {
                 title={
                   canCancelOrder
                     ? "Hủy đơn hàng"
-                    : "Chỉ có thể hủy đơn đang chờ xác nhận hoặc đã xác nhận"
+                    : "Không thể hủy khi đơn đã hoàn tất"
                 }
               >
                 <Button
@@ -674,11 +677,32 @@ export default function OrderDetailRouteClient() {
               return;
             }
           }
-          if (newStatus) {
+
+          const performUpdate = () => {
             updateStatusMutation.mutate({
               trangThai: newStatus,
               shippingCarrier: newStatus === "dang_giao" ? shippingCarrier : undefined,
               trackingCode: newStatus === "dang_giao" ? trackingCode : undefined,
+            });
+          };
+
+          if (newStatus) {
+            const statusLabel = ORDER_STATUS_OPTIONS.find((s) => s.value === newStatus)?.label || "";
+            let confirmContent = "Hệ thống không cho phép lùi trạng thái sau khi đã cập nhật. Bạn có chắc chắn muốn chuyển sang trạng thái này?";
+            
+            if (newStatus === "dang_giao") {
+              confirmContent = "Hệ thống không cho phép lùi trạng thái sau khi đã cập nhật. Bạn có chắc chắn đơn hàng này đã được bàn giao cho đơn vị vận chuyển?";
+            } else if (newStatus === "hoan_tat") {
+              confirmContent = "Hệ thống không cho phép lùi trạng thái sau khi đã cập nhật. Bạn có chắc chắn khách hàng đã nhận được hàng và thanh toán đủ?";
+            }
+
+            modal.confirm({
+              title: `Xác nhận chuyển sang "${statusLabel}"?`,
+              content: confirmContent,
+              okText: "Đồng ý",
+              cancelText: "Hủy",
+              okButtonProps: { danger: true, type: "primary" },
+              onOk: performUpdate,
             });
           }
         }}
@@ -691,7 +715,7 @@ export default function OrderDetailRouteClient() {
           placeholder="Chọn trạng thái"
           className="w-full"
           options={ORDER_STATUS_OPTIONS.filter(
-            (status) => status.value !== order?.trangThai
+            (status) => order?.trangThai && ALLOWED_NEXT_STATUS[order.trangThai]?.includes(status.value)
           )}
           onChange={setNewStatus}
         />
@@ -750,16 +774,18 @@ export default function OrderDetailRouteClient() {
         }}
       >
         <p className="mb-2 text-sm font-semibold text-text-main">Lý do hủy</p>
-        <Input.TextArea
-          value={cancelReason}
-          rows={4}
-          maxLength={500}
-          showCount
-          placeholder="Ví dụ: Khách hàng yêu cầu hủy đơn..."
-          onChange={(event) => setCancelReason(event.target.value)}
-        />
+        <div className="pb-6">
+          <Input.TextArea
+            value={cancelReason}
+            rows={4}
+            maxLength={500}
+            showCount
+            placeholder="Ví dụ: Khách hàng yêu cầu hủy đơn..."
+            onChange={(event) => setCancelReason(event.target.value)}
+          />
+        </div>
         {trimmedCancelReason.length > 0 && trimmedCancelReason.length < 5 ? (
-          <p className="mt-2 text-xs font-semibold text-red-600">
+          <p className="mt-0 text-xs font-semibold text-red-600">
             Lý do hủy cần ít nhất 5 ký tự.
           </p>
         ) : null}

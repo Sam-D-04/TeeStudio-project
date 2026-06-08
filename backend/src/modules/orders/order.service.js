@@ -464,15 +464,7 @@ async function layDanhSachDonHang({
         SELECT 1
         FROM OrderItem oiCustom
         WHERE oiCustom.orderId = co.id AND oiCustom.designId IS NOT NULL
-      ) AS coThietKe,
-      EXISTS (
-        SELECT 1
-        FROM OrderItem oiSpec
-        LEFT JOIN OrderProduction opSpec ON opSpec.orderItemId = oiSpec.id
-        WHERE oiSpec.orderId = co.id
-          AND (oiSpec.productionStatus IN ('PRINTING', 'PRINTED')
-               OR opSpec.status IN ('PRINTING', 'PRINTED'))
-      ) AS daXuatThongSoIn
+      ) AS coThietKe
     FROM CustomerOrder co
     JOIN Account a ON a.id = co.userId
     LEFT JOIN Payment p ON p.orderId = co.id
@@ -518,7 +510,6 @@ async function layDanhSachDonHang({
         daThanh: daThanh,
       },
       trangThai: MAP_TRANG_THAI_DB_SANG_FE[row.status] || "cho_xac_nhan",
-      daXuatThongSoIn: Boolean(row.daXuatThongSoIn),
     };
   });
 
@@ -844,11 +835,10 @@ async function huyDonHang(id, lyDo, actor) {
 
   const donHienTai = rows[0];
 
-  // Chỉ hủy được khi đơn đang ở PENDING hoặc CONFIRMED
-  const coTheHuy = ["PENDING", "CONFIRMED"].includes(donHienTai.status);
-  if (!coTheHuy) {
+  const khongTheHuy = ["COMPLETED", "CANCELLED"].includes(donHienTai.status);
+  if (khongTheHuy) {
     const err = new Error(
-      "Chỉ có thể hủy đơn hàng đang ở trạng thái Chờ xác nhận hoặc Đã xác nhận"
+      "Không thể hủy đơn hàng khi đã hoàn tất hoặc đã hủy"
     );
     err.statusCode = 400;
     throw err;
