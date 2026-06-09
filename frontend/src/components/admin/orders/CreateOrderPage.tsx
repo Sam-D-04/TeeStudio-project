@@ -43,10 +43,12 @@ type CreateOrderFormValues = {
   phone?: string;
   addressLine?: string;
   items?: Array<{
+    productType?: ProductLineType;
     productId?: number;
     variantId?: number;
     quantity?: number;
     designId?: number;
+    color?: string;
   }>;
   paymentMethod?: TaoMoiDonHangInput["paymentMethod"];
   paymentType?: TaoMoiDonHangInput["paymentType"];
@@ -54,7 +56,10 @@ type CreateOrderFormValues = {
   promotionId?: number;
 };
 
+type ProductLineType = "STANDARD" | "CUSTOM";
+
 type OrderPreviewLine = {
+  productType: ProductLineType;
   product?: SanPhamTimKiem;
   variant?: BienTheSanPham;
   quantity: number;
@@ -80,7 +85,7 @@ type OrderPreview = {
 };
 
 const initialValues: CreateOrderFormValues = {
-  items: [{ quantity: 1 }],
+  items: [{ productType: "STANDARD", quantity: 1 }],
   paymentMethod: "COD",
   paymentType: "FULL",
   shippingFee: 0,
@@ -145,6 +150,12 @@ function normalizeComparableText(value?: string | null) {
   return String(value || "").trim().toLowerCase();
 }
 
+function getItemProductType(
+  item?: NonNullable<CreateOrderFormValues["items"]>[number] | null
+): ProductLineType {
+  return item?.productType === "CUSTOM" ? "CUSTOM" : "STANDARD";
+}
+
 function getDesignColor(design?: ThietKe, product?: SanPhamTimKiem) {
   if (!design) return "";
 
@@ -163,6 +174,26 @@ function getDesignSizeOptions(
 
   return product.bienThe.filter(
     (variant) => normalizeComparableText(variant.mau) === lockedColor
+  );
+}
+
+function getProductColorOptions(product: SanPhamTimKiem | undefined) {
+  if (!product) return [];
+
+  return Array.from(
+    new Set(product.bienThe.map((variant) => variant.mau).filter(Boolean))
+  );
+}
+
+function getStandardSizeOptions(
+  product: SanPhamTimKiem | undefined,
+  color?: string
+) {
+  if (!product || !color) return [];
+
+  const selectedColor = normalizeComparableText(color);
+  return product.bienThe.filter(
+    (variant) => normalizeComparableText(variant.mau) === selectedColor
   );
 }
 
@@ -267,10 +298,14 @@ function buildPreview(
 ): OrderPreview {
   const lines =
     values.items?.map((item) => {
+      const productType = getItemProductType(item);
       const quantity = Math.max(1, Number(item?.quantity) || 1);
       const product = item?.productId ? productById[item.productId] : undefined;
       const variant = product?.bienThe.find((v) => v.id === item?.variantId);
-      const design = item?.designId ? designById[item.designId] : undefined;
+      const design =
+        productType === "CUSTOM" && item?.designId
+          ? designById[item.designId]
+          : undefined;
       const { unitPrice, discountPercent, bulkMinQty } = tinhDonGiaPreview(
         product,
         quantity
@@ -279,6 +314,7 @@ function buildPreview(
       const designFee = design?.phiThietKe ?? 0;
 
       return {
+        productType,
         product,
         variant,
         quantity,
@@ -450,6 +486,7 @@ function DesignPicker({
         label="Thiết kế POD"
         name={[rowIndex, "designId"]}
         className="mb-0"
+        rules={[{ required: true, message: "Vui lòng chọn thiết kế POD" }]}
       >
         <Select
           allowClear
@@ -517,7 +554,9 @@ function ProductItemRow({
   isLoadingDesigns,
   previewLine,
   onProductSearch,
+  onProductTypeChange,
   onProductChange,
+  onColorChange,
   onVariantChange,
   onDesignSearch,
   onDesignChange,
@@ -532,18 +571,31 @@ function ProductItemRow({
   isLoadingDesigns: boolean;
   previewLine?: OrderPreviewLine;
   onProductSearch: (value: string) => void;
+  onProductTypeChange: (rowIndex: number, productType: ProductLineType) => void;
   onProductChange: (rowIndex: number, productId?: number) => void;
+  onColorChange: (rowIndex: number, color?: string) => void;
   onVariantChange: (rowIndex: number) => void;
   onDesignSearch: (value: string) => void;
   onDesignChange: (rowIndex: number, designId?: number) => void;
   onRemove: () => void;
 }) {
+  const currentItem = Form.useWatch(["items", fieldName]) as
+    | NonNullable<CreateOrderFormValues["items"]>[number]
+    | undefined;
+  const productType = getItemProductType(currentItem);
+  const isCustomProduct = productType === "CUSTOM";
   const product = previewLine?.product;
   const variant = previewLine?.variant;
   const selectedDesign = previewLine?.design;
   const selectedProductId = product?.id;
-  const availableSizeVariants = getDesignSizeOptions(product, selectedDesign);
   const lockedColor = getDesignColor(selectedDesign, product);
+  const selectedColor = isCustomProduct
+    ? lockedColor
+    : currentItem?.color || variant?.mau || "";
+  const availableSizeVariants = isCustomProduct
+    ? getDesignSizeOptions(product, selectedDesign)
+    : getStandardSizeOptions(product, selectedColor);
+  const colorOptions = getProductColorOptions(product);
 
   return (
     <div className="rounded-xl border border-border bg-surface-alt p-4">
@@ -553,7 +605,7 @@ function ProductItemRow({
             Sản phẩm #{fieldName + 1}
           </h4>
           <p className="mt-1 text-xs text-text-secondary">
-            Chọn thiết kế trước; hệ thống tự khóa phôi áo và màu theo bản đã duyệt.
+            Chọn loại mua cho từng dòng; áo mẫu tự chọn phôi, áo POD khóa phôi và màu theo thiết kế.
           </p>
         </div>
 
@@ -570,14 +622,35 @@ function ProductItemRow({
         ) : null}
       </div>
 
-      <DesignPicker
-        rowIndex={fieldName}
-        userId={userId}
-        designs={designs}
-        isLoadingDesigns={isLoadingDesigns}
-        onDesignSearch={onDesignSearch}
-        onDesignChange={onDesignChange}
-      />
+      <Form.Item
+        label="Loại sản phẩm"
+        name={[fieldName, "productType"]}
+        rules={[{ required: true, message: "Vui lòng chọn loại sản phẩm" }]}
+      >
+        <Radio.Group
+          optionType="button"
+          buttonStyle="solid"
+          onChange={(event) =>
+            onProductTypeChange(fieldName, event.target.value as ProductLineType)
+          }
+        >
+          <Radio.Button value="STANDARD">Áo mẫu / phôi trơn</Radio.Button>
+          <Radio.Button value="CUSTOM">Áo in POD</Radio.Button>
+        </Radio.Group>
+      </Form.Item>
+
+      {isCustomProduct ? (
+        <div className="rounded-lg border border-primary-container/25 bg-sky-50 p-3">
+          <DesignPicker
+            rowIndex={fieldName}
+            userId={userId}
+            designs={designs}
+            isLoadingDesigns={isLoadingDesigns}
+            onDesignSearch={onDesignSearch}
+            onDesignChange={onDesignChange}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.8fr_0.8fr_150px]">
         <Form.Item
@@ -586,13 +659,18 @@ function ProductItemRow({
           rules={[{ required: true, message: "Vui lòng chọn sản phẩm" }]}
         >
           <Select
+            allowClear={!isCustomProduct}
             showSearch
-            disabled
+            disabled={isCustomProduct}
             filterOption={false}
             loading={isSearchingProducts}
             onSearch={onProductSearch}
             onChange={(value) => onProductChange(fieldName, value)}
-            placeholder="Sẽ tự điền sau khi chọn thiết kế"
+            placeholder={
+              isCustomProduct
+                ? "Tự động điền sau khi chọn thiết kế"
+                : "Tìm áo mẫu hoặc phôi trơn"
+            }
             suffixIcon={<SearchOutlined />}
             options={productOptions.map((item) => ({
               value: item.id,
@@ -624,13 +702,34 @@ function ProductItemRow({
           />
         </Form.Item>
 
-        <Form.Item label="Màu">
-          <Input
-            disabled
-            value={lockedColor}
-            placeholder="Tự điền theo thiết kế"
-          />
-        </Form.Item>
+        {isCustomProduct ? (
+          <Form.Item label="Màu">
+            <Input
+              disabled
+              value={lockedColor}
+              placeholder="Tự điền theo thiết kế"
+            />
+          </Form.Item>
+        ) : (
+          <Form.Item
+            label="Màu"
+            name={[fieldName, "color"]}
+            rules={[{ required: true, message: "Vui lòng chọn màu" }]}
+          >
+            <Select
+              disabled={!selectedProductId}
+              placeholder={
+                selectedProductId ? "Chọn màu" : "Chọn sản phẩm trước"
+              }
+              onChange={(value) => onColorChange(fieldName, value)}
+              options={colorOptions.map((color) => ({
+                value: color,
+                label: color,
+              }))}
+              notFoundContent="Sản phẩm chưa có màu"
+            />
+          </Form.Item>
+        )}
 
         <Form.Item
           label="Size"
@@ -638,9 +737,19 @@ function ProductItemRow({
           rules={[{ required: true, message: "Vui lòng chọn size" }]}
         >
           <Select
-            disabled={!selectedDesign || !selectedProductId}
+            disabled={
+              isCustomProduct
+                ? !selectedDesign || !selectedProductId
+                : !selectedProductId || !selectedColor
+            }
             placeholder={
-              selectedDesign ? "Chọn size" : "Chọn thiết kế trước"
+              isCustomProduct
+                ? selectedDesign
+                  ? "Chọn size"
+                  : "Chọn thiết kế trước"
+                : selectedColor
+                  ? "Chọn size"
+                  : "Chọn màu trước"
             }
             onChange={() => onVariantChange(fieldName)}
             options={availableSizeVariants.map((item) => ({
@@ -715,7 +824,9 @@ function ProductsSection({
   isLoadingDesigns,
   preview,
   onProductSearch,
+  onProductTypeChange,
   onProductChange,
+  onColorChange,
   onVariantChange,
   onDesignSearch,
   onDesignChange,
@@ -727,7 +838,9 @@ function ProductsSection({
   isLoadingDesigns: boolean;
   preview: OrderPreview;
   onProductSearch: (value: string) => void;
+  onProductTypeChange: (rowIndex: number, productType: ProductLineType) => void;
   onProductChange: (rowIndex: number, productId?: number) => void;
+  onColorChange: (rowIndex: number, color?: string) => void;
   onVariantChange: (rowIndex: number) => void;
   onDesignSearch: (value: string) => void;
   onDesignChange: (rowIndex: number, designId?: number) => void;
@@ -735,7 +848,7 @@ function ProductsSection({
   return (
     <SectionPanel
       title="2. Chọn sản phẩm & thiết kế POD"
-      description="Ưu tiên chọn bản thiết kế đã duyệt. Phôi áo và màu sẽ tự điền, bị khóa chỉnh sửa; admin chỉ chọn size và số lượng."
+      description="Mỗi dòng có loại mua riêng: áo mẫu tự chọn phôi, màu, size; áo POD chọn thiết kế rồi khóa phôi và màu theo bản đã duyệt."
     >
       <Form.List
         name="items"
@@ -766,7 +879,9 @@ function ProductsSection({
                         isLoadingDesigns={isLoadingDesigns}
                         previewLine={preview.lines[field.name]}
                         onProductSearch={onProductSearch}
+                        onProductTypeChange={onProductTypeChange}
                         onProductChange={onProductChange}
+                        onColorChange={onColorChange}
                         onVariantChange={onVariantChange}
                         onDesignSearch={onDesignSearch}
                         onDesignChange={onDesignChange}
@@ -784,20 +899,7 @@ function ProductsSection({
               type="dashed"
               icon={<PlusOutlined />}
               onClick={() => {
-                const sourceLine = [...preview.lines]
-                  .reverse()
-                  .find((line) => line.design && line.product);
-
-                add(
-                  sourceLine?.design && sourceLine.product
-                    ? {
-                        productId: sourceLine.product.id,
-                        designId: sourceLine.design.id,
-                        variantId: undefined,
-                        quantity: 1,
-                      }
-                    : { quantity: 1 }
-                );
+                add({ productType: "STANDARD", quantity: 1 });
               }}
               className="h-10 w-full rounded-[10px] font-semibold"
             >
@@ -1224,7 +1326,9 @@ export default function CreateOrderPage() {
     [designById, productById, promotions, values]
   );
 
-  const hasCustomDesign = preview.lines.some((line) => Boolean(line.design));
+  const hasCustomDesign = preview.lines.some(
+    (line) => line.productType === "CUSTOM"
+  );
 
   useEffect(() => {
     const newValues: Partial<CreateOrderFormValues> = {};
@@ -1329,15 +1433,49 @@ export default function CreateOrderPage() {
       recipientName: undefined,
       phone: undefined,
       addressLine: undefined,
-      items: currentItems.map((item) => ({
-        ...item,
-        productId: undefined,
-        variantId: undefined,
-        designId: undefined,
-      })),
+      items: currentItems.map((item) => {
+        const productType = getItemProductType(item);
+
+        if (productType === "STANDARD") {
+          return {
+            ...item,
+            productType,
+            quantity: item.quantity ?? 1,
+          };
+        }
+
+        return {
+          productType,
+          productId: undefined,
+          variantId: undefined,
+          designId: undefined,
+          color: undefined,
+          quantity: item.quantity ?? 1,
+        };
+      }),
     });
     setDesignKeyword("");
     setSelectedDesignById({});
+  }
+
+  function handleProductTypeChange(
+    rowIndex: number,
+    productType: ProductLineType
+  ) {
+    const currentItem =
+      (form.getFieldValue(["items", rowIndex]) as NonNullable<
+        CreateOrderFormValues["items"]
+      >[number]) ?? {};
+
+    form.setFieldValue(["items", rowIndex], {
+      ...currentItem,
+      productType,
+      productId: undefined,
+      variantId: undefined,
+      designId: undefined,
+      color: undefined,
+      quantity: currentItem.quantity ?? 1,
+    });
   }
 
   function handleDesignChange(rowIndex: number, designId?: number) {
@@ -1350,9 +1488,11 @@ export default function CreateOrderPage() {
     if (!selectedDesign) {
       form.setFieldValue(["items", rowIndex], {
         ...currentItem,
+        productType: "CUSTOM",
         productId: undefined,
         variantId: undefined,
         designId: undefined,
+        color: undefined,
         quantity: currentItem.quantity ?? 1,
       });
       return;
@@ -1373,15 +1513,23 @@ export default function CreateOrderPage() {
 
     form.setFieldValue(["items", rowIndex], {
       ...currentItem,
+      productType: "CUSTOM",
       productId: syncedDesign.productId,
       variantId: undefined,
       designId: syncedDesign.id,
+      color: undefined,
       quantity: currentItem.quantity ?? 1,
     });
   }
 
   function handleProductChange(rowIndex: number, productId?: number) {
-    const selectedProduct = foundProducts.find((product) => product.id === productId);
+    const currentItem =
+      (form.getFieldValue(["items", rowIndex]) as NonNullable<
+        CreateOrderFormValues["items"]
+      >[number]) ?? {};
+    const selectedProduct =
+      (productId ? productById[productId] : undefined) ??
+      foundProducts.find((product) => product.id === productId);
 
     if (selectedProduct) {
       setSelectedProductById((current) => ({
@@ -1390,16 +1538,33 @@ export default function CreateOrderPage() {
       }));
     }
 
-    form.setFieldValue(["items", rowIndex, "variantId"], undefined);
-    form.setFieldValue(["items", rowIndex, "designId"], undefined);
-    form.setFieldValue(
-      ["items", rowIndex, "quantity"],
-      form.getFieldValue(["items", rowIndex, "quantity"]) ?? 1
-    );
+    form.setFieldValue(["items", rowIndex], {
+      ...currentItem,
+      productType: getItemProductType(currentItem),
+      productId,
+      variantId: undefined,
+      designId: undefined,
+      color: undefined,
+      quantity: currentItem.quantity ?? 1,
+    });
+  }
+
+  function handleColorChange(rowIndex: number, color?: string) {
+    const currentItem =
+      (form.getFieldValue(["items", rowIndex]) as NonNullable<
+        CreateOrderFormValues["items"]
+      >[number]) ?? {};
+
+    form.setFieldValue(["items", rowIndex], {
+      ...currentItem,
+      color,
+      variantId: undefined,
+      quantity: currentItem.quantity ?? 1,
+    });
   }
 
   function handleVariantChange() {
-    // Size được chọn trong cùng phôi/màu đã khóa theo thiết kế, không reset thiết kế.
+    // Chọn size không làm thay đổi phôi, màu hoặc thiết kế đã chọn của dòng hiện tại.
   }
 
   function buildPayload(valuesToSubmit: CreateOrderFormValues): TaoMoiDonHangInput {
@@ -1408,11 +1573,18 @@ export default function CreateOrderPage() {
       recipientName: valuesToSubmit.recipientName || "",
       phone: valuesToSubmit.phone || "",
       addressLine: valuesToSubmit.addressLine || "",
-      items: (valuesToSubmit.items ?? []).map((item) => ({
-        variantId: Number(item.variantId),
-        quantity: Number(item.quantity),
-        designId: item.designId ? Number(item.designId) : null,
-      })),
+      items: (valuesToSubmit.items ?? []).map((item) => {
+        const productType = getItemProductType(item);
+
+        return {
+          variantId: Number(item.variantId),
+          quantity: Number(item.quantity),
+          designId:
+            productType === "CUSTOM" && item.designId
+              ? Number(item.designId)
+              : null,
+        };
+      }),
       paymentMethod: valuesToSubmit.paymentMethod ?? "COD",
       paymentType: valuesToSubmit.paymentType ?? "FULL",
       shippingFee: Math.max(0, Number(valuesToSubmit.shippingFee) || 0),
@@ -1518,7 +1690,9 @@ export default function CreateOrderPage() {
               isLoadingDesigns={isLoadingDesigns}
               preview={preview}
               onProductSearch={setProductKeyword}
+              onProductTypeChange={handleProductTypeChange}
               onProductChange={handleProductChange}
+              onColorChange={handleColorChange}
               onVariantChange={handleVariantChange}
               onDesignSearch={setDesignKeyword}
               onDesignChange={handleDesignChange}
