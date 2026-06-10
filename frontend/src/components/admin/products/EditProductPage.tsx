@@ -1,25 +1,25 @@
 "use client";
 
 /**
- * EditProductDrawer – Drawer (slide từ phải) để chỉnh sửa phôi áo.
+ * EditProductPage – Trang xem và chỉnh sửa phôi áo.
  *
- * Cấu trúc 2 tab:
- *   Tab "Thông tin cơ bản" – sửa tên, danh mục, giá, chất liệu, form dáng, xuất xứ, mô tả,
+ * Cấu trúc 2 mục:
+ *   Mục "Thông tin cơ bản" – sửa tên, danh mục, giá, chất liệu, kiểu dáng, xuất xứ, mô tả,
  *                            bật/tắt hiển thị trên cửa hàng.
- *   Tab "Quản lý biến thể" – xem toàn bộ biến thể hiện có, sửa tồn kho / SKU / màu / size
+ *   Mục "Quản lý biến thể" – xem toàn bộ biến thể hiện có, sửa tồn kho / SKU / màu / kích thước
  *                            từng biến thể, thêm biến thể mới.
  *
  * Luồng API:
- *   - Mở drawer → GET /api/admin/products/:id  (layChiTietSanPham)
- *   - Lưu tab 1 → PUT /api/admin/products/:id  (capNhatSanPham)
+ *   - Mở trang → GET /api/admin/products/:id  (layChiTietSanPham)
+ *   - Lưu thông tin → PUT /api/admin/products/:id  (capNhatSanPham)
  *   - Bật/tắt   → PATCH /api/admin/products/:id/status
  *   - Sửa biến thể → PUT /api/admin/products/:id/variants/:variantId
  *   - Thêm biến thể mới → POST /api/admin/products/:id/variants
  */
 
 import {
+  ArrowLeftOutlined,
   CheckOutlined,
-  CloseOutlined,
   DeleteOutlined,
   EditOutlined,
   EyeInvisibleOutlined,
@@ -28,11 +28,11 @@ import {
   SaveOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import * as productService from "@/services/admin/productService";
 import type {
   BienTheSanPham,
-  SanPham,
   TrangThaiHienThi,
 } from "@/services/admin/productService";
 
@@ -42,7 +42,7 @@ import type {
 
 type TabHienTai = "thong_tin" | "bien_the";
 
-/** State form thông tin cơ bản (Tab 1) */
+/** Trạng thái biểu mẫu thông tin cơ bản */
 type FormThongTin = {
   tenSanPham: string;
   danhMucId: string;
@@ -73,13 +73,9 @@ type HangBienTheMoi = {
   tonKho: string;
 };
 
-type EditProductDrawerProps = {
-  /** Phôi áo đang được chọn để chỉnh sửa (null = đóng drawer) */
-  sanPham: SanPham | null;
-  /** Hàm đóng drawer */
-  onDong: () => void;
-  /** Callback sau khi lưu thành công bất kỳ thay đổi nào */
-  onThanhCong?: () => void;
+type EditProductPageProps = {
+  /** Mã phôi áo lấy từ URL */
+  productId: number;
 };
 
 // =====================================================================
@@ -94,7 +90,7 @@ const DS_MAU_PHO_BIEN: { ten: string; hex: string }[] = [
   { ten: "Trắng sữa", hex: "#f8f5f0" },
   { ten: "Xám", hex: "#6b7280" },
   { ten: "Xám nhạt", hex: "#d1d5db" },
-  { ten: "Navy", hex: "#1e3a8a" },
+  { ten: "Xanh hải quân", hex: "#1e3a8a" },
   { ten: "Xanh dương", hex: "#2563eb" },
   { ten: "Xanh lá", hex: "#16a34a" },
   { ten: "Đỏ", hex: "#dc2626" },
@@ -142,7 +138,7 @@ function validateThongTin(f: FormThongTin): Partial<Record<keyof FormThongTin, s
   else if (isNaN(Number(f.giaNen)) || Number(f.giaNen) < 0)
     e.giaNen = "Giá nền phải là số không âm";
   if (!f.chatLieu.trim()) e.chatLieu = "Vui lòng nhập chất liệu";
-  if (!f.formDang.trim()) e.formDang = "Vui lòng nhập form dáng";
+  if (!f.formDang.trim()) e.formDang = "Vui lòng nhập kiểu dáng";
   if (!f.xuatXu.trim()) e.xuatXu = "Vui lòng nhập xuất xứ";
   if (!f.moTa.trim()) e.moTa = "Vui lòng nhập mô tả";
   else if (f.moTa.trim().length < 10) e.moTa = "Mô tả phải có ít nhất 10 ký tự";
@@ -201,19 +197,15 @@ function BadgeTonKho({ status }: { status: string }) {
 // =====================================================================
 // COMPONENT CHÍNH
 // =====================================================================
-export default function EditProductDrawer({
-  sanPham,
-  onDong,
-  onThanhCong,
-}: EditProductDrawerProps) {
+export default function EditProductPage({ productId }: EditProductPageProps) {
+  const router = useRouter();
   const queryClient = useQueryClient();
-  const dangMo = sanPham !== null;
-  const drawerRef = useRef<HTMLDivElement>(null);
+  const productIdHopLe = Number.isFinite(productId) && productId > 0;
 
-  // ===== TAB STATE =====
+  // ===== MỤC ĐANG HIỂN THỊ =====
   const [tabHienTai, setTabHienTai] = useState<TabHienTai>("thong_tin");
 
-  // ===== TOAST THÔNG BÁO =====
+  // ===== THÔNG BÁO =====
   const [thongBao, setThongBao] = useState<{
     loai: "thanh_cong" | "loi";
     noi_dung: string;
@@ -224,7 +216,7 @@ export default function EditProductDrawer({
     setTimeout(() => setThongBao(null), 3500);
   }
 
-  // ===== TAB 1: FORM THÔNG TIN CƠ BẢN =====
+  // ===== BIỂU MẪU THÔNG TIN CƠ BẢN =====
   const [formThongTin, setFormThongTin] = useState<FormThongTin>({
     tenSanPham: "",
     danhMucId: "",
@@ -239,7 +231,7 @@ export default function EditProductDrawer({
   >({});
   const [trangThaiHienThi, setTrangThaiHienThi] = useState<TrangThaiHienThi>("dang_hien_thi");
 
-  // ===== TAB 2: BIẾN THỂ HIỆN CÓ + BIẾN THỂ MỚI =====
+  // ===== BIẾN THỂ HIỆN CÓ + BIẾN THỂ MỚI =====
   const [dsBienTheEdit, setDsBienTheEdit] = useState<BienTheEdit[]>([]);
   const [dsBienTheMoi, setDsBienTheMoi] = useState<HangBienTheMoi[]>([]);
   const [loiBienThe, setLoiBienThe] = useState<string>("");
@@ -259,9 +251,9 @@ export default function EditProductDrawer({
     isLoading: dangTaiChiTiet,
     isError: loiTaiChiTiet,
   } = useQuery({
-    queryKey: ["products", "detail", sanPham?.id],
-    queryFn: () => productService.layChiTietSanPham(sanPham!.id),
-    enabled: sanPham !== null,
+    queryKey: ["products", "detail", productId],
+    queryFn: () => productService.layChiTietSanPham(productId),
+    enabled: productIdHopLe,
     staleTime: 0,
   });
 
@@ -274,6 +266,8 @@ export default function EditProductDrawer({
       ? String(chiTiet.categoryId)
       : String(danhSachDanhMuc.find((dm) => dm.ten === chiTiet.category)?.id ?? "");
 
+    // Dữ liệu truy vấn là nguồn khởi tạo cho toàn bộ biểu mẫu chỉnh sửa.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormThongTin({
       tenSanPham: chiTiet.name,
       danhMucId: catId,
@@ -301,41 +295,14 @@ export default function EditProductDrawer({
     setLoiBienThe("");
   }, [chiTiet, danhSachDanhMuc]);
 
-  // ===== RESET KHI ĐÓNG =====
-  function dongVaReset() {
-    onDong();
-    setTimeout(() => {
-      setTabHienTai("thong_tin");
-      setLoiThongTin({});
-      setLoiBienThe("");
-      setThongBao(null);
-      setKeyDangChonMau(null);
-      setKeyMoiDangChonMau(null);
-    }, 350);
-  }
-
-  // ===== ESC ĐỂ ĐÓNG =====
-  useEffect(() => {
-    function xuLyEsc(e: KeyboardEvent) {
-      if (e.key === "Escape" && dangMo) dongVaReset();
-    }
-    window.addEventListener("keydown", xuLyEsc);
-    return () => window.removeEventListener("keydown", xuLyEsc);
-  }, [dangMo]);
-
-  // ===== FOCUS KHI MỞ =====
-  useEffect(() => {
-    if (dangMo) setTimeout(() => drawerRef.current?.focus(), 50);
-  }, [dangMo]);
-
   // =====================================================================
-  // MUTATIONS – TAB 1
+  // THAO TÁC CẬP NHẬT THÔNG TIN
   // =====================================================================
 
   /** Cập nhật thông tin cơ bản */
   const { mutate: luuThongTin, isPending: dangLuuThongTin } = useMutation({
     mutationFn: () =>
-      productService.capNhatSanPham(sanPham!.id, {
+      productService.capNhatSanPham(productId, {
         categoryId: Number(formThongTin.danhMucId),
         name: formThongTin.tenSanPham.trim(),
         basePrice: Number(formThongTin.giaNen),
@@ -346,7 +313,6 @@ export default function EditProductDrawer({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      if (onThanhCong) onThanhCong();
       hienThiThongBao("thanh_cong", "Đã cập nhật thông tin phôi áo thành công!");
     },
     onError: (err: unknown) => {
@@ -358,11 +324,10 @@ export default function EditProductDrawer({
   /** Bật / tắt hiển thị */
   const { mutate: doiTrangThai, isPending: dangDoiTrangThai } = useMutation({
     mutationFn: (trangThai: TrangThaiHienThi) =>
-      productService.capNhatTrangThaiSanPham(sanPham!.id, trangThai),
+      productService.capNhatTrangThaiSanPham(productId, trangThai),
     onSuccess: (data) => {
       setTrangThaiHienThi(data.trangThai);
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      if (onThanhCong) onThanhCong();
       hienThiThongBao(
         "thanh_cong",
         data.trangThai === "dang_hien_thi"
@@ -397,7 +362,7 @@ export default function EditProductDrawer({
   }
 
   // =====================================================================
-  // MUTATIONS – TAB 2: BIẾN THỂ HIỆN CÓ
+  // THAO TÁC CẬP NHẬT BIẾN THỂ HIỆN CÓ
   // =====================================================================
 
   const { mutate: luuBienTheHienCo, isPending: dangLuuBienThe } = useMutation({
@@ -407,7 +372,7 @@ export default function EditProductDrawer({
     }: {
       variantId: number;
       payload: productService.CapNhatBienTheInput;
-    }) => productService.capNhatBienThe(sanPham!.id, variantId, payload),
+    }) => productService.capNhatBienThe(productId, variantId, payload),
     onSuccess: (data, { variantId }) => {
       // Cập nhật lại state local ngay lập tức
       setDsBienTheEdit((prev) =>
@@ -426,7 +391,6 @@ export default function EditProductDrawer({
         )
       );
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      if (onThanhCong) onThanhCong();
       hienThiThongBao("thanh_cong", "Đã cập nhật biến thể thành công!");
     },
     onError: (err: unknown) => {
@@ -436,13 +400,13 @@ export default function EditProductDrawer({
   });
 
   // =====================================================================
-  // MUTATIONS – TAB 2: THÊM BIẾN THỂ MỚI
+  // THAO TÁC THÊM BIẾN THỂ MỚI
   // =====================================================================
 
   const { mutate: themBienTheMoi, isPending: dangThemBienThe } = useMutation({
     mutationFn: async (danhSach: HangBienTheMoi[]) => {
       for (const bt of danhSach) {
-        await productService.themBienThe(sanPham!.id, {
+        await productService.themBienThe(productId, {
           color: bt.mauSac.trim(),
           size: bt.kichThuoc.trim(),
           sku: bt.maSKU.trim(),
@@ -453,9 +417,8 @@ export default function EditProductDrawer({
     onSuccess: () => {
       setDsBienTheMoi([]);
       // Reload chi tiết để lấy danh sách biến thể mới nhất
-      queryClient.invalidateQueries({ queryKey: ["products", "detail", sanPham?.id] });
+      queryClient.invalidateQueries({ queryKey: ["products", "detail", productId] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      if (onThanhCong) onThanhCong();
       hienThiThongBao("thanh_cong", "Đã thêm biến thể mới thành công!");
     },
     onError: (err: unknown) => {
@@ -581,7 +544,7 @@ export default function EditProductDrawer({
   }
 
   // =====================================================================
-  // RENDER HELPERS
+  // HỖ TRỢ HIỂN THỊ
   // =====================================================================
   const inputClass =
     "h-9 w-full rounded-[7px] border border-border bg-surface-alt px-3 text-body-md text-text-main outline-none transition-all placeholder:text-text-muted focus:border-primary-container focus:ring-1 focus:ring-primary-container";
@@ -590,61 +553,57 @@ export default function EditProductDrawer({
     "w-full resize-none rounded-[7px] border border-border bg-surface-alt px-3 py-2 text-body-md text-text-main outline-none transition-all placeholder:text-text-muted focus:border-primary-container focus:ring-1 focus:ring-primary-container";
 
   // =====================================================================
-  // RENDER
+  // HIỂN THỊ
   // =====================================================================
   return (
-    <>
-      {/* ===== OVERLAY ===== */}
-      <div
-        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-300 ${
-          dangMo ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
-        onClick={dongVaReset}
-        aria-hidden="true"
-      />
-
-      {/* ===== DRAWER ===== */}
-      <div
-        ref={drawerRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Chỉnh sửa phôi áo"
-        className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-[680px] flex-col bg-surface shadow-2xl outline-none transition-transform duration-300 ease-in-out ${
-          dangMo ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        {/* ──────────────────────────────────────
-            HEADER
-        ────────────────────────────────────── */}
-        <div className="flex shrink-0 items-start justify-between border-b border-border px-6 py-4">
-          <div className="min-w-0 flex-1 pr-4">
-            <div className="flex items-center gap-2">
-              <EditOutlined className="text-[18px] text-primary-container" />
-              <h2 className="truncate text-[18px] font-extrabold text-text-main">
-                Chỉnh sửa phôi áo
-              </h2>
-            </div>
-            {sanPham && (
-              <p className="mt-0.5 truncate text-[13px] text-text-secondary">
-                {sanPham.name}
-              </p>
-            )}
-          </div>
-
-          {/* Nút đóng */}
+    <div className="pb-12">
+      <section className="mb-6 flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-end">
+        <div>
           <button
             type="button"
-            onClick={dongVaReset}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-alt hover:text-text-main"
-            title="Đóng"
+            onClick={() => router.push("/admin/san-pham-phoi-ao")}
+            className="mb-3 flex items-center gap-2 text-[13px] font-semibold text-text-secondary transition-colors hover:text-primary-container"
           >
-            <CloseOutlined className="text-[18px]" />
+            <ArrowLeftOutlined />
+            Danh sách phôi áo
           </button>
+          <div className="flex items-center gap-2">
+            <EditOutlined className="text-[20px] text-primary-container" />
+            <h2 className="font-extrabold text-headline-lg-mobile text-text-main md:text-headline-lg">
+              Xem và sửa phôi áo
+            </h2>
+          </div>
+          <p className="mt-1 max-w-2xl text-body-sm text-text-secondary">
+            {chiTiet?.name ?? "Đang tải thông tin phôi áo..."}
+          </p>
         </div>
 
+        {tabHienTai === "thong_tin" && chiTiet && !dangTaiChiTiet && (
+          <button
+            type="button"
+            onClick={xuLyLuuThongTin}
+            disabled={dangLuuThongTin}
+            className="flex h-10 items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-6 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {dangLuuThongTin ? (
+              <>
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                Đang lưu...
+              </>
+            ) : (
+              <>
+                <SaveOutlined />
+                Lưu thay đổi
+              </>
+            )}
+          </button>
+        )}
+      </section>
+
+      <section className="overflow-hidden rounded-[20px] border border-border bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
+
         {/* ──────────────────────────────────────
-            TOAST THÔNG BÁO
+            THÔNG BÁO
         ────────────────────────────────────── */}
         {thongBao && (
           <div
@@ -664,7 +623,7 @@ export default function EditProductDrawer({
         )}
 
         {/* ──────────────────────────────────────
-            TAB BAR
+            THANH CHUYỂN MỤC
         ────────────────────────────────────── */}
         <div className="flex shrink-0 border-b border-border px-6">
           {(
@@ -692,25 +651,40 @@ export default function EditProductDrawer({
         </div>
 
         {/* ──────────────────────────────────────
-            NỘI DUNG (CÓ SCROLL)
+            NỘI DUNG
         ────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto">
+        <div>
+          {!productIdHopLe && (
+            <div className="flex min-h-48 flex-col items-center justify-center gap-3 p-6 text-center">
+              <p className="text-[14px] font-semibold text-error">
+                Mã phôi áo không hợp lệ.
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push("/admin/san-pham-phoi-ao")}
+                className="rounded-[8px] border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-secondary hover:bg-surface-alt"
+              >
+                Về danh sách phôi áo
+              </button>
+            </div>
+          )}
+
           {/* --- Trạng thái loading --- */}
-          {dangTaiChiTiet && (
+          {productIdHopLe && dangTaiChiTiet && (
             <div className="flex h-48 items-center justify-center text-text-muted">
               <span className="animate-pulse text-[14px]">Đang tải dữ liệu...</span>
             </div>
           )}
 
           {/* --- Trạng thái lỗi --- */}
-          {loiTaiChiTiet && !dangTaiChiTiet && (
+          {productIdHopLe && loiTaiChiTiet && !dangTaiChiTiet && (
             <div className="flex h-48 flex-col items-center justify-center gap-2 text-center text-error">
               <span className="text-[14px]">Không thể tải dữ liệu phôi áo.</span>
               <button
                 type="button"
                 onClick={() =>
                   queryClient.invalidateQueries({
-                    queryKey: ["products", "detail", sanPham?.id],
+                    queryKey: ["products", "detail", productId],
                   })
                 }
                 className="rounded-lg border border-error/30 px-4 py-1.5 text-[13px] hover:bg-error/5"
@@ -720,7 +694,7 @@ export default function EditProductDrawer({
             </div>
           )}
 
-          {/* ===== TAB 1: THÔNG TIN CƠ BẢN ===== */}
+          {/* ===== THÔNG TIN CƠ BẢN ===== */}
           {!dangTaiChiTiet && !loiTaiChiTiet && tabHienTai === "thong_tin" && chiTiet && (
             <div className="space-y-5 p-6">
 
@@ -804,7 +778,7 @@ export default function EditProductDrawer({
                 </FormField>
               </div>
 
-              {/* ── Chất liệu + Form dáng ── */}
+              {/* ── Chất liệu + Kiểu dáng ── */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField label="Chất liệu" required error={loiThongTin.chatLieu}>
                   <input
@@ -817,7 +791,7 @@ export default function EditProductDrawer({
                   />
                 </FormField>
 
-                <FormField label="Form dáng" required error={loiThongTin.formDang}>
+                <FormField label="Kiểu dáng" required error={loiThongTin.formDang}>
                   <input
                     id="edit-form-dang"
                     type="text"
@@ -852,22 +826,22 @@ export default function EditProductDrawer({
                 />
               </FormField>
 
-              {/* ── Slug (chỉ đọc) ── */}
+              {/* ── Đường dẫn tĩnh (chỉ đọc) ── */}
               <div className="flex flex-col gap-1">
                 <label className="text-[13px] font-semibold text-text-secondary">
-                  Slug (URL)
+                  Đường dẫn tĩnh
                 </label>
                 <div className="flex h-9 items-center rounded-[7px] border border-border/50 bg-surface-container px-3 font-mono text-[12px] text-text-muted">
                   {chiTiet.slug}
                 </div>
                 <span className="text-[11px] text-text-muted">
-                  Slug được sinh tự động và không thể thay đổi sau khi tạo.
+                  Đường dẫn tĩnh được sinh tự động và không thể thay đổi sau khi tạo.
                 </span>
               </div>
             </div>
           )}
 
-          {/* ===== TAB 2: BIẾN THỂ ===== */}
+          {/* ===== BIẾN THỂ ===== */}
           {!dangTaiChiTiet && !loiTaiChiTiet && tabHienTai === "bien_the" && chiTiet && (
             <div className="space-y-5 p-6">
 
@@ -1126,7 +1100,7 @@ export default function EditProductDrawer({
                     className="flex w-full items-center justify-center gap-2 rounded-[10px] border-2 border-dashed border-border py-4 text-[13px] font-semibold text-text-muted transition-colors hover:border-primary-container/40 hover:bg-primary-container/5 hover:text-primary-container"
                   >
                     <PlusOutlined />
-                    Nhấn để thêm biến thể màu × size mới
+                    Nhấn để thêm biến thể màu × kích thước mới
                   </button>
                 ) : (
                   <div className="space-y-2">
@@ -1289,18 +1263,16 @@ export default function EditProductDrawer({
           )}
         </div>
 
-        {/* ──────────────────────────────────────
-            FOOTER – Nút hành động Tab 1
-        ────────────────────────────────────── */}
+        {/* Thanh hành động phần thông tin cơ bản */}
         {tabHienTai === "thong_tin" && chiTiet && !dangTaiChiTiet && (
-          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border bg-surface-alt/40 px-6 py-4">
+          <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-border bg-surface/95 px-6 py-4 backdrop-blur-sm">
             <button
               type="button"
-              onClick={dongVaReset}
+              onClick={() => router.push("/admin/san-pham-phoi-ao")}
               disabled={dangLuuThongTin}
               className="flex h-10 items-center gap-2 rounded-[10px] border border-border bg-surface px-5 text-[14px] font-semibold text-text-secondary transition-colors hover:bg-surface-alt disabled:opacity-40"
             >
-              Đóng
+              Về danh sách
             </button>
             <button
               type="button"
@@ -1323,25 +1295,19 @@ export default function EditProductDrawer({
           </div>
         )}
 
-        {/* Footer tab biến thể chỉ hiện nút đóng khi không có biến thể mới */}
+        {/* Thanh hành động phần biến thể khi không có biến thể mới */}
         {tabHienTai === "bien_the" && chiTiet && !dangTaiChiTiet && dsBienTheMoi.length === 0 && (
-          <div className="flex shrink-0 items-center justify-end border-t border-border bg-surface-alt/40 px-6 py-4">
+          <div className="sticky bottom-0 flex items-center justify-end border-t border-border bg-surface/95 px-6 py-4 backdrop-blur-sm">
             <button
               type="button"
-              onClick={dongVaReset}
+              onClick={() => router.push("/admin/san-pham-phoi-ao")}
               className="flex h-10 items-center gap-2 rounded-[10px] border border-border bg-surface px-5 text-[14px] font-semibold text-text-secondary transition-colors hover:bg-surface-alt"
             >
-              Đóng
+              Về danh sách
             </button>
           </div>
         )}
-      </div>
-
-      {/* Animation style */}
-      <style>{`
-        .translate-x-full { transform: translateX(100%); }
-        .translate-x-0    { transform: translateX(0); }
-      `}</style>
-    </>
+      </section>
+    </div>
   );
 }

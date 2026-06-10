@@ -25,7 +25,7 @@ type AdminTopbarProps = {
 
 const quickCreateItems: MenuProps["items"] = [
   { key: "create-b2b-order", icon: <ShoppingCartOutlined />, label: "Tạo đơn B2B" },
-  { key: "create-product", icon: <AppstoreAddOutlined />, label: "Tạo sản phẩm mới" },
+  { key: "create-product", icon: <AppstoreAddOutlined />, label: "Thêm phôi áo mới" },
   { key: "create-stock-receipt", icon: <InboxOutlined />, label: "Tạo phiếu nhập kho" },
   { key: "create-customer", icon: <UserAddOutlined />, label: "Thêm khách hàng" },
 ];
@@ -51,6 +51,12 @@ export default function AdminTopbar({ onMenuClick }: AdminTopbarProps) {
       clearSession();
       router.replace("/dang-nhap");
       router.refresh();
+    }
+  };
+
+  const handleQuickCreate: MenuProps["onClick"] = ({ key }) => {
+    if (key === "create-product") {
+      router.push("/admin/san-pham-phoi-ao/them-moi");
     }
   };
 
@@ -101,7 +107,11 @@ export default function AdminTopbar({ onMenuClick }: AdminTopbarProps) {
 
         {user?.role === "ADMIN" ? (
           <>
-            <Dropdown menu={{ items: quickCreateItems }} trigger={["click"]} placement="bottomRight">
+            <Dropdown
+              menu={{ items: quickCreateItems, onClick: handleQuickCreate }}
+              trigger={["click"]}
+              placement="bottomRight"
+            >
               <Button type="primary" icon={<PlusOutlined />} className="hidden sm:inline-flex">
                 <span className="inline-flex items-center gap-2">
                   Tạo nhanh
@@ -109,7 +119,11 @@ export default function AdminTopbar({ onMenuClick }: AdminTopbarProps) {
                 </span>
               </Button>
             </Dropdown>
-            <Dropdown menu={{ items: quickCreateItems }} trigger={["click"]} placement="bottomRight">
+            <Dropdown
+              menu={{ items: quickCreateItems, onClick: handleQuickCreate }}
+              trigger={["click"]}
+              placement="bottomRight"
+            >
               <button
                 type="button"
                 aria-label="Tạo nhanh"

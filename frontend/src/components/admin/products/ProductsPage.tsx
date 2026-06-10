@@ -19,11 +19,11 @@ import {
   WarningOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import * as productService from "@/services/admin/productService";
 import type { SanPham } from "@/services/admin/productService";
-import AddProductModal from "./AddProductModal";
-import EditProductDrawer from "./EditProductDrawer";
 import InventoryAlertPanel from "./InventoryAlertPanel";
 import ProductFilterBar from "./ProductFilterBar";
 import ProductPagination from "./ProductPagination";
@@ -34,13 +34,8 @@ import ProductTable from "./ProductTable";
 const SO_MOI_TRANG = 10;
 
 export default function ProductsPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
-
-  // ===== STATE MODAL THÊM PHÔI ÁO =====
-  const [modalThemMo, setModalThemMo] = useState(false);
-
-  // ===== STATE DRAWER CHỈNH SỬa =====
-  const [sanPhamDangSua, setSanPhamDangSua] = useState<SanPham | null>(null);
 
   // ===== STATE QUẢN LÝ FILTER =====
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -139,14 +134,14 @@ export default function ProductsPage() {
 
   // ===== XỬ LÝ HÀNH ĐỘNG =====
 
-  /** Xem chi tiết: TODO – mở modal hoặc chuyển trang */
+  /** Xem chi tiết: chuyển tới trang xem và sửa phôi áo */
   function handleView(product: SanPham) {
-    alert(`Xem chi tiết: ${product.name}`);
+    router.push(`/admin/san-pham-phoi-ao/${product.id}`);
   }
 
-  /** Chỉnh sửa: mở drawer chỉnh sửa */
+  /** Chỉnh sửa: dùng chung trang xem và sửa phôi áo */
   function handleEdit(product: SanPham) {
-    setSanPhamDangSua(product);
+    router.push(`/admin/san-pham-phoi-ao/${product.id}`);
   }
 
   /** Xóa: hiển thị hộp thoại xác nhận rồi gọi API */
@@ -178,7 +173,7 @@ export default function ProductsPage() {
             Sản phẩm / Phôi áo
           </h2>
           <p className="mt-1 max-w-2xl text-body-sm text-text-secondary">
-            Quản lý danh mục phôi áo, biến thể màu và size, giá nền và tồn kho
+            Quản lý danh mục phôi áo, biến thể màu và kích thước, giá nền và tồn kho
             dùng cho khách tự thiết kế.
           </p>
         </div>
@@ -186,14 +181,13 @@ export default function ProductsPage() {
         {/* Nhóm nút hành động đầu trang */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Nút chính: Thêm phôi áo mới */}
-          <button
-            type="button"
-            onClick={() => setModalThemMo(true)}
+          <Link
+            href="/admin/san-pham-phoi-ao/them-moi"
             className="flex h-control-h items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-5 text-button-text font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7]"
           >
             <PlusOutlined />
             Thêm phôi áo
-          </button>
+          </Link>
         </div>
       </section>
 
@@ -216,7 +210,7 @@ export default function ProductsPage() {
             value={dangTaiThongKe ? "..." : (thongKe?.dangHienThi ?? 0)}
           />
 
-          {/* Tổng số biến thể (tổng tất cả màu × size) */}
+          {/* Tổng số biến thể (tổng tất cả màu × kích thước) */}
           <ProductStatCard
             label="Tổng biến thể"
             value={dangTaiThongKe ? "..." : (thongKe?.tongBienThe ?? 0)}
@@ -314,28 +308,6 @@ export default function ProductsPage() {
       {/* Khoảng trống phía dưới để trang không bị sát */}
       <div className="h-12" />
 
-      {/* ===================================================
-          MODAL THÊM PHÔI ÁO MỚI
-          =================================================== */}
-      <AddProductModal
-        dangMo={modalThemMo}
-        onDong={() => setModalThemMo(false)}
-        onThanhCong={() => {
-          setModalThemMo(false);
-          // Làm mới danh sách và thống kê
-          queryClient.invalidateQueries({ queryKey: ["products"] });
-        }}
-      />
-      {/* ===================================================
-          DRAWER CHỈNH SỬa PHÔI ÁO
-          =================================================== */}
-      <EditProductDrawer
-        sanPham={sanPhamDangSua}
-        onDong={() => setSanPhamDangSua(null)}
-        onThanhCong={() => {
-          queryClient.invalidateQueries({ queryKey: ["products"] });
-        }}
-      />
     </div>
   );
 }

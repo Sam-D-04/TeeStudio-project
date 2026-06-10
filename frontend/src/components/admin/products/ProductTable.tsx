@@ -5,8 +5,8 @@
  *
  * Tính năng:
  * 1. Hiển thị danh sách phôi áo (tên, danh mục, chất liệu, giá nền, biến thể, tồn kho, trạng thái).
- * 2. Bấm vào hàng hoặc mũi tên ở đầu để mở rộng/thu gọn panel biến thể màu × size.
- * 3. Panel biến thể hiển thị bảng con với SKU, số lượng tồn, trạng thái từng biến thể.
+ * 2. Bấm vào hàng hoặc mũi tên ở đầu để mở rộng/thu gọn phần biến thể màu × kích thước.
+ * 3. Phần biến thể hiển thị bảng con với SKU, số lượng tồn, trạng thái từng biến thể.
  * 4. Các nút hành động: Xem chi tiết, Chỉnh sửa, Xóa.
  *
  * Thiết kế: bảng phẳng, nền trắng, header xám nhạt, hover row, border mảnh.
@@ -25,8 +25,6 @@ import type { SanPham, BienTheSanPham } from "@/services/admin/productService";
 import {
   InventoryStatusBadge,
   ProductDisplayStatusBadge,
-  type InventoryStatus,
-  type ProductDisplayStatus,
 } from "./ProductStatusBadge";
 
 // ===== TYPE RE-EXPORT để tương thích với code cũ tham chiếu =====
@@ -75,13 +73,13 @@ function countSizes(variants: BienTheSanPham[]): number {
 // ===== COMPONENT CON: Hàng biến thể mở rộng =====
 
 /**
- * VariantExpandedRow – panel hiển thị bảng biến thể khi mở rộng một phôi áo.
+ * VariantExpandedRow – phần hiển thị bảng biến thể khi mở rộng một phôi áo.
  * Hiển thị bên dưới hàng phôi áo, kéo dài theo chiều rộng bảng (colspan=9).
  */
 function VariantExpandedRow({ variants }: { variants: BienTheSanPham[] }) {
   return (
     <tr className="border-b border-border shadow-inner">
-      {/* colspan=9 để panel trải hết chiều rộng bảng */}
+      {/* colspan=9 để phần biến thể trải hết chiều rộng bảng */}
       <td colSpan={9} className="p-0">
         <div className="bg-surface-alt/50 px-12 py-4">
           {/* Card bên trong */}
@@ -201,8 +199,8 @@ export default function ProductTable({
             <th className="px-5 py-3">Sản phẩm</th>
             {/* Cột Danh mục */}
             <th className="px-5 py-3">Danh mục</th>
-            {/* Cột Chất liệu / Form dáng */}
-            <th className="px-5 py-3">Chất liệu / Form</th>
+            {/* Cột Chất liệu / Kiểu dáng */}
+            <th className="px-5 py-3">Chất liệu / Kiểu dáng</th>
             {/* Cột Giá nền */}
             <th className="px-5 py-3 text-right">Giá nền (VNĐ)</th>
             {/* Cột Số biến thể */}
@@ -225,7 +223,7 @@ export default function ProductTable({
                 colSpan={9}
                 className="py-16 text-center text-body-md text-text-muted"
               >
-                Chưa có phôi áo nào. Bấm "Thêm phôi áo" để bắt đầu.
+                Chưa có phôi áo nào. Bấm &ldquo;Thêm phôi áo&rdquo; để bắt đầu.
               </td>
             </tr>
           ) : (
@@ -271,7 +269,7 @@ export default function ProductTable({
                           <div className="text-card-title font-bold text-text-main">
                             {product.name}
                           </div>
-                          {/* Slug – nhỏ, màu xám */}
+                          {/* Đường dẫn tĩnh – nhỏ, màu xám */}
                           <div className="mt-0.5 text-[12px] text-text-muted">
                             {product.slug}
                           </div>
@@ -284,7 +282,7 @@ export default function ProductTable({
                       {product.category}
                     </td>
 
-                    {/* Chất liệu + form dáng */}
+                    {/* Chất liệu và kiểu dáng */}
                     <td className="px-5 py-3 text-text-secondary">
                       {product.material}
                       <br />
@@ -298,11 +296,11 @@ export default function ProductTable({
                       {formatPrice(product.basePrice)}
                     </td>
 
-                    {/* Số biến thể: "X màu · Y size" */}
+                    {/* Số biến thể: "X màu · Y kích thước" */}
                     <td className="px-5 py-3 text-center">
                       <span className="inline-flex h-6 items-center justify-center rounded-md bg-surface-container px-2 text-[13px] font-medium text-text-secondary">
                         {countColors(product.variants)} màu ·{" "}
-                        {countSizes(product.variants)} size
+                        {countSizes(product.variants)} kích thước
                       </span>
                     </td>
 

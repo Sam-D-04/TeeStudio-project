@@ -17,7 +17,7 @@ import ProductsClient from "@/components/admin/products/ProductsClient";
 export const metadata: Metadata = {
   title: "Sản phẩm / Phôi áo – TeeStudio Quản trị",
   description:
-    "Quản lý danh mục phôi áo, biến thể màu và size, giá nền và tồn kho cho hệ thống in áo tự thiết kế TeeStudio.",
+    "Quản lý danh mục phôi áo, biến thể màu và kích thước, giá nền và tồn kho cho hệ thống in áo tự thiết kế TeeStudio.",
 };
 
 export default function ProductsAdminPage() {

@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * AddProductModal – Modal 2 bước để thêm phôi áo mới.
+ * AddProductPage – Trang thêm phôi áo mới trên một biểu mẫu duy nhất.
  *
- * Bước 1 – Thông tin cơ bản:
- *   Tên phôi áo, Danh mục, Giá nền, Chất liệu, Form dáng, Xuất xứ, Mô tả.
+ * Thông tin cơ bản:
+ *   Tên phôi áo, Danh mục, Giá nền, Chất liệu, Kiểu dáng, Xuất xứ, Mô tả.
  *
- * Bước 2 – Biến thể:
+ * Biến thể:
  *   Thêm ít nhất 1 biến thể (Màu, Kích thước, SKU, Tồn kho ban đầu).
  *   Hỗ trợ thêm nhiều biến thể trước khi lưu.
  *
@@ -17,19 +17,20 @@
  */
 
 import {
+  ArrowLeftOutlined,
   CheckOutlined,
-  CloseOutlined,
   DeleteOutlined,
   PlusOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import * as productService from "@/services/admin/productService";
 import type { ThemBienTheInput } from "@/services/admin/productService";
 
 // ===== KIỂU DỮ LIỆU NỘI BỘ =====
 
-/** Dữ liệu form bước 1 */
+/** Dữ liệu thông tin cơ bản */
 type FormBuoc1 = {
   tenSanPham: string;
   danhMucId: string;
@@ -40,7 +41,7 @@ type FormBuoc1 = {
   moTa: string;
 };
 
-/** Một hàng biến thể trong bảng bước 2 */
+/** Một hàng biến thể trong bảng */
 type HangBienThe = {
   /** ID tạm thời (dùng để xác định hàng trong UI) */
   key: string;
@@ -50,18 +51,9 @@ type HangBienThe = {
   tonKhoBanDau: string;
 };
 
-type AddProductModalProps = {
-  /** Modal đang mở hay không */
-  dangMo: boolean;
-  /** Hàm gọi khi đóng modal */
-  onDong: () => void;
-  /** Hàm gọi sau khi thêm thành công */
-  onThanhCong?: () => void;
-};
-
 // ===== HẰNG SỐ =====
 
-/** Danh sách size phổ biến để gợi ý nhanh */
+/** Danh sách kích thước phổ biến để gợi ý nhanh */
 const DS_SIZE_GOI_Y = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 
 /** Danh sách màu phổ biến để chọn nhanh */
@@ -71,7 +63,7 @@ const DS_MAU_PHO_BIEN: { ten: string; hex: string }[] = [
   { ten: "Trắng sữa", hex: "#f8f5f0" },
   { ten: "Xám", hex: "#6b7280" },
   { ten: "Xám nhạt", hex: "#d1d5db" },
-  { ten: "Navy", hex: "#1e3a8a" },
+  { ten: "Xanh hải quân", hex: "#1e3a8a" },
   { ten: "Xanh dương", hex: "#2563eb" },
   { ten: "Xanh lá", hex: "#16a34a" },
   { ten: "Đỏ", hex: "#dc2626" },
@@ -90,8 +82,8 @@ function taoKey() {
   return Math.random().toString(36).slice(2, 9);
 }
 
-/** Tạo gợi ý SKU tự động từ tên, màu, size */
-function goiYSKU(ten: string, mau: string, size: string): string {
+/** Tạo gợi ý SKU tự động từ tên, màu, kích thước */
+function goiYSKU(ten: string, mau: string, kichThuoc: string): string {
   const tenSlug = ten
     .toUpperCase()
     .normalize("NFD")
@@ -106,12 +98,12 @@ function goiYSKU(ten: string, mau: string, size: string): string {
     .replace(/Đ/g, "D")
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, 3);
-  const sizeSlug = size.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 4);
-  if (!tenSlug && !mauSlug && !sizeSlug) return "";
-  return `${tenSlug}-${mauSlug}-${sizeSlug}`;
+  const kichThuocSlug = kichThuoc.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 4);
+  if (!tenSlug && !mauSlug && !kichThuocSlug) return "";
+  return `${tenSlug}-${mauSlug}-${kichThuocSlug}`;
 }
 
-/** Validate form bước 1, trả về object lỗi */
+/** Kiểm tra phần thông tin cơ bản, trả về danh sách lỗi */
 function validateBuoc1(form: FormBuoc1): Partial<Record<keyof FormBuoc1, string>> {
   const loi: Partial<Record<keyof FormBuoc1, string>> = {};
   if (!form.tenSanPham.trim()) loi.tenSanPham = "Vui lòng nhập tên phôi áo";
@@ -120,7 +112,7 @@ function validateBuoc1(form: FormBuoc1): Partial<Record<keyof FormBuoc1, string>
   if (!form.giaNen.trim()) loi.giaNen = "Vui lòng nhập giá nền";
   else if (isNaN(Number(form.giaNen)) || Number(form.giaNen) < 0) loi.giaNen = "Giá nền phải là số không âm";
   if (!form.chatLieu.trim()) loi.chatLieu = "Vui lòng nhập chất liệu";
-  if (!form.formDang.trim()) loi.formDang = "Vui lòng nhập form dáng";
+  if (!form.formDang.trim()) loi.formDang = "Vui lòng nhập kiểu dáng";
   if (!form.xuatXu.trim()) loi.xuatXu = "Vui lòng nhập xuất xứ";
   if (!form.moTa.trim()) loi.moTa = "Vui lòng nhập mô tả";
   else if (form.moTa.trim().length < 10) loi.moTa = "Mô tả phải có ít nhất 10 ký tự";
@@ -166,19 +158,14 @@ function FormField({
 }
 
 // ===== COMPONENT CHÍNH =====
-export default function AddProductModal({
-  dangMo,
-  onDong,
-  onThanhCong,
-}: AddProductModalProps) {
+export default function AddProductPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   // ===== STATE =====
-  const [buocHienTai, setBuocHienTai] = useState<1 | 2>(1);
   const [idSanPhamMoi, setIdSanPhamMoi] = useState<number | null>(null);
-  const [tenSanPhamLuu, setTenSanPhamLuu] = useState("");
 
-  // Form bước 1
+  // Thông tin cơ bản
   const [formBuoc1, setFormBuoc1] = useState<FormBuoc1>({
     tenSanPham: "",
     danhMucId: "",
@@ -190,7 +177,7 @@ export default function AddProductModal({
   });
   const [loiBuoc1, setLoiBuoc1] = useState<Partial<Record<keyof FormBuoc1, string>>>({});
 
-  // Form bước 2 – danh sách biến thể
+  // Danh sách biến thể
   const [danhSachBienThe, setDanhSachBienThe] = useState<HangBienThe[]>([
     { key: taoKey(), mauSac: "", kichThuoc: "", maSKU: "", tonKhoBanDau: "0" },
   ]);
@@ -199,9 +186,6 @@ export default function AddProductModal({
   // Hàng đang chọn màu nhanh
   const [keyDangChonMau, setKeyDangChonMau] = useState<string | null>(null);
 
-  // Ref để focus vào modal khi mở
-  const modalRef = useRef<HTMLDivElement>(null);
-
   // ===== LẤY DANH MỤC =====
   const { data: danhSachDanhMuc = [] } = useQuery({
     queryKey: ["products", "categories"],
@@ -209,22 +193,7 @@ export default function AddProductModal({
     staleTime: 5 * 60_000,
   });
 
-  // ===== MUTATION BƯỚC 1: Tạo phôi áo =====
-  const { mutate: taoPhoi, isPending: dangTaoPhoi } = useMutation({
-    mutationFn: (payload: productService.TaoSanPhamInput) =>
-      productService.taoSanPham(payload),
-    onSuccess: (data) => {
-      setIdSanPhamMoi(data.id);
-      setTenSanPhamLuu(formBuoc1.tenSanPham.trim());
-      setBuocHienTai(2);
-    },
-    onError: (error: unknown) => {
-      const msg = error instanceof Error ? error.message : "Đã xảy ra lỗi khi tạo phôi áo";
-      setLoiBuoc1({ tenSanPham: msg });
-    },
-  });
-
-  // ===== MUTATION BƯỚC 2: Thêm biến thể =====
+  // ===== MUTATION THÊM BIẾN THỂ =====
   const { mutate: luuBienThe, isPending: dangLuuBienThe } = useMutation({
     mutationFn: async ({
       productId,
@@ -241,8 +210,8 @@ export default function AddProductModal({
     onSuccess: () => {
       // Làm mới toàn bộ dữ liệu phôi áo (danh sách, stats, alerts)
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      if (onThanhCong) onThanhCong();
-      dongVaReset();
+      router.replace("/admin/san-pham-phoi-ao");
+      router.refresh();
     },
     onError: (error: unknown) => {
       const msg = error instanceof Error ? error.message : "Đã xảy ra lỗi khi thêm biến thể";
@@ -250,57 +219,39 @@ export default function AddProductModal({
     },
   });
 
-  // ===== RESET KHI ĐÓNG =====
-  function dongVaReset() {
-    onDong();
-    // Delay reset để tránh nhấp nháy khi modal đang đóng
-    setTimeout(() => {
-      setBuocHienTai(1);
-      setIdSanPhamMoi(null);
-      setTenSanPhamLuu("");
-      setFormBuoc1({
-        tenSanPham: "",
-        danhMucId: "",
-        giaNen: "",
-        chatLieu: "",
-        formDang: "",
-        xuatXu: "Việt Nam",
-        moTa: "",
+  // ===== MUTATION TẠO PHÔI ÁO =====
+  const { mutate: taoPhoi, isPending: dangTaoPhoi } = useMutation({
+    mutationFn: (payload: productService.TaoSanPhamInput) =>
+      productService.taoSanPham(payload),
+    onSuccess: (data) => {
+      setIdSanPhamMoi(data.id);
+      luuBienThe({
+        productId: data.id,
+        danhSach: taoDanhSachBienTheInput(),
       });
-      setLoiBuoc1({});
-      setDanhSachBienThe([
-        { key: taoKey(), mauSac: "", kichThuoc: "", maSKU: "", tonKhoBanDau: "0" },
-      ]);
-      setLoiBuoc2Chung("");
-      setKeyDangChonMau(null);
-    }, 300);
+    },
+    onError: (error: unknown) => {
+      const msg = error instanceof Error ? error.message : "Đã xảy ra lỗi khi tạo phôi áo";
+      setLoiBuoc1({ tenSanPham: msg });
+    },
+  });
+
+  function quayVeDanhSach() {
+    if (
+      idSanPhamMoi &&
+      !window.confirm(
+        "Phôi áo đã được tạo nhưng chưa có biến thể. Bạn có chắc muốn về danh sách?"
+      )
+    ) {
+      return;
+    }
+    router.replace("/admin/san-pham-phoi-ao");
   }
 
-  // ===== ĐÓNG KHI BẤM OVERLAY =====
-  function xuLyClickOverlay(e: React.MouseEvent<HTMLDivElement>) {
-    if (e.target === e.currentTarget) dongVaReset();
-  }
-
-  // ===== ĐÓNG KHI BẤM ESC =====
-  useEffect(() => {
-    function xuLyKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && dangMo) dongVaReset();
-    }
-    window.addEventListener("keydown", xuLyKeyDown);
-    return () => window.removeEventListener("keydown", xuLyKeyDown);
-  }, [dangMo]);
-
-  // ===== FOCUS KHI MỞ =====
-  useEffect(() => {
-    if (dangMo) {
-      setTimeout(() => modalRef.current?.focus(), 50);
-    }
-  }, [dangMo]);
-
-  // ===== XỬ LÝ FORM BƯỚC 1 =====
+  // ===== XỬ LÝ THÔNG TIN CƠ BẢN =====
   function capNhatBuoc1(field: keyof FormBuoc1, value: string) {
     setFormBuoc1((prev) => ({ ...prev, [field]: value }));
-    // Xóa lỗi khi user bắt đầu nhập lại
+    // Xóa lỗi khi người dùng bắt đầu nhập lại
     if (loiBuoc1[field]) {
       setLoiBuoc1((prev) => {
         const next = { ...prev };
@@ -308,25 +259,6 @@ export default function AddProductModal({
         return next;
       });
     }
-  }
-
-  function xuLyTiepTheo() {
-    const loi = validateBuoc1(formBuoc1);
-    if (Object.keys(loi).length > 0) {
-      setLoiBuoc1(loi);
-      return;
-    }
-
-    // Gọi API tạo phôi áo
-    taoPhoi({
-      categoryId: Number(formBuoc1.danhMucId),
-      name: formBuoc1.tenSanPham.trim(),
-      basePrice: Number(formBuoc1.giaNen),
-      material: formBuoc1.chatLieu.trim(),
-      form: formBuoc1.formDang.trim(),
-      madeIn: formBuoc1.xuatXu.trim(),
-      description: formBuoc1.moTa.trim(),
-    });
   }
 
   // ===== XỬ LÝ BẢNG BIẾN THỂ =====
@@ -337,7 +269,7 @@ export default function AddProductModal({
         const hangMoi = { ...hang, [field]: value };
         // Tự động gợi ý SKU nếu SKU chưa có hoặc vẫn là gợi ý tự động
         if (field === "mauSac" || field === "kichThuoc") {
-          const tenHienTai = tenSanPhamLuu || formBuoc1.tenSanPham.trim();
+          const tenHienTai = formBuoc1.tenSanPham.trim();
           const skuGoiY = goiYSKU(
             tenHienTai,
             field === "mauSac" ? value : hang.mauSac,
@@ -371,10 +303,20 @@ export default function AddProductModal({
     setKeyDangChonMau(null);
   }
 
-  function xuLyLuu() {
-    if (!idSanPhamMoi) return;
+  function taoDanhSachBienTheInput(): ThemBienTheInput[] {
+    return danhSachBienThe.map((hang) => ({
+      color: hang.mauSac.trim(),
+      size: hang.kichThuoc.trim(),
+      sku: hang.maSKU.trim(),
+      stockQty: Number(hang.tonKhoBanDau) || 0,
+    }));
+  }
 
-    // Validate tất cả biến thể
+  function xuLyLuu() {
+    const loiThongTin = validateBuoc1(formBuoc1);
+    setLoiBuoc1(loiThongTin);
+
+    // Kiểm tra tất cả biến thể
     const tatCaLoi: string[] = [];
     for (const hang of danhSachBienThe) {
       const loi = validateHangBienThe(hang);
@@ -388,34 +330,42 @@ export default function AddProductModal({
       tatCaLoi.push(`Mã SKU "${skuTrung[0]}" bị trùng lặp trong danh sách`);
     }
 
-    // Kiểm tra màu + size trùng nhau
+    // Kiểm tra tổ hợp màu và kích thước trùng nhau
     const dsMauSize = danhSachBienThe.map((h) => `${h.mauSac.trim()}|${h.kichThuoc.trim()}`);
     const mauSizeTrung = dsMauSize.filter((ms, i) => dsMauSize.indexOf(ms) !== i && ms !== "|");
     if (mauSizeTrung.length > 0) {
-      const [mau, size] = mauSizeTrung[0].split("|");
-      tatCaLoi.push(`Biến thể màu "${mau}" – size "${size}" bị trùng lặp`);
+      const [mau, kichThuoc] = mauSizeTrung[0].split("|");
+      tatCaLoi.push(
+        `Biến thể màu "${mau}" – kích thước "${kichThuoc}" bị trùng lặp`
+      );
     }
 
-    if (tatCaLoi.length > 0) {
-      setLoiBuoc2Chung(tatCaLoi[0]);
+    setLoiBuoc2Chung(tatCaLoi[0] ?? "");
+
+    if (Object.keys(loiThongTin).length > 0 || tatCaLoi.length > 0) {
       return;
     }
 
-    // Gọi API
-    luuBienThe({
-      productId: idSanPhamMoi,
-      danhSach: danhSachBienThe.map((hang) => ({
-        color: hang.mauSac.trim(),
-        size: hang.kichThuoc.trim(),
-        sku: hang.maSKU.trim(),
-        stockQty: Number(hang.tonKhoBanDau) || 0,
-      })),
+    if (idSanPhamMoi) {
+      luuBienThe({
+        productId: idSanPhamMoi,
+        danhSach: taoDanhSachBienTheInput(),
+      });
+      return;
+    }
+
+    taoPhoi({
+      categoryId: Number(formBuoc1.danhMucId),
+      name: formBuoc1.tenSanPham.trim(),
+      basePrice: Number(formBuoc1.giaNen),
+      material: formBuoc1.chatLieu.trim(),
+      form: formBuoc1.formDang.trim(),
+      madeIn: formBuoc1.xuatXu.trim(),
+      description: formBuoc1.moTa.trim(),
     });
   }
 
-  // ===== RENDER =====
-  if (!dangMo) return null;
-
+  // ===== HIỂN THỊ =====
   const inputClass =
     "h-10 w-full rounded-[8px] border border-border bg-surface-alt px-3 text-body-md text-text-main outline-none transition-all placeholder:text-text-muted focus:border-primary-container focus:ring-1 focus:ring-primary-container";
 
@@ -423,100 +373,84 @@ export default function AddProductModal({
     "w-full resize-none rounded-[8px] border border-border bg-surface-alt px-3 py-2.5 text-body-md text-text-main outline-none transition-all placeholder:text-text-muted focus:border-primary-container focus:ring-1 focus:ring-primary-container";
 
   return (
-    // Overlay – backdrop-blur + nền tối
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-      onClick={xuLyClickOverlay}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Thêm phôi áo mới"
-    >
-      {/* Modal container */}
-      <div
-        ref={modalRef}
-        tabIndex={-1}
-        className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-[20px] border border-border bg-surface shadow-2xl outline-none"
-        style={{ animation: "fadeInScale 0.2s ease-out" }}
-      >
-        {/* ===== HEADER ===== */}
-        <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
-          <div>
-            <h2 className="text-[18px] font-extrabold text-text-main">
-              Thêm phôi áo mới
-            </h2>
-            <p className="mt-0.5 text-[13px] text-text-secondary">
-              {buocHienTai === 1
-                ? "Bước 1/2 – Nhập thông tin cơ bản"
-                : `Bước 2/2 – Thêm biến thể cho "${tenSanPhamLuu}"`}
-            </p>
-          </div>
+    <div className="pb-12">
+      <section className="mb-6 flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
+        <div>
+          <button
+            type="button"
+            onClick={quayVeDanhSach}
+            className="mb-3 flex items-center gap-2 text-[13px] font-semibold text-text-secondary transition-colors hover:text-primary-container"
+          >
+            <ArrowLeftOutlined />
+            Danh sách phôi áo
+          </button>
+          <h2 className="font-extrabold text-headline-lg-mobile text-text-main md:text-headline-lg">
+            Thêm phôi áo mới
+          </h2>
+          <p className="mt-1 max-w-2xl text-body-sm text-text-secondary">
+            Khai báo thông tin cơ bản, biến thể màu sắc, kích thước và tồn kho
+            ban đầu của phôi áo.
+          </p>
+        </div>
+      </section>
 
-          {/* Chỉ báo bước */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              {/* Bước 1 */}
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-bold transition-colors ${
-                  buocHienTai === 1
-                    ? "bg-primary-container text-white"
-                    : "bg-primary-container/80 text-white"
-                }`}
-              >
-                {buocHienTai > 1 ? <CheckOutlined /> : "1"}
-              </div>
-              <div
-                className={`h-0.5 w-8 transition-colors ${
-                  buocHienTai > 1 ? "bg-primary-container" : "bg-border"
-                }`}
-              />
-              {/* Bước 2 */}
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-bold transition-colors ${
-                  buocHienTai === 2
-                    ? "bg-primary-container text-white"
-                    : "bg-surface-alt text-text-muted"
-                }`}
-              >
-                2
-              </div>
-            </div>
-
-            {/* Nút đóng */}
-            <button
-              type="button"
-              onClick={dongVaReset}
-              className="ml-2 flex h-9 w-9 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-alt hover:text-text-main"
-              title="Đóng"
-            >
-              <CloseOutlined className="text-[18px]" />
-            </button>
-          </div>
+      <section className="overflow-hidden rounded-[20px] border border-border bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
+        <div className="border-b border-border px-6 py-4">
+          <h3 className="text-[18px] font-extrabold text-text-main">
+            Thông tin phôi áo
+          </h3>
+          <p className="mt-0.5 text-[13px] text-text-secondary">
+            Hoàn thiện thông tin cơ bản và biến thể, sau đó lưu phôi áo trong một lần.
+          </p>
         </div>
 
-        {/* ===== NỘI DUNG (scroll) ===== */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {/* ----------------------------------------
-              BƯỚC 1: THÔNG TIN CƠ BẢN
-              ---------------------------------------- */}
-          {buocHienTai === 1 && (
-            <div className="flex flex-col gap-5">
-              {/* Tên phôi áo */}
-              <FormField
-                label="Tên phôi áo"
-                required
-                error={loiBuoc1.tenSanPham}
+        {/* ===== NỘI DUNG ===== */}
+        <div className="space-y-8 p-6 lg:p-8">
+          {/* Thông tin cơ bản */}
+          <section
+            aria-labelledby="tieu-de-thong-tin-co-ban"
+            className="rounded-[14px] border border-border p-5"
+          >
+            <div className="mb-5">
+              <h3
+                id="tieu-de-thong-tin-co-ban"
+                className="text-[16px] font-extrabold text-text-main"
               >
-                <input
-                  id="add-product-ten"
-                  type="text"
-                  value={formBuoc1.tenSanPham}
-                  onChange={(e) => capNhatBuoc1("tenSanPham", e.target.value)}
-                  placeholder="Ví dụ: Áo thun Unisex Cotton nặng"
-                  maxLength={300}
-                  className={`${inputClass} ${loiBuoc1.tenSanPham ? "border-error focus:border-error focus:ring-error/30" : ""}`}
-                  autoFocus
-                />
-              </FormField>
+                Thông tin cơ bản
+              </h3>
+              <p className="mt-1 text-[13px] text-text-secondary">
+                Nhập thông tin dùng chung của phôi áo.
+              </p>
+            </div>
+
+            {idSanPhamMoi && (
+              <div className="mb-5 rounded-[10px] border border-primary-container/30 bg-primary-container/5 px-4 py-3 text-[13px] text-text-secondary">
+                Thông tin cơ bản đã được tạo. Hãy kiểm tra và lưu lại phần biến thể.
+              </div>
+            )}
+
+            <fieldset
+              disabled={Boolean(idSanPhamMoi)}
+              className={idSanPhamMoi ? "pointer-events-none opacity-60" : ""}
+            >
+              <div className="flex flex-col gap-5">
+                {/* Tên phôi áo */}
+                <FormField
+                  label="Tên phôi áo"
+                  required
+                  error={loiBuoc1.tenSanPham}
+                >
+                  <input
+                    id="add-product-ten"
+                    type="text"
+                    value={formBuoc1.tenSanPham}
+                    onChange={(e) => capNhatBuoc1("tenSanPham", e.target.value)}
+                    placeholder="Ví dụ: Áo thun phom rộng bằng vải bông dày"
+                    maxLength={300}
+                    className={`${inputClass} ${loiBuoc1.tenSanPham ? "border-error focus:border-error focus:ring-error/30" : ""}`}
+                    autoFocus
+                  />
+                </FormField>
 
               {/* Hàng 2: Danh mục + Giá nền */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -558,7 +492,7 @@ export default function AddProductModal({
                 </FormField>
               </div>
 
-              {/* Hàng 3: Chất liệu + Form dáng */}
+              {/* Hàng 3: Chất liệu + Kiểu dáng */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
                   label="Chất liệu"
@@ -570,14 +504,14 @@ export default function AddProductModal({
                     type="text"
                     value={formBuoc1.chatLieu}
                     onChange={(e) => capNhatBuoc1("chatLieu", e.target.value)}
-                    placeholder="Ví dụ: Cotton 100% 250gsm"
+                    placeholder="Ví dụ: Vải bông 100%, định lượng 250 g/m²"
                     maxLength={200}
                     className={`${inputClass} ${loiBuoc1.chatLieu ? "border-error" : ""}`}
                   />
                 </FormField>
 
                 <FormField
-                  label="Form dáng"
+                  label="Kiểu dáng"
                   required
                   error={loiBuoc1.formDang}
                 >
@@ -586,7 +520,7 @@ export default function AddProductModal({
                     type="text"
                     value={formBuoc1.formDang}
                     onChange={(e) => capNhatBuoc1("formDang", e.target.value)}
-                    placeholder="Ví dụ: Oversized fit"
+                    placeholder="Ví dụ: Phom rộng"
                     maxLength={100}
                     className={`${inputClass} ${loiBuoc1.formDang ? "border-error" : ""}`}
                   />
@@ -617,32 +551,46 @@ export default function AddProductModal({
                   className={`${textareaClass} ${loiBuoc1.moTa ? "border-error" : ""}`}
                 />
               </FormField>
-            </div>
-          )}
-
-          {/* ----------------------------------------
-              BƯỚC 2: BIẾN THỂ
-              ---------------------------------------- */}
-          {buocHienTai === 2 && (
-            <div className="flex flex-col gap-4">
-              {/* Banner hướng dẫn */}
-              <div className="flex items-start gap-3 rounded-[10px] border border-primary-container/30 bg-primary-container/5 px-4 py-3">
-                <span className="mt-0.5 text-[18px] text-primary-container">ℹ️</span>
-                <div className="text-[13px] text-text-secondary">
-                  <span className="font-semibold text-text-main">Thêm biến thể màu × kích thước</span>
-                  <br />
-                  Mỗi biến thể là một tổ hợp <strong>Màu sắc + Kích thước</strong> duy nhất.
-                  SKU được gợi ý tự động, bạn có thể chỉnh sửa trực tiếp.
-                </div>
               </div>
+            </fieldset>
+          </section>
 
-              {/* Thông báo lỗi chung bước 2 */}
-              {loiBuoc2Chung && (
-                <div className="flex items-center gap-2 rounded-[8px] border border-error/30 bg-error/5 px-4 py-2.5 text-[13px] text-error">
-                  <span>⚠️</span>
-                  {loiBuoc2Chung}
+          {/* Biến thể */}
+          <section
+            aria-labelledby="tieu-de-bien-the"
+            className="rounded-[14px] border border-border p-5"
+          >
+            <div className="mb-5">
+              <h3
+                id="tieu-de-bien-the"
+                className="text-[16px] font-extrabold text-text-main"
+              >
+                Biến thể phôi áo
+              </h3>
+              <p className="mt-1 text-[13px] text-text-secondary">
+                Thêm các tổ hợp màu sắc, kích thước, mã SKU và tồn kho ban đầu.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-4">
+                {/* Banner hướng dẫn */}
+                <div className="flex items-start gap-3 rounded-[10px] border border-primary-container/30 bg-primary-container/5 px-4 py-3">
+                  <span className="mt-0.5 text-[18px] text-primary-container">ℹ️</span>
+                  <div className="text-[13px] text-text-secondary">
+                    <span className="font-semibold text-text-main">Thêm biến thể màu × kích thước</span>
+                    <br />
+                    Mỗi biến thể là một tổ hợp <strong>Màu sắc + Kích thước</strong> duy nhất.
+                    SKU được gợi ý tự động, bạn có thể chỉnh sửa trực tiếp.
+                  </div>
                 </div>
-              )}
+
+                {/* Thông báo lỗi chung của phần biến thể */}
+                {loiBuoc2Chung && (
+                  <div className="flex items-center gap-2 rounded-[8px] border border-error/30 bg-error/5 px-4 py-2.5 text-[13px] text-error">
+                    <span>⚠️</span>
+                    {loiBuoc2Chung}
+                  </div>
+                )}
 
               {/* Bảng biến thể */}
               <div className="overflow-x-auto rounded-[12px] border border-border">
@@ -662,11 +610,11 @@ export default function AddProductModal({
                         key={hang.key}
                         className="border-b border-border/50 last:border-b-0"
                       >
-                        {/* Ô màu sắc + picker nhanh */}
+                        {/* Ô màu sắc và bảng chọn nhanh */}
                         <td className="px-3 py-2">
                           <div className="relative">
                             <div className="flex items-center gap-1.5">
-                              {/* Chấm màu preview */}
+                              {/* Chấm màu xem trước */}
                               <span
                                 className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border shadow-sm cursor-pointer"
                                 style={{
@@ -694,7 +642,7 @@ export default function AddProductModal({
                               />
                             </div>
 
-                            {/* Dropdown chọn màu nhanh */}
+                            {/* Bảng chọn màu nhanh */}
                             {keyDangChonMau === hang.key && (
                               <div className="absolute left-0 top-full z-20 mt-1 w-[280px] rounded-[10px] border border-border bg-surface p-3 shadow-lg">
                                 <p className="mb-2 text-[11px] font-semibold uppercase text-text-muted">
@@ -728,7 +676,7 @@ export default function AddProductModal({
                           </div>
                         </td>
 
-                        {/* Ô kích thước – dropdown + pill nhanh */}
+                        {/* Ô kích thước và các lựa chọn nhanh */}
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap gap-1">
                             {DS_SIZE_GOI_Y.map((sz) => (
@@ -803,7 +751,7 @@ export default function AddProductModal({
                 className="flex w-full items-center justify-center gap-2 rounded-[10px] border-2 border-dashed border-border py-2.5 text-[13px] font-semibold text-text-secondary transition-colors hover:border-primary-container/50 hover:bg-primary-container/5 hover:text-primary-container"
               >
                 <PlusOutlined />
-                Thêm biến thể màu × size
+                Thêm biến thể màu × kích thước
               </button>
 
               {/* Tóm tắt: số biến thể đã thêm */}
@@ -811,83 +759,40 @@ export default function AddProductModal({
                 Đã thêm <span className="font-semibold text-text-main">{danhSachBienThe.length}</span> biến thể
               </p>
             </div>
-          )}
+          </section>
         </div>
 
-        {/* ===== FOOTER (nút hành động) ===== */}
-        <div className="flex shrink-0 items-center justify-between border-t border-border bg-surface-alt/40 px-6 py-4">
-          {/* Bên trái: nút quay lại */}
-          <div>
-            {buocHienTai === 2 && (
-              <button
-                type="button"
-                onClick={() => setBuocHienTai(1)}
-                disabled={dangLuuBienThe}
-                className="flex h-10 items-center gap-2 rounded-[10px] border border-border bg-surface px-5 text-[14px] font-semibold text-text-secondary transition-colors hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                ← Quay lại
-              </button>
-            )}
-          </div>
+        {/* ===== CHÂN BIỂU MẪU ===== */}
+        <div className="flex flex-col-reverse gap-3 border-t border-border bg-surface-alt/40 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
+          <button
+            type="button"
+            onClick={quayVeDanhSach}
+            disabled={dangTaoPhoi || dangLuuBienThe}
+            className="flex h-10 items-center justify-center gap-2 rounded-[10px] border border-border bg-surface px-5 text-[14px] font-semibold text-text-secondary transition-colors hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Về danh sách
+          </button>
 
-          {/* Bên phải: nút hủy + hành động chính */}
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={dongVaReset}
-              disabled={dangTaoPhoi || dangLuuBienThe}
-              className="flex h-10 items-center gap-2 rounded-[10px] border border-border bg-surface px-5 text-[14px] font-semibold text-text-secondary transition-colors hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Hủy
-            </button>
-
-            {buocHienTai === 1 ? (
-              <button
-                type="button"
-                onClick={xuLyTiepTheo}
-                disabled={dangTaoPhoi}
-                className="flex h-10 items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-6 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {dangTaoPhoi ? (
-                  <>
-                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                    Đang xử lý...
-                  </>
-                ) : (
-                  <>Tiếp theo →</>
-                )}
-              </button>
+          <button
+            type="button"
+            onClick={xuLyLuu}
+            disabled={dangTaoPhoi || dangLuuBienThe}
+            className="flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#0ea5e9] px-6 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {dangTaoPhoi || dangLuuBienThe ? (
+              <>
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                Đang lưu...
+              </>
             ) : (
-              <button
-                type="button"
-                onClick={xuLyLuu}
-                disabled={dangLuuBienThe}
-                className="flex h-10 items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-6 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {dangLuuBienThe ? (
-                  <>
-                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                    Đang lưu...
-                  </>
-                ) : (
-                  <>
-                    <CheckOutlined />
-                    Lưu phôi áo
-                  </>
-                )}
-              </button>
+              <>
+                <CheckOutlined />
+                Lưu phôi áo
+              </>
             )}
-          </div>
+          </button>
         </div>
-      </div>
-
-      {/* CSS animation inline */}
-      <style>{`
-        @keyframes fadeInScale {
-          from { opacity: 0; transform: scale(0.95) translateY(-10px); }
-          to   { opacity: 1; transform: scale(1)    translateY(0); }
-        }
-      `}</style>
+      </section>
     </div>
   );
 }
