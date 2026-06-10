@@ -17,7 +17,7 @@
  *  - Component con nhận dữ liệu qua props.
  */
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   HighlightOutlined,
@@ -520,7 +520,7 @@ export default function DesignPage() {
                         Math.abs(p - trangHienTai) <= 1
                     )
                     .map((p, idx, arr) => (
-                      <>
+                      <Fragment key={p}>
                         {idx > 0 && arr[idx - 1] !== p - 1 && (
                           <span
                             key={`ellipsis-${p}`}
@@ -549,7 +549,7 @@ export default function DesignPage() {
                         >
                           {p}
                         </button>
-                      </>
+                      </Fragment>
                     ))}
 
                   {/* Nút trang sau */}

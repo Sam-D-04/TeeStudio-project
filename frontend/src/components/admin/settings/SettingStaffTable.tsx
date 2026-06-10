@@ -26,6 +26,7 @@ const initials = (name: string) => {
 
 export default function SettingStaffTable() {
   const [form] = Form.useForm();
+  const [messageApi, contextHolder] = message.useMessage();
   const [staff, setStaff] = useState<AuthUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -70,16 +71,16 @@ export default function SettingStaffTable() {
 
       if (editing) {
         await userService.updateStaff(editing.id, values as UpdateStaffPayload);
-        message.success("Đã cập nhật quyền nhân sự.");
+        messageApi.success("Đã cập nhật quyền nhân sự.");
       } else {
         await userService.createStaff(values as CreateStaffPayload);
-        message.success("Đã tạo tài khoản nhân sự.");
+        messageApi.success("Đã tạo tài khoản nhân sự.");
       }
       setModalOpen(false);
       await loadStaff();
     } catch (error) {
       if (error && typeof error === "object" && "errorFields" in error) return;
-      message.error(getApiErrorMessage(error, "Không thể lưu tài khoản nhân sự."));
+      messageApi.error(getApiErrorMessage(error, "Không thể lưu tài khoản nhân sự."));
     } finally {
       setSubmitting(false);
     }
@@ -92,6 +93,7 @@ export default function SettingStaffTable() {
 
   return (
     <div className="flex flex-col overflow-hidden rounded-[20px] border border-border bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
+      {contextHolder}
       <div className="flex items-center justify-between border-b border-border p-6">
         <div>
           <h3 className="text-[17px] font-bold text-on-surface">Danh sách nhân sự</h3>
