@@ -6,6 +6,7 @@ const pricingRoutes = require("../modules/pricing/pricing.routes");
 const adminOrderRoutes = require("../modules/orders/order.routes");
 const adminDesignRoutes = require("../modules/designs/design.routes");
 const paymentRoutes = require("../modules/payments/payment.routes");
+const adminProductRoutes = require("../modules/products/product.routes");
 
 // Import controller cho 2 public endpoints (vi-tri-in, stickers dành cho Design Studio)
 const designController = require("../modules/designs/design.controller");
@@ -45,5 +46,8 @@ router.use("/admin/orders", adminOrderRoutes);
 
 // Quản lý thiết kế & in ấn – /api/admin/designs/...
 router.use("/admin/designs", adminDesignRoutes);
+
+// Quản lý sản phẩm / phôi áo – /api/admin/products/...
+router.use("/admin/products", adminProductRoutes);
 
 module.exports = router;

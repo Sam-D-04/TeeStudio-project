@@ -3,13 +3,11 @@
 import { useState, useMemo } from "react";
 import {
   HistoryOutlined,
-  DownloadOutlined,
   PlusSquareOutlined,
   InboxOutlined,
   WarningOutlined,
   ExportOutlined,
   ImportOutlined,
-  InfoCircleOutlined,
 } from "@ant-design/icons";
 
 import InventoryStatCard from "./InventoryStatCard";
@@ -271,7 +269,7 @@ export default function InventoryPage() {
           </h2>
           {/* Mô tả ngắn */}
           <p className="mt-1 text-sm text-text-secondary">
-            Theo dõi tồn kho áo trơn theo màu, size và SKU trước khi chuyển sang xưởng in.
+            Theo dõi tồn kho áo theo màu, size và SKU trước khi chuyển sang xưởng in.
           </p>
         </div>
 
@@ -286,14 +284,6 @@ export default function InventoryPage() {
             Lịch sử kho
           </button>
 
-          {/* Nút phụ: xuất báo cáo */}
-          <button
-            type="button"
-            className="flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-text-secondary transition-colors hover:bg-surface-alt"
-          >
-            <DownloadOutlined />
-            Xuất báo cáo
-          </button>
 
           {/* Nút chính: nhập kho phôi áo */}
           <button
@@ -306,22 +296,6 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* ===== BANNER THÔNG TIN HỆ THỐNG KHO ===== */}
-      {/* Nền xanh nhạt, viền xanh, icon info */}
-      <div className="flex items-start gap-3 rounded-xl border border-primary-fixed bg-primary-fixed-dim/20 p-4">
-        <InfoCircleOutlined
-          className="mt-0.5 flex-shrink-0 text-primary-container"
-          style={{ fontSize: 20 }}
-        />
-        <div>
-          <h4 className="text-sm font-bold text-on-primary-container">Thông tin hệ thống kho</h4>
-          <p className="mt-1 text-sm text-on-primary-container/80">
-            Kho hàng này chỉ quản lý số lượng <strong>phôi áo chưa in</strong> (Blank Tees).
-            Số lượng sẽ được tự động giữ lại (Reserved) và chuyển trạng thái khi xưởng in bắt đầu
-            xử lý đơn custom.
-          </p>
-        </div>
-      </div>
 
       {/* ===== 4 THẺ THỐNG KÊ KPI ===== */}
       {/* Grid 4 cột trên desktop, 2 cột trên tablet, 1 cột trên mobile */}

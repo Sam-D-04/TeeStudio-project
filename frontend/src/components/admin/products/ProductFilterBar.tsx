@@ -3,7 +3,7 @@
  *
  * Gồm 3 phần:
  * 1. Ô tìm kiếm (theo tên phôi áo)
- * 2. Dropdown lọc danh mục (Áo thun / Polo / Hoodie)
+ * 2. Dropdown lọc danh mục – lấy từ API (không hardcode)
  * 3. Dropdown lọc trạng thái (Đang hiển thị / Đang ẩn)
  * 4. Nhóm pill filter: Tất cả / Còn hàng / Sắp hết / Hết hàng
  *
@@ -11,6 +11,8 @@
  */
 
 import { SearchOutlined } from "@ant-design/icons";
+import { useQuery } from "@tanstack/react-query";
+import * as productService from "@/services/admin/productService";
 
 // ===== KIỂU DỮ LIỆU CHO FILTER =====
 // Mỗi pill filter kho có giá trị (value) và nhãn hiển thị (label)
@@ -22,7 +24,7 @@ type ProductFilterBarProps = {
   /** Hàm cập nhật từ khóa tìm kiếm */
   onSearchChange: (value: string) => void;
 
-  /** Danh mục đang được lọc */
+  /** Danh mục đang được lọc (tên danh mục) */
   categoryFilter: string;
   /** Hàm cập nhật danh mục */
   onCategoryChange: (value: string) => void;
@@ -56,6 +58,13 @@ export default function ProductFilterBar({
   stockFilter,
   onStockFilterChange,
 }: ProductFilterBarProps) {
+  // Lấy danh sách danh mục từ API để hiển thị trong dropdown
+  const { data: danhSachDanhMuc = [] } = useQuery({
+    queryKey: ["products", "categories"],
+    queryFn: productService.layDanhMucSanPham,
+    staleTime: 5 * 60_000, // Cache 5 phút, danh mục ít thay đổi
+  });
+
   return (
     // Thanh filter: nền trắng ngà nhẹ, border bên dưới
     <div className="flex flex-col gap-4 border-b border-border bg-surface-alt/30 p-5 lg:flex-row lg:items-center lg:justify-between">
@@ -76,7 +85,7 @@ export default function ProductFilterBar({
           />
         </label>
 
-        {/* Dropdown lọc theo danh mục */}
+        {/* Dropdown lọc theo danh mục (lấy từ API) */}
         <select
           id="category-filter"
           value={categoryFilter}
@@ -85,9 +94,11 @@ export default function ProductFilterBar({
           className="h-control-h min-w-[160px] rounded-[10px] border border-border bg-surface-alt px-3 text-body-md text-text-main outline-none transition-all focus:border-primary-container focus:ring-1 focus:ring-primary-container"
         >
           <option value="">Danh mục (Tất cả)</option>
-          <option value="ao-thun">Áo thun T-shirt</option>
-          <option value="ao-polo">Áo Polo</option>
-          <option value="ao-hoodie">Áo Hoodie</option>
+          {danhSachDanhMuc.map((dm) => (
+            <option key={dm.id} value={dm.ten}>
+              {dm.ten}
+            </option>
+          ))}
         </select>
 
         {/* Dropdown lọc theo trạng thái hiển thị */}
