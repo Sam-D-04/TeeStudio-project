@@ -22,6 +22,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import * as productService from "@/services/admin/productService";
 import type { SanPham } from "@/services/admin/productService";
+import AddProductModal from "./AddProductModal";
+import EditProductDrawer from "./EditProductDrawer";
 import InventoryAlertPanel from "./InventoryAlertPanel";
 import ProductFilterBar from "./ProductFilterBar";
 import ProductPagination from "./ProductPagination";
@@ -33,6 +35,12 @@ const SO_MOI_TRANG = 10;
 
 export default function ProductsPage() {
   const queryClient = useQueryClient();
+
+  // ===== STATE MODAL THÊM PHÔI ÁO =====
+  const [modalThemMo, setModalThemMo] = useState(false);
+
+  // ===== STATE DRAWER CHỈNH SỬa =====
+  const [sanPhamDangSua, setSanPhamDangSua] = useState<SanPham | null>(null);
 
   // ===== STATE QUẢN LÝ FILTER =====
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -136,9 +144,9 @@ export default function ProductsPage() {
     alert(`Xem chi tiết: ${product.name}`);
   }
 
-  /** Chỉnh sửa: TODO – navigate đến trang edit */
+  /** Chỉnh sửa: mở drawer chỉnh sửa */
   function handleEdit(product: SanPham) {
-    alert(`Chỉnh sửa: ${product.name}`);
+    setSanPhamDangSua(product);
   }
 
   /** Xóa: hiển thị hộp thoại xác nhận rồi gọi API */
@@ -180,6 +188,7 @@ export default function ProductsPage() {
           {/* Nút chính: Thêm phôi áo mới */}
           <button
             type="button"
+            onClick={() => setModalThemMo(true)}
             className="flex h-control-h items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-5 text-button-text font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7]"
           >
             <PlusOutlined />
@@ -304,6 +313,29 @@ export default function ProductsPage() {
 
       {/* Khoảng trống phía dưới để trang không bị sát */}
       <div className="h-12" />
+
+      {/* ===================================================
+          MODAL THÊM PHÔI ÁO MỚI
+          =================================================== */}
+      <AddProductModal
+        dangMo={modalThemMo}
+        onDong={() => setModalThemMo(false)}
+        onThanhCong={() => {
+          setModalThemMo(false);
+          // Làm mới danh sách và thống kê
+          queryClient.invalidateQueries({ queryKey: ["products"] });
+        }}
+      />
+      {/* ===================================================
+          DRAWER CHỈNH SỬa PHÔI ÁO
+          =================================================== */}
+      <EditProductDrawer
+        sanPham={sanPhamDangSua}
+        onDong={() => setSanPhamDangSua(null)}
+        onThanhCong={() => {
+          queryClient.invalidateQueries({ queryKey: ["products"] });
+        }}
+      />
     </div>
   );
 }

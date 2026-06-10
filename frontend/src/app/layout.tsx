@@ -59,7 +59,10 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${inter.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#f1f5f9]">
+      <body
+        suppressHydrationWarning
+        className="min-h-full flex flex-col bg-[#f1f5f9]"
+      >
         <QueryProvider>
           <AntdRegistry>
             <ConfigProvider theme={antdTheme} locale={viVN}>

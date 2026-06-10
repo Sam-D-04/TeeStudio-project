@@ -46,10 +46,16 @@ export type SanPham = {
   slug: string;
   /** Tên danh mục */
   category: string;
+  /** ID danh mục (chỉ có khi gọi layChiTietSanPham) */
+  categoryId?: number;
   /** Chất liệu, ví dụ: "Cotton 100% 250gsm" */
   material: string;
   /** Form dáng, ví dụ: "Oversized fit" */
   fit: string;
+  /** Xuất xứ, ví dụ: "Việt Nam" (chỉ có khi gọi layChiTietSanPham) */
+  madeIn?: string;
+  /** Mô tả sản phẩm (chỉ có khi gọi layChiTietSanPham) */
+  description?: string;
   /** Giá nền tính theo VNĐ */
   basePrice: number;
   /** Trạng thái hiển thị trên cửa hàng */

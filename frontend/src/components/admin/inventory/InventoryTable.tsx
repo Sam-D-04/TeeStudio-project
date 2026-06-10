@@ -20,7 +20,7 @@ export type InventoryItem = {
   id: number;
   ten: string;           // Tên sản phẩm, ví dụ "Basic Cotton Tee"
   mau: string;           // Màu sắc, ví dụ "Trắng"
-  mauHex: string;        // Mã màu hex để vẽ ô màu, ví dụ "#ffffff"
+  mauHex?: string;       // Mã màu hex để vẽ ô màu, ví dụ "#ffffff"
   size: string;          // Kích cỡ, ví dụ "M"
   sku: string;           // Mã SKU duy nhất, ví dụ "TS-TEE-WHT-M"
   tonHienTai: number;    // Tổng số áo đang có trong kho
@@ -36,6 +36,7 @@ type InventoryTableProps = {
   onSelectItem: (id: number) => void;  // Hàm tích/bỏ tích một hàng
   onSelectAll: () => void;             // Hàm tích/bỏ tích tất cả
   onViewDetail: (item: InventoryItem) => void; // Hàm mở drawer xem chi tiết
+  onGiaoDich: (item: InventoryItem) => void;   // Hàm mở modal nhập/xuất kho
 };
 
 export default function InventoryTable({
@@ -44,6 +45,7 @@ export default function InventoryTable({
   onSelectItem,
   onSelectAll,
   onViewDetail,
+  onGiaoDich,
 }: InventoryTableProps) {
   // Kiểm tra xem tất cả các dòng đang hiển thị có được chọn hết không
   const isAllSelected = items.length > 0 && selectedIds.length === items.length;
@@ -141,7 +143,7 @@ export default function InventoryTable({
                     {/* Ô hình vuông nhỏ hiển thị màu của phôi áo */}
                     <div
                       className="h-10 w-10 flex-shrink-0 rounded-lg border border-border"
-                      style={{ backgroundColor: item.mauHex }}
+                      style={{ backgroundColor: item.mauHex || "#f3f4f6" }}
                       title={`Màu: ${item.mau}`}
                     />
                     <div>
@@ -191,6 +193,7 @@ export default function InventoryTable({
                     <button
                       type="button"
                       title="Nhập / Xuất kho"
+                      onClick={() => onGiaoDich(item)}
                       className="flex h-8 w-8 items-center justify-center rounded text-text-secondary transition-colors hover:bg-surface-alt hover:text-primary"
                     >
                       <SyncOutlined style={{ fontSize: 16 }} />
