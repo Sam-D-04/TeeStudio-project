@@ -11,19 +11,23 @@ CREATE TABLE IF NOT EXISTS `Account` (
 	`createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	PRIMARY KEY (`id`),
-	UNIQUE KEY `uq_account_email` (`email`)
+	UNIQUE KEY `uq_account_email` (`email`),
+	KEY `idx_account_role_status` (`role`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 CREATE TABLE IF NOT EXISTS `UserToken` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`userId` INT NOT NULL,
-	`refreshToken` VARCHAR(500) NOT NULL,
+	`refreshToken` VARCHAR(64) NOT NULL COMMENT 'SHA-256 hash of refresh token',
 	`expiresAt` DATETIME NOT NULL,
+	`userAgent` VARCHAR(500) NULL,
+	`ipAddress` VARCHAR(45) NULL,
 	`createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	PRIMARY KEY (`id`),
 	UNIQUE KEY `uq_user_token_refresh_token` (`refreshToken`),
 	KEY `idx_user_token_user_id` (`userId`),
+	KEY `idx_user_token_expires_at` (`expiresAt`),
 	CONSTRAINT `fk_user_token_user`
 		FOREIGN KEY (`userId`) REFERENCES `Account` (`id`)
 		ON UPDATE NO ACTION ON DELETE CASCADE
@@ -510,3 +514,10 @@ CREATE TABLE IF NOT EXISTS `PromotionUsage` (
 
 -- Bước 4: Chuyển các bản ghi DRAFT đang chờ admin sang PENDING_REVIEW (nếu cần)
 -- UPDATE `CustomDesign` SET `status` = 'PENDING_REVIEW' WHERE `status` = 'DRAFT';
+
+-- =====================================================================
+-- AUTH BOOTSTRAP NOTE
+-- Public registration always creates a CUSTOMER account. After registering
+-- the first owner account, promote it once with the statement below, then
+-- manage all later staff accounts from Admin > Cai dat.
+-- UPDATE `Account` SET `role` = 'ADMIN' WHERE `email` = 'owner@example.com';

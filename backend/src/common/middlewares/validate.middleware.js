@@ -52,7 +52,7 @@ const validateField = (value, rules, location, field, req) => {
     errors.push({
       field,
       location,
-      message: `${label} is required`,
+      message: `${label} là bắt buộc`,
     });
     return errors;
   }
@@ -65,7 +65,7 @@ const validateField = (value, rules, location, field, req) => {
     errors.push({
       field,
       location,
-      message: `${label} must be ${rules.type}`,
+      message: `${label} phải có kiểu ${rules.type}`,
     });
     return errors;
   }
@@ -76,7 +76,7 @@ const validateField = (value, rules, location, field, req) => {
       errors.push({
         field,
         location,
-        message: `${label} must be a valid email`,
+        message: `${label} phải là email hợp lệ`,
       });
     }
   }
@@ -85,7 +85,7 @@ const validateField = (value, rules, location, field, req) => {
     errors.push({
       field,
       location,
-      message: `${label} must be at least ${rules.minLength} characters`,
+      message: `${label} phải có ít nhất ${rules.minLength} ký tự`,
     });
   }
 
@@ -93,7 +93,7 @@ const validateField = (value, rules, location, field, req) => {
     errors.push({
       field,
       location,
-      message: `${label} must be at most ${rules.maxLength} characters`,
+      message: `${label} chỉ được có tối đa ${rules.maxLength} ký tự`,
     });
   }
 
@@ -101,7 +101,7 @@ const validateField = (value, rules, location, field, req) => {
     errors.push({
       field,
       location,
-      message: `${label} must be greater than or equal to ${rules.min}`,
+      message: `${label} phải lớn hơn hoặc bằng ${rules.min}`,
     });
   }
 
@@ -109,7 +109,7 @@ const validateField = (value, rules, location, field, req) => {
     errors.push({
       field,
       location,
-      message: `${label} must be less than or equal to ${rules.max}`,
+      message: `${label} phải nhỏ hơn hoặc bằng ${rules.max}`,
     });
   }
 
@@ -117,7 +117,7 @@ const validateField = (value, rules, location, field, req) => {
     errors.push({
       field,
       location,
-      message: `${label} must be one of: ${rules.enum.join(", ")}`,
+      message: `${label} phải là một trong các giá trị: ${rules.enum.join(", ")}`,
     });
   }
 
@@ -125,7 +125,7 @@ const validateField = (value, rules, location, field, req) => {
     errors.push({
       field,
       location,
-      message: `${label} has invalid format`,
+      message: `${label} có định dạng không hợp lệ`,
     });
   }
 
@@ -135,7 +135,7 @@ const validateField = (value, rules, location, field, req) => {
       errors.push({
         field,
         location,
-        message: typeof result === "string" ? result : `${label} is invalid`,
+        message: typeof result === "string" ? result : `${label} không hợp lệ`,
       });
     }
   }
@@ -162,7 +162,7 @@ const validate = (schema) => {
     if (errors.length > 0) {
       return res.status(400).json({
         success: false,
-        message: "Validation failed",
+        message: "Dữ liệu không hợp lệ",
         errors,
       });
     }

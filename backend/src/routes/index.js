@@ -1,5 +1,7 @@
 const router = require("express").Router();
 
+const authRoutes = require("../modules/auth/auth.api.routes");
+const userRoutes = require("../modules/users/user.api.routes");
 const pricingRoutes = require("../modules/pricing/pricing.routes");
 const adminOrderRoutes = require("../modules/orders/order.routes");
 const adminDesignRoutes = require("../modules/designs/design.routes");
@@ -14,6 +16,9 @@ router.get("/health", (req, res) => {
     message: "TeeStudio API is healthy",
   });
 });
+
+router.use("/auth", authRoutes);
+router.use("/users", userRoutes);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Route công khai – dành cho giao diện khách hàng (Design Studio)

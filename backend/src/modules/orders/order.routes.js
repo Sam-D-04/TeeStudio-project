@@ -14,7 +14,8 @@
 
 const router = require("express").Router();
 
-const { verifyToken, requireAdmin } = require("../../common/middlewares/auth.middleware");
+const { verifyToken, requireRoles } = require("../../common/middlewares/auth.middleware");
+const { ROLES } = require("../../common/constants/roles");
 const validate = require("../../common/middlewares/validate.middleware");
 const orderController = require("./order.controller");
 const {
@@ -23,6 +24,8 @@ const {
   createOrderSchema,
   updateShippingAddressSchema,
 } = require("./order.validation");
+
+const requireAdmin = requireRoles(ROLES.ADMIN, ROLES.PRODUCTION);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTE HỖ TRỢ FORM TẠO ĐƠN MỚI

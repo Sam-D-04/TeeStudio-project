@@ -1,7 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  canAccessAdminPath,
+  getDefaultRouteForRole,
+  isInternalRole,
+} from "@/lib/authorization";
+import useAuthStore from "@/store/useAuthStore";
 import AdminSidebar from "./AdminSidebar";
 import AdminTopbar from "./AdminTopbar";
 
@@ -26,6 +33,11 @@ function getServerReadySnapshot() {
 }
 
 export default function AdminShell({ children }: AdminShellProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+  const hydrated = useAuthStore((state) => state.hydrated);
+  const hydrate = useAuthStore((state) => state.hydrate);
   const clientReady = useSyncExternalStore(
     subscribeToClientReady,
     getClientReadySnapshot,
@@ -37,7 +49,29 @@ export default function AdminShell({ children }: AdminShellProps) {
     ? "admin-dashboard-shell admin-dashboard-shell--sidebar-collapsed"
     : "admin-dashboard-shell";
 
-  if (!clientReady) {
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+
+    if (!user) {
+      router.replace(`/dang-nhap?redirect=${encodeURIComponent(pathname)}`);
+      return;
+    }
+
+    if (!isInternalRole(user.role)) {
+      router.replace("/");
+      return;
+    }
+
+    if (!canAccessAdminPath(user.role, pathname)) {
+      router.replace(getDefaultRouteForRole(user.role));
+    }
+  }, [hydrated, pathname, router, user]);
+
+  if (!clientReady || !hydrated || !user || !canAccessAdminPath(user.role, pathname)) {
     return <div className="admin-dashboard-shell" suppressHydrationWarning />;
   }
 

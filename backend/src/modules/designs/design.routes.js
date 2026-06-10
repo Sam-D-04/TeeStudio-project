@@ -9,7 +9,10 @@
 
 const router = require("express").Router();
 const controller = require("./design.controller");
-const { verifyToken, requireAdmin } = require("../../common/middlewares/auth.middleware");
+const { verifyToken, requireRoles } = require("../../common/middlewares/auth.middleware");
+const { ROLES } = require("../../common/constants/roles");
+
+const requireAdmin = requireRoles(ROLES.ADMIN, ROLES.PRODUCTION);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTES DÀNH CHO ADMIN – Yêu cầu xác thực

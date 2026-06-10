@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Input, Button, Badge, Drawer } from "antd";
+import { Input, Badge, Drawer } from "antd";
+import HeaderAuthActions from "@/components/auth/HeaderAuthActions";
 
 const navItems = [
   { key: "home",      label: "Trang chủ" },
@@ -165,37 +166,7 @@ export default function AppHeader() {
               flexShrink:  0,
             }}
           >
-            <Button
-              style={{
-                background:   "#f1f5f9",
-                border:       "1px solid #e2e8f0",
-                color:        "#475569",
-                fontWeight:   500,
-                height:       40,
-                padding:      "0 16px",
-                borderRadius: 8,
-                fontSize:     14,
-              }}
-              className="hidden md:inline-flex"
-            >
-              Đăng nhập
-            </Button>
-
-            <Button
-              type="primary"
-              style={{
-                background:   "#0ea5e9",
-                border:       "none",
-                fontWeight:   600,
-                height:       40,
-                padding:      "0 20px",
-                borderRadius: 8,
-                fontSize:     14,
-              }}
-              className="hidden md:inline-flex"
-            >
-              Đăng ký
-            </Button>
+            <HeaderAuthActions />
 
             {/* Cart */}
             <Badge count={0} showZero={false}>
@@ -297,11 +268,8 @@ export default function AppHeader() {
           ))}
         </nav>
 
-        <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 10 }}>
-          <Button block size="large" style={{ borderRadius: 8, fontWeight: 600 }}>Đăng nhập</Button>
-          <Button block type="primary" size="large" style={{ borderRadius: 8, fontWeight: 600, background: "#0ea5e9", border: "none" }}>
-            Đăng ký
-          </Button>
+        <div style={{ padding: "20px" }}>
+          <HeaderAuthActions mobile onNavigate={() => setDrawerOpen(false)} />
         </div>
       </Drawer>
     </>

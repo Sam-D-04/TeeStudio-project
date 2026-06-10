@@ -1,66 +1,93 @@
-/**
- * auth.middleware.js
- *
- * Middleware xác thực JWT và kiểm tra quyền Admin.
- *
- * TRẠNG THÁI HIỆN TẠI: Bypass tạm thời (luôn gọi next()).
- * Logic verify token thật sẽ được đắp vào sau khi module Auth hoàn thành.
- *
- * Cách dùng trong route:
- *   router.get("/", verifyToken, requireAdmin, controller.handler);
- */
+const jwt = require("jsonwebtoken");
+const db = require("../../database/mysql");
+const { ROLES } = require("../constants/roles");
 
-/**
- * verifyToken – kiểm tra JWT trong header Authorization.
- *
- * Thật ra sẽ:
- * 1. Đọc token từ header: Authorization: Bearer <token>
- * 2. Xác minh token bằng jwt.verify(token, process.env.JWT_SECRET)
- * 3. Lưu thông tin user vào req.user = { id, email, role }
- * 4. Gọi next() nếu hợp lệ, trả 401 nếu không hợp lệ
- *
- * TẠM THỜI: Luôn cho qua để không chặn luồng test chức năng.
- */
-const verifyToken = (req, res, next) => {
-  // TODO: Đắp logic verify JWT thật vào đây
-  // Ví dụ:
-  // const authHeader = req.headers["authorization"];
-  // if (!authHeader || !authHeader.startsWith("Bearer ")) {
-  //   return res.status(401).json({ success: false, message: "Chưa đăng nhập" });
-  // }
-  // const token = authHeader.split(" ")[1];
-  // try {
-  //   const decoded = jwt.verify(token, process.env.JWT_SECRET);
-  //   req.user = decoded;
-  //   next();
-  // } catch {
-  //   return res.status(401).json({ success: false, message: "Token không hợp lệ" });
-  // }
-
-  // Tạm thời bypass: gán user giả để code sau này không bị lỗi khi đọc req.user
-  req.user = { id: 1, email: "admin@teestudio.vn", role: "ADMIN" };
-  next();
-};
-
-/**
- * requireAdmin – kiểm tra người dùng phải có role ADMIN.
- *
- * Chạy SAU verifyToken. Đọc req.user.role và từ chối nếu không phải ADMIN.
- *
- * TẠM THỜI: Vì verifyToken đã gán role ADMIN, middleware này luôn cho qua.
- * Sau khi logic thật được đắp vào verifyToken, middleware này sẽ tự động hoạt động đúng.
- */
-const requireAdmin = (req, res, next) => {
-  if (!req.user || req.user.role !== "ADMIN") {
-    return res.status(403).json({
-      success: false,
-      message: "Bạn không có quyền thực hiện thao tác này",
-    });
+const getAccessTokenSecret = () => {
+  const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
+  if (!secret && process.env.NODE_ENV === "production") {
+    throw new Error("JWT_ACCESS_SECRET must be configured in production");
   }
-  next();
+  return secret || "teestudio-development-access-secret";
 };
+
+const unauthorized = (res, message = "Vui lòng đăng nhập để tiếp tục") => {
+  return res.status(401).json({ success: false, message });
+};
+
+const verifyToken = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return unauthorized(res);
+  }
+
+  const token = authHeader.slice(7).trim();
+
+  try {
+    const payload = jwt.verify(token, getAccessTokenSecret(), {
+      algorithms: ["HS256"],
+    });
+
+    if (payload.type !== "access" || !payload.sub) {
+      return unauthorized(res, "Access token không hợp lệ");
+    }
+
+    const [accounts] = await db.pool.query(
+      `SELECT id, email, fullName, phone, role, status
+       FROM Account
+       WHERE id = ?
+       LIMIT 1`,
+      [Number(payload.sub)]
+    );
+    const account = accounts[0];
+
+    if (!account || account.status !== "ACTIVE") {
+      return unauthorized(res, "Tài khoản không tồn tại hoặc đã bị vô hiệu hóa");
+    }
+
+    req.user = {
+      id: account.id,
+      email: account.email,
+      fullName: account.fullName,
+      phone: account.phone,
+      role: account.role,
+      status: account.status,
+    };
+    return next();
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return unauthorized(res, "Access token đã hết hạn");
+    }
+
+    if (error.name === "JsonWebTokenError") {
+      return unauthorized(res, "Access token không hợp lệ");
+    }
+
+    return next(error);
+  }
+};
+
+const requireRoles = (...roles) => {
+  const allowedRoles = Array.isArray(roles[0]) ? roles[0] : roles;
+
+  return (req, res, next) => {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Bạn không có quyền truy cập chức năng này",
+      });
+    }
+
+    return next();
+  };
+};
+
+const verifyRole = (roles) => requireRoles(roles);
+const requireAdmin = requireRoles(ROLES.ADMIN);
 
 module.exports = {
   verifyToken,
+  verifyRole,
+  requireRoles,
   requireAdmin,
 };
