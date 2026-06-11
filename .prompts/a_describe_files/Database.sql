@@ -436,6 +436,7 @@ CREATE TABLE IF NOT EXISTS `Payment` (
 	`transactionId` VARCHAR(255) NULL,
 	`paidAt` DATETIME NULL,
 	`gatewayResponse` TEXT NULL,
+	`note` TEXT NULL COMMENT 'Ghi chú kế toán của admin',
 	`createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	PRIMARY KEY (`id`),
 	UNIQUE KEY `uq_payment_transaction_id` (`transactionId`),
@@ -521,3 +522,11 @@ CREATE TABLE IF NOT EXISTS `PromotionUsage` (
 -- the first owner account, promote it once with the statement below, then
 -- manage all later staff accounts from Admin > Cai dat.
 -- UPDATE `Account` SET `role` = 'ADMIN' WHERE `email` = 'owner@example.com';
+
+-- =====================================================================
+-- MIGRATION: Thêm cột note vào bảng Payment cho ghi chú kế toán
+-- Chạy script này nếu bạn đang nâng cấp database đã có
+-- (Nếu import database mới từ đầu, ALTER này không cần thiết
+--  vì CREATE TABLE ở trên đã bao gồm cột note)
+-- =====================================================================
+-- ALTER TABLE `Payment` ADD COLUMN `note` TEXT NULL COMMENT 'Ghi chú kế toán của admin' AFTER `gatewayResponse`;

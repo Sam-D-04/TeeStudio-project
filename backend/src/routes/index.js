@@ -6,6 +6,7 @@ const pricingRoutes = require("../modules/pricing/pricing.routes");
 const adminOrderRoutes = require("../modules/orders/order.routes");
 const adminDesignRoutes = require("../modules/designs/design.routes");
 const paymentRoutes = require("../modules/payments/payment.routes");
+const adminPaymentRoutes = require("../modules/payments/payment.routes").adminRouter;
 const adminProductRoutes = require("../modules/products/product.routes");
 const adminInventoryRoutes = require("../modules/inventory/inventory.routes");
 
@@ -53,5 +54,8 @@ router.use("/admin/products", adminProductRoutes);
 
 // Quản lý kho hàng – /api/admin/inventory/...
 router.use("/admin/inventory", adminInventoryRoutes);
+
+// Quản lý thanh toán – /api/admin/payments/...
+router.use("/admin/payments", adminPaymentRoutes);
 
 module.exports = router;

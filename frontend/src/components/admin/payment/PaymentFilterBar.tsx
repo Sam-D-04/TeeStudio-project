@@ -12,30 +12,30 @@ import type { PaymentStatus } from "./PaymentStatusBadge";
 type FilterPill = {
   key: PaymentStatus | "tat_ca"; // "tat_ca" = không lọc trạng thái
   label: string;
-  count?: number; // Số lượng giao dịch trong tab này (hiển thị trong ngoặc)
   pillClassName?: string; // Lớp CSS tùy chỉnh khi không active
 };
 
 const FILTER_PILLS: FilterPill[] = [
   { key: "tat_ca",        label: "Tất cả" },
-  { key: "cho_thanh_toan", label: "Chờ thanh toán", count: 18 },
+  { key: "cho_thanh_toan", label: "Chờ thanh toán" },
   { key: "da_thanh_toan",  label: "Đã thanh toán" },
   {
     key: "that_bai",
     label: "Thất bại",
-    count: 5,
     // Pill màu đỏ nhạt khi không active
     pillClassName: "bg-[#fef2f2] border-[#fca5a5] text-[#b91c1c] hover:bg-[#fee2e2]",
   },
-  { key: "hoan_tien", label: "Hoàn tiền" },
-  {
-    key: "can_doi_soat",
-    label: "Cần đối soát",
-    count: 7,
-    // Pill màu vàng nhạt khi không active
-    pillClassName: "bg-[#fef9c3] border-[#fde047] text-[#854d0e] hover:bg-[#fef08a]",
-  },
+
 ];
+
+/** Số lượng giao dịch cho mỗi tab */
+export type TabCounts = {
+  tat_ca?: number;
+  cho_thanh_toan?: number;
+  da_thanh_toan?: number;
+  that_bai?: number;
+  can_doi_soat?: number;
+};
 
 type PaymentFilterBarProps = {
   // Tìm kiếm theo mã đơn / mã giao dịch
@@ -59,6 +59,9 @@ type PaymentFilterBarProps = {
   // Nút lọc và đặt lại
   onFilter: () => void;
   onReset: () => void;
+
+  // Số lượng cho mỗi tab pill (từ API)
+  tabCounts?: TabCounts;
 };
 
 export default function PaymentFilterBar({
@@ -74,6 +77,7 @@ export default function PaymentFilterBar({
   onTimeFilterChange,
   onFilter,
   onReset,
+  tabCounts,
 }: PaymentFilterBarProps) {
   return (
     // Khung filter: nền trắng, bo góc 12px, viền 1px, shadow nhẹ
@@ -125,7 +129,6 @@ export default function PaymentFilterBar({
               <option value="da_thanh_toan">Đã thanh toán</option>
               <option value="cho_thanh_toan">Chờ thanh toán</option>
               <option value="that_bai">Thất bại</option>
-              <option value="hoan_tien">Hoàn tiền</option>
             </select>
             {/* Icon mũi tên xuống */}
             <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-text-secondary">
@@ -211,6 +214,7 @@ export default function PaymentFilterBar({
         <div className="flex flex-wrap gap-2">
           {FILTER_PILLS.map((pill) => {
             const isActive = activeTab === pill.key;
+            const count = tabCounts?.[pill.key as keyof TabCounts];
 
             // Xác định lớp CSS cho pill đang active
             const activeClass = "bg-text-main text-surface";
@@ -231,8 +235,8 @@ export default function PaymentFilterBar({
               >
                 {/* Hiển thị số lượng trong ngoặc nếu có */}
                 {pill.label}
-                {pill.count !== undefined && !isActive
-                  ? ` (${pill.count})`
+                {count !== undefined && count > 0 && !isActive
+                  ? ` (${count})`
                   : ""}
               </button>
             );

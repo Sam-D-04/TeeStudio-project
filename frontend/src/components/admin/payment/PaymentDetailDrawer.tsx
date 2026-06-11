@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import type { Payment } from "./PaymentTable";
+import { useState, useEffect } from "react";
+import type { Payment, PaymentType } from "./PaymentTable";
 import PaymentStatusBadge from "./PaymentStatusBadge";
 
 /**
@@ -16,15 +16,27 @@ import PaymentStatusBadge from "./PaymentStatusBadge";
  * 5. Ghi chú kế toán + nút hành động (Hoàn tiền, Đồng bộ VNPAY)
  *
  * Props:
- * - payment: null = ẩn ngăn kéo | Payment = hiển thị ngăn kéo với dữ liệu
+ * - payment: null = ẩn ngăn kéo | PaymentDetail = hiển thị ngăn kéo với dữ liệu
  * - onClose: gọi khi bấm nút X
+ * - onRefund: gọi khi bấm nút Hoàn tiền
+ * - onSyncVnpay: gọi khi bấm nút Đồng bộ VNPAY
+ * - onSaveNote: gọi khi bấm nút Lưu ghi chú
+ * - isActionLoading: true khi đang xử lý hành động (disable nút)
  */
+
+// Nhãn tiếng Việt cho từng loại thanh toán (ánh xạ từ DB.paymentType)
+const PAYMENT_TYPE_LABEL: Record<PaymentType, string> = {
+  DEPOSIT: "Thanh toán cọc",
+  FULL_PAYMENT: "Thanh toán toàn bộ",
+  COD_FINAL: "Thanh toán COD",
+};
 
 // Kiểu mở rộng chứa thêm thông tin chi tiết (ngoài các trường cơ bản của Payment)
 export type PaymentDetail = Payment & {
   customerPhone?: string;       // Số điện thoại khách hàng
   createdAt: string;            // Thời gian tạo giao dịch (đã format)
-  paidAt?: string;              // Thời gian thanh toán thành công (nếu có)
+  note?: string;                // Ghi chú kế toán
+  // paidAt đã được kế thừa từ Payment (Payment.paidAt?: string)
   // Lịch sử IPN: mỗi bước có mô tả và thời gian
   ipnHistory: {
     description: string;        // Ví dụ: "Nhận IPN thành công"
@@ -35,16 +47,35 @@ export type PaymentDetail = Payment & {
 };
 
 type PaymentDetailDrawerProps = {
-  payment: PaymentDetail | null; // null = ẩn ngăn kéo
-  onClose: () => void;           // Đóng ngăn kéo
+  payment: PaymentDetail | null;           // null = ẩn ngăn kéo
+  onClose: () => void;                     // Đóng ngăn kéo
+  isLoading?: boolean;                     // Đang tải chi tiết
+  onRefund?: (id: number) => void;         // Hoàn tiền
+  onSyncVnpay?: (id: number) => void;      // Đồng bộ VNPAY
+  onSaveNote?: (id: number, note: string) => void; // Lưu ghi chú
+  isActionLoading?: boolean;               // Đang xử lý hành động
 };
 
 export default function PaymentDetailDrawer({
   payment,
   onClose,
+  isLoading = false,
+  onRefund,
+  onSyncVnpay,
+  onSaveNote,
+  isActionLoading = false,
 }: PaymentDetailDrawerProps) {
   // State lưu nội dung ghi chú kế toán
   const [accountingNote, setAccountingNote] = useState("");
+
+  // Khi payment thay đổi, cập nhật ghi chú
+  useEffect(() => {
+    if (payment?.note !== undefined) {
+      setAccountingNote(payment.note);
+    } else {
+      setAccountingNote("");
+    }
+  }, [payment?.id, payment?.note]);
 
   // Hàm định dạng số tiền VNĐ
   function formatVnd(amount: number): string {
@@ -90,8 +121,16 @@ export default function PaymentDetailDrawer({
         {/* ---- Nội dung cuộn được ---- */}
         <div className="flex-1 space-y-6 overflow-y-auto p-5">
 
+          {/* Trạng thái loading */}
+          {isLoading && (
+            <div className="flex items-center justify-center py-12">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-[#0ea5e9]" />
+              <span className="ml-3 text-sm text-text-secondary">Đang tải...</span>
+            </div>
+          )}
+
           {/* Phần 1: Mã giao dịch + trạng thái */}
-          {payment && (
+          {payment && !isLoading && (
             <div className="flex items-center justify-between">
               <div>
                 <p className="mb-1 text-xs text-text-secondary">Mã Giao Dịch</p>
@@ -102,7 +141,7 @@ export default function PaymentDetailDrawer({
           )}
 
           {/* Phần 2: Thông tin thanh toán – nền xám nhạt */}
-          {payment && (
+          {payment && !isLoading && (
             <div className="space-y-3 rounded-lg border border-border bg-surface-alt p-4">
               <h3 className="text-xs font-bold uppercase text-text-secondary">
                 Thông tin thanh toán
@@ -114,12 +153,17 @@ export default function PaymentDetailDrawer({
                   {formatVnd(payment.amountVnd)}
                 </span>
 
+                <span className="text-text-secondary">Loại thanh toán:</span>
+                <span className="text-right font-medium text-text-main">
+                  {PAYMENT_TYPE_LABEL[payment.paymentType]}
+                </span>
+
                 <span className="text-text-secondary">Phương thức:</span>
                 <span className="text-right font-medium text-text-main">
                   {payment.method}
                 </span>
 
-                <span className="text-text-secondary">Mã cổng TT:</span>
+                <span className="text-text-secondary">Mã cổng thanh toán:</span>
                 <span className="text-right font-mono text-xs text-text-muted">
                   {payment.gatewayCode}
                 </span>
@@ -129,7 +173,7 @@ export default function PaymentDetailDrawer({
 
                 {payment.paidAt && (
                   <>
-                    <span className="text-text-secondary">Thời gian TT:</span>
+                    <span className="text-text-secondary">Thời gian thanh toán:</span>
                     <span className="text-right text-text-main">{payment.paidAt}</span>
                   </>
                 )}
@@ -138,7 +182,7 @@ export default function PaymentDetailDrawer({
           )}
 
           {/* Phần 3: Đơn hàng liên quan */}
-          {payment && (
+          {payment && !isLoading && (
             <div className="space-y-3 rounded-lg border border-border p-4">
               <h3 className="text-xs font-bold uppercase text-text-secondary">
                 Đơn hàng liên quan
@@ -168,37 +212,41 @@ export default function PaymentDetailDrawer({
           )}
 
           {/* Phần 4: Lịch sử xử lý IPN – timeline theo chiều dọc */}
-          {payment && (
+          {payment && !isLoading && (
             <div>
               <h3 className="mb-3 text-xs font-bold uppercase text-text-secondary">
                 Lịch sử xử lý IPN
               </h3>
 
-              {/* Timeline: đường kẻ dọc bên trái + các điểm tròn */}
-              <div className="relative ml-2 space-y-4 border-l border-[#cbd5e1] pb-2">
-                {payment.ipnHistory.map((step, index) => (
-                  <div key={index} className="relative pl-5">
-                    {/* Điểm tròn trên timeline: xanh lá = thành công, xám = đang chờ */}
-                    <div
-                      className={`absolute -left-[4.5px] top-1.5 h-2 w-2 rounded-full ring-4 ring-surface ${
-                        step.isSuccess ? "bg-[#10b981]" : "bg-border"
-                      }`}
-                    />
-                    <p className="text-sm font-medium text-text-main">
-                      {step.description}
-                    </p>
-                    <p className="text-xs text-text-muted">
-                      {step.time}
-                      {step.note && ` – ${step.note}`}
-                    </p>
-                  </div>
-                ))}
-              </div>
+              {payment.ipnHistory.length === 0 ? (
+                <p className="text-sm italic text-text-muted">Chưa có lịch sử xử lý</p>
+              ) : (
+                /* Timeline: đường kẻ dọc bên trái + các điểm tròn */
+                <div className="relative ml-2 space-y-4 border-l border-[#cbd5e1] pb-2">
+                  {payment.ipnHistory.map((step, index) => (
+                    <div key={index} className="relative pl-5">
+                      {/* Điểm tròn trên timeline: xanh lá = thành công, xám = đang chờ */}
+                      <div
+                        className={`absolute -left-[4.5px] top-1.5 h-2 w-2 rounded-full ring-4 ring-surface ${
+                          step.isSuccess ? "bg-[#10b981]" : "bg-border"
+                        }`}
+                      />
+                      <p className="text-sm font-medium text-text-main">
+                        {step.description}
+                      </p>
+                      <p className="text-xs text-text-muted">
+                        {step.time}
+                        {step.note && ` – ${step.note}`}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           {/* Phần 5: Ghi chú kế toán */}
-          {payment && (
+          {payment && !isLoading && (
             <div>
               <h3 className="mb-2 text-xs font-bold uppercase text-text-secondary">
                 Ghi chú kế toán
@@ -213,28 +261,46 @@ export default function PaymentDetailDrawer({
               {/* Nút lưu ghi chú */}
               <button
                 type="button"
-                className="mt-2 h-control-h w-full rounded-lg border border-border bg-surface text-sm font-semibold text-text-main transition-colors hover:bg-surface-container"
+                disabled={isActionLoading}
+                onClick={() => {
+                  if (payment && onSaveNote) {
+                    onSaveNote(payment.id, accountingNote);
+                  }
+                }}
+                className="mt-2 h-control-h w-full rounded-lg border border-border bg-surface text-sm font-semibold text-text-main transition-colors hover:bg-surface-container disabled:opacity-50"
               >
-                Lưu ghi chú
+                {isActionLoading ? "Đang lưu..." : "Lưu ghi chú"}
               </button>
             </div>
           )}
         </div>
 
         {/* ---- Khu vực nút hành động cuối ngăn kéo ---- */}
-        {payment && (
+        {payment && !isLoading && (
           <div className="flex shrink-0 gap-3 border-t border-border bg-surface p-5">
             {/* Nút Hoàn tiền – màu đỏ nhạt */}
             <button
               type="button"
-              className="h-control-h flex-1 rounded-lg border border-[#fca5a5] bg-surface text-sm font-semibold text-[#b91c1c] transition-colors hover:bg-[#fef2f2]"
+              disabled={isActionLoading || payment.status !== "da_thanh_toan"}
+              onClick={() => {
+                if (payment && onRefund) {
+                  onRefund(payment.id);
+                }
+              }}
+              className="h-control-h flex-1 rounded-lg border border-[#fca5a5] bg-surface text-sm font-semibold text-[#b91c1c] transition-colors hover:bg-[#fef2f2] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Hoàn tiền
             </button>
             {/* Nút Đồng bộ VNPAY – màu xanh chính */}
             <button
               type="button"
-              className="h-control-h flex-1 rounded-lg bg-[#0ea5e9] text-sm font-semibold text-white transition-colors hover:bg-[#0284c7]"
+              disabled={isActionLoading || payment.method !== "VNPAY"}
+              onClick={() => {
+                if (payment && onSyncVnpay) {
+                  onSyncVnpay(payment.id);
+                }
+              }}
+              className="h-control-h flex-1 rounded-lg bg-[#0ea5e9] text-sm font-semibold text-white transition-colors hover:bg-[#0284c7] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Đồng bộ VNPAY
             </button>
