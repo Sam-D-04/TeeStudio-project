@@ -1,45 +1,25 @@
-/**
- * SettingRoleBadge – Badge hiển thị vai trò nhân viên.
- *
- * Mỗi vai trò có một bộ màu riêng để dễ phân biệt trực quan.
- * - Admin: Xanh da trời (primary)
- * - Kho: Xanh lam nhạt (secondary)
- * - Sản xuất: Xanh ngọc (tertiary)
- * - Kế toán: Xám (neutral)
- */
+import type { UserRole } from "@/types/auth";
 
-// Định nghĩa các vai trò hợp lệ trong hệ thống
-export type StaffRole = "admin" | "kho" | "san_xuat" | "ke_toan";
+export type StaffRole = Exclude<UserRole, "CUSTOMER">;
 
-// Nhãn hiển thị tiếng Việt cho từng vai trò
-const ROLE_LABELS: Record<StaffRole, string> = {
-  admin:     "Admin",
-  kho:       "Kho",
-  san_xuat:  "Sản xuất",
-  ke_toan:   "Kế toán",
+const roleLabels: Record<StaffRole, string> = {
+  ADMIN: "Quản trị viên",
+  WAREHOUSE: "Thủ kho",
+  PRODUCTION: "Thiết kế & in ấn",
 };
 
-// Bộ màu nền và màu chữ cho từng vai trò
-// Dùng màu nền nhạt + chữ đậm để tạo contrast tốt
-const ROLE_STYLES: Record<StaffRole, string> = {
-  admin:     "bg-[#e0f2fe] text-[#0284c7]",         // Xanh primary
-  kho:       "bg-[#cce5ff] text-[#004b73]",          // Xanh secondary nhạt
-  san_xuat:  "bg-[#bee9ff] text-[#1e4c5f]",          // Xanh tertiary nhạt
-  ke_toan:   "bg-[#e4e9ed] text-[#475569]",          // Xám trung tính
+const roleStyles: Record<StaffRole, string> = {
+  ADMIN: "bg-[#e0f2fe] text-[#0284c7]",
+  WAREHOUSE: "bg-[#cce5ff] text-[#004b73]",
+  PRODUCTION: "bg-[#bee9ff] text-[#1e4c5f]",
 };
 
-type SettingRoleBadgeProps = {
-  role: StaffRole; // Vai trò cần hiển thị
-};
-
-export default function SettingRoleBadge({ role }: SettingRoleBadgeProps) {
+export default function SettingRoleBadge({ role }: { role: StaffRole }) {
   return (
-    // Badge bo góc 6px (dạng "rounded-md" – không tròn hoàn toàn)
-    // Padding nhỏ, chữ 12px đậm
     <span
-      className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold ${ROLE_STYLES[role]}`}
+      className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold ${roleStyles[role]}`}
     >
-      {ROLE_LABELS[role]}
+      {roleLabels[role]}
     </span>
   );
 }

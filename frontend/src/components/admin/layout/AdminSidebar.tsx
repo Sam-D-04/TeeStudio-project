@@ -16,23 +16,25 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import useAuthStore from "@/store/useAuthStore";
+import type { UserRole } from "@/types/auth";
 
 type NavItem = {
   label: string;
   icon: ReactNode;
-  href: string; // Đường dẫn thực tế cho từng mục menu
+  href: string;
+  allowedRoles: UserRole[];
 };
 
-// Danh sách các mục menu sidebar với đường dẫn tương ứng
 const navItems: NavItem[] = [
-  { label: "Tổng quan",  icon: <DashboardOutlined />,    href: "/admin" },
-  { label: "Đơn hàng",  icon: <ShoppingCartOutlined />,  href: "/admin/don-hang" },
-  { label: "Sản phẩm / Phôi áo", icon: <SkinOutlined />, href: "/admin/san-pham-phoi-ao" },
-  { label: "Thiết kế & In ấn",  icon: <BgColorsOutlined />,      href: "/admin/thiet-ke" },
-  { label: "Kho hàng",  icon: <InboxOutlined />,         href: "/admin/kho-hang" },
-  { label: "Thanh toán",icon: <CreditCardOutlined />,    href: "/admin/thanh-toan" },
-  { label: "Khuyến mãi & Báo giá", icon: <TagsOutlined />, href: "/admin/khuyen-mai-bao-gia" },
-  { label: "Cài đặt",   icon: <SettingOutlined />,       href: "/admin/cai-dat" },
+  { label: "Tổng quan", icon: <DashboardOutlined />, href: "/admin", allowedRoles: ["ADMIN"] },
+  { label: "Đơn hàng", icon: <ShoppingCartOutlined />, href: "/admin/don-hang", allowedRoles: ["ADMIN", "PRODUCTION"] },
+  { label: "Sản phẩm / Phôi áo", icon: <SkinOutlined />, href: "/admin/san-pham-phoi-ao", allowedRoles: ["ADMIN", "WAREHOUSE"] },
+  { label: "Thiết kế & In ấn", icon: <BgColorsOutlined />, href: "/admin/thiet-ke", allowedRoles: ["ADMIN", "PRODUCTION"] },
+  { label: "Kho hàng", icon: <InboxOutlined />, href: "/admin/kho-hang", allowedRoles: ["ADMIN", "WAREHOUSE"] },
+  { label: "Thanh toán", icon: <CreditCardOutlined />, href: "/admin/thanh-toan", allowedRoles: ["ADMIN"] },
+  { label: "Khuyến mãi & Báo giá", icon: <TagsOutlined />, href: "/admin/khuyen-mai-bao-gia", allowedRoles: ["ADMIN"] },
+  { label: "Cài đặt", icon: <SettingOutlined />, href: "/admin/cai-dat", allowedRoles: ["ADMIN"] },
 ];
 
 function SidebarContent({
@@ -46,13 +48,14 @@ function SidebarContent({
   onClose?: () => void;
   onToggleCollapse?: () => void;
 }) {
-  // usePathname trả về đường dẫn hiện tại (ví dụ: "/admin/don-hang")
-  // Dùng để xác định mục menu nào đang được chọn (active)
   const pathname = usePathname();
+  const role = useAuthStore((state) => state.user?.role);
+  const visibleItems = navItems.filter(
+    (item) => role && item.allowedRoles.includes(role),
+  );
 
   return (
     <>
-      {/* Logo + tên hệ thống */}
       <div
         className={`mb-8 flex items-center ${
           collapsed ? "justify-center px-2" : "gap-3 px-base"
@@ -71,12 +74,11 @@ function SidebarContent({
             </div>
           </>
         )}
+
         {onToggleCollapse ? (
           <button
             type="button"
-            aria-label={
-              collapsed ? "Mở rộng menu quản trị" : "Thu gọn menu quản trị"
-            }
+            aria-label={collapsed ? "Mở rộng menu quản trị" : "Thu gọn menu quản trị"}
             aria-expanded={!collapsed}
             onClick={onToggleCollapse}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] text-text-secondary transition-colors hover:bg-surface-alt hover:text-primary"
@@ -95,27 +97,22 @@ function SidebarContent({
         ) : null}
       </div>
 
-      {/* Danh sách các mục menu */}
       <nav className="flex-1 overflow-y-auto">
         <ul className="space-y-1">
-          {navItems.map((item) => {
-            // Kiểm tra xem đường dẫn hiện tại có khớp với mục menu không
-            // Đặc biệt: "/admin" chỉ active khi đúng "/admin", không active khi là "/admin/don-hang"
+          {visibleItems.map((item) => {
             const isActive =
               item.href === "/admin"
                 ? pathname === "/admin"
                 : pathname.startsWith(item.href);
-
-            // Class cho mục đang active và mục thường
             const itemClass = isActive
-              ? "bg-secondary-fixed text-on-secondary-fixed-variant"  // Xanh nhạt + chữ xanh đậm
-              : "text-text-secondary hover:bg-surface-alt hover:text-primary"; // Xám, hover xanh
+              ? "bg-secondary-fixed text-on-secondary-fixed-variant"
+              : "text-text-secondary hover:bg-surface-alt hover:text-primary";
 
             return (
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  onClick={onClose} // Đóng menu mobile khi chọn mục
+                  onClick={onClose}
                   aria-label={item.label}
                   title={collapsed ? item.label : undefined}
                   className={`mx-2 flex h-11 items-center rounded-[8px] py-2 text-sidebar-item font-semibold transition-colors ${
@@ -123,9 +120,7 @@ function SidebarContent({
                   } ${itemClass}`}
                 >
                   <span className="flex shrink-0 text-[22px] leading-none">{item.icon}</span>
-                  <span className={collapsed ? "sr-only" : "truncate"}>
-                    {item.label}
-                  </span>
+                  <span className={collapsed ? "sr-only" : "truncate"}>{item.label}</span>
                 </Link>
               </li>
             );
@@ -149,14 +144,8 @@ export default function AdminSidebar({
 }) {
   return (
     <>
-      <aside
-        className="admin-sidebar-desktop"
-        data-collapsed={collapsed}
-      >
-        <SidebarContent
-          collapsed={collapsed}
-          onToggleCollapse={onToggleCollapse}
-        />
+      <aside className="admin-sidebar-desktop" data-collapsed={collapsed}>
+        <SidebarContent collapsed={collapsed} onToggleCollapse={onToggleCollapse} />
       </aside>
 
       {mobileOpen ? (

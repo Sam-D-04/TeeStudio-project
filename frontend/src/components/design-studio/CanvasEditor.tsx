@@ -353,7 +353,7 @@ export default function CanvasEditor({
   const [isDragging, setIsDragging] = useState(false);
 
   const handleStageClick = useCallback(
-    (e: Konva.KonvaEventObject<MouseEvent>) => {
+    (e: Konva.KonvaEventObject<any>) => {
       if (e.target === e.target.getStage()) {
         setSelectedId(null);
       }

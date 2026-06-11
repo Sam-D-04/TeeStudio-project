@@ -1,16 +1,32 @@
+import { CalendarOutlined } from "@ant-design/icons";
+import { DatePicker } from "antd";
+import dayjs from "dayjs";
+import type { Dayjs } from "dayjs";
+import type { RangePickerProps } from "antd/es/date-picker";
 import type { OrderStatus } from "./OrderStatusBadge";
+
+const { RangePicker } = DatePicker;
 
 /**
  * OrderFilterBar – thanh lọc đơn hàng.
  *
  * Gồm hai phần:
  * 1. Hàng pill (nút bo tròn) để lọc theo trạng thái xử lý.
- * 2. Hàng select để lọc theo thanh toán, thời gian, loại đơn.
+ * 2. Hàng filter nâng cao để lọc theo thanh toán, thời gian, loại đơn.
  */
+
+export type DateRange = [Dayjs, Dayjs];
+
+function getWeekRange(): DateRange {
+  const today = dayjs();
+  const daysFromMonday = (today.day() + 6) % 7;
+
+  return [today.subtract(daysFromMonday, "day"), today];
+}
 
 // Danh sách các tab lọc trạng thái (pill)
 export type FilterTab = {
-  key: OrderStatus | "tat_ca" | "dang_xu_ly_in"; // "tat_ca" = Tất cả
+  key: OrderStatus | "tat_ca"; // "tat_ca" = Tất cả
   label: string;
 };
 
@@ -20,8 +36,9 @@ const FILTER_TABS: FilterTab[] = [
   { key: "da_xac_nhan",   label: "Đã xác nhận" },
   { key: "dang_xu_ly_in", label: "Đang xử lý in" },
   { key: "cho_giao",      label: "Chờ giao" },
-  { key: "dang_giao",     label: "Đang giao" },
+  { key: "dang_giao",     label: "Đang giao hàng" },
   { key: "hoan_tat",      label: "Hoàn tất" },
+  { key: "da_huy",        label: "Đã hủy" },
 ];
 
 type OrderFilterBarProps = {
@@ -34,8 +51,8 @@ type OrderFilterBarProps = {
   paymentFilter: string;
   onPaymentFilterChange: (value: string) => void;
 
-  timeFilter: string;
-  onTimeFilterChange: (value: string) => void;
+  dateRange: DateRange | null;
+  onDateRangeChange: (value: DateRange | null) => void;
 
   typeFilter: string;
   onTypeFilterChange: (value: string) => void;
@@ -46,11 +63,28 @@ export default function OrderFilterBar({
   onTabChange,
   paymentFilter,
   onPaymentFilterChange,
-  timeFilter,
-  onTimeFilterChange,
+  dateRange,
+  onDateRangeChange,
   typeFilter,
   onTypeFilterChange,
 }: OrderFilterBarProps) {
+  const today = dayjs();
+  const [weekStart, weekEnd] = getWeekRange();
+  const rangePresets: RangePickerProps["presets"] = [
+    { label: "Hôm nay", value: [today, today] as DateRange },
+    { label: "Tuần này", value: [weekStart, weekEnd] as DateRange },
+    { label: "Tháng này", value: [today.startOf("month"), today] as DateRange },
+  ];
+
+  const handleDateRangeChange: NonNullable<RangePickerProps["onChange"]> = (dates) => {
+    if (dates?.[0] && dates[1]) {
+      onDateRangeChange([dates[0], dates[1]]);
+      return;
+    }
+
+    onDateRangeChange(null);
+  };
+
   return (
     // Khu vực filter: nền xám nhạt, viền dưới, padding 16px
     <div className="space-y-4 border-b border-border bg-surface-alt px-4 py-4">
@@ -98,21 +132,20 @@ export default function OrderFilterBar({
           </span>
         </div>
 
-        {/* Select lọc theo thời gian */}
-        <div className="relative">
-          <select
-            value={timeFilter}
-            onChange={(e) => onTimeFilterChange(e.target.value)}
-            className="h-control-h appearance-none rounded-lg border border-border bg-surface pl-4 pr-10 text-sm text-text-main outline-none focus:border-primary-container"
-          >
-            <option value="tat_ca">Tất cả thời gian</option>
-            <option value="hom_nay">Hôm nay</option>
-            <option value="tuan_nay">Tuần này</option>
-            <option value="thang_nay">Tháng này</option>
-          </select>
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary">
-            ▾
-          </span>
+        {/* Lọc theo thời gian */}
+        <div className="w-full sm:w-auto">
+          <RangePicker
+            aria-label="Chọn khoảng thời gian"
+            value={dateRange}
+            format="YYYY-MM-DD"
+            presets={rangePresets}
+            placeholder={["Từ ngày", "Đến ngày"]}
+            separator="→"
+            suffixIcon={<CalendarOutlined />}
+            allowClear
+            onChange={handleDateRangeChange}
+            className="h-control-h w-full min-w-[260px] sm:w-[320px]"
+          />
         </div>
 
         {/* Select lọc theo loại đơn */}

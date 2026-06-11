@@ -1,87 +1,80 @@
 "use client";
 
 import { Drawer } from "antd";
-import { CloseOutlined } from "@ant-design/icons";
+import { CloseOutlined, LoadingOutlined } from "@ant-design/icons";
+import { useQuery } from "@tanstack/react-query";
 import type { InventoryItem } from "./InventoryTable";
 import InventoryStatusBadge from "./InventoryStatusBadge";
+import * as inventoryService from "@/services/admin/inventoryService";
 
 /**
  * InventoryDetailDrawer – drawer (ngăn trượt từ phải) hiển thị chi tiết phôi áo.
  *
- * Mở khi người dùng bấm nút "Xem chi tiết" trên bảng.
- * Gồm các phần:
- * 1. Header: tiêu đề + nút đóng
- * 2. Thông tin tổng quan: ô màu + tên + SKU + size + badge trạng thái
- * 3. 3 ô mini thống kê: Tồn hiện tại / Đã giữ / Khả dụng
- * 4. Danh sách đơn hàng đang chờ xuất phôi
- * 5. Timeline lịch sử biến động tồn kho gần đây
- * 6. Footer: nút "Điều chỉnh tồn" + nút "Nhập thêm"
+ * Đã kết nối API thật:
+ * - Lấy danh sách đơn hàng chờ xuất phôi từ API.
+ * - Lấy lịch sử biến động tồn kho từ API.
+ * - Hiển thị loading skeleton khi đang tải.
  */
-
-// Kiểu dữ liệu cho một mục trong lịch sử biến động
-type LichSuBienDong = {
-  id: number;
-  moTa: string;       // Mô tả biến động, ví dụ "+50 áo (Nhập kho #PO-092)"
-  thoiGian: string;   // Thời gian, ví dụ "Hôm nay, 09:42 AM"
-  loai: "nhap" | "xuat" | "giu"; // Loại biến động để chọn màu dot
-};
-
-// Kiểu dữ liệu cho đơn hàng đang chờ xuất phôi
-type DonChoXuat = {
-  id: string;     // Mã đơn, ví dụ "ORD-2938"
-  soLuong: number; // Số áo cần xuất
-};
 
 // Kiểu dữ liệu props nhận từ component cha (InventoryPage)
 type InventoryDetailDrawerProps = {
-  isOpen: boolean;             // Drawer đang mở hay đóng
-  onClose: () => void;         // Hàm gọi khi đóng drawer
-  item: InventoryItem | null;  // Dữ liệu phôi áo đang được xem (null nếu chưa chọn)
+  isOpen: boolean;              // Drawer đang mở hay đóng
+  onClose: () => void;          // Hàm gọi khi đóng drawer
+  item: InventoryItem | null;   // Dữ liệu phôi áo đang được xem (null nếu chưa chọn)
+  onGiaoDich: (item: InventoryItem) => void; // Mở modal nhập/xuất kho
 };
 
-// ===== DỮ LIỆU MẪU – thay bằng API thực sau =====
-// Danh sách đơn hàng đang chờ xuất phôi áo (giả lập)
-const donChoXuatMau: DonChoXuat[] = [
-  { id: "ORD-2938", soLuong: 4 },
-  { id: "ORD-2941", soLuong: 6 },
-];
-
-// Lịch sử biến động tồn kho gần đây (giả lập)
-const lichSuMau: LichSuBienDong[] = [
-  { id: 1, moTa: "+50 áo", thoiGian: "Hôm nay, 09:42 SA", loai: "nhap" },
-  { id: 2, moTa: "-12 áo (Giữ cho đơn ORD-2938)", thoiGian: "Hôm qua, 14:20 CH", loai: "giu" },
-];
-
 // Lấy màu cho điểm tròn trong timeline theo loại biến động
-function getMauDotTimeline(loai: LichSuBienDong["loai"]): string {
-  if (loai === "nhap") return "bg-[#059669]";   // Xanh lá khi nhập kho
-  if (loai === "giu")  return "bg-[#d97706]";   // Vàng khi giữ lại
-  return "bg-[#b91c1c]";                         // Đỏ khi xuất kho
+function getMauDotTimeline(loai: "nhap" | "xuat" | "giu"): string {
+  if (loai === "nhap") return "bg-[#059669]";  // Xanh lá khi nhập kho
+  if (loai === "giu")  return "bg-[#d97706]";  // Vàng khi giữ lại
+  return "bg-[#b91c1c]";                        // Đỏ khi xuất kho
 }
 
 export default function InventoryDetailDrawer({
   isOpen,
   onClose,
   item,
+  onGiaoDich,
 }: InventoryDetailDrawerProps) {
+  // ===== GỌI API ĐƠN HÀNG CHỜ XUẤT PHÔI =====
+  const {
+    data: donChoXuat = [],
+    isLoading: dangTaiDon,
+  } = useQuery({
+    queryKey: ["inventory", "pending-orders", item?.id],
+    queryFn: () => inventoryService.layDonChoXuat(item!.id),
+    enabled: isOpen && !!item?.id,
+    staleTime: 30_000,
+  });
+
+  // ===== GỌI API LỊCH SỬ BIẾN ĐỘNG =====
+  const {
+    data: lichSu = [],
+    isLoading: dangTaiLichSu,
+  } = useQuery({
+    queryKey: ["inventory", "history", item?.id],
+    queryFn: () => inventoryService.layLichSuBienDong(item!.id),
+    enabled: isOpen && !!item?.id,
+    staleTime: 30_000,
+  });
+
   // Nếu chưa có item được chọn thì không render nội dung
   if (!item) return null;
 
   return (
     // Dùng Ant Design Drawer – trượt từ phải sang, rộng 420px
-    // Tắt header mặc định của Ant Design (closable=false, title=null)
-    // để tự vẽ header theo đúng thiết kế
     <Drawer
       open={isOpen}
       onClose={onClose}
       size={420}
-      closable={false}        // Tắt nút X mặc định của Ant Design
-      title={null}            // Tắt thanh tiêu đề mặc định
+      closable={false}
+      title={null}
       styles={{
-        body: { padding: 0 },                    // Xóa padding mặc định của body
+        body: { padding: 0 },
         wrapper: { boxShadow: "none" },
       }}
-      style={{ borderLeft: "1px solid #e2e8f0" }} // Viền trái theo thiết kế
+      style={{ borderLeft: "1px solid #e2e8f0" }}
     >
       {/* Toàn bộ nội dung drawer chia thành 3 phần theo flexbox dọc */}
       <div className="flex h-full flex-col">
@@ -101,17 +94,17 @@ export default function InventoryDetailDrawer({
         </div>
 
         {/* ===== PHẦN 2: NỘI DUNG CUỘN ĐƯỢC ===== */}
-        {/* flex-1 + overflow-y-auto: phần này cuộn được khi nội dung dài */}
         <div className="flex-1 space-y-8 overflow-y-auto p-6">
 
           {/* --- 2a. Thông tin tổng quan --- */}
           <div className="flex items-start gap-4">
-            {/* Ô màu phôi áo (80×80px) */}
+            {/* Ô màu phôi áo (80×80px) – hiển thị màu tên vì không có mã hex từ API kho */}
             <div
-              className="h-20 w-20 flex-shrink-0 rounded-xl border border-border"
-              style={{ backgroundColor: item.mauHex }}
+              className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-xl border border-border bg-surface-alt text-xs font-bold text-text-secondary"
               title={`Màu: ${item.mau}`}
-            />
+            >
+              {item.mau}
+            </div>
             <div>
               {/* Tên + màu */}
               <h4 className="text-[16px] font-semibold text-text-main">
@@ -161,36 +154,52 @@ export default function InventoryDetailDrawer({
                 Đơn hàng đang chờ xuất phôi
               </h5>
               <span className="rounded bg-surface-alt px-2 py-0.5 text-xs text-text-secondary">
-                {donChoXuatMau.length} đơn
+                {dangTaiDon ? "..." : `${donChoXuat.length} đơn`}
               </span>
             </div>
 
+            {/* Trạng thái đang tải */}
+            {dangTaiDon && (
+              <div className="flex items-center gap-2 py-4 text-xs text-text-secondary">
+                <LoadingOutlined spin />
+                <span>Đang tải danh sách đơn hàng...</span>
+              </div>
+            )}
+
             {/* Danh sách đơn */}
-            <ul className="space-y-3">
-              {donChoXuatMau.map((don) => (
-                <li key={don.id} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    {/* Chấm tròn tím làm điểm nhấn */}
-                    <span className="h-2 w-2 rounded-full bg-accent" />
-                    {/* Mã đơn – màu xanh, có thể click để xem đơn */}
-                    <a
-                      href={`/admin/don-hang/${don.id}`}
-                      className="font-medium text-primary-container hover:underline"
+            {!dangTaiDon && donChoXuat.length === 0 && (
+              <p className="py-4 text-center text-xs text-text-muted">
+                Không có đơn hàng nào đang chờ xuất phôi.
+              </p>
+            )}
+
+            {!dangTaiDon && donChoXuat.length > 0 && (
+              <ul className="space-y-3">
+                {donChoXuat.map((don) => (
+                  <li key={don.id} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      {/* Chấm tròn tím làm điểm nhấn */}
+                      <span className="h-2 w-2 rounded-full bg-accent" />
+                      {/* Mã đơn – màu xanh, có thể click để xem đơn */}
+                      <a
+                        href={`/admin/don-hang/${don.id}`}
+                        className="font-medium text-primary-container hover:underline"
+                      >
+                        {don.id}
+                      </a>
+                      <span className="text-text-secondary">cần {don.soLuong} áo</span>
+                    </div>
+                    {/* Nút xuất phôi cho đơn này */}
+                    <button
+                      type="button"
+                      className="rounded border border-border px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-surface-alt"
                     >
-                      {don.id}
-                    </a>
-                    <span className="text-text-secondary">cần {don.soLuong} áo</span>
-                  </div>
-                  {/* Nút xuất phôi cho đơn này */}
-                  <button
-                    type="button"
-                    className="rounded border border-border px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-surface-alt"
-                  >
-                    Xuất phôi
-                  </button>
-                </li>
-              ))}
-            </ul>
+                      Xuất phôi
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {/* --- 2d. Timeline lịch sử biến động --- */}
@@ -198,34 +207,53 @@ export default function InventoryDetailDrawer({
             <h5 className="mb-3 border-b border-border pb-2 text-sm font-semibold text-text-main">
               Lịch sử biến động gần đây
             </h5>
-            {/*
-              Timeline dạng đường thẳng dọc:
-              - "before:" tạo đường kẻ dọc màu xám từ trên xuống dưới
-              - Mỗi sự kiện có chấm tròn màu ở bên trái
-            */}
-            <div className="relative space-y-4 pl-4 before:absolute before:inset-y-0 before:left-[7px] before:w-px before:bg-border">
-              {lichSuMau.map((su) => (
-                <div key={su.id} className="relative">
-                  {/* Chấm tròn trên đường timeline, màu theo loại biến động */}
-                  <span
-                    className={`absolute -left-4 top-1 h-2 w-2 rounded-full ring-4 ring-surface ${getMauDotTimeline(su.loai)}`}
-                  />
-                  {/* Nội dung sự kiện */}
-                  <p className="text-sm text-text-main">{su.moTa}</p>
-                  <p className="mt-0.5 text-xs text-text-muted">{su.thoiGian}</p>
-                </div>
-              ))}
-            </div>
+
+            {/* Trạng thái đang tải */}
+            {dangTaiLichSu && (
+              <div className="flex items-center gap-2 py-4 text-xs text-text-secondary">
+                <LoadingOutlined spin />
+                <span>Đang tải lịch sử biến động...</span>
+              </div>
+            )}
+
+            {/* Trống */}
+            {!dangTaiLichSu && lichSu.length === 0 && (
+              <p className="py-4 text-center text-xs text-text-muted">
+                Chưa có biến động tồn kho nào được ghi nhận.
+              </p>
+            )}
+
+            {/* Timeline */}
+            {!dangTaiLichSu && lichSu.length > 0 && (
+              /*
+                Timeline dạng đường thẳng dọc:
+                - "before:" tạo đường kẻ dọc màu xám từ trên xuống dưới
+                - Mỗi sự kiện có chấm tròn màu ở bên trái
+              */
+              <div className="relative space-y-4 pl-4 before:absolute before:inset-y-0 before:left-[7px] before:w-px before:bg-border">
+                {lichSu.map((su) => (
+                  <div key={su.id} className="relative">
+                    {/* Chấm tròn trên đường timeline, màu theo loại biến động */}
+                    <span
+                      className={`absolute -left-4 top-1 h-2 w-2 rounded-full ring-4 ring-surface ${getMauDotTimeline(su.loai)}`}
+                    />
+                    {/* Nội dung sự kiện */}
+                    <p className="text-sm text-text-main">{su.moTa}</p>
+                    <p className="mt-0.5 text-xs text-text-muted">{su.thoiGian}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
         </div>
 
         {/* ===== PHẦN 3: FOOTER HÀNH ĐỘNG ===== */}
-        {/* Luôn hiển thị ở dưới cùng, không cuộn theo nội dung */}
         <div className="flex gap-3 border-t border-border bg-surface p-4">
           {/* Nút phụ: điều chỉnh tồn kho */}
           <button
             type="button"
+            onClick={() => onGiaoDich(item)}
             className="h-10 flex-1 rounded-lg border border-border text-sm font-semibold text-text-secondary transition-colors hover:bg-surface-alt"
           >
             Điều chỉnh tồn
@@ -233,6 +261,7 @@ export default function InventoryDetailDrawer({
           {/* Nút chính: nhập thêm phôi áo vào kho */}
           <button
             type="button"
+            onClick={() => onGiaoDich(item)}
             className="h-10 flex-1 rounded-lg bg-primary-container text-sm font-semibold text-on-primary shadow-sm transition-colors hover:bg-[#0284c7]"
           >
             Nhập thêm

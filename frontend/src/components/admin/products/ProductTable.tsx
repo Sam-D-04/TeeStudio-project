@@ -5,8 +5,8 @@
  *
  * Tính năng:
  * 1. Hiển thị danh sách phôi áo (tên, danh mục, chất liệu, giá nền, biến thể, tồn kho, trạng thái).
- * 2. Bấm vào hàng hoặc mũi tên ở đầu để mở rộng/thu gọn panel biến thể màu × size.
- * 3. Panel biến thể hiển thị bảng con với SKU, số lượng tồn, trạng thái từng biến thể.
+ * 2. Bấm vào hàng hoặc mũi tên ở đầu để mở rộng/thu gọn phần biến thể màu × kích thước.
+ * 3. Phần biến thể hiển thị bảng con với SKU, số lượng tồn, trạng thái từng biến thể.
  * 4. Các nút hành động: Xem chi tiết, Chỉnh sửa, Xóa.
  *
  * Thiết kế: bảng phẳng, nền trắng, header xám nhạt, hover row, border mảnh.
@@ -21,62 +21,29 @@ import {
   SkinOutlined,
 } from "@ant-design/icons";
 import { Fragment, useState } from "react";
+import type { SanPham, BienTheSanPham } from "@/services/admin/productService";
 import {
   InventoryStatusBadge,
   ProductDisplayStatusBadge,
-  type InventoryStatus,
-  type ProductDisplayStatus,
 } from "./ProductStatusBadge";
 
-// ===== KIỂU DỮ LIỆU =====
-
-/** Một biến thể cụ thể của phôi áo (1 màu × 1 size = 1 variant) */
-export type ProductVariant = {
-  id: number;
-  /** Tên màu, ví dụ: "Đen", "Trắng" */
-  colorName: string;
-  /** Mã màu hex để vẽ chấm màu, ví dụ: "#000000" */
-  colorHex: string;
-  /** Kích thước, ví dụ: "S", "M", "L", "XL" */
-  size: string;
-  /** Mã SKU định danh duy nhất */
-  sku: string;
-  /** Số lượng tồn kho */
-  stock: number;
-  /** Trạng thái tồn kho */
-  inventoryStatus: InventoryStatus;
-};
-
-/** Một phôi áo (blank product) */
-export type Product = {
-  id: number;
-  /** Tên phôi áo */
-  name: string;
-  /** Slug (đường dẫn thân thiện), ví dụ: "premium-heavyweight-tshirt" */
-  slug: string;
-  /** Danh mục, ví dụ: "Áo thun T-shirt" */
-  category: string;
-  /** Chất liệu, ví dụ: "Cotton 100% 250gsm" */
-  material: string;
-  /** Form dáng, ví dụ: "Oversized fit" */
-  fit: string;
-  /** Giá nền tính theo VNĐ */
-  basePrice: number;
-  /** Danh sách biến thể */
-  variants: ProductVariant[];
-  /** Trạng thái hiển thị */
-  displayStatus: ProductDisplayStatus;
-};
+// ===== TYPE RE-EXPORT để tương thích với code cũ tham chiếu =====
+/** @deprecated Dùng SanPham từ productService thay thế */
+export type Product = SanPham;
+/** @deprecated Dùng BienTheSanPham từ productService thay thế */
+export type ProductVariant = BienTheSanPham;
 
 type ProductTableProps = {
   /** Danh sách phôi áo */
-  products: Product[];
+  products: SanPham[];
+  /** Đang có thao tác loading (ví dụ: đang xóa) */
+  isLoading?: boolean;
   /** Hàm gọi khi bấm nút Xem chi tiết */
-  onView: (product: Product) => void;
+  onView: (product: SanPham) => void;
   /** Hàm gọi khi bấm nút Chỉnh sửa */
-  onEdit: (product: Product) => void;
+  onEdit: (product: SanPham) => void;
   /** Hàm gọi khi bấm nút Xóa */
-  onDelete: (product: Product) => void;
+  onDelete: (product: SanPham) => void;
 };
 
 // ===== HÀM TIỆN ÍCH =====
@@ -87,18 +54,18 @@ function formatPrice(amount: number): string {
 }
 
 /** Tính tổng tồn kho của tất cả biến thể */
-function getTotalStock(variants: ProductVariant[]): number {
+function getTotalStock(variants: BienTheSanPham[]): number {
   return variants.reduce((sum, v) => sum + v.stock, 0);
 }
 
 /** Đếm số màu (không trùng) trong danh sách biến thể */
-function countColors(variants: ProductVariant[]): number {
+function countColors(variants: BienTheSanPham[]): number {
   const uniqueColors = new Set(variants.map((v) => v.colorName));
   return uniqueColors.size;
 }
 
 /** Đếm số kích thước (không trùng) trong danh sách biến thể */
-function countSizes(variants: ProductVariant[]): number {
+function countSizes(variants: BienTheSanPham[]): number {
   const uniqueSizes = new Set(variants.map((v) => v.size));
   return uniqueSizes.size;
 }
@@ -106,28 +73,22 @@ function countSizes(variants: ProductVariant[]): number {
 // ===== COMPONENT CON: Hàng biến thể mở rộng =====
 
 /**
- * VariantExpandedRow – panel hiển thị bảng biến thể khi mở rộng một phôi áo.
+ * VariantExpandedRow – phần hiển thị bảng biến thể khi mở rộng một phôi áo.
  * Hiển thị bên dưới hàng phôi áo, kéo dài theo chiều rộng bảng (colspan=9).
  */
-function VariantExpandedRow({ variants }: { variants: ProductVariant[] }) {
+function VariantExpandedRow({ variants }: { variants: BienTheSanPham[] }) {
   return (
     <tr className="border-b border-border shadow-inner">
-      {/* colspan=9 để panel trải hết chiều rộng bảng */}
+      {/* colspan=9 để phần biến thể trải hết chiều rộng bảng */}
       <td colSpan={9} className="p-0">
         <div className="bg-surface-alt/50 px-12 py-4">
           {/* Card bên trong */}
           <div className="overflow-hidden rounded-lg border border-border bg-surface">
-            {/* Tiêu đề mini + nút Chỉnh sửa nhanh */}
+            {/* Tiêu đề mini */}
             <div className="flex items-center justify-between border-b border-border bg-surface-container-low px-4 py-2">
               <span className="text-label-bold font-bold uppercase text-text-secondary">
                 Chi tiết biến thể ({variants.length})
               </span>
-              <button
-                type="button"
-                className="text-[12px] font-medium text-primary hover:underline"
-              >
-                Chỉnh sửa nhanh
-              </button>
             </div>
 
             {/* Bảng biến thể */}
@@ -206,6 +167,7 @@ function VariantExpandedRow({ variants }: { variants: ProductVariant[] }) {
 
 export default function ProductTable({
   products,
+  isLoading = false,
   onView,
   onEdit,
   onDelete,
@@ -237,8 +199,8 @@ export default function ProductTable({
             <th className="px-5 py-3">Sản phẩm</th>
             {/* Cột Danh mục */}
             <th className="px-5 py-3">Danh mục</th>
-            {/* Cột Chất liệu / Form dáng */}
-            <th className="px-5 py-3">Chất liệu / Form</th>
+            {/* Cột Chất liệu / Kiểu dáng */}
+            <th className="px-5 py-3">Chất liệu / Kiểu dáng</th>
             {/* Cột Giá nền */}
             <th className="px-5 py-3 text-right">Giá nền (VNĐ)</th>
             {/* Cột Số biến thể */}
@@ -261,7 +223,7 @@ export default function ProductTable({
                 colSpan={9}
                 className="py-16 text-center text-body-md text-text-muted"
               >
-                Chưa có phôi áo nào. Bấm "Thêm phôi áo" để bắt đầu.
+                Chưa có phôi áo nào. Bấm &ldquo;Thêm phôi áo&rdquo; để bắt đầu.
               </td>
             </tr>
           ) : (
@@ -307,7 +269,7 @@ export default function ProductTable({
                           <div className="text-card-title font-bold text-text-main">
                             {product.name}
                           </div>
-                          {/* Slug – nhỏ, màu xám */}
+                          {/* Đường dẫn tĩnh – nhỏ, màu xám */}
                           <div className="mt-0.5 text-[12px] text-text-muted">
                             {product.slug}
                           </div>
@@ -320,7 +282,7 @@ export default function ProductTable({
                       {product.category}
                     </td>
 
-                    {/* Chất liệu + form dáng */}
+                    {/* Chất liệu và kiểu dáng */}
                     <td className="px-5 py-3 text-text-secondary">
                       {product.material}
                       <br />
@@ -334,11 +296,11 @@ export default function ProductTable({
                       {formatPrice(product.basePrice)}
                     </td>
 
-                    {/* Số biến thể: "X màu · Y size" */}
+                    {/* Số biến thể: "X màu · Y kích thước" */}
                     <td className="px-5 py-3 text-center">
                       <span className="inline-flex h-6 items-center justify-center rounded-md bg-surface-container px-2 text-[13px] font-medium text-text-secondary">
                         {countColors(product.variants)} màu ·{" "}
-                        {countSizes(product.variants)} size
+                        {countSizes(product.variants)} kích thước
                       </span>
                     </td>
 
@@ -384,7 +346,8 @@ export default function ProductTable({
                           type="button"
                           title="Xóa"
                           onClick={() => onDelete(product)}
-                          className="rounded p-1.5 text-text-secondary transition-colors hover:bg-error-container hover:text-error"
+                          disabled={isLoading}
+                          className="rounded p-1.5 text-text-secondary transition-colors hover:bg-error-container hover:text-error disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <DeleteOutlined className="text-[18px]" />
                         </button>

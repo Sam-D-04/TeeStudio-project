@@ -8,7 +8,7 @@ import type { MaKhuyenMai } from "./PromotionTable";
 /**
  * PromotionDrawer – Panel tạo/sửa mã khuyến mãi dạng ngăn kéo (Drawer).
  *
- * Sử dụng Ant Design <Drawer> – giống với OrderDetailDrawer ở module đơn hàng.
+ * Sử dụng Ant Design <Drawer> để hiển thị chi tiết khuyến mãi.
  * Khi mở: panel trượt vào từ bên phải, phần nền phía sau tối lại tự động.
  * Khi đóng: panel trượt ra, nền trở lại bình thường.
  * Không đẩy hay thu hẹp nội dung phía sau – đè lên hoàn toàn.
@@ -137,7 +137,7 @@ export default function PromotionDrawer({
   }
 
   return (
-    // Ant Design Drawer – giống OrderDetailDrawer
+    // Ant Design Drawer hiển thị chi tiết khuyến mãi
     // - open: điều khiển hiển thị/ẩn
     // - onClose: gọi khi bấm overlay hoặc nút đóng
     // - size: chiều rộng panel (480px để form thoải mái)
@@ -193,7 +193,7 @@ export default function PromotionDrawer({
             )}
           </div>
 
-          {/* Nút đóng (X) – giống OrderDetailDrawer */}
+          {/* Nút đóng (X) */}
           <button
             type="button"
             aria-label="Đóng ngăn kéo"

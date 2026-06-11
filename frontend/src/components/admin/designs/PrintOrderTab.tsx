@@ -6,101 +6,28 @@
  * Hiển thị danh sách các đơn hàng đã được duyệt thiết kế,
  * đang chờ được gửi đến xưởng in hoặc đang trong quá trình in.
  *
- * Cột bảng:
- *  1. Mã đơn hàng
- *  2. Thiết kế (preview mini + mã TK)
- *  3. Khách hàng
- *  4. Số lượng
- *  5. Vị trí in
- *  6. Trạng thái
- *  7. Ngày tạo đơn
- *  8. Thao tác (nút "Gửi xưởng" hoặc "Xem tiến độ")
+ * Dữ liệu lấy từ API GET /api/admin/designs/don-can-in.
+ * Hành động "Gửi xưởng" gọi PATCH /api/admin/designs/don-can-in/:id/gui-xuong.
  */
 
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   SendOutlined,
   EyeOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
+  LoadingOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import DesignPreview from "./DesignPreview";
 
-// ── Kiểu dữ liệu cho 1 đơn cần in ──
-// Khớp với response API GET /api/admin/designs/print-orders
-type DonCanIn = {
-  id: number;
-  maDon: string;          // Ví dụ: "DH-1045"
-  maThietKe: string;      // Ví dụ: "TK-2023"
-  urlPreview?: string;    // URL ảnh preview trên Cloudinary
-  mauAo: string;          // Mã hex màu áo
-  tenKhachHang: string;
-  soLuong: number;
-  viTriIn: string;        // Ví dụ: "Sau lưng to"
-  trangThai: "cho_gui_xuong" | "dang_in" | "da_in_xong";
-  ngayTao: string;        // Ví dụ: "03/06/2026"
-};
+import * as designService from "@/services/admin/designService";
+import type { DonCanIn } from "@/services/admin/designService";
 
-// Dữ liệu mẫu – sẽ thay bằng gọi API GET /api/admin/designs/print-orders
-const DU_LIEU_MAU_DON: DonCanIn[] = [
-  {
-    id: 1,
-    maDon: "DH-1045",
-    maThietKe: "TK-2023",
-    mauAo: "#ffffff",
-    tenKhachHang: "Trần Thị B",
-    soLuong: 50,
-    viTriIn: "Sau lưng to",
-    trangThai: "cho_gui_xuong",
-    ngayTao: "01/06/2026",
-  },
-  {
-    id: 2,
-    maDon: "DH-1043",
-    maThietKe: "TK-2021",
-    mauAo: "#1e293b",
-    tenKhachHang: "Công ty ABC",
-    soLuong: 120,
-    viTriIn: "Ngực trái",
-    trangThai: "cho_gui_xuong",
-    ngayTao: "31/05/2026",
-  },
-  {
-    id: 3,
-    maDon: "DH-1038",
-    maThietKe: "TK-2018",
-    mauAo: "#dc2626",
-    tenKhachHang: "Lê Hoàng Nam",
-    soLuong: 30,
-    viTriIn: "Ngực trái",
-    trangThai: "dang_in",
-    ngayTao: "29/05/2026",
-  },
-  {
-    id: 4,
-    maDon: "DH-1035",
-    maThietKe: "TK-2015",
-    mauAo: "#0ea5e9",
-    tenKhachHang: "Phạm Minh Tuấn",
-    soLuong: 20,
-    viTriIn: "Sau lưng",
-    trangThai: "dang_in",
-    ngayTao: "28/05/2026",
-  },
-  {
-    id: 5,
-    maDon: "DH-1030",
-    maThietKe: "TK-2010",
-    mauAo: "#16a34a",
-    tenKhachHang: "Nguyễn Thị Lan",
-    soLuong: 10,
-    viTriIn: "Ngực phải",
-    trangThai: "da_in_xong",
-    ngayTao: "25/05/2026",
-  },
-];
-
+// ─────────────────────────────────────────────────────────────────────────────
 // Cấu hình badge trạng thái đơn in
+// ─────────────────────────────────────────────────────────────────────────────
 const CAU_HINH_TRANG_THAI: Record<
   DonCanIn["trangThai"],
   { nhan: string; mauNen: string; mauChu: string; icon: React.ReactNode }
@@ -126,69 +53,127 @@ const CAU_HINH_TRANG_THAI: Record<
 };
 
 export default function PrintOrderTab() {
-  // State danh sách đơn – sẽ thay bằng gọi API trong thực tế
-  const [danhSach, setDanhSach] = useState<DonCanIn[]>(DU_LIEU_MAU_DON);
+  const queryClient = useQueryClient();
 
-  // Xử lý gửi đơn đến xưởng
+  // ── State lọc theo trạng thái ──
+  const [locTrangThai, setLocTrangThai] = useState("");
+  // ── State phân trang ──
+  const [trang, setTrang] = useState(1);
+
+  // ─── Fetch danh sách đơn cần in ─────────────────────────────────────────
+  const {
+    data: ketQua,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["don-can-in", trang, locTrangThai],
+    queryFn: () =>
+      designService.layDanhSachDonCanIn({
+        page: trang,
+        limit: 10,
+        trang_thai: locTrangThai || undefined,
+      }),
+    staleTime: 15_000,
+  });
+
+  // ─── Mutation: Gửi xưởng ─────────────────────────────────────────────────
+  const mutationGuiXuong = useMutation({
+    mutationFn: (id: number) => designService.guiDonXuongIn(id),
+    onSuccess: () => {
+      // Reload danh sách và KPI
+      queryClient.invalidateQueries({ queryKey: ["don-can-in"] });
+      queryClient.invalidateQueries({ queryKey: ["thiet-ke-thong-ke"] });
+    },
+    onError: (err: Error) => {
+      alert(`Lỗi khi gửi xưởng: ${err.message}`);
+    },
+  });
+
   function xuLyGuiXuong(id: number) {
     if (window.confirm("Xác nhận gửi đơn này đến xưởng in?")) {
-      // Trong thực tế: gọi API PATCH /api/admin/designs/print-orders/:id
-      // với body { trangThai: "dang_in" }
-      setDanhSach((ds) =>
-        ds.map((don) =>
-          don.id === id ? { ...don, trangThai: "dang_in" as const } : don
-        )
-      );
+      mutationGuiXuong.mutate(id);
     }
   }
 
-  // Thống kê nhanh
+  const danhSach = ketQua?.danhSach ?? [];
+  const tongSo = ketQua?.tongSo ?? 0;
+  const tongSoTrang = ketQua?.tongSoTrang ?? 1;
+
+  // Thống kê nhanh từ dữ liệu đang hiển thị
   const soChoGuiXuong = danhSach.filter((d) => d.trangThai === "cho_gui_xuong").length;
   const soDangIn = danhSach.filter((d) => d.trangThai === "dang_in").length;
 
   return (
     <div style={{ padding: 24 }}>
-      {/* ── Thanh thống kê nhanh ── */}
+      {/* ── Thanh lọc + Thống kê nhanh ── */}
       <div
         style={{
           display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
           gap: 16,
           marginBottom: 20,
           flexWrap: "wrap",
         }}
       >
-        <div
+        {/* Thống kê nhanh */}
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 16px",
+              background: "#e0f2fe",
+              borderRadius: 8,
+              fontSize: 13,
+              color: "#0284c7",
+              fontWeight: 600,
+            }}
+          >
+            <ClockCircleOutlined />
+            {soChoGuiXuong} đơn chờ gửi xưởng
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 16px",
+              background: "#dcfce7",
+              borderRadius: 8,
+              fontSize: 13,
+              color: "#10b981",
+              fontWeight: 600,
+            }}
+          >
+            <CheckCircleOutlined />
+            {soDangIn} đơn đang in tại xưởng
+          </div>
+        </div>
+
+        {/* Dropdown lọc trạng thái */}
+        <select
+          value={locTrangThai}
+          onChange={(e) => { setLocTrangThai(e.target.value); setTrang(1); }}
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 16px",
-            background: "#e0f2fe",
+            height: 36,
+            padding: "0 12px",
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
             borderRadius: 8,
             fontSize: 13,
-            color: "#0284c7",
-            fontWeight: 600,
+            color: locTrangThai ? "#0f172a" : "#94a3b8",
+            outline: "none",
+            cursor: "pointer",
+            minWidth: 160,
           }}
         >
-          <ClockCircleOutlined />
-          {soChoGuiXuong} đơn chờ gửi xưởng
-        </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 16px",
-            background: "#dcfce7",
-            borderRadius: 8,
-            fontSize: 13,
-            color: "#10b981",
-            fontWeight: 600,
-          }}
-        >
-          <CheckCircleOutlined />
-          {soDangIn} đơn đang in tại xưởng
-        </div>
+          <option value="">Tất cả trạng thái</option>
+          <option value="cho_gui_xuong">Chờ gửi xưởng</option>
+          <option value="dang_in">Đang in</option>
+          <option value="da_in_xong">Đã in xong</option>
+        </select>
       </div>
 
       {/* ── Bảng danh sách đơn cần in ── */}
@@ -200,180 +185,279 @@ export default function PrintOrderTab() {
           overflow: "hidden",
         }}
       >
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-            <thead>
-              <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                {["MÃ ĐƠN", "THIẾT KẾ", "KHÁCH HÀNG", "SỐ LƯỢNG", "VỊ TRÍ IN", "TRẠNG THÁI", "NGÀY TẠO", "THAO TÁC"].map(
-                  (tieuDe, viTri) => (
-                    <th
-                      key={tieuDe}
-                      style={{
-                        padding: "12px 16px",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: "#475569",
-                        letterSpacing: "0.05em",
-                        whiteSpace: "nowrap",
-                        textAlign: viTri === 7 ? "right" : "left",
-                      }}
-                    >
-                      {tieuDe}
-                    </th>
-                  )
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {danhSach.map((don) => {
-                const cauHinh = CAU_HINH_TRANG_THAI[don.trangThai];
-                return (
-                  <tr
-                    key={don.id}
-                    style={{ borderBottom: "1px solid #e2e8f0", transition: "background-color 0.15s ease" }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "#f8fafc";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "transparent";
-                    }}
-                  >
-                    {/* Mã đơn */}
-                    <td style={{ padding: "14px 16px" }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
-                        {don.maDon}
-                      </span>
-                    </td>
+        {/* Trạng thái đang tải */}
+        {isLoading && (
+          <div style={{ padding: "48px 0", textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+            <LoadingOutlined style={{ fontSize: 24, marginBottom: 8, display: "block" }} />
+            Đang tải danh sách đơn in...
+          </div>
+        )}
 
-                    {/* Thiết kế: thumbnail + mã TK */}
-                    <td style={{ padding: "14px 16px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <DesignPreview
-                          urlAnh={don.urlPreview}
-                          mauAo={don.mauAo}
-                          maThietKe={don.maThietKe}
-                        />
-                        <span style={{ fontSize: 13, color: "#475569", fontWeight: 500 }}>
-                          {don.maThietKe}
-                        </span>
-                      </div>
-                    </td>
+        {/* Trạng thái lỗi */}
+        {isError && !isLoading && (
+          <div style={{ padding: "48px 0", textAlign: "center", color: "#ef4444", fontSize: 14 }}>
+            <WarningOutlined style={{ fontSize: 24, marginBottom: 8, display: "block" }} />
+            Không thể tải dữ liệu. Vui lòng thử lại sau.
+          </div>
+        )}
 
-                    {/* Khách hàng */}
-                    <td style={{ padding: "14px 16px" }}>
-                      <span style={{ fontSize: 14, color: "#0f172a" }}>
-                        {don.tenKhachHang}
-                      </span>
-                    </td>
+        {/* Trống */}
+        {!isLoading && !isError && danhSach.length === 0 && (
+          <div style={{ padding: "48px 0", textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+            Không có đơn cần in nào phù hợp.
+          </div>
+        )}
 
-                    {/* Số lượng */}
-                    <td style={{ padding: "14px 16px" }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
-                        {don.soLuong}
-                      </span>
-                      <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: 4 }}>áo</span>
-                    </td>
-
-                    {/* Vị trí in */}
-                    <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                      <span style={{ fontSize: 13, color: "#475569" }}>{don.viTriIn}</span>
-                    </td>
-
-                    {/* Trạng thái */}
-                    <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                      <span
+        {/* Bảng */}
+        {!isLoading && !isError && danhSach.length > 0 && (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+              <thead>
+                <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                  {["MÃ ĐƠN", "THIẾT KẾ", "KHÁCH HÀNG", "SỐ LƯỢNG", "VỊ TRÍ IN", "TRẠNG THÁI", "NGÀY TẠO", "THAO TÁC"].map(
+                    (tieuDe, viTri) => (
+                      <th
+                        key={tieuDe}
                         style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          padding: "3px 10px",
-                          borderRadius: 20,
+                          padding: "12px 16px",
                           fontSize: 12,
                           fontWeight: 700,
-                          backgroundColor: cauHinh.mauNen,
-                          color: cauHinh.mauChu,
+                          color: "#475569",
+                          letterSpacing: "0.05em",
+                          whiteSpace: "nowrap",
+                          textAlign: viTri === 7 ? "right" : "left",
                         }}
                       >
-                        {cauHinh.icon}
-                        {cauHinh.nhan}
-                      </span>
-                    </td>
+                        {tieuDe}
+                      </th>
+                    )
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {danhSach.map((don) => {
+                  const cauHinh = CAU_HINH_TRANG_THAI[don.trangThai] ?? CAU_HINH_TRANG_THAI.cho_gui_xuong;
+                  const dangGuiXuong =
+                    mutationGuiXuong.isPending && mutationGuiXuong.variables === don.id;
+                  return (
+                    <tr
+                      key={don.id}
+                      style={{
+                        borderBottom: "1px solid #e2e8f0",
+                        transition: "background-color 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "#f8fafc";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "transparent";
+                      }}
+                    >
+                      {/* Mã đơn */}
+                      <td style={{ padding: "14px 16px" }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
+                          {don.maDon}
+                        </span>
+                      </td>
 
-                    {/* Ngày tạo */}
-                    <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                      <span style={{ fontSize: 13, color: "#475569" }}>{don.ngayTao}</span>
-                    </td>
+                      {/* Thiết kế: thumbnail + mã TK */}
+                      <td style={{ padding: "14px 16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <DesignPreview
+                            urlAnh={don.urlPreview ?? undefined}
+                            mauAo={don.mauAo}
+                            maThietKe={don.maThietKe}
+                          />
+                          <span style={{ fontSize: 13, color: "#475569", fontWeight: 500 }}>
+                            {don.maThietKe}
+                          </span>
+                        </div>
+                      </td>
 
-                    {/* Thao tác */}
-                    <td style={{ padding: "14px 16px", textAlign: "right", whiteSpace: "nowrap" }}>
-                      <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
-                        {/* Nút Xem luôn hiện */}
-                        <button
-                          title="Xem chi tiết đơn"
-                          onClick={() => alert(`Xem chi tiết đơn ${don.maDon}`)}
+                      {/* Khách hàng */}
+                      <td style={{ padding: "14px 16px" }}>
+                        <span style={{ fontSize: 14, color: "#0f172a" }}>{don.tenKhachHang}</span>
+                      </td>
+
+                      {/* Số lượng */}
+                      <td style={{ padding: "14px 16px" }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
+                          {don.soLuong}
+                        </span>
+                        <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: 4 }}>áo</span>
+                      </td>
+
+                      {/* Vị trí in */}
+                      <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
+                        <span style={{ fontSize: 13, color: "#475569" }}>{don.viTriIn}</span>
+                      </td>
+
+                      {/* Trạng thái */}
+                      <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
+                        <span
                           style={{
-                            width: 32,
-                            height: 32,
-                            display: "flex",
+                            display: "inline-flex",
                             alignItems: "center",
-                            justifyContent: "center",
-                            borderRadius: 6,
-                            border: "1px solid #e2e8f0",
-                            background: "#f8fafc",
-                            color: "#475569",
-                            cursor: "pointer",
-                            fontSize: 14,
-                            transition: "all 0.15s ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            (e.currentTarget as HTMLButtonElement).style.color = "#0ea5e9";
-                          }}
-                          onMouseLeave={(e) => {
-                            (e.currentTarget as HTMLButtonElement).style.color = "#475569";
+                            gap: 4,
+                            padding: "3px 10px",
+                            borderRadius: 20,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            backgroundColor: cauHinh.mauNen,
+                            color: cauHinh.mauChu,
                           }}
                         >
-                          <EyeOutlined />
-                        </button>
+                          {cauHinh.icon}
+                          {cauHinh.nhan}
+                        </span>
+                      </td>
 
-                        {/* Nút Gửi xưởng – chỉ hiện khi trạng thái "Chờ gửi xưởng" */}
-                        {don.trangThai === "cho_gui_xuong" && (
+                      {/* Ngày tạo */}
+                      <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
+                        <span style={{ fontSize: 13, color: "#475569" }}>{don.ngayTao}</span>
+                      </td>
+
+                      {/* Thao tác */}
+                      <td style={{ padding: "14px 16px", textAlign: "right", whiteSpace: "nowrap" }}>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                          {/* Nút Xem */}
                           <button
-                            title="Gửi đến xưởng in"
-                            onClick={() => xuLyGuiXuong(don.id)}
+                            title="Xem chi tiết đơn"
+                            onClick={() =>
+                              alert(`Xem chi tiết đơn ${don.maDon} – Sẽ mở drawer trong phiên bản tiếp theo`)
+                            }
                             style={{
+                              width: 32,
                               height: 32,
-                              padding: "0 12px",
                               display: "flex",
                               alignItems: "center",
-                              gap: 6,
+                              justifyContent: "center",
                               borderRadius: 6,
-                              border: "none",
-                              background: "#0ea5e9",
-                              color: "#ffffff",
+                              border: "1px solid #e2e8f0",
+                              background: "#f8fafc",
+                              color: "#475569",
                               cursor: "pointer",
-                              fontSize: 13,
-                              fontWeight: 600,
-                              transition: "background-color 0.15s ease",
+                              fontSize: 14,
+                              transition: "all 0.15s ease",
                             }}
                             onMouseEnter={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0284c7";
+                              (e.currentTarget as HTMLButtonElement).style.color = "#0ea5e9";
                             }}
                             onMouseLeave={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0ea5e9";
+                              (e.currentTarget as HTMLButtonElement).style.color = "#475569";
                             }}
                           >
-                            <SendOutlined style={{ fontSize: 13 }} />
-                            Gửi xưởng
+                            <EyeOutlined />
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+
+                          {/* Nút Gửi xưởng – chỉ hiện khi "Chờ gửi xưởng" */}
+                          {don.trangThai === "cho_gui_xuong" && (
+                            <button
+                              title="Gửi đến xưởng in"
+                              onClick={() => xuLyGuiXuong(don.id)}
+                              disabled={mutationGuiXuong.isPending}
+                              style={{
+                                height: 32,
+                                padding: "0 12px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                                borderRadius: 6,
+                                border: "none",
+                                background: dangGuiXuong ? "#7dd3fc" : "#0ea5e9",
+                                color: "#ffffff",
+                                cursor: mutationGuiXuong.isPending ? "not-allowed" : "pointer",
+                                fontSize: 13,
+                                fontWeight: 600,
+                                transition: "background-color 0.15s ease",
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!mutationGuiXuong.isPending) {
+                                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0284c7";
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!mutationGuiXuong.isPending) {
+                                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0ea5e9";
+                                }
+                              }}
+                            >
+                              {dangGuiXuong ? (
+                                <LoadingOutlined style={{ fontSize: 13 }} />
+                              ) : (
+                                <SendOutlined style={{ fontSize: 13 }} />
+                              )}
+                              {dangGuiXuong ? "Đang gửi..." : "Gửi xưởng"}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Phân trang */}
+        {!isLoading && !isError && danhSach.length > 0 && (
+          <div
+            style={{
+              padding: "12px 16px",
+              borderTop: "1px solid #e2e8f0",
+              backgroundColor: "#f8fafc",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <span style={{ fontSize: 13, color: "#475569" }}>Tổng cộng {tongSo} đơn</span>
+            <div style={{ display: "flex", gap: 4 }}>
+              <button
+                disabled={trang <= 1}
+                onClick={() => setTrang((t) => Math.max(1, t - 1))}
+                style={{
+                  width: 32, height: 32, display: "flex", alignItems: "center",
+                  justifyContent: "center", border: "1px solid #e2e8f0", borderRadius: 6,
+                  background: "#ffffff", color: trang <= 1 ? "#94a3b8" : "#0f172a",
+                  cursor: trang <= 1 ? "not-allowed" : "pointer", fontSize: 16,
+                }}
+              >
+                ‹
+              </button>
+              {Array.from({ length: tongSoTrang }, (_, i) => i + 1).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setTrang(p)}
+                  style={{
+                    width: 32, height: 32, display: "flex", alignItems: "center",
+                    justifyContent: "center",
+                    border: p === trang ? "1px solid #0ea5e9" : "1px solid #e2e8f0",
+                    borderRadius: 6,
+                    background: p === trang ? "#0ea5e9" : "#ffffff",
+                    color: p === trang ? "#ffffff" : "#0f172a",
+                    cursor: "pointer", fontSize: 14, fontWeight: p === trang ? 600 : 400,
+                  }}
+                >
+                  {p}
+                </button>
+              ))}
+              <button
+                disabled={trang >= tongSoTrang}
+                onClick={() => setTrang((t) => Math.min(tongSoTrang, t + 1))}
+                style={{
+                  width: 32, height: 32, display: "flex", alignItems: "center",
+                  justifyContent: "center", border: "1px solid #e2e8f0", borderRadius: 6,
+                  background: "#ffffff", color: trang >= tongSoTrang ? "#94a3b8" : "#0f172a",
+                  cursor: trang >= tongSoTrang ? "not-allowed" : "pointer", fontSize: 16,
+                }}
+              >
+                ›
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

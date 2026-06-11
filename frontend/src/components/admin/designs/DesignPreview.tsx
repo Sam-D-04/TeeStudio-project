@@ -12,7 +12,7 @@
  */
 
 type DesignPreviewProps = {
-  urlAnh?: string;      // URL ảnh thật từ Cloudinary (tùy chọn)
+  urlAnh?: string | null;      // URL ảnh thật từ Cloudinary (tùy chọn)
   mauAo?: string;       // Màu hex của áo (dùng khi chưa có ảnh, ví dụ "#000000")
   maThietKe?: string;   // Mã thiết kế ngắn (2 ký tự đầu, ví dụ "TK")
 };

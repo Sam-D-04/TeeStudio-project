@@ -1,4 +1,4 @@
-import { EyeOutlined, PrinterOutlined } from "@ant-design/icons";
+import { EyeOutlined } from "@ant-design/icons";
 import type { OrderStatus } from "./OrderStatusBadge";
 import OrderStatusBadge from "./OrderStatusBadge";
 
@@ -11,14 +11,16 @@ import OrderStatusBadge from "./OrderStatusBadge";
  * - Hình ảnh sản phẩm, tên sản phẩm, loại đơn, size
  * - Tổng tiền + trạng thái thanh toán
  * - Badge trạng thái xử lý đơn
- * - Các nút thao tác (ẩn, chỉ hiện khi hover)
+ * - Nút thao tác ở cột cuối
  *
- * Khi bấm vào hàng → gọi onRowClick để mở Drawer chi tiết.
+ * Khi bấm vào hàng → gọi onRowClick để chuyển sang trang chi tiết theo ID.
  */
 
 // Kiểu dữ liệu cho một mục thanh toán
 export type PaymentInfo = {
   method: string;   // Phương thức: "VNPAY", "COD", "Chuyển khoản"
+  type?: string;
+  amountVnd?: number;
   isPaid: boolean;  // Đã thanh toán hay chưa
 };
 
@@ -28,6 +30,8 @@ export type OrderProductSummary = {
   type: "custom_design" | "ao_mau"; // Loại đơn
   sizes: string;       // Ví dụ: "Size L, XL"
   imageUrl?: string;   // URL ảnh (nếu có từ Cloudinary)
+  extraCount?: number;  // Số dòng sản phẩm khác ngoài dòng đại diện
+  totalQuantity?: number; // Tổng số lượng áo trong đơn
 };
 
 // Kiểu dữ liệu cho một đơn hàng (hiển thị trong bảng)
@@ -41,12 +45,11 @@ export type Order = {
   totalAmountVnd: number;         // Tổng tiền (số nguyên VND)
   payment: PaymentInfo;           // Thông tin thanh toán
   status: OrderStatus;            // Trạng thái xử lý
-  hasPrintSpec?: boolean;         // Đã xuất thông số in chưa (cho đơn custom)
 };
 
 type OrderTableProps = {
   orders: Order[];
-  onRowClick: (order: Order) => void;  // Gọi khi bấm vào hàng để xem chi tiết
+  onRowClick: (order: Order) => void;
 };
 
 // Hàm định dạng số tiền VND: 429000 → "429.000đ"
@@ -78,7 +81,7 @@ export default function OrderTable({ orders, onRowClick }: OrderTableProps) {
             <tr
               key={order.id}
               // Khi hover: nền xám rất nhạt, con trỏ dạng bàn tay
-              className="group cursor-pointer border-b border-border transition-colors hover:bg-surface-alt"
+              className="cursor-pointer border-b border-border transition-colors hover:bg-surface-alt"
               onClick={() => onRowClick(order)}
             >
               {/* Cột 1: Mã đơn + ngày tạo */}
@@ -101,6 +104,7 @@ export default function OrderTable({ orders, onRowClick }: OrderTableProps) {
                   {/* Ô thumbnail ảnh sản phẩm (48x48px) */}
                   <div className="h-12 w-12 shrink-0 overflow-hidden rounded border border-border bg-surface-container">
                     {order.product.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={order.product.imageUrl}
                         alt={order.product.name}
@@ -114,9 +118,16 @@ export default function OrderTable({ orders, onRowClick }: OrderTableProps) {
                     )}
                   </div>
 
-                  <div>
+                  <div className="min-w-0">
                     {/* Tên sản phẩm */}
-                    <div className="font-medium text-text-main">{order.product.name}</div>
+                    <div className="max-w-[220px] truncate font-medium text-text-main">
+                      {order.product.name}
+                    </div>
+                    {order.product.extraCount && order.product.extraCount > 0 ? (
+                      <div className="mt-1 text-xs font-semibold text-[#006591]">
+                        + {order.product.extraCount} sản phẩm khác
+                      </div>
+                    ) : null}
                     <div className="mt-1 flex items-center gap-2">
                       {/* Nhãn loại đơn: "Thiết kế tùy chỉnh" hoặc "Áo mẫu" */}
                       {order.product.type === "custom_design" ? (
@@ -131,6 +142,11 @@ export default function OrderTable({ orders, onRowClick }: OrderTableProps) {
                       {/* Kích cỡ */}
                       <span className="text-xs text-text-secondary">{order.product.sizes}</span>
                     </div>
+                    {order.product.totalQuantity && order.product.totalQuantity > 0 ? (
+                      <div className="mt-1 text-xs text-text-muted">
+                        Tổng SL: {order.product.totalQuantity}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </td>
@@ -160,41 +176,23 @@ export default function OrderTable({ orders, onRowClick }: OrderTableProps) {
               <td className="p-4 align-top">
                 <OrderStatusBadge status={order.status} />
 
-                {/* Nhãn nhỏ "Đã xuất thông số" nếu đơn custom đã in spec */}
-                {order.hasPrintSpec && (
-                  <div className="mt-1 inline-block rounded border border-border px-1.5 py-0.5 text-[10px] text-text-secondary">
-                    Đã xuất thông số
-                  </div>
-                )}
               </td>
 
-              {/* Cột 6: Nút thao tác (chỉ hiện khi hover vào hàng) */}
+              {/* Cột 6: Nút thao tác */}
               <td className="p-4 align-top text-right">
-                <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="flex items-center justify-end gap-2">
                   {/* Nút xem chi tiết */}
                   <button
                     type="button"
                     title="Xem chi tiết"
                     onClick={(e) => {
-                      e.stopPropagation(); // Không để sự kiện lan ra hàng
+                      e.stopPropagation();
                       onRowClick(order);
                     }}
                     className="rounded p-1.5 text-text-secondary transition-colors hover:bg-surface-dim hover:text-[#006591]"
                   >
                     <EyeOutlined style={{ fontSize: 18 }} />
                   </button>
-
-                  {/* Nút xuất thông số in (chỉ hiện với đơn custom design) */}
-                  {order.product.type === "custom_design" && (
-                    <button
-                      type="button"
-                      title="Xuất thông số in"
-                      onClick={(e) => e.stopPropagation()}
-                      className="rounded p-1.5 text-text-secondary transition-colors hover:bg-surface-dim hover:text-[#006591]"
-                    >
-                      <PrinterOutlined style={{ fontSize: 18 }} />
-                    </button>
-                  )}
                 </div>
               </td>
             </tr>
