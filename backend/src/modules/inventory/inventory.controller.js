@@ -143,11 +143,72 @@ const ghiGiaoDich = async (req, res, next) => {
   }
 };
 
+// =====================================================================
+// DANH SÁCH SẢN PHẨM + BIẾN THỂ (phục vụ trang nhập kho)
+// =====================================================================
+
+/**
+ * GET /api/admin/inventory/products-with-variants
+ * Lấy danh sách sản phẩm đang ACTIVE kèm toàn bộ biến thể.
+ * Admin dùng để chọn sản phẩm → màu + size khi nhập kho.
+ */
+const getDanhSachSanPhamVaBienThe = async (req, res, next) => {
+  try {
+    const data = await inventoryService.layDanhSachSanPhamVaBienThe();
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// =====================================================================
+// DANH SÁCH NHÀ CUNG CẤP (phục vụ trang nhập kho)
+// =====================================================================
+
+/**
+ * GET /api/admin/inventory/suppliers
+ * Lấy danh sách tất cả nhà cung cấp để hiển thị trong dropdown.
+ */
+const getDanhSachNhaCungCap = async (req, res, next) => {
+  try {
+    const data = await inventoryService.layDanhSachNhaCungCap();
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// =====================================================================
+// LỊCH SỬ TOÀN KHO (có phân trang + lọc + tìm kiếm)
+// =====================================================================
+
+/**
+ * GET /api/admin/inventory/history
+ * Lấy lịch sử giao dịch kho toàn bộ, hỗ trợ phân trang + lọc theo loại + tìm kiếm SKU.
+ *
+ * Query params:
+ *   trang          – Trang hiện tại (mặc định: 1)
+ *   soMoiTrang     – Số dòng mỗi trang (mặc định: 20)
+ *   loaiGiaoDich   – "IMPORT" | "EXPORT" | "ADJUSTMENT" | "ORDER_EXPORT" | "RETURN" | "tat_ca"
+ *   tuKhoa         – Tìm theo SKU hoặc tên sản phẩm
+ */
+const getLichSuKho = async (req, res, next) => {
+  try {
+    const data = await inventoryService.layLichSuKho(req.query);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getThongKeKho,
   getDanhSachTonKho,
   getChiTietBienThe,
   getDonChoXuat,
   getLichSuBienDong,
+  getLichSuKho,
   ghiGiaoDich,
+  getDanhSachSanPhamVaBienThe,
+  getDanhSachNhaCungCap,
 };

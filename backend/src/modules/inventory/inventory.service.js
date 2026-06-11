@@ -5,8 +5,11 @@
  * - Lấy danh sách tồn kho (biến thể × ProductVariant) với phân trang + lọc.
  * - Tính toán thống kê KPI (tổng phôi, sắp hết, đã giữ, nhập tháng).
  * - Lấy lịch sử biến động (InventoryTransaction) theo biến thể.
+ * - Lấy lịch sử toàn kho (InventoryTransaction toàn bộ) với phân trang + lọc.
  * - Lấy đơn hàng đang chờ xuất phôi theo biến thể.
  * - Ghi nhận giao dịch nhập/xuất/điều chỉnh kho.
+ * - Lấy danh sách sản phẩm kèm biến thể phục vụ trang nhập kho.
+ * - Lấy danh sách nhà cung cấp phục vụ trang nhập kho.
  */
 
 const db = require("../../database/mysql");
@@ -418,11 +421,226 @@ async function ghiGiaoDichKho(payload) {
   return result;
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// DANH SÁCH SẢN PHẨM KÈM BIẾN THỂ (phục vụ trang nhập kho)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Lấy danh sách sản phẩm đang ACTIVE cùng toàn bộ biến thể.
+ * Dùng trên trang Nhập kho để admin chọn sản phẩm → màu → size → nhập số lượng.
+ *
+ * @returns {Promise<Array<{id, ten, danhSachBienThe: Array<{id, mau, size, sku, tonHienTai}>}>>}
+ */
+async function layDanhSachSanPhamVaBienThe() {
+  // Lấy toàn bộ sản phẩm ACTIVE
+  const sanPhams = await db.query(
+    `SELECT id, name AS ten FROM Product WHERE status = 'ACTIVE' ORDER BY name ASC`
+  );
+
+  if (!sanPhams.length) return [];
+
+  // Lấy toàn bộ biến thể của các sản phẩm đó
+  const productIds = sanPhams.map((p) => p.id);
+  const placeholders = productIds.map(() => "?").join(",");
+  const bienThes = await db.query(
+    `SELECT id, productId, color AS mau, size, sku, stockQty AS tonHienTai
+     FROM ProductVariant
+     WHERE productId IN (${placeholders})
+     ORDER BY productId ASC, color ASC, FIELD(size,'XS','S','M','L','XL','XXL','2XL','3XL')`,
+    productIds
+  );
+
+  // Gom biến thể vào từng sản phẩm
+  const bienTheMap = {};
+  for (const bt of bienThes) {
+    if (!bienTheMap[bt.productId]) bienTheMap[bt.productId] = [];
+    bienTheMap[bt.productId].push({
+      id: bt.id,
+      mau: bt.mau,
+      size: bt.size,
+      sku: bt.sku,
+      tonHienTai: Number(bt.tonHienTai),
+    });
+  }
+
+  return sanPhams.map((sp) => ({
+    id: sp.id,
+    ten: sp.ten,
+    danhSachBienThe: bienTheMap[sp.id] || [],
+  }));
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// DANH SÁCH NHÀ CUNG CẤP (phục vụ trang nhập kho)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Lấy danh sách tất cả nhà cung cấp.
+ * Dùng trên trang Nhập kho để admin chọn nhà cung cấp.
+ *
+ * @returns {Promise<Array<{id, ten, soDienThoai}>>}
+ */
+async function layDanhSachNhaCungCap() {
+  const rows = await db.query(
+    `SELECT id, name AS ten, phone AS soDienThoai FROM Supplier ORDER BY name ASC`
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    ten: row.ten,
+    soDienThoai: row.soDienThoai || "",
+  }));
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// LỊCH SỬ TOÀN KHO (có phân trang + lọc loại GD + tìm kiếm SKU)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Lấy lịch sử giao dịch kho TOÀN BỘ (không lọc theo biến thể cụ thể).
+ * Hỗ trợ:
+ *  - Phân trang (trang, soMoiTrang)
+ *  - Lọc theo loại giao dịch (loaiGiaoDich)
+ *  - Tìm kiếm theo SKU hoặc tên sản phẩm (tuKhoa)
+ *
+ * @param {object} params
+ * @param {number}  [params.trang=1]
+ * @param {number}  [params.soMoiTrang=20]
+ * @param {string}  [params.loaiGiaoDich]  – "IMPORT" | "EXPORT" | "ADJUSTMENT" | "ORDER_EXPORT" | "RETURN" | "tat_ca"
+ * @param {string}  [params.tuKhoa]        – Tìm theo SKU hoặc tên sản phẩm
+ * @returns {Promise<{danhSach: object[], tongSo: number, trang: number, soMoiTrang: number, tongSoTrang: number}>}
+ */
+async function layLichSuKho(params = {}) {
+  const trang = Math.max(1, parseInt(params.trang) || 1);
+  const soMoiTrang = Math.min(50, Math.max(1, parseInt(params.soMoiTrang) || 20));
+  const offset = (trang - 1) * soMoiTrang;
+  const loaiGiaoDich = params.loaiGiaoDich || "tat_ca";
+  const tuKhoa = params.tuKhoa ? params.tuKhoa.trim() : "";
+
+  const conditions = [];
+  const values = [];
+
+  // Lọc theo loại giao dịch
+  if (loaiGiaoDich && loaiGiaoDich !== "tat_ca") {
+    conditions.push(`it.transactionType = ?`);
+    values.push(loaiGiaoDich);
+  }
+
+  // Tìm kiếm theo SKU hoặc tên sản phẩm
+  if (tuKhoa) {
+    conditions.push(`(pv.sku LIKE ? OR p.name LIKE ?)`);
+    const like = `%${tuKhoa}%`;
+    values.push(like, like);
+  }
+
+  const whereClause =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  // Đếm tổng
+  const [countRows] = await db.pool.query(
+    `SELECT COUNT(*) AS total
+     FROM InventoryTransaction it
+     INNER JOIN ProductVariant pv ON pv.id = it.variantId
+     INNER JOIN Product p ON p.id = pv.productId
+     ${whereClause}`,
+    values
+  );
+  const tongSo = Number(countRows[0]?.total ?? 0);
+
+  // Lấy dữ liệu
+  const rows = await db.query(
+    `SELECT
+       it.id,
+       it.quantityChanged,
+       it.transactionType,
+       it.reason,
+       it.createdAt,
+       pv.sku,
+       pv.color  AS mau,
+       pv.size,
+       p.name    AS tenSanPham,
+       co.orderCode,
+       s.name    AS tenNhaCungCap
+     FROM InventoryTransaction it
+     INNER JOIN ProductVariant pv ON pv.id = it.variantId
+     INNER JOIN Product p ON p.id = pv.productId
+     LEFT JOIN CustomerOrder co ON co.id = it.orderId
+     LEFT JOIN Supplier s ON s.id = it.supplierId
+     ${whereClause}
+     ORDER BY it.createdAt DESC
+     LIMIT ? OFFSET ?`,
+    [...values, soMoiTrang, offset]
+  );
+
+  const danhSach = rows.map((row) => {
+    const soLuong = Math.abs(row.quantityChanged);
+    const isNhap = row.quantityChanged > 0;
+
+    // Nhãn loại giao dịch (tiếng Việt)
+    const NHAN_LOAI = {
+      IMPORT:       "Nhập kho",
+      EXPORT:       "Xuất kho",
+      ADJUSTMENT:   "Điều chỉnh",
+      ORDER_EXPORT: "Xuất cho đơn",
+      RETURN:       "Hoàn trả",
+    };
+    const nhanLoai = NHAN_LOAI[row.transactionType] || row.transactionType;
+
+    // Mô tả chi tiết
+    let moTa = row.reason || "";
+    if (row.transactionType === "IMPORT") {
+      moTa = `Nhập ${soLuong} áo${row.tenNhaCungCap ? ` từ ${row.tenNhaCungCap}` : ""}`;
+      if (row.reason) moTa += ` – ${row.reason}`;
+    } else if (row.transactionType === "ORDER_EXPORT") {
+      moTa = `Xuất ${soLuong} áo cho đơn ${row.orderCode || "?"}` ;
+    } else if (row.transactionType === "EXPORT") {
+      moTa = `Xuất ${soLuong} áo – ${row.reason}`;
+    } else if (row.transactionType === "RETURN") {
+      moTa = `Hoàn trả ${soLuong} áo – ${row.reason}`;
+    } else if (row.transactionType === "ADJUSTMENT") {
+      const sign = isNhap ? `+${soLuong}` : `-${soLuong}`;
+      moTa = `Điều chỉnh ${sign} áo – ${row.reason}`;
+    }
+
+    // Format ngày giờ
+    const d = new Date(row.createdAt);
+    const ngay = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
+    const gio  = `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+
+    return {
+      id: row.id,
+      loaiGiaoDich: row.transactionType,
+      nhanLoai,
+      soLuong: row.quantityChanged,          // Giá trị có dấu (+/-)
+      sku: row.sku,
+      tenSanPham: row.tenSanPham,
+      mau: row.mau,
+      size: row.size,
+      moTa,
+      tenNhaCungCap: row.tenNhaCungCap || null,
+      maDonHang: row.orderCode || null,
+      ngay,
+      gio,
+      thoiGianISO: row.createdAt,
+    };
+  });
+
+  return {
+    danhSach,
+    tongSo,
+    trang,
+    soMoiTrang,
+    tongSoTrang: Math.max(1, Math.ceil(tongSo / soMoiTrang)),
+  };
+}
+
 module.exports = {
   layThongKeKho,
   layDanhSachTonKho,
   layChiTietBienThe,
   layDonChoXuat,
   layLichSuBienDong,
+  layLichSuKho,
   ghiGiaoDichKho,
+  layDanhSachSanPhamVaBienThe,
+  layDanhSachNhaCungCap,
 };
