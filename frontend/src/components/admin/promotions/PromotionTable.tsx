@@ -31,13 +31,14 @@ export type MaKhuyenMai = {
   loaiGiam:
     | "phan_tram"           // Giảm theo %
     | "so_tien"             // Giảm số tiền cố định
-    | "mien_phi_ship";      // Miễn phí vận chuyển
+    | "mien_phi_van_chuyen"; // Miễn phí vận chuyển
   giaTriGiam: number;       // Giá trị: 10 (cho phan_tram) hoặc 50000 (cho so_tien)
   donToiThieu: number;      // Giá trị đơn hàng tối thiểu để áp dụng (đơn vị: VNĐ)
   ngayBatDau: string;       // Format "DD/MM/YYYY" hoặc ISO date
   ngayKetThuc: string | null; // null = vô thời hạn
-  daSDung: number;          // Số lượt đã dùng
+  daSuDung: number;         // Số lượt đã dùng
   gioiHanLuot: number | null; // null = không giới hạn
+  chiDanhChoKhachMoi: boolean;
   trangThai: PromotionStatus;
 };
 
@@ -58,8 +59,8 @@ function hienThiLoaiGiam(loaiGiam: MaKhuyenMai["loaiGiam"]): string {
       return "Phần trăm";
     case "so_tien":
       return "Số tiền";
-    case "mien_phi_ship":
-      return "Miễn phí ship";
+    case "mien_phi_van_chuyen":
+      return "Miễn phí vận chuyển";
     default:
       return "Không rõ";
   }
@@ -75,7 +76,7 @@ function hienThiGiaTriGiam(
       return `${giaTriGiam}%`;
     case "so_tien":
       return giaTriGiam.toLocaleString("vi-VN") + "đ";
-    case "mien_phi_ship":
+    case "mien_phi_van_chuyen":
       return "Toàn quốc";
     default:
       return String(giaTriGiam);
@@ -87,10 +88,14 @@ function hienThiThoiGian(
   ngayBatDau: string,
   ngayKetThuc: string | null,
 ): string {
+  const dinhDangNgay = (value: string) => {
+    const [nam, thang, ngay] = value.split("-");
+    return ngay && thang && nam ? `${ngay}/${thang}/${nam}` : value;
+  };
   if (!ngayKetThuc) {
-    return `${ngayBatDau} - Vô thời hạn`;
+    return `${dinhDangNgay(ngayBatDau)} - Vô thời hạn`;
   }
-  return `${ngayBatDau} - ${ngayKetThuc}`;
+  return `${dinhDangNgay(ngayBatDau)} - ${dinhDangNgay(ngayKetThuc)}`;
 }
 
 export default function PromotionTable({
@@ -265,7 +270,7 @@ export default function PromotionTable({
                   {/* Số lượt dùng */}
                   <td style={{ padding: "12px 16px" }}>
                     <PromotionUsageBar
-                      daSDung={ma.daSDung}
+                      daSuDung={ma.daSuDung}
                       gioiHan={ma.gioiHanLuot}
                     />
                   </td>

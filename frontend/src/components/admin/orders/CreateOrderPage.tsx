@@ -285,7 +285,9 @@ function tinhGiamGiaPreview(
   const discount =
     promotion.loaiGiam === "PERCENT"
       ? promotionBaseAmount * (promotion.giaTriGiam / 100)
-      : promotion.giaTriGiam;
+      : promotion.loaiGiam === "FIXED"
+        ? promotion.giaTriGiam
+        : 0;
 
   return Math.min(Math.round(discount), promotionBaseAmount);
 }
@@ -330,7 +332,7 @@ function buildPreview(
 
   const subtotal = lines.reduce((sum, line) => sum + line.lineProductTotal, 0);
   const designFee = lines.reduce((sum, line) => sum + line.designFee, 0);
-  const shippingFee = Math.max(0, Number(values.shippingFee) || 0);
+  const shippingFeeInput = Math.max(0, Number(values.shippingFee) || 0);
   const selectedPromotion = values.promotionId
     ? promotions.find((promo) => promo.id === values.promotionId)
     : undefined;
@@ -339,6 +341,8 @@ function buildPreview(
     selectedPromotion,
     promotionBaseAmount
   );
+  const shippingFee =
+    selectedPromotion?.loaiGiam === "FREE_SHIPPING" ? 0 : shippingFeeInput;
   const totalAmount = Math.max(
     0,
     subtotal + designFee + shippingFee - discountAmount
@@ -1074,13 +1078,15 @@ function ShippingSection({
           <Select
             allowClear
             loading={isLoadingPromotions}
-            placeholder="Chọn promotion nếu có"
+            placeholder="Chọn mã khuyến mãi nếu có"
             options={promotions.map((promo) => {
               const disabled = preview.promotionBaseAmount < promo.donHangToiThieu;
               const discountLabel =
                 promo.loaiGiam === "PERCENT"
                   ? `Giảm ${promo.giaTriGiam}%`
-                  : `Giảm ${formatCurrency(promo.giaTriGiam)}`;
+                  : promo.loaiGiam === "FIXED"
+                    ? `Giảm ${formatCurrency(promo.giaTriGiam)}`
+                    : "Miễn phí vận chuyển";
 
               return {
                 value: promo.id,

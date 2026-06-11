@@ -47,6 +47,8 @@ export default function AdminTopbar({ onMenuClick }: AdminTopbarProps) {
 
     try {
       await authService.logout();
+    } catch {
+      // Server-side token revocation is best-effort; always clear the local session.
     } finally {
       clearSession();
       router.replace("/dang-nhap");

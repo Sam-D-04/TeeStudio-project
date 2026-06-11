@@ -9,7 +9,11 @@
 
 // Kiểu dữ liệu cho trạng thái mã khuyến mãi
 // Phải khớp với giá trị enum từ Backend trả về
-export type PromotionStatus = "dang_hoat_dong" | "tam_dung" | "het_han";
+export type PromotionStatus =
+  | "dang_hoat_dong"
+  | "tam_dung"
+  | "het_han"
+  | "sap_dien_ra";
 
 type PromotionStatusBadgeProps = {
   trangThai: PromotionStatus; // Trạng thái từ API
@@ -35,6 +39,11 @@ const cauHinhTrangThai: Record<
     nhan: "Hết hạn",
     nenBadge: "#e4e9ed", // Xám nhạt
     chuBadge: "#6e7881", // Xám vừa
+  },
+  sap_dien_ra: {
+    nhan: "Sắp diễn ra",
+    nenBadge: "#e0f2fe",
+    chuBadge: "#0284c7",
   },
 };
 

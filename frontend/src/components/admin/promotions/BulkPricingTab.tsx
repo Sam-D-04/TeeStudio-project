@@ -1,80 +1,85 @@
 "use client";
 
 import { useState } from "react";
-import { PlusOutlined, EditOutlined, DeleteOutlined, SaveOutlined, CloseOutlined } from "@ant-design/icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  CloseOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  LoadingOutlined,
+  PlusOutlined,
+  SaveOutlined,
+} from "@ant-design/icons";
+import { App } from "antd";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
+import * as promotionService from "@/services/admin/promotionService";
 
-/**
- * BulkPricingTab – Tab "Giá số lượng lớn".
- *
- * Quản trị viên thiết lập bảng giá theo số lượng áo đặt hàng.
- * Ví dụ: Đặt 10-29 áo → giảm 5%, đặt từ 30 áo trở lên → giảm 10%.
- *
- * Bảng dữ liệu gồm:
- *  - Số lượng từ (tuSoLuong)
- *  - Số lượng đến (denSoLuong) – null = không giới hạn
- *  - Phần trăm giảm (phanTramGiam)
- *  - Nút sửa / xóa
- */
-
-// Kiểu dữ liệu cho một dải giá số lượng lớn
-// Phải khớp với structure JSON từ Backend
-type DaiGia = {
-  id: number;
-  tuSoLuong: number;        // Từ x cái
-  denSoLuong: number | null; // Đến y cái (null = từ x trở lên)
-  phanTramGiam: number;     // % giảm, ví dụ 5 = 5%
+const inputStyle: React.CSSProperties = {
+  height: 36,
+  padding: "0 10px",
+  border: "1px solid #cbd5e1",
+  borderRadius: 7,
+  outline: "none",
 };
 
-// Dữ liệu mẫu tĩnh để hiển thị demo giao diện
-// Trong thực tế: thay bằng dữ liệu từ API GET /api/admin/pricing/bulk
-const DU_LIEU_MAU: DaiGia[] = [
-  { id: 1, tuSoLuong: 10, denSoLuong: 29, phanTramGiam: 5 },
-  { id: 2, tuSoLuong: 30, denSoLuong: 49, phanTramGiam: 8 },
-  { id: 3, tuSoLuong: 50, denSoLuong: null, phanTramGiam: 12 },
-];
+function BulkPricingContent() {
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
+  const [productId, setProductId] = useState<number | null>(null);
+  const [dangSuaId, setDangSuaId] = useState<number | null>(null);
+  const [form, setForm] = useState({ minQty: "", discountPercent: "" });
 
-export default function BulkPricingTab() {
-  // State danh sách bảng giá
-  const [danhSach, setDanhSach] = useState<DaiGia[]>(DU_LIEU_MAU);
+  const productsQuery = useQuery({
+    queryKey: ["admin-promotions", "bulk-products"],
+    queryFn: promotionService.laySanPhamGiaSoLuong,
+  });
+  const selectedProductId = productId ?? productsQuery.data?.[0]?.id ?? null;
 
-  // State form thêm mới
-  const [dangThem, setDangThem] = useState(false);
-  const [formMoi, setFormMoi] = useState({
-    tuSoLuong: "",
-    denSoLuong: "",
-    phanTramGiam: "",
+  const tiersQuery = useQuery({
+    queryKey: ["admin-promotions", "bulk-pricing", selectedProductId],
+    queryFn: () => promotionService.layGiaSoLuong(selectedProductId!),
+    enabled: selectedProductId !== null,
   });
 
-  // Hàm xóa một dải giá
-  function xoaDaiGia(id: number) {
-    if (window.confirm("Bạn có chắc muốn xóa dải giá này?")) {
-      setDanhSach((ds) => ds.filter((d) => d.id !== id));
-    }
-  }
+  const lamMoi = () => {
+    queryClient.invalidateQueries({ queryKey: ["admin-promotions", "bulk-pricing", selectedProductId] });
+    queryClient.invalidateQueries({ queryKey: ["admin-promotions", "bulk-products"] });
+  };
 
-  // Hàm lưu dải giá mới (demo: chỉ thêm vào state)
-  // Thực tế: gọi API POST /api/admin/pricing/bulk
-  function luuDaiGiaMoi() {
-    const tuSo = parseInt(formMoi.tuSoLuong);
-    const denSo = formMoi.denSoLuong === "" ? null : parseInt(formMoi.denSoLuong);
-    const giamPT = parseFloat(formMoi.phanTramGiam);
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedProductId || !form.minQty || !form.discountPercent) {
+        throw new Error("Vui lòng nhập đủ số lượng tối thiểu và phần trăm giảm");
+      }
+      const payload = {
+        productId: selectedProductId,
+        minQty: Number(form.minQty),
+        discountPercent: Number(form.discountPercent),
+      };
+      return dangSuaId
+        ? promotionService.capNhatGiaSoLuong(dangSuaId, payload)
+        : promotionService.taoGiaSoLuong(payload);
+    },
+    onSuccess: () => {
+      message.success(dangSuaId ? "Đã cập nhật mức giá" : "Đã thêm mức giá");
+      setDangSuaId(null);
+      setForm({ minQty: "", discountPercent: "" });
+      lamMoi();
+    },
+    onError: (error) => message.error(getApiErrorMessage(error)),
+  });
 
-    if (isNaN(tuSo) || isNaN(giamPT)) {
-      alert("Vui lòng điền đầy đủ thông tin hợp lệ.");
-      return;
-    }
+  const deleteMutation = useMutation({
+    mutationFn: promotionService.xoaGiaSoLuong,
+    onSuccess: () => {
+      message.success("Đã xóa mức giá");
+      lamMoi();
+    },
+    onError: (error) => message.error(getApiErrorMessage(error)),
+  });
 
-    const bangGiaMoi: DaiGia = {
-      id: Date.now(),
-      tuSoLuong: tuSo,
-      denSoLuong: denSo,
-      phanTramGiam: giamPT,
-    };
-
-    setDanhSach((ds) => [...ds, bangGiaMoi]);
-    setFormMoi({ tuSoLuong: "", denSoLuong: "", phanTramGiam: "" });
-    setDangThem(false);
-  }
+  const danhSach = tiersQuery.data?.danhSach ?? [];
+  const dangMoForm = dangSuaId !== null || form.minQty !== "" || form.discountPercent !== "";
 
   return (
     <div
@@ -82,296 +87,206 @@ export default function BulkPricingTab() {
         background: "#ffffff",
         borderRadius: 20,
         border: "1px solid #e2e8f0",
-        boxShadow: "0px 1px 4px rgba(0, 0, 0, 0.05)",
         overflow: "hidden",
       }}
     >
-      {/* Tiêu đề + nút thêm */}
       <div
         style={{
           padding: "16px 20px",
           borderBottom: "1px solid #e2e8f0",
           display: "flex",
+          flexWrap: "wrap",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: 12,
           backgroundColor: "#f8fafc",
         }}
       >
         <div>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: 0 }}>
-            Bảng giá theo số lượng
+            Bảng giá theo số lượng của từng sản phẩm
           </h3>
-          <p style={{ fontSize: 12, color: "#94a3b8", margin: "4px 0 0" }}>
-            Thiết lập mức giảm giá tự động khi khách đặt số lượng lớn
+          <p style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>
+            Hệ thống tự chọn mức giảm cao nhất có số lượng tối thiểu phù hợp.
           </p>
         </div>
-
-        {/* Nút Thêm dải giá */}
-        <button
-          onClick={() => setDangThem(true)}
-          style={{
-            height: 36,
-            padding: "0 14px",
-            background: "#0ea5e9",
-            border: "none",
-            borderRadius: 8,
-            fontSize: 13,
-            fontWeight: 600,
-            color: "#ffffff",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            transition: "background-color 0.15s ease",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0284c7";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0ea5e9";
-          }}
-        >
-          <PlusOutlined />
-          Thêm dải giá
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <select
+            value={selectedProductId ?? ""}
+            onChange={(event) => {
+              setProductId(Number(event.target.value));
+              setDangSuaId(null);
+              setForm({ minQty: "", discountPercent: "" });
+            }}
+            style={{ ...inputStyle, minWidth: 240 }}
+          >
+            {productsQuery.data?.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.ten}{product.dangHoatDong ? "" : " (đang ẩn)"}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => {
+              setDangSuaId(null);
+              setForm({ minQty: "2", discountPercent: "" });
+            }}
+            disabled={!selectedProductId}
+            style={{
+              ...inputStyle,
+              background: "#0ea5e9",
+              color: "#fff",
+              border: "none",
+              cursor: selectedProductId ? "pointer" : "not-allowed",
+            }}
+          >
+            <PlusOutlined /> Thêm mức giá
+          </button>
+        </div>
       </div>
 
-      {/* Bảng dữ liệu */}
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead>
-            <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-              {["Số lượng từ (cái)", "Số lượng đến (cái)", "Giảm (%)", "Thao tác"].map(
-                (tieu, idx) => (
-                  <th
-                    key={idx}
-                    style={{
-                      padding: "10px 16px",
-                      textAlign: idx === 3 ? "right" : "left",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "#475569",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    {tieu}
-                  </th>
-                ),
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {danhSach.map((dai) => (
-              <tr
-                key={dai.id}
-                style={{ borderBottom: "1px solid #e2e8f0" }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "#f8fafc";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "transparent";
-                }}
-              >
-                <td style={{ padding: "12px 16px", fontWeight: 600, color: "#0f172a" }}>
-                  {dai.tuSoLuong.toLocaleString("vi-VN")}
-                </td>
-                <td style={{ padding: "12px 16px", color: "#475569" }}>
-                  {dai.denSoLuong === null
-                    ? "Không giới hạn"
-                    : dai.denSoLuong.toLocaleString("vi-VN")}
-                </td>
-                <td style={{ padding: "12px 16px" }}>
-                  {/* Badge % giảm – màu xanh */}
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      padding: "3px 10px",
-                      borderRadius: 9999,
-                      backgroundColor: "#e0f2fe",
-                      color: "#0284c7",
-                      fontSize: 12,
-                      fontWeight: 700,
-                    }}
-                  >
-                    -{dai.phanTramGiam}%
-                  </span>
-                </td>
-                <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 4 }}>
+      {(productsQuery.isLoading || tiersQuery.isLoading) && (
+        <div style={{ padding: 48, textAlign: "center", color: "#475569" }}>
+          <LoadingOutlined /> Đang tải bảng giá...
+        </div>
+      )}
+      {(productsQuery.isError || tiersQuery.isError) && (
+        <div style={{ padding: 48, textAlign: "center", color: "#b91c1c" }}>
+          Không thể tải bảng giá theo số lượng.
+        </div>
+      )}
+      {!productsQuery.isLoading && !productsQuery.isError && productsQuery.data?.length === 0 && (
+        <div style={{ padding: 48, textAlign: "center", color: "#64748b" }}>
+          Chưa có sản phẩm để thiết lập giá theo số lượng.
+        </div>
+      )}
+
+      {!productsQuery.isLoading &&
+        !tiersQuery.isLoading &&
+        !productsQuery.isError &&
+        !tiersQuery.isError &&
+        Boolean(productsQuery.data?.length) && (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                {["Từ số lượng", "Đến số lượng", "Mức giảm", "Đơn giá sau giảm", "Thao tác"].map(
+                  (title) => (
+                    <th key={title} style={{ padding: "11px 16px", textAlign: "left", color: "#475569" }}>
+                      {title}
+                    </th>
+                  ),
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {danhSach.map((tier) => (
+                <tr key={tier.id} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                  <td style={{ padding: "12px 16px", fontWeight: 600 }}>{tier.tuSoLuong}</td>
+                  <td style={{ padding: "12px 16px" }}>
+                    {tier.denSoLuong ?? "Không giới hạn"}
+                  </td>
+                  <td style={{ padding: "12px 16px", color: "#0284c7", fontWeight: 700 }}>
+                    -{tier.phanTramGiam}%
+                  </td>
+                  <td style={{ padding: "12px 16px" }}>
+                    {tier.donGiaSauGiam.toLocaleString("vi-VN")}đ
+                  </td>
+                  <td style={{ padding: "12px 16px" }}>
                     <button
                       title="Chỉnh sửa"
-                      style={{
-                        padding: 6,
-                        border: "none",
-                        background: "transparent",
-                        color: "#94a3b8",
-                        borderRadius: 6,
-                        cursor: "pointer",
-                        fontSize: 14,
+                      onClick={() => {
+                        setDangSuaId(tier.id);
+                        setForm({
+                          minQty: String(tier.tuSoLuong),
+                          discountPercent: String(tier.phanTramGiam),
+                        });
                       }}
-                      onMouseEnter={(e) => {
-                        const el = e.currentTarget as HTMLButtonElement;
-                        el.style.background = "#eaeef2";
-                        el.style.color = "#0f172a";
-                      }}
-                      onMouseLeave={(e) => {
-                        const el = e.currentTarget as HTMLButtonElement;
-                        el.style.background = "transparent";
-                        el.style.color = "#94a3b8";
-                      }}
+                      style={{ marginRight: 8, cursor: "pointer" }}
                     >
                       <EditOutlined />
                     </button>
                     <button
                       title="Xóa"
-                      onClick={() => xoaDaiGia(dai.id)}
-                      style={{
-                        padding: 6,
-                        border: "none",
-                        background: "transparent",
-                        color: "#94a3b8",
-                        borderRadius: 6,
-                        cursor: "pointer",
-                        fontSize: 14,
+                      onClick={() => {
+                        if (window.confirm("Bạn có chắc muốn xóa mức giá này?")) {
+                          deleteMutation.mutate(tier.id);
+                        }
                       }}
-                      onMouseEnter={(e) => {
-                        const el = e.currentTarget as HTMLButtonElement;
-                        el.style.background = "#ffdad6";
-                        el.style.color = "#ea580c";
-                      }}
-                      onMouseLeave={(e) => {
-                        const el = e.currentTarget as HTMLButtonElement;
-                        el.style.background = "transparent";
-                        el.style.color = "#94a3b8";
-                      }}
+                      style={{ cursor: "pointer", color: "#b91c1c" }}
                     >
                       <DeleteOutlined />
                     </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-
-            {/* Form thêm mới – hiện khi dangThem=true */}
-            {dangThem && (
-              <tr style={{ backgroundColor: "#f0f9ff", borderBottom: "1px solid #e2e8f0" }}>
-                <td style={{ padding: "10px 16px" }}>
-                  <input
-                    type="number"
-                    placeholder="10"
-                    value={formMoi.tuSoLuong}
-                    onChange={(e) =>
-                      setFormMoi((f) => ({ ...f, tuSoLuong: e.target.value }))
-                    }
-                    style={{
-                      width: 90,
-                      height: 34,
-                      padding: "0 8px",
-                      border: "1px solid #0ea5e9",
-                      borderRadius: 6,
-                      fontSize: 13,
-                      outline: "none",
-                    }}
-                  />
-                </td>
-                <td style={{ padding: "10px 16px" }}>
-                  <input
-                    type="number"
-                    placeholder="Để trống = không giới hạn"
-                    value={formMoi.denSoLuong}
-                    onChange={(e) =>
-                      setFormMoi((f) => ({ ...f, denSoLuong: e.target.value }))
-                    }
-                    style={{
-                      width: 140,
-                      height: 34,
-                      padding: "0 8px",
-                      border: "1px solid #0ea5e9",
-                      borderRadius: 6,
-                      fontSize: 13,
-                      outline: "none",
-                    }}
-                  />
-                </td>
-                <td style={{ padding: "10px 16px" }}>
-                  <input
-                    type="number"
-                    placeholder="5"
-                    value={formMoi.phanTramGiam}
-                    onChange={(e) =>
-                      setFormMoi((f) => ({ ...f, phanTramGiam: e.target.value }))
-                    }
-                    style={{
-                      width: 70,
-                      height: 34,
-                      padding: "0 8px",
-                      border: "1px solid #0ea5e9",
-                      borderRadius: 6,
-                      fontSize: 13,
-                      outline: "none",
-                    }}
-                  />
-                </td>
-                <td style={{ padding: "10px 16px", textAlign: "right" }}>
-                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                  </td>
+                </tr>
+              ))}
+              {danhSach.length === 0 && !dangMoForm && (
+                <tr>
+                  <td colSpan={5} style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>
+                    Sản phẩm này chưa có mức giá theo số lượng.
+                  </td>
+                </tr>
+              )}
+              {dangMoForm && (
+                <tr style={{ background: "#f0f9ff" }}>
+                  <td style={{ padding: "10px 16px" }}>
+                    <input
+                      type="number"
+                      min={2}
+                      value={form.minQty}
+                      onChange={(event) => setForm((old) => ({ ...old, minQty: event.target.value }))}
+                      style={{ ...inputStyle, width: 100 }}
+                    />
+                  </td>
+                  <td style={{ padding: "10px 16px", color: "#64748b" }}>Tự động xác định</td>
+                  <td style={{ padding: "10px 16px" }}>
+                    <input
+                      type="number"
+                      min={0.01}
+                      max={100}
+                      step={0.01}
+                      value={form.discountPercent}
+                      onChange={(event) =>
+                        setForm((old) => ({ ...old, discountPercent: event.target.value }))
+                      }
+                      style={{ ...inputStyle, width: 100 }}
+                    />
+                  </td>
+                  <td style={{ padding: "10px 16px", color: "#64748b" }}>
+                    Hệ thống tự tính theo giá sản phẩm
+                  </td>
+                  <td style={{ padding: "10px 16px" }}>
                     <button
-                      onClick={luuDaiGiaMoi}
-                      title="Lưu"
-                      style={{
-                        padding: "6px 12px",
-                        background: "#0ea5e9",
-                        border: "none",
-                        borderRadius: 6,
-                        color: "#fff",
-                        fontSize: 13,
-                        cursor: "pointer",
-                        fontWeight: 600,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 4,
-                      }}
+                      onClick={() => saveMutation.mutate()}
+                      disabled={saveMutation.isPending}
+                      style={{ marginRight: 8, cursor: "pointer", color: "#0284c7" }}
                     >
-                      <SaveOutlined /> Lưu
+                      <SaveOutlined /> {saveMutation.isPending ? "Đang lưu" : "Lưu"}
                     </button>
                     <button
-                      onClick={() => setDangThem(false)}
-                      title="Hủy"
-                      style={{
-                        padding: "6px 10px",
-                        background: "transparent",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: 6,
-                        color: "#475569",
-                        fontSize: 13,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
+                      onClick={() => {
+                        setDangSuaId(null);
+                        setForm({ minQty: "", discountPercent: "" });
                       }}
+                      style={{ cursor: "pointer" }}
                     >
-                      <CloseOutlined />
+                      <CloseOutlined /> Hủy
                     </button>
-                  </div>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Ghi chú hướng dẫn */}
-      <div
-        style={{
-          padding: "12px 20px",
-          borderTop: "1px solid #e2e8f0",
-          backgroundColor: "#f8fafc",
-        }}
-      >
-        <p style={{ fontSize: 12, color: "#94a3b8", margin: 0 }}>
-          💡 Mức giảm sẽ được áp dụng tự động khi khách đặt số lượng đủ điều kiện. Các dải giá không được chồng chéo nhau.
-        </p>
-      </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function BulkPricingTab() {
+  return (
+    <App>
+      <BulkPricingContent />
+    </App>
   );
 }

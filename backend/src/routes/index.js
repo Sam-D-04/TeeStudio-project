@@ -9,6 +9,7 @@ const paymentRoutes = require("../modules/payments/payment.routes");
 const adminPaymentRoutes = require("../modules/payments/payment.routes").adminRouter;
 const adminProductRoutes = require("../modules/products/product.routes");
 const adminInventoryRoutes = require("../modules/inventory/inventory.routes");
+const adminPromotionRoutes = require("../modules/promotions/promotion.routes");
 
 // Import controller cho 2 public endpoints (vi-tri-in, stickers dành cho Design Studio)
 const designController = require("../modules/designs/design.controller");
@@ -54,6 +55,9 @@ router.use("/admin/products", adminProductRoutes);
 
 // Quản lý kho hàng – /api/admin/inventory/...
 router.use("/admin/inventory", adminInventoryRoutes);
+
+// Quản lý khuyến mãi và cấu hình báo giá – /api/admin/promotions/...
+router.use("/admin/promotions", adminPromotionRoutes);
 
 // Quản lý thanh toán – /api/admin/payments/...
 router.use("/admin/payments", adminPaymentRoutes);

@@ -1405,21 +1405,21 @@ async function layDanhSachKhuyenMai() {
      FROM Promotion
      WHERE status = 'ACTIVE'
        AND startDate <= ?
-       AND endDate >= ?
-       AND usedCount < usageLimit
-     ORDER BY endDate ASC
+       AND (endDate IS NULL OR endDate >= ?)
+       AND (usageLimit IS NULL OR usedCount < usageLimit)
+     ORDER BY endDate IS NULL ASC, endDate ASC
      LIMIT 50`,
     [now, now]
   );
   return rows.map((r) => ({
     id: r.id,
     ma: r.code,
-    loaiGiam: r.discountType,       // PERCENT | FIXED
+    loaiGiam: r.discountType,       // PERCENT | FIXED | FREE_SHIPPING
     giaTriGiam: Number(r.discountValue),
     donHangToiThieu: Number(r.minOrderAmount),
-    ngayKetThuc: r.endDate,
+    ngayKetThuc: r.endDate || null,
     daUsed: r.usedCount,
-    usageLimit: r.usageLimit,
+    usageLimit: r.usageLimit === null ? null : r.usageLimit,
   }));
 }
 
@@ -1623,7 +1623,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     0
   );
 
-  const shippingFee = Math.max(0, Number(shippingFeeInput) || 0);
+  let shippingFee = Math.max(0, Number(shippingFeeInput) || 0);
 
   // Tính discountAmount từ promotion (nếu có)
   let discountAmount = 0;
@@ -1633,7 +1633,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     const now = new Date();
     const [rowsPromo] = await db.pool.query(
       `SELECT id, code, discountType, discountValue, minOrderAmount,
-              usageLimit, usedCount, startDate, endDate, status
+              usageLimit, usedCount, startDate, endDate, status, isNewCustomerOnly
        FROM Promotion
        WHERE id = ? LIMIT 1`,
       [promotionId]
@@ -1655,17 +1655,32 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     }
 
     // Kiểm tra thời hạn
-    if (new Date(promo.startDate) > now || new Date(promo.endDate) < now) {
+    if (
+      new Date(promo.startDate) > now ||
+      (promo.endDate && new Date(promo.endDate) < now)
+    ) {
       const err = new Error("Mã khuyến mãi đã hết hạn hoặc chưa đến ngày áp dụng");
       err.statusCode = 400;
       throw err;
     }
 
     // Kiểm tra số lượt dùng
-    if (promo.usedCount >= promo.usageLimit) {
+    if (promo.usageLimit !== null && promo.usedCount >= promo.usageLimit) {
       const err = new Error("Mã khuyến mãi đã hết lượt sử dụng");
       err.statusCode = 400;
       throw err;
+    }
+
+    if (promo.isNewCustomerOnly) {
+      const [rowsExistingOrders] = await db.pool.query(
+        "SELECT id FROM CustomerOrder WHERE userId = ? LIMIT 1",
+        [userId]
+      );
+      if (rowsExistingOrders.length > 0) {
+        const err = new Error("Mã khuyến mãi này chỉ dành cho khách hàng chưa từng đặt hàng");
+        err.statusCode = 400;
+        throw err;
+      }
     }
 
     // Kiểm tra đơn hàng đạt minOrderAmount
@@ -1695,9 +1710,10 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     // Tính giá trị giảm
     if (promo.discountType === "PERCENT") {
       discountAmount = orderBaseAmount * (Number(promo.discountValue) / 100);
-    } else {
-      // FIXED
+    } else if (promo.discountType === "FIXED") {
       discountAmount = Number(promo.discountValue);
+    } else if (promo.discountType === "FREE_SHIPPING") {
+      shippingFee = 0;
     }
     discountAmount = Math.min(discountAmount, orderBaseAmount); // không giảm quá tổng đơn
     discountAmount = Math.round(discountAmount * 100) / 100;

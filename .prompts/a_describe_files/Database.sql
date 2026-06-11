@@ -298,17 +298,37 @@ CREATE TABLE IF NOT EXISTS `CartItem` (
 CREATE TABLE IF NOT EXISTS `Promotion` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`code` VARCHAR(50) NOT NULL,
-	`discountType` VARCHAR(20) NOT NULL,
-	`discountValue` DECIMAL(15,2) NOT NULL,
+	`discountType` VARCHAR(30) NOT NULL COMMENT 'PERCENT, FIXED, FREE_SHIPPING',
+	`discountValue` DECIMAL(15,2) NOT NULL DEFAULT 0,
 	`minOrderAmount` DECIMAL(15,2) NOT NULL DEFAULT 0,
 	`startDate` DATETIME NOT NULL,
-	`endDate` DATETIME NOT NULL,
-	`usageLimit` INT NOT NULL,
+	`endDate` DATETIME NULL,
+	`usageLimit` INT NULL,
 	`usedCount` INT NOT NULL DEFAULT 0,
+	`isNewCustomerOnly` TINYINT NOT NULL DEFAULT 0,
 	`status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+	`createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	PRIMARY KEY (`id`),
-	UNIQUE KEY `uq_promotion_code` (`code`)
+	UNIQUE KEY `uq_promotion_code` (`code`),
+	KEY `idx_promotion_status_dates` (`status`, `startDate`, `endDate`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+CREATE TABLE IF NOT EXISTS `PricingConfiguration` (
+	`id` INT NOT NULL,
+	`roundingUnit` INT NOT NULL DEFAULT 1000,
+	`defaultShippingFee` DECIMAL(15,2) NOT NULL DEFAULT 30000,
+	`freeShippingThreshold` DECIMAL(15,2) NOT NULL DEFAULT 500000,
+	`vatPercent` DECIMAL(5,2) NOT NULL DEFAULT 0,
+	`updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `PricingConfiguration`
+	(`id`, `roundingUnit`, `defaultShippingFee`, `freeShippingThreshold`, `vatPercent`)
+VALUES (1, 1000, 30000, 500000, 0)
+ON DUPLICATE KEY UPDATE `id` = `id`;
 
 
 CREATE TABLE IF NOT EXISTS `CustomerOrder` (

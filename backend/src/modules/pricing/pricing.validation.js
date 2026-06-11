@@ -39,12 +39,14 @@ const calculateQuoteSchema = {
           return true;
         }
 
-        const discountTypes = ["PERCENT", "FIXED"];
+        const discountTypes = ["PERCENT", "FIXED", "FREE_SHIPPING"];
         const hasValidType = discountTypes.includes(promotion.discountType);
-        const hasValidValue = !Number.isNaN(Number(promotion.discountValue));
+        const hasValidValue =
+          promotion.discountType === "FREE_SHIPPING" ||
+          !Number.isNaN(Number(promotion.discountValue));
 
         if (!hasValidType) {
-          return "promotion.discountType must be PERCENT or FIXED";
+          return "promotion.discountType phải là PERCENT, FIXED hoặc FREE_SHIPPING";
         }
 
         if (!hasValidValue) {

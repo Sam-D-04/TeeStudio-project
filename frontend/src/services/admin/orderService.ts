@@ -337,12 +337,12 @@ export type ThietKe = {
 export type KhuyenMai = {
   id: number;
   ma: string;
-  loaiGiam: "PERCENT" | "FIXED";
+  loaiGiam: "PERCENT" | "FIXED" | "FREE_SHIPPING";
   giaTriGiam: number;
   donHangToiThieu: number;
-  ngayKetThuc: string;
+  ngayKetThuc: string | null;
   daUsed: number;
-  usageLimit: number;
+  usageLimit: number | null;
 };
 
 /** Một dòng item trong đơn (payload gửi lên backend) */

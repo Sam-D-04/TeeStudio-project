@@ -4,6 +4,28 @@ const {
   calculateFixedAmount,
   clampDiscount,
 } = require("./pricing.utils");
+const db = require("../../database/mysql");
+
+const DEFAULT_CONFIGURATION = {
+  roundingUnit: 1000,
+  defaultShippingFee: 30000,
+  freeShippingThreshold: 500000,
+  vatPercent: 0,
+};
+
+const getPricingConfiguration = async () => {
+  const [rows] = await db.pool.query(
+    `SELECT roundingUnit, defaultShippingFee, freeShippingThreshold, vatPercent
+     FROM PricingConfiguration WHERE id = 1 LIMIT 1`
+  );
+  if (!rows.length) return DEFAULT_CONFIGURATION;
+  return {
+    roundingUnit: Number(rows[0].roundingUnit),
+    defaultShippingFee: Number(rows[0].defaultShippingFee),
+    freeShippingThreshold: Number(rows[0].freeShippingThreshold),
+    vatPercent: Number(rows[0].vatPercent),
+  };
+};
 
 const calculatePrintPositionsCost = (printPositions = []) => {
   return toMoney(
@@ -30,6 +52,10 @@ const calculatePromotionDiscount = (amountAfterBulkDiscount, promotion) => {
     return 0;
   }
 
+  if (promotion.discountType === "FREE_SHIPPING") {
+    return 0;
+  }
+
   if (promotion.discountType === "PERCENT") {
     return clampDiscount(
       amountAfterBulkDiscount,
@@ -46,7 +72,7 @@ const calculatePromotionDiscount = (amountAfterBulkDiscount, promotion) => {
   );
 };
 
-const calculateDesignQuote = ({
+const calculateDesignQuote = async ({
   basePrice,
   quantity,
   designFee = 0,
@@ -54,6 +80,7 @@ const calculateDesignQuote = ({
   bulkDiscountPercent = 0,
   promotion = null,
 }) => {
+  const configuration = await getPricingConfiguration();
   const printPositionsCost = calculatePrintPositionsCost(printPositions);
   const unitPriceBeforeDiscount = toMoney(
     Number(basePrice) + Number(designFee) + printPositionsCost
@@ -65,8 +92,27 @@ const calculateDesignQuote = ({
     amountAfterBulkDiscount,
     promotion
   );
-  const totalAmount = toMoney(
+  const amountAfterPromotion = toMoney(
     Math.max(amountAfterBulkDiscount - promotionDiscount, 0)
+  );
+  const promotionEligible =
+    promotion &&
+    amountAfterBulkDiscount >= Number(promotion.minOrderAmount || 0);
+  const shippingFee =
+    (promotionEligible && promotion.discountType === "FREE_SHIPPING") ||
+    (configuration.freeShippingThreshold > 0 &&
+      amountAfterPromotion >= configuration.freeShippingThreshold)
+      ? 0
+      : configuration.defaultShippingFee;
+  const vatAmount = toMoney(
+    (amountAfterPromotion * configuration.vatPercent) / 100
+  );
+  const amountBeforeRounding = toMoney(
+    amountAfterPromotion + shippingFee + vatAmount
+  );
+  const totalAmount = toMoney(
+    Math.ceil(amountBeforeRounding / Math.max(configuration.roundingUnit, 1)) *
+      Math.max(configuration.roundingUnit, 1)
   );
 
   return {
@@ -81,6 +127,10 @@ const calculateDesignQuote = ({
       promotionDiscount,
       totalDiscount: toMoney(bulkDiscount + promotionDiscount),
     },
+    shippingFee: toMoney(shippingFee),
+    vatAmount,
+    amountBeforeRounding,
+    pricingConfiguration: configuration,
     totalAmount,
   };
 };

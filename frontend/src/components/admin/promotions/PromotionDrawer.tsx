@@ -15,8 +15,8 @@ import type { MaKhuyenMai } from "./PromotionTable";
  *
  * Form gồm các trường:
  *  1. Mã khuyến mãi (text, tự động viết hoa) + nút tạo ngẫu nhiên
- *  2. Loại giảm giá (radio buttons: %, số tiền, miễn phí ship)
- *  3. Giá trị giảm (hiển thị khi không phải miễn phí ship)
+ *  2. Loại giảm giá (phần trăm, số tiền, miễn phí vận chuyển)
+ *  3. Giá trị giảm (hiển thị khi không phải miễn phí vận chuyển)
  *  4. Giá trị đơn hàng tối thiểu
  *  5. Ngày bắt đầu + ngày kết thúc
  *  6. Giới hạn tổng lượt dùng
@@ -26,13 +26,14 @@ import type { MaKhuyenMai } from "./PromotionTable";
 // Kiểu dữ liệu cho form – dùng string để các ô input hoạt động đúng
 export type FormMaKhuyenMai = {
   ma: string;                                               // Mã code
-  loaiGiam: "phan_tram" | "so_tien" | "mien_phi_ship";    // Loại giảm
+  loaiGiam: "phan_tram" | "so_tien" | "mien_phi_van_chuyen"; // Loại giảm
   giaTriGiam: string;                                       // Giá trị (string vì là input)
   donToiThieu: string;                                      // Đơn tối thiểu (VNĐ)
   ngayBatDau: string;                                       // ISO date cho input[type=date]
   ngayKetThuc: string;                                      // ISO date hoặc ""
   gioiHanLuot: string;                                      // "" = không giới hạn
   chiDanhChoKhachMoi: boolean;                              // Checkbox
+  dangHoatDong: boolean;
 };
 
 // Giá trị mặc định khi mở form tạo mới
@@ -45,6 +46,7 @@ const FORM_MAC_DINH: FormMaKhuyenMai = {
   ngayKetThuc: "",
   gioiHanLuot: "",
   chiDanhChoKhachMoi: false,
+  dangHoatDong: true,
 };
 
 type PromotionDrawerProps = {
@@ -53,6 +55,7 @@ type PromotionDrawerProps = {
   duLieuDangSua?: MaKhuyenMai | null;        // Dữ liệu mã đang được sửa
   onDong: () => void;                        // Callback khi đóng drawer
   onLuu: (duLieu: FormMaKhuyenMai) => void; // Callback khi submit form
+  dangLuu?: boolean;
 };
 
 // Hàm tạo mã ngẫu nhiên gồm 6-8 ký tự chữ hoa và số
@@ -86,7 +89,8 @@ function taoFormBanDau(
       duLieuDangSua.gioiHanLuot !== null
         ? String(duLieuDangSua.gioiHanLuot)
         : "",
-    chiDanhChoKhachMoi: false,
+    chiDanhChoKhachMoi: duLieuDangSua.chiDanhChoKhachMoi,
+    dangHoatDong: duLieuDangSua.trangThai !== "tam_dung",
   };
 }
 
@@ -121,6 +125,7 @@ export default function PromotionDrawer({
   duLieuDangSua,
   onDong,
   onLuu,
+  dangLuu = false,
 }: PromotionDrawerProps) {
   // State lưu giá trị form. Component được remount mỗi lần mở drawer,
   // nên giá trị ban đầu luôn khớp chế độ tạo mới hoặc chỉnh sửa.
@@ -301,7 +306,7 @@ export default function PromotionDrawer({
                 [
                   { giaTri: "phan_tram", nhan: "Phần trăm (%)" },
                   { giaTri: "so_tien", nhan: "Số tiền trực tiếp" },
-                  { giaTri: "mien_phi_ship", nhan: "Miễn phí vận chuyển" },
+                  { giaTri: "mien_phi_van_chuyen", nhan: "Miễn phí vận chuyển" },
                 ] as const
               ).map((lua_chon) => (
                 <label
@@ -329,8 +334,8 @@ export default function PromotionDrawer({
             </div>
           </div>
 
-          {/* ═══ TRƯỜNG 3: Giá trị giảm (ẩn khi chọn miễn phí ship) ═══ */}
-          {form.loaiGiam !== "mien_phi_ship" && (
+          {/* ═══ TRƯỜNG 3: Giá trị giảm (ẩn khi chọn miễn phí vận chuyển) ═══ */}
+          {form.loaiGiam !== "mien_phi_van_chuyen" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>
                 Giá trị giảm <span style={{ color: "#ea580c" }}>*</span>
@@ -472,6 +477,33 @@ export default function PromotionDrawer({
               </span>
             </label>
           </div>
+
+          <div style={{ paddingTop: 4 }}>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 8,
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={form.dangHoatDong}
+                onChange={(e) => capNhatTruong("dangHoatDong", e.target.checked)}
+                style={{
+                  accentColor: "#0ea5e9",
+                  width: 16,
+                  height: 16,
+                  marginTop: 2,
+                  cursor: "pointer",
+                }}
+              />
+              <span style={{ fontSize: 13, color: "#0f172a", lineHeight: "20px" }}>
+                Cho phép sử dụng mã khuyến mãi
+              </span>
+            </label>
+          </div>
         </div>
 
         {/* ── Phần chân Drawer: Nút Hủy + Lưu ── */}
@@ -516,6 +548,7 @@ export default function PromotionDrawer({
           <button
             type="button"
             onClick={() => onLuu(form)}
+            disabled={dangLuu}
             style={{
               flex: 1,
               height: 40,
@@ -525,7 +558,8 @@ export default function PromotionDrawer({
               fontSize: 14,
               fontWeight: 600,
               color: "#ffffff",
-              cursor: "pointer",
+              cursor: dangLuu ? "wait" : "pointer",
+              opacity: dangLuu ? 0.7 : 1,
               boxShadow: "0 1px 4px rgba(14,165,233,0.3)",
               transition: "background-color 0.15s ease",
               fontFamily: "Inter, sans-serif",
@@ -537,7 +571,7 @@ export default function PromotionDrawer({
               (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0ea5e9";
             }}
           >
-            {dangSua ? "Lưu thay đổi" : "Lưu mã"}
+            {dangLuu ? "Đang lưu..." : dangSua ? "Lưu thay đổi" : "Lưu mã"}
           </button>
         </div>
       </div>

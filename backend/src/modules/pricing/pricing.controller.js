@@ -1,8 +1,8 @@
 const pricingService = require("./pricing.service");
 
-const calculateQuote = (req, res, next) => {
+const calculateQuote = async (req, res, next) => {
   try {
-    const quote = pricingService.calculateDesignQuote(req.body);
+    const quote = await pricingService.calculateDesignQuote(req.body);
 
     res.json({
       success: true,
