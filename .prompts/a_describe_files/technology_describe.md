@@ -5,7 +5,7 @@ Tên dự án: Xây dựng web thương mại điện tử bán áo tự thiết
 Dưới đây là bản Đặc tả Công nghệ & Tiêu chuẩn Đồng bộ (Tech Stack & Synchronization Protocol) chi tiết nhất. Các bạn hãy dùng bản này làm tài liệu chuẩn mực (Guideline) cho suốt quá trình phát triển.
 1. Frontend: Kiến trúc Mặt tiền & Design Studio
 •	Next.js (dựa trên ReactJS): Đóng vai trò là framework cốt lõi để xây dựng giao diện người dùng. Next.js cung cấp khả năng điều hướng (Routing) linh hoạt và hỗ trợ tối ưu hóa quá trình kết xuất (Rendering) để tăng cường trải nghiệm người dùng.
-•	Thư viện UI & Styling: Tailwind CSS. Bắt buộc thống nhất dùng Tailwind để tránh việc mỗi người viết một kiểu CSS thuần gây xung đột giao diện. Có thể kết hợp thêm thư viện component như shadcn/ui hoặc Ant Design để tiết kiệm thời gian làm form, bảng biểu.
+•	Thư viện UI & Styling: Tailwind CSS và Ant Design. Bắt buộc thống nhất dùng để tránh việc mỗi người viết một kiểu CSS thuần gây xung đột giao diện. Có thể kết hợp thêm thư viện component là Ant Design để tiết kiệm thời gian làm form, bảng biểu.
 •	Design Studio (Linh hồn dự án): Sử dụng Konva.js (khuyên dùng react-konva). Thư viện này hỗ trợ vẽ Canvas, kéo thả logo, thay đổi màu áo và xuất tọa độ ra định dạng JSON cực kỳ mạnh mẽ.
 •	Quản lý State phức tạp: Sử dụng Zustand. Zustand đặc biệt phù hợp để quản lý các trạng thái thay đổi liên tục trên Canvas (như tọa độ X, Y của logo, màu sắc đang chọn) mà không làm chậm ứng dụng.
 •	Giao tiếp API: Axios kết hợp với React Query (@tanstack/react-query) để tự động quản lý bộ nhớ đệm (cache) phía client và xử lý trạng thái loading/error gọn gàng.
