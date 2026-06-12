@@ -10,7 +10,7 @@ import {
   PlusOutlined,
   TagOutlined,
 } from "@ant-design/icons";
-import { message } from "antd";
+import { App } from "antd";
 
 import PromotionStatCard from "./PromotionStatCard";
 import PromotionFilterBar, { type BoDucMaKhuyenMai } from "./PromotionFilterBar";
@@ -51,7 +51,8 @@ const doiFormSangPayload = (
   status: form.dangHoatDong ? "ACTIVE" : "INACTIVE",
 });
 
-export default function PromotionPage() {
+function PromotionContent() {
+  const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [tabDangChon, setTabDangChon] = useState<TenTab>("ma_khuyen_mai");
   const [trang, setTrang] = useState(1);
@@ -346,5 +347,13 @@ export default function PromotionPage() {
         dangLuu={saveMutation.isPending}
       />
     </>
+  );
+}
+
+export default function PromotionPage() {
+  return (
+    <App>
+      <PromotionContent />
+    </App>
   );
 }

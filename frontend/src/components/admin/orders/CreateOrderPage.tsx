@@ -1679,6 +1679,7 @@ export default function CreateOrderPage() {
         onFinish={handleFinish}
         onFinishFailed={handleFinishFailed}
         requiredMark={false}
+        className="rounded-2xl border border-border bg-surface-alt p-3 shadow-admin-card md:p-5"
       >
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-5">
