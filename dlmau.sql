@@ -317,8 +317,8 @@ INSERT INTO `Payment` (orderId, amount, paymentMethod, paymentType, status, tran
 (1,  705000, 'VNPAY',          'FULL', 'COMPLETED', 'VNP20260603001', '2026-06-03 08:30:00'),
 -- ĐH2: COD chờ thanh toán
 (2,  380000, 'COD',            'FULL','PENDING',   NULL, NULL),
--- ĐH3: Chuyển khoản đã thanh toán
-(3,  2400000,'BANK_TRANSFER',  'FULL', 'COMPLETED', 'CK20260602001', '2026-06-02 14:00:00'),
+-- ĐH3: VNPAY đã thanh toán
+(3,  2400000,'VNPAY',  'FULL', 'COMPLETED', 'VNP20260602001', '2026-06-02 14:00:00'),
 -- ĐH4: VNPAY đã thanh toán
 (4,  510000, 'VNPAY',          'FULL', 'COMPLETED', 'VNP20260531001', '2026-05-31 15:30:00'),
 -- ĐH5: COD chờ thanh toán

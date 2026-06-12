@@ -573,6 +573,15 @@ export default function OrderDetailRouteClient() {
     ]);
   }
 
+  async function refreshStockData() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["admin-order-product-search"] }),
+      queryClient.invalidateQueries({ queryKey: ["admin-order-design-search"] }),
+      queryClient.invalidateQueries({ queryKey: ["products"] }),
+      queryClient.invalidateQueries({ queryKey: ["inventory"] }),
+    ]);
+  }
+
   const updateStatusMutation = useMutation({
     mutationFn: (payload: { trangThai: string; shippingCarrier?: string; trackingCode?: string }) =>
       orderService.capNhatTrangThaiDonHang({
@@ -598,7 +607,7 @@ export default function OrderDetailRouteClient() {
       setIsCancelModalOpen(false);
       setCancelReason("");
       messageApi.success("Đã hủy đơn hàng thành công");
-      await refreshOrderData();
+      await Promise.all([refreshOrderData(), refreshStockData()]);
     },
     onError: (mutationError) => {
       messageApi.error(getApiErrorMessage(mutationError));

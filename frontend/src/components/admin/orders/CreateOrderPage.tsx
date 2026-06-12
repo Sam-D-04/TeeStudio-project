@@ -1411,8 +1411,9 @@ export default function CreateOrderPage() {
         queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-order-product-search"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-products"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-inventory"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-order-design-search"] }),
+        queryClient.invalidateQueries({ queryKey: ["products"] }),
+        queryClient.invalidateQueries({ queryKey: ["inventory"] }),
       ]);
       router.push(`/admin/don-hang/${result.id}`);
     },
