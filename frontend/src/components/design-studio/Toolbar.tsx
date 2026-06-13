@@ -39,9 +39,10 @@ interface ToolbarProps {
   onSave: () => void;
   onDownloadImage: () => void;
   onShowToast: (msg: string) => void;
+  isSaving?: boolean;
 }
 
-export default function Toolbar({ onSave, onDownloadImage, onShowToast }: ToolbarProps) {
+export default function Toolbar({ onSave, onDownloadImage, onShowToast, isSaving }: ToolbarProps) {
   const { undo, redo, undoStack, redoStack, clearDesign, shirtType } = useDesignStore();
 
   const shirtLabel =
@@ -131,8 +132,17 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast }: Toolba
           className="ds-toolbar-btn ds-toolbar-btn--primary"
           onClick={onSave}
           title="Lưu thiết kế (Ctrl+S)"
+          disabled={isSaving}
         >
-          <SaveIcon /> Lưu thiết kế
+          {isSaving ? (
+            <svg className="ds-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <SaveIcon />
+          )}
+          {isSaving ? "Đang lưu..." : "Lưu thiết kế"}
         </button>
       </div>
     </header>

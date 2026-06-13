@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const userController = require("./user.controller");
+const userDesignRoutes = require("./user.design.routes");
 const validate = require("../../common/middlewares/validate.middleware");
 const {
   verifyToken,
@@ -13,6 +14,8 @@ const {
 
 router.get("/me", verifyToken, userController.getProfile);
 router.patch("/me", verifyToken, validate(updateProfileSchema), userController.updateProfile);
+
+router.use("/me/designs", verifyToken, userDesignRoutes);
 
 router.get("/staff", verifyToken, requireAdmin, userController.listStaff);
 router.post(
