@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CloseOutlined, EditOutlined, LoadingOutlined, SaveOutlined } from "@ant-design/icons";
-import { message } from "antd";
+import { App } from "antd";
 import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import * as promotionService from "@/services/admin/promotionService";
 
-export default function PrintSurchargeTab() {
+function PrintSurchargeContent() {
+  const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [dangSua, setDangSua] = useState<{ loai: promotionService.LoaiPhuPhi; id: number } | null>(
     null,
@@ -200,5 +201,13 @@ export default function PrintSurchargeTab() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function PrintSurchargeTab() {
+  return (
+    <App>
+      <PrintSurchargeContent />
+    </App>
   );
 }

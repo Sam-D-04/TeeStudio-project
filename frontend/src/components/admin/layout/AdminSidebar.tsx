@@ -12,6 +12,7 @@ import {
   SkinOutlined,
   ShoppingCartOutlined,
   TagsOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
   { label: "Kho hàng", icon: <InboxOutlined />, href: "/admin/kho-hang", allowedRoles: ["ADMIN", "WAREHOUSE"] },
   { label: "Thanh toán", icon: <CreditCardOutlined />, href: "/admin/thanh-toan", allowedRoles: ["ADMIN"] },
   { label: "Khuyến mãi & Báo giá", icon: <TagsOutlined />, href: "/admin/khuyen-mai-bao-gia", allowedRoles: ["ADMIN"] },
+  { label: "Tài khoản", icon: <TeamOutlined />, href: "/admin/tai-khoan", allowedRoles: ["ADMIN"] },
   { label: "Cài đặt", icon: <SettingOutlined />, href: "/admin/cai-dat", allowedRoles: ["ADMIN"] },
 ];
 
