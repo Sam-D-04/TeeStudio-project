@@ -3,7 +3,10 @@ import { Inter } from "next/font/google";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { ConfigProvider } from "antd";
 import viVN from "antd/locale/vi_VN";
+import QueryProvider from "@/providers/QueryProvider";
 import "./globals.css";
+
+import { getGoogleFontsUrl } from "@/constants/fonts";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -52,13 +55,26 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="vi" className={`${inter.variable} h-full antialiased`}>
-      <body suppressHydrationWarning={true} className="min-h-full flex flex-col bg-[#f1f5f9]">
-        <AntdRegistry>
-          <ConfigProvider theme={antdTheme} locale={viVN}>
-            {children}
-          </ConfigProvider>
-        </AntdRegistry>
+    <html
+      lang="vi"
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+      className={`${inter.variable} h-full antialiased`}
+    >
+      <head>
+        <link rel="stylesheet" href={getGoogleFontsUrl()} />
+      </head>
+      <body
+        suppressHydrationWarning
+        className="min-h-full flex flex-col bg-[#f1f5f9]"
+      >
+        <QueryProvider>
+          <AntdRegistry>
+            <ConfigProvider theme={antdTheme} locale={viVN}>
+              {children}
+            </ConfigProvider>
+          </AntdRegistry>
+        </QueryProvider>
       </body>
     </html>
   );

@@ -12,6 +12,7 @@ export interface DesignElement {
   width: number;
   height: number;
   rotation: number;
+  locked?: boolean;
   // image-specific
   src?: string;
   // text-specific
@@ -20,6 +21,11 @@ export interface DesignElement {
   fontFamily?: string;
   fill?: string;
   fontStyle?: "normal" | "bold" | "italic" | "bold italic";
+  textDecoration?: "underline" | "linethrough" | "none";
+  align?: "left" | "center" | "right";
+  textTransform?: "uppercase" | "none";
+  letterSpacing?: number;
+  lineHeight?: number;
 }
 
 export type ShirtType = "tshirt" | "polo" | "hoodie";
@@ -35,6 +41,10 @@ export interface DesignState {
   shirtColor: string;
   shirtView: ShirtView;
 
+  /* Current DB state */
+  currentDesignId: number | null;
+  designName: string;
+
   /* Undo / Redo stacks (snapshot of elements[]) */
   undoStack: DesignElement[][];
   redoStack: DesignElement[][];
@@ -47,11 +57,16 @@ export interface DesignState {
   duplicateElement: (id: string) => void;
   moveElementUp: (id: string) => void;
   moveElementDown: (id: string) => void;
+  toggleLock: (id: string) => void;
 
   /* Actions ─ shirt */
   setShirtType: (t: ShirtType) => void;
   setShirtColor: (c: string) => void;
   setShirtView: (v: ShirtView) => void;
+  
+  /* Actions - persistence state */
+  setCurrentDesignId: (id: number | null) => void;
+  setDesignName: (name: string) => void;
 
   /* Actions ─ history */
   undo: () => void;
@@ -70,6 +85,8 @@ const STORAGE_KEY = "teestudio_design";
 export const useDesignStore = create<DesignState>((set, get) => ({
   elements: [],
   selectedId: null,
+  currentDesignId: null,
+  designName: "Thiết kế chưa đặt tên",
 
   shirtType: "tshirt",
   shirtColor: "#ffffff",
@@ -148,12 +165,26 @@ export const useDesignStore = create<DesignState>((set, get) => ({
     set({ elements: arr });
   },
 
+  toggleLock: (id) => {
+    set((s) => ({
+      elements: s.elements.map((el) =>
+        el.id === id ? { ...el, locked: !el.locked } : el
+      ),
+    }));
+  },
+
   /* ── Shirt config ── */
   setShirtType: (t) => set({ shirtType: t }),
   setShirtColor: (c) => set({ shirtColor: c }),
-  setShirtView: (v) => set({ shirtView: v }),
+  setShirtView: (v) => {
+    get().pushHistory();
+    set({ shirtView: v });
+  },
 
-  /* ── Undo / Redo ── */
+  setCurrentDesignId: (id) => set({ currentDesignId: id }),
+  setDesignName: (name) => set({ designName: name }),
+
+  /* ─── Undo / Redo ─── */
   undo: () => {
     const { undoStack, elements } = get();
     if (undoStack.length === 0) return;
@@ -180,8 +211,8 @@ export const useDesignStore = create<DesignState>((set, get) => ({
 
   /* ── Persistence ── */
   saveToLocal: () => {
-    const { elements, shirtType, shirtColor, shirtView } = get();
-    const data = { elements, shirtType, shirtColor, shirtView, savedAt: Date.now() };
+    const { elements, shirtType, shirtColor, shirtView, currentDesignId, designName } = get();
+    const data = { elements, shirtType, shirtColor, shirtView, currentDesignId, designName, savedAt: Date.now() };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   },
 
@@ -195,6 +226,8 @@ export const useDesignStore = create<DesignState>((set, get) => ({
         shirtType: data.shirtType || "tshirt",
         shirtColor: data.shirtColor || "#ffffff",
         shirtView: data.shirtView || "front",
+        currentDesignId: data.currentDesignId || null,
+        designName: data.designName || "Thiết kế chưa đặt tên",
         selectedId: null,
         undoStack: [],
         redoStack: [],
@@ -207,7 +240,7 @@ export const useDesignStore = create<DesignState>((set, get) => ({
   clearDesign: () => {
     const state = get();
     state.pushHistory();
-    set({ elements: [], selectedId: null });
+    set({ elements: [], selectedId: null, currentDesignId: null, designName: "Thiết kế chưa đặt tên" });
   },
 
   exportDesignJSON: () => {

@@ -1,0 +1,3 @@
+ALTER TABLE CustomerOrder
+  ADD COLUMN depositAmount DECIMAL(15,2) NOT NULL DEFAULT 0.00 AFTER totalAmount,
+  ADD COLUMN codAmount DECIMAL(15,2) NOT NULL DEFAULT 0.00 AFTER depositAmount;

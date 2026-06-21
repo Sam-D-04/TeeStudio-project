@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import AdminDashboardClient from "@/components/admin/AdminDashboardClient";
+import AdminDashboardClient from "@/components/admin/dashboard/AdminDashboardClient";
 
 export const metadata: Metadata = {
   title: "Tổng quan vận hành - TeeStudio Quản trị",
