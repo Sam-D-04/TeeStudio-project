@@ -47,25 +47,6 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   da_huy: { label: "Đã hủy", color: "red" },
 };
 
-const ORDER_STATUS_OPTIONS = [
-  { value: "cho_xac_nhan", label: "Chờ xác nhận" },
-  { value: "da_xac_nhan", label: "Đã xác nhận" },
-  { value: "dang_xu_ly_in", label: "Đang xử lý in" },
-  { value: "cho_giao", label: "Chờ giao" },
-  { value: "dang_giao", label: "Đang giao hàng" },
-  { value: "hoan_tat", label: "Hoàn tất" },
-];
-
-const ALLOWED_NEXT_STATUS: Record<string, string[]> = {
-  cho_xac_nhan: ["da_xac_nhan"],
-  da_xac_nhan: ["dang_xu_ly_in"],
-  dang_xu_ly_in: ["cho_giao"],
-  cho_giao: ["dang_giao"],
-  dang_giao: ["hoan_tat"],
-  hoan_tat: [],
-  da_huy: [],
-};
-
 const CANCELLABLE_STATUSES = new Set(["cho_xac_nhan", "da_xac_nhan", "dang_xu_ly_in", "cho_giao", "dang_giao"]);
 const EDITABLE_ADDRESS_STATUSES = new Set([
   "cho_xac_nhan",
@@ -73,26 +54,6 @@ const EDITABLE_ADDRESS_STATUSES = new Set([
   "dang_xu_ly_in",
   "cho_giao",
 ]);
-
-function hasCustomDesignOrder(order?: ChiTietDonHang | null) {
-  if (!order) return false;
-
-  return Boolean(
-    order.items?.some((item) => item.loai === "custom_design" || Boolean(item.designId)) ||
-      order.sanPham?.loai === "custom_design" ||
-      order.anhXemTruocThietKe
-  );
-}
-
-function getAllowedNextStatuses(order?: ChiTietDonHang | null) {
-  if (!order) return [];
-
-  if (order.trangThai === "da_xac_nhan" && !hasCustomDesignOrder(order)) {
-    return ["cho_giao"];
-  }
-
-  return ALLOWED_NEXT_STATUS[order.trangThai] ?? [];
-}
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("vi-VN", {
@@ -598,10 +559,6 @@ export default function OrderDetailRouteClient() {
   const orderId = Number(params.id);
   const [messageApi, messageContextHolder] = message.useMessage();
   const [modal, modalContextHolder] = Modal.useModal();
-  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-  const [newStatus, setNewStatus] = useState("");
-  const [shippingCarrier, setShippingCarrier] = useState<string | undefined>(undefined);
-  const [trackingCode, setTrackingCode] = useState("");
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
@@ -648,24 +605,6 @@ export default function OrderDetailRouteClient() {
     ]);
   }
 
-  const updateStatusMutation = useMutation({
-    mutationFn: (payload: { trangThai: string; shippingCarrier?: string; trackingCode?: string }) =>
-      orderService.capNhatTrangThaiDonHang({
-        id: orderId,
-        ...payload,
-      }),
-    onSuccess: async () => {
-      setIsUpdateModalOpen(false);
-      setNewStatus("");
-      setShippingCarrier(undefined);
-      setTrackingCode("");
-      messageApi.success("Cập nhật trạng thái đơn hàng thành công");
-      await refreshOrderData();
-    },
-    onError: (mutationError) => {
-      messageApi.error(getApiErrorMessage(mutationError));
-    },
-  });
 
   const cancelOrderMutation = useMutation({
     mutationFn: (reason: string) => orderService.huyDonHang(orderId, reason),
@@ -759,13 +698,6 @@ export default function OrderDetailRouteClient() {
                   Sửa địa chỉ
                 </Button>
               ) : null}
-              <Button
-                icon={<EditOutlined />}
-                className="h-9 rounded-[10px] font-semibold"
-                onClick={() => setIsUpdateModalOpen(true)}
-              >
-                Cập nhật trạng thái
-              </Button>
             </>
           ) : null}
 
@@ -793,100 +725,6 @@ export default function OrderDetailRouteClient() {
 
       {!isLoading && !isError && order ? <OrderDetailContent order={order} /> : null}
 
-      {/* Modal cập nhật trạng thái */}
-      <Modal
-        open={isUpdateModalOpen}
-        title="Cập nhật trạng thái đơn hàng"
-        okText="Xác nhận"
-        cancelText="Đóng"
-        confirmLoading={updateStatusMutation.isPending}
-        okButtonProps={{ disabled: !newStatus }}
-        mask={{ closable: true }}
-        onCancel={() => {
-          setIsUpdateModalOpen(false);
-          setNewStatus("");
-          setShippingCarrier(undefined);
-          setTrackingCode("");
-        }}
-        onOk={() => {
-          if (newStatus === "dang_giao") {
-            if (!shippingCarrier) {
-              messageApi.error("Vui lòng chọn hoặc nhập đơn vị vận chuyển");
-              return;
-            }
-          }
-
-          const performUpdate = () => {
-            updateStatusMutation.mutate({
-              trangThai: newStatus,
-              shippingCarrier: newStatus === "dang_giao" ? shippingCarrier : undefined,
-              trackingCode: newStatus === "dang_giao" ? trackingCode : undefined,
-            });
-          };
-
-          if (newStatus) {
-            const statusLabel = ORDER_STATUS_OPTIONS.find((s) => s.value === newStatus)?.label || "";
-            let confirmContent = "Hệ thống không cho phép lùi trạng thái sau khi đã cập nhật. Bạn có chắc chắn muốn chuyển sang trạng thái này?";
-
-            if (newStatus === "dang_giao") {
-              confirmContent = "Hệ thống không cho phép lùi trạng thái sau khi đã cập nhật. Bạn có chắc chắn đơn hàng này đã được bàn giao cho đơn vị vận chuyển?";
-            } else if (newStatus === "hoan_tat") {
-              confirmContent = "Hệ thống không cho phép lùi trạng thái sau khi đã cập nhật. Bạn có chắc chắn khách hàng đã nhận được hàng và thanh toán đủ?";
-            }
-
-            modal.confirm({
-              title: `Xác nhận chuyển sang "${statusLabel}"?`,
-              content: confirmContent,
-              okText: "Đồng ý",
-              cancelText: "Hủy",
-              okButtonProps: { danger: true, type: "primary" },
-              onOk: performUpdate,
-            });
-          }
-        }}
-      >
-        <p className="mb-2 text-sm font-semibold text-text-main">Trạng thái mới</p>
-        <Select
-          value={newStatus || undefined}
-          placeholder="Chọn trạng thái"
-          className="w-full"
-          options={ORDER_STATUS_OPTIONS.filter(
-            (status) => getAllowedNextStatuses(order).includes(status.value)
-          )}
-          onChange={setNewStatus}
-        />
-        {newStatus === "dang_giao" && (
-          <div className="mt-4 space-y-3 rounded-lg border border-border bg-surface-alt p-4">
-            <div>
-              <p className="mb-1 text-sm font-semibold text-text-main">
-                Đơn vị vận chuyển <span className="text-red-500">*</span>
-              </p>
-              <AutoComplete
-                value={shippingCarrier}
-                options={[
-                  { value: "GHTK" },
-                  { value: "Viettel Post" },
-                  { value: "J&T Express" },
-                  { value: "Ahamove" },
-                  { value: "Lalamove" },
-                  { value: "VNPost" },
-                ]}
-                placeholder="Chọn hoặc nhập đơn vị vận chuyển"
-                className="w-full"
-                onChange={setShippingCarrier}
-              />
-            </div>
-            <div>
-              <p className="mb-1 text-sm font-semibold text-text-main">Mã vận đơn</p>
-              <Input
-                value={trackingCode}
-                placeholder="Nhập mã vận đơn (nếu có)"
-                onChange={(e) => setTrackingCode(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-      </Modal>
 
       {/* Modal hủy đơn */}
       <Modal

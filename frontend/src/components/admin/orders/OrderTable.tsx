@@ -1,4 +1,4 @@
-import { EyeOutlined } from "@ant-design/icons";
+import { EyeOutlined, EditOutlined } from "@ant-design/icons";
 import type { OrderStatus } from "./OrderStatusBadge";
 import OrderStatusBadge from "./OrderStatusBadge";
 
@@ -11,7 +11,7 @@ import OrderStatusBadge from "./OrderStatusBadge";
  * - Hình ảnh sản phẩm, tên sản phẩm, loại đơn, size
  * - Tổng tiền + trạng thái thanh toán
  * - Badge trạng thái xử lý đơn
- * - Nút thao tác ở cột cuối
+ * - Nút thao tác ở cột cuối (xem chi tiết, cập nhật trạng thái)
  *
  * Khi bấm vào hàng → gọi onRowClick để chuyển sang trang chi tiết theo ID.
  */
@@ -50,6 +50,7 @@ export type Order = {
 type OrderTableProps = {
   orders: Order[];
   onRowClick: (order: Order) => void;
+  onEditStatus?: (order: Order) => void;
 };
 
 // Hàm định dạng số tiền VND: 429000 → "429.000đ"
@@ -57,7 +58,7 @@ function formatCurrency(amountVnd: number): string {
   return amountVnd.toLocaleString("vi-VN") + "đ";
 }
 
-export default function OrderTable({ orders, onRowClick }: OrderTableProps) {
+export default function OrderTable({ orders, onRowClick, onEditStatus }: OrderTableProps) {
   return (
     // Wrapper cho phép cuộn ngang trên màn hình nhỏ
     <div className="overflow-x-auto">
@@ -193,6 +194,21 @@ export default function OrderTable({ orders, onRowClick }: OrderTableProps) {
                   >
                     <EyeOutlined style={{ fontSize: 18 }} />
                   </button>
+
+                  {/* Nút cập nhật trạng thái */}
+                  {onEditStatus && (
+                    <button
+                      type="button"
+                      title="Cập nhật trạng thái"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditStatus(order);
+                      }}
+                      className="rounded p-1.5 text-text-secondary transition-colors hover:bg-surface-dim hover:text-primary-container"
+                    >
+                      <EditOutlined style={{ fontSize: 18 }} />
+                    </button>
+                  )}
                 </div>
               </td>
             </tr>
