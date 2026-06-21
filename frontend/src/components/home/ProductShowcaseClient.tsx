@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "antd";
 import { useRouter } from "next/navigation";
-import { ColorVariantFromDB } from "./ProductShowcase";
+import { ProductShowcaseItemFromDB } from "./ProductShowcase";
 
 /* ─── Màu hex chuẩn map từ tên màu trong DB ─────────────────────────────── */
 const COLOR_HEX_MAP: Record<string, string> = {
@@ -91,23 +91,23 @@ const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ";
 
 /* ─── Client Component ──────────────────────────────────────────────────── */
 interface Props {
-  variants: ColorVariantFromDB[];
+  products: ProductShowcaseItemFromDB[];
 }
 
-export default function ProductShowcaseClient({ variants }: Props) {
+export default function ProductShowcaseClient({ products }: Props) {
   const [activeFilter, setActiveFilter] = useState("all");
   const router = useRouter();
 
   const filters = [
     "all",
-    ...Array.from(new Set(variants.map((v) => v.form))),
+    ...Array.from(new Set(products.map((v) => v.form))),
   ];
 
-  const filtered = variants.filter(
+  const filtered = products.filter(
     (v) => activeFilter === "all" || v.form === activeFilter
   );
 
-  if (variants.length === 0) return null;
+  if (products.length === 0) return null;
 
   return (
     <section className="section-padding" style={{ background: "#f8fafc" }}>
@@ -134,10 +134,10 @@ export default function ProductShowcaseClient({ variants }: Props) {
                 letterSpacing: "-0.3px",
               }}
             >
-              Màu áo nổi bật
+              Sản phẩm nổi bật
             </h2>
             <p style={{ color: "#94a3b8", fontSize: 13, margin: "4px 0 0" }}>
-              Các màu áo đang có sẵn trong kho — thiết kế và đặt hàng ngay.
+              Các sản phẩm được yêu thích nhất đang có sẵn trong kho — thiết kế và đặt hàng ngay.
             </p>
           </div>
           <Button
@@ -182,12 +182,17 @@ export default function ProductShowcaseClient({ variants }: Props) {
           className="template-grid"
         >
           {filtered.map((v, idx) => {
-            const hex = getHex(v.color);
+            const colorList = v.colors ? v.colors.split(",") : [];
+            const firstColor = colorList[0] || "White";
+            const hex = getHex(firstColor);
             const isLight = ["#ffffff", "#d6b89a", "#c5b28a", "#eab308"].includes(hex);
 
             return (
               <div
-                key={`${v.form}-${v.color}-${idx}`}
+                key={v.productId}
+                onClick={() =>
+                  router.push(`/product/${v.productId}`)
+                }
                 style={{
                   background:   "#ffffff",
                   borderRadius: 16,
@@ -241,18 +246,32 @@ export default function ProductShowcaseClient({ variants }: Props) {
                     {v.totalStock <= 10 ? `Còn ${v.totalStock}` : "Còn hàng"}
                   </span>
 
-                  <div style={{ width: 90 }}>
-                    {v.form === "polo" ? (
+                  <div style={{ width: v.imageUrl ? "100%" : 90, height: v.imageUrl ? "100%" : "auto" }}>
+                    {v.imageUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={v.imageUrl}
+                        alt={v.productName}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          mixBlendMode: "multiply",
+                          borderRadius: 8,
+                        }}
+                        draggable={false}
+                      />
+                    ) : v.form === "polo" ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={
-                          v.color === "Navy"
+                          firstColor === "Navy"
                             ? "/images/mockups/Polo-Navy-Front.png"
-                            : v.color === "Beige"
+                            : firstColor === "Beige"
                             ? "/images/mockups/Polo-Beige-Front.png"
                             : "/images/mockups/Polo-White-Front.png"
                         }
-                        alt={`${v.productName} ${v.color}`}
+                        alt={`${v.productName} ${firstColor}`}
                         style={{ width: "100%", objectFit: "contain", filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.15))" }}
                         draggable={false}
                       />
@@ -264,37 +283,43 @@ export default function ProductShowcaseClient({ variants }: Props) {
 
                 {/* ─ Info area ─ */}
                 <div style={{ padding: "14px 16px" }}>
-                  {/* Tên màu + loại áo */}
+                  {/* Tên sản phẩm */}
                   <p
                     style={{
                       fontSize:     13,
                       fontWeight:   600,
                       color:        "#0f172a",
-                      margin:       "0 0 2px",
+                      margin:       "0 0 6px",
                       whiteSpace:   "nowrap",
                       overflow:     "hidden",
                       textOverflow: "ellipsis",
                     }}
                   >
-                    {v.productName} – {v.color}
+                    {v.productName}
                   </p>
 
                   {/* Dot màu + tên màu tiếng Việt */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 10 }}>
-                    <span
-                      style={{
-                        display:      "inline-block",
-                        width:        10,
-                        height:       10,
-                        borderRadius: "50%",
-                        background:   hex,
-                        border:       "1px solid #e2e8f0",
-                        flexShrink:   0,
-                      }}
-                    />
-                    <span style={{ fontSize: 11, color: "#94a3b8" }}>
-                      {FORM_LABEL[v.form]}
-                    </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 12 }}>
+                    {colorList.slice(0, 5).map((col) => (
+                      <span
+                        key={col}
+                        title={col}
+                        style={{
+                          display:      "inline-block",
+                          width:        12,
+                          height:       12,
+                          borderRadius: "50%",
+                          background:   getHex(col),
+                          border:       "1px solid #e2e8f0",
+                          flexShrink:   0,
+                        }}
+                      />
+                    ))}
+                    {colorList.length > 5 && (
+                      <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500, marginLeft: 2 }}>
+                        +{colorList.length - 5}
+                      </span>
+                    )}
                   </div>
 
                   <div
@@ -320,11 +345,12 @@ export default function ProductShowcaseClient({ variants }: Props) {
                         height:       28,
                         padding:      "0 12px",
                       }}
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.stopPropagation();
                         router.push(
-                          `/design-studio?shirt=${v.form}&color=${encodeURIComponent(v.color)}&view=front`
-                        )
-                      }
+                          `/design-studio?shirt=${v.form}&color=${encodeURIComponent(firstColor)}&view=front`
+                        );
+                      }}
                     >
                       Thiết kế
                     </Button>

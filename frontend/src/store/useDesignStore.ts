@@ -43,6 +43,7 @@ export interface DesignState {
 
   /* Current DB state */
   currentDesignId: number | null;
+  designName: string;
 
   /* Undo / Redo stacks (snapshot of elements[]) */
   undoStack: DesignElement[][];
@@ -65,6 +66,7 @@ export interface DesignState {
   
   /* Actions - persistence state */
   setCurrentDesignId: (id: number | null) => void;
+  setDesignName: (name: string) => void;
 
   /* Actions ─ history */
   undo: () => void;
@@ -84,6 +86,7 @@ export const useDesignStore = create<DesignState>((set, get) => ({
   elements: [],
   selectedId: null,
   currentDesignId: null,
+  designName: "Thiết kế chưa đặt tên",
 
   shirtType: "tshirt",
   shirtColor: "#ffffff",
@@ -179,6 +182,7 @@ export const useDesignStore = create<DesignState>((set, get) => ({
   },
 
   setCurrentDesignId: (id) => set({ currentDesignId: id }),
+  setDesignName: (name) => set({ designName: name }),
 
   /* ─── Undo / Redo ─── */
   undo: () => {
@@ -207,8 +211,8 @@ export const useDesignStore = create<DesignState>((set, get) => ({
 
   /* ── Persistence ── */
   saveToLocal: () => {
-    const { elements, shirtType, shirtColor, shirtView, currentDesignId } = get();
-    const data = { elements, shirtType, shirtColor, shirtView, currentDesignId, savedAt: Date.now() };
+    const { elements, shirtType, shirtColor, shirtView, currentDesignId, designName } = get();
+    const data = { elements, shirtType, shirtColor, shirtView, currentDesignId, designName, savedAt: Date.now() };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   },
 
@@ -223,6 +227,7 @@ export const useDesignStore = create<DesignState>((set, get) => ({
         shirtColor: data.shirtColor || "#ffffff",
         shirtView: data.shirtView || "front",
         currentDesignId: data.currentDesignId || null,
+        designName: data.designName || "Thiết kế chưa đặt tên",
         selectedId: null,
         undoStack: [],
         redoStack: [],
@@ -235,7 +240,7 @@ export const useDesignStore = create<DesignState>((set, get) => ({
   clearDesign: () => {
     const state = get();
     state.pushHistory();
-    set({ elements: [], selectedId: null, currentDesignId: null });
+    set({ elements: [], selectedId: null, currentDesignId: null, designName: "Thiết kế chưa đặt tên" });
   },
 
   exportDesignJSON: () => {

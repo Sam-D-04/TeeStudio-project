@@ -6,7 +6,10 @@ import type Konva from "konva";
 
 import { useDesignStore } from "@/store/useDesignStore";
 import useAuthStore from "@/store/useAuthStore";
-import { userDesignService } from "@/services/userDesignService";
+import { userDesignService, SavedDesign } from "@/services/userDesignService";
+import { calcDesignFee } from "@/utils/designFeeCalculator";
+import { Modal } from "antd";
+
 import Toolbar from "./Toolbar";
 import Sidebar from "./Sidebar";
 import PropertiesPanel from "./PropertiesPanel";
@@ -19,6 +22,8 @@ import ShirtMockupImage, {
 } from "./ShirtMockupImage";
 import FloatingToolbar from "./FloatingToolbar";
 import StaticTextToolbar from "./StaticTextToolbar";
+import SaveDesignModal from "./SaveDesignModal";
+import MyDesignsModal from "./MyDesignsModal";
 
 import "../../app/design-studio/design-studio.css";
 
@@ -56,6 +61,15 @@ export default function DesignStudioApp() {
     toastTimer.current = setTimeout(() => setToast(null), 2500);
   }, []);
 
+  /* ── Phụ phí thiết kế (real-time) ── */
+  const [designFeeInfo, setDesignFeeInfo] = useState({ fee: 0, label: "Miễn phí", areaCm2: 0 });
+
+  // Cập nhật phí mỗi khi danh sách phần tử thay đổi
+  const elements = useDesignStore((s) => s.elements);
+  useEffect(() => {
+    setDesignFeeInfo(calcDesignFee(elements));
+  }, [elements]);
+
   /* ── Zoom ── */
   const [zoom, setZoom] = useState(1.75);
   const displayW = Math.round(CONTAINER_W * zoom);
@@ -90,9 +104,6 @@ export default function DesignStudioApp() {
 
       if ((e.ctrlKey || e.metaKey) && e.key === "z") { e.preventDefault(); undo(); }
       if ((e.ctrlKey || e.metaKey) && e.key === "y") { e.preventDefault(); redo(); }
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault(); saveToLocal(); showToast("Đã lưu thiết kế!");
-      }
       if (e.key === "Delete" || e.key === "Backspace") {
         const { selectedId } = useDesignStore.getState();
         if (selectedId) removeElement(selectedId);
@@ -142,28 +153,35 @@ export default function DesignStudioApp() {
 
   /* ── Save / Download ── */
   const [isSaving, setIsSaving] = useState(false);
-  const handleSave = useCallback(async () => {
-    saveToLocal();
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isMyDesignsOpen, setIsMyDesignsOpen] = useState(false);
+
+  const handleSaveClick = useCallback(() => {
     if (!isAuthenticated || !accessToken) {
-      alert("Thiết kế đã lưu tạm trên trình duyệt. Vui lòng đăng nhập để lưu lên mây!");
+      alert("Vui lòng đăng nhập tài khoản để lưu thiết kế của bạn!");
       return;
     }
+    setIsSaveModalOpen(true);
+  }, [isAuthenticated, accessToken]);
 
+  const handleConfirmSave = useCallback(async (name: string) => {
+    if (!accessToken) return;
     try {
       setIsSaving(true);
-      showToast("Đang lưu thiết kế lên mây...");
+      
+      // Update store name
+      useDesignStore.getState().setDesignName(name);
 
       // Capture canvas as base64
       let previewUrl = "";
       if (stageRef.current) {
-        // Deselect so transform boxes are hidden
         setSelectedId(null);
-        // Slight delay for React state update before capturing
         await new Promise((r) => setTimeout(r, 50));
         previewUrl = stageRef.current.toDataURL({ pixelRatio: 1 });
       }
 
       const payload = {
+        name,
         shirtType,
         shirtColor,
         canvasData: {
@@ -181,14 +199,51 @@ export default function DesignStudioApp() {
         setCurrentDesignId(res.id);
         showToast("Đã lưu thiết kế mới thành công!");
       }
+      setIsSaveModalOpen(false);
     } catch (err: any) {
       showToast(err.message || "Lỗi khi lưu thiết kế");
     } finally {
       setIsSaving(false);
     }
-  }, [saveToLocal, isAuthenticated, accessToken, showToast, currentDesignId, shirtType, shirtColor, setSelectedId, setCurrentDesignId]);
+  }, [accessToken, currentDesignId, shirtType, shirtColor, setSelectedId, setCurrentDesignId, showToast]);
 
-  const handleDownloadImage = useCallback(() => { showToast("Tính năng xuất file đang được phát triển!"); }, [showToast]);
+  const handleLoadDesign = useCallback((design: SavedDesign) => {
+    const doLoad = () => {
+      const state = useDesignStore.getState();
+      state.clearDesign(); // Clear everything (and push to history)
+      
+      const elements = design.canvasData?.elements || [];
+      const view = design.canvasData?.shirtView || "front";
+      
+      // Set the values individually without causing infinite renders
+      useDesignStore.setState({
+        elements,
+        shirtView: view,
+        shirtType: design.productId === 1 ? "tshirt" : (design.productId === 2 ? "polo" : "hoodie"), // Fallback if no exact product ID map
+        shirtColor: design.baseColor,
+        currentDesignId: design.id,
+        designName: design.name,
+      });
+
+      setIsMyDesignsOpen(false);
+      showToast("Đã nạp thiết kế: " + design.name);
+    };
+
+    const currentElements = useDesignStore.getState().elements;
+    if (currentElements.length > 0) {
+      Modal.confirm({
+        title: "Bạn có chắc chắn muốn mở thiết kế này?",
+        content: "Thiết kế hiện tại trên màn hình sẽ bị ghi đè. Bạn có muốn tiếp tục không?",
+        okText: "Tiếp tục",
+        cancelText: "Hủy",
+        onOk: doLoad,
+      });
+    } else {
+      doLoad();
+    }
+  }, [showToast]);
+
+  const handleDownloadImage = useCallback(() => { showToast("Tính năng xuất file đang được phát triển"); }, [showToast]);
 
   /* ── Print area (logical coordinates) ── */
   const pa = getPrintAreaBoundary(shirtType, shirtView, CONTAINER_W, CONTAINER_H);
@@ -222,9 +277,10 @@ export default function DesignStudioApp() {
   return (
     <div className="ds-root">
       <Toolbar 
-        onSave={handleSave} 
+        onSave={handleSaveClick} 
         onDownloadImage={handleDownloadImage} 
         onShowToast={showToast} 
+        onOpenMyDesigns={() => setIsMyDesignsOpen(true)}
         isSaving={isSaving}
       />
 
@@ -360,6 +416,31 @@ export default function DesignStudioApp() {
             <button className="ds-zoom-btn" onClick={zoomIn}  title="Phóng to">+</button>
           </div>
 
+          {/* ── Phụ phí thiết kế real-time ── */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: "6px 16px",
+            background: "rgba(0,0,0,0.35)",
+            borderRadius: 8,
+            marginTop: 8,
+            fontSize: 13,
+            color: "#f1f5f9",
+          }}>
+            <span style={{ opacity: 0.65 }}>Phụ phí thiết kế:</span>
+            <span style={{
+              fontWeight: 700,
+              color: designFeeInfo.fee === 0 ? "#4ade80" : designFeeInfo.fee === 30000 ? "#facc15" : "#f87171",
+            }}>
+              {designFeeInfo.fee === 0 ? "Miễn phí" : `+${designFeeInfo.fee.toLocaleString("vi-VN")}đ`}
+            </span>
+            <span style={{ opacity: 0.45, fontSize: 11 }}>
+              (Diện tích bao phủ: {designFeeInfo.areaCm2.toFixed(0)} cm²)
+            </span>
+          </div>
+
             {/* Shortcut hints */}
             <div className="ds-shortcut-hint">
               <span><kbd>Ctrl+Z</kbd> Hoàn tác</span>
@@ -375,13 +456,26 @@ export default function DesignStudioApp() {
           </div>
         </div>
 
-      {/*
-        FloatingToolbar: nhận ref div#print_body-image và zoom
-        để tính tọa độ viewport chính xác
-      */}
+      {/* Floating Toolbars for element properties */}
       <FloatingToolbar
         shirtContainerRef={shirtContainerRef}
         zoom={zoom}
+      />
+      <StaticTextToolbar />
+
+      {/* Modals */}
+      <SaveDesignModal
+        open={isSaveModalOpen}
+        initialName={useDesignStore.getState().designName}
+        onCancel={() => setIsSaveModalOpen(false)}
+        onConfirm={handleConfirmSave}
+        isSaving={isSaving}
+      />
+      
+      <MyDesignsModal
+        open={isMyDesignsOpen}
+        onCancel={() => setIsMyDesignsOpen(false)}
+        onSelectDesign={handleLoadDesign}
       />
 
       <div className={`ds-toast ${toast ? "ds-toast--visible" : ""}`}>{toast}</div>

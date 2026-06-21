@@ -42,6 +42,9 @@ router.get("/public/products", publicController.getDanhSachSanPham);
 // GET /api/public/products/colors → màu áo nổi bật còn hàng (cho ProductShowcase)
 router.get("/public/products/colors", publicController.getMauAoNoiBat);
 
+// GET /api/public/products/:id → chi tiết 1 sản phẩm (cho Product Detail Page)
+router.get("/public/products/:id", publicController.getChiTietSanPhamCongKhai);
+
 // Xác thực Return URL và nhận IPN từ VNPAY.
 router.use("/payments", paymentRoutes);
 

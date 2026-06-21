@@ -7,16 +7,18 @@
 import ProductShowcaseClient from "./ProductShowcaseClient";
 
 // ─── Kiểu dữ liệu từ API ──────────────────────────────────────────────────────
-export interface ColorVariantFromDB {
-  color: string;
+export interface ProductShowcaseItemFromDB {
+  productId: number;
   form: "tshirt" | "polo" | "hoodie";
   productName: string;
+  colors: string; // "Đen,Trắng,Navy"
   basePrice: number;
   totalStock: number;
+  imageUrl: string | null;
 }
 
 // ─── Fetch data ───────────────────────────────────────────────────────────────
-async function getColorVariants(): Promise<ColorVariantFromDB[]> {
+async function getFeaturedProducts(): Promise<ProductShowcaseItemFromDB[]> {
   try {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api"}/public/products/colors`,
@@ -25,13 +27,13 @@ async function getColorVariants(): Promise<ColorVariantFromDB[]> {
     if (!res.ok) return [];
     const json = await res.json();
     return json.data ?? [];
-  } catch {
+  } catch (error) {
     return [];
   }
 }
 
 // ─── Server Component ─────────────────────────────────────────────────────────
 export default async function ProductShowcase() {
-  const variants = await getColorVariants();
-  return <ProductShowcaseClient variants={variants} />;
+  const products = await getFeaturedProducts();
+  return <ProductShowcaseClient products={products} />;
 }

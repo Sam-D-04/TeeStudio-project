@@ -2,6 +2,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL + "/users/me/designs";
 
 export interface SavedDesign {
   id: number;
+  name: string;
   productId: number;
   baseColor: string;
   canvasData: any;
@@ -31,7 +32,10 @@ export const userDesignService = {
       },
       body: JSON.stringify(payload)
     });
-    if (!res.ok) throw new Error("Lỗi khi lưu thiết kế");
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || "Lỗi khi lưu thiết kế");
+    }
     const json = await res.json();
     return json.data;
   },
@@ -45,7 +49,10 @@ export const userDesignService = {
       },
       body: JSON.stringify(payload)
     });
-    if (!res.ok) throw new Error("Lỗi khi cập nhật thiết kế");
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || "Lỗi khi cập nhật thiết kế");
+    }
     const json = await res.json();
     return json.data;
   },

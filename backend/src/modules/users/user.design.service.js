@@ -1,4 +1,5 @@
 const db = require("../../database/mysql");
+const { calculateBoundingBoxAreaFee } = require("../pricing/pricing.service");
 
 /**
  * Maps frontend shirtType to a database product ID.
@@ -26,7 +27,7 @@ async function mapShirtTypeToProductId(shirtType) {
  */
 async function getMyDesigns(userId) {
   const [rows] = await db.pool.query(
-    `SELECT id, productId, baseColor, canvasData, previewUrl, status, updatedAt 
+    `SELECT id, name, productId, baseColor, canvasData, previewUrl, status, updatedAt 
      FROM CustomDesign 
      WHERE userId = ? AND status = 'DRAFT'
      ORDER BY updatedAt DESC`,
@@ -50,25 +51,28 @@ async function getMyDesigns(userId) {
  * Create a new DRAFT custom design.
  */
 async function saveNewDesign(userId, payload) {
-  const { shirtType, shirtColor, canvasData, previewUrl } = payload;
+  const { name, shirtType, shirtColor, canvasData, previewUrl } = payload;
   
   const productId = await mapShirtTypeToProductId(shirtType);
   const dataStr = typeof canvasData === 'object' ? JSON.stringify(canvasData) : canvasData;
 
+  // Tự động tính designFee từ canvasData – Backend không tin tưởng giá trị FE gửi lên
+  const designFee = calculateBoundingBoxAreaFee(canvasData);
+
   const [result] = await db.pool.query(
-    `INSERT INTO CustomDesign (userId, productId, baseColor, canvasData, previewUrl, status, designFee) 
-     VALUES (?, ?, ?, ?, ?, 'DRAFT', 0)`,
-    [userId, productId, shirtColor, dataStr, previewUrl]
+    `INSERT INTO CustomDesign (userId, name, productId, baseColor, canvasData, previewUrl, status, designFee) 
+     VALUES (?, ?, ?, ?, ?, ?, 'DRAFT', ?)`,
+    [userId, name || 'Thiết kế chưa đặt tên', productId, shirtColor, dataStr, previewUrl, designFee]
   );
 
-  return { id: result.insertId };
+  return { id: result.insertId, designFee };
 }
 
 /**
  * Update an existing DRAFT design.
  */
 async function updateDesign(userId, designId, payload) {
-  const { shirtType, shirtColor, canvasData, previewUrl } = payload;
+  const { name, shirtType, shirtColor, canvasData, previewUrl } = payload;
   
   // Verify ownership and status
   const [check] = await db.pool.query(
@@ -85,14 +89,17 @@ async function updateDesign(userId, designId, payload) {
   const productId = await mapShirtTypeToProductId(shirtType);
   const dataStr = typeof canvasData === 'object' ? JSON.stringify(canvasData) : canvasData;
 
+  // Tự động tính lại designFee mỗi lần user lưu (dữ liệu thay đổi thì phí cũng thay đổi)
+  const designFee = calculateBoundingBoxAreaFee(canvasData);
+
   await db.pool.query(
     `UPDATE CustomDesign 
-     SET productId = ?, baseColor = ?, canvasData = ?, previewUrl = ?
+     SET name = COALESCE(?, name), productId = ?, baseColor = ?, canvasData = ?, previewUrl = ?, designFee = ?
      WHERE id = ?`,
-    [productId, shirtColor, dataStr, previewUrl, designId]
+    [name || null, productId, shirtColor, dataStr, previewUrl, designFee, designId]
   );
 
-  return { id: designId };
+  return { id: designId, designFee };
 }
 
 /**

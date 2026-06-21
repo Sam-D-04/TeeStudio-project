@@ -14,6 +14,7 @@ export interface ProductFromDB {
   basePrice: number;
   material: string;
   categoryName: string;
+  imageUrl: string | null;
 }
 
 // ─── Fetch data ───────────────────────────────────────────────────────────────
@@ -64,9 +65,9 @@ export const SHIRT_UI_MAP = {
 
 // ─── Fallback khi API lỗi ────────────────────────────────────────────────────
 const FALLBACK_PRODUCTS: ProductFromDB[] = [
-  { id: 1, name: "Áo Thun",   form: "tshirt", basePrice: 145000, material: "Cotton 100%",   categoryName: "Áo Thun" },
-  { id: 2, name: "Áo Polo",   form: "polo",   basePrice: 225000, material: "Vải cá sấu",    categoryName: "Áo Polo" },
-  { id: 3, name: "Áo Hoodie", form: "hoodie", basePrice: 385000, material: "Nỉ dày",         categoryName: "Áo Hoodie" },
+  { id: 1, name: "Áo Thun",   form: "tshirt", basePrice: 145000, material: "Cotton 100%",   categoryName: "Áo Thun",   imageUrl: null },
+  { id: 2, name: "Áo Polo",   form: "polo",   basePrice: 225000, material: "Vải cá sấu",    categoryName: "Áo Polo",   imageUrl: null },
+  { id: 3, name: "Áo Hoodie", form: "hoodie", basePrice: 385000, material: "Nỉ dày",         categoryName: "Áo Hoodie", imageUrl: null },
 ];
 
 // ─── Server Component ─────────────────────────────────────────────────────────

@@ -545,7 +545,6 @@ CREATE TABLE IF NOT EXISTS `product` (
   `id` int NOT NULL AUTO_INCREMENT,
   `categoryId` int NOT NULL,
   `name` varchar(300) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `slug` varchar(300) COLLATE utf8mb4_unicode_ci NOT NULL,
   `basePrice` decimal(15,2) NOT NULL,
   `material` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
   `form` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'product shape/form',

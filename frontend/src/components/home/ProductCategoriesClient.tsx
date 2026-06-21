@@ -147,6 +147,7 @@ export default function ProductCategoriesClient({ products }: Props) {
             return (
               <div
                 key={product.id}
+                onClick={() => router.push(`/product/${product.id}`)}
                 style={{
                   background:   "#ffffff",
                   borderRadius: 20,
@@ -202,8 +203,16 @@ export default function ProductCategoriesClient({ products }: Props) {
                   </span>
 
                   {/* Vector shirt or real mockup */}
-                  <div style={{ width: ui.mockupImg ? "70%" : "80%", maxWidth: ui.mockupImg ? 150 : 130, animation: "float 3.5s ease-in-out infinite" }}>
-                    {ui.mockupImg ? (
+                  <div style={{ width: product.imageUrl ? "100%" : (ui.mockupImg ? "70%" : "80%"), maxWidth: product.imageUrl ? 180 : (ui.mockupImg ? 150 : 130), animation: "float 3.5s ease-in-out infinite" }}>
+                    {product.imageUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={product.imageUrl}
+                        alt={product.name}
+                        style={{ width: "100%", height: 180, objectFit: "contain", display: "block", mixBlendMode: "multiply", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.18))" }}
+                        draggable={false}
+                      />
+                    ) : ui.mockupImg ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={ui.mockupImg}
@@ -248,6 +257,7 @@ export default function ProductCategoriesClient({ products }: Props) {
                       alignItems:     "center",
                       justifyContent: "space-between",
                       marginTop:      "auto",
+                      gap:            8,
                     }}
                   >
                     <span
@@ -260,21 +270,44 @@ export default function ProductCategoriesClient({ products }: Props) {
                       {fmt(product.basePrice)}
                     </span>
 
-                    <Button
-                      type="primary"
-                      onClick={() => router.push(`/design-studio?shirt=${product.form}`)}
-                      style={{
-                        background:   ui.accentColor,
-                        border:       "none",
-                        borderRadius: 8,
-                        fontWeight:   600,
-                        height:       36,
-                        fontSize:     13,
-                        padding:      "0 16px",
-                      }}
-                    >
-                      Thiết kế ngay
-                    </Button>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/product/${product.id}`);
+                        }}
+                        style={{
+                          border:       `1px solid ${ui.accentColor}40`,
+                          borderRadius: 8,
+                          fontWeight:   600,
+                          height:       36,
+                          fontSize:     12,
+                          padding:      "0 12px",
+                          color:        ui.accentColor,
+                          background:   "#ffffff",
+                        }}
+                      >
+                        Xem chi tiết
+                      </Button>
+                      <Button
+                        type="primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/design-studio?shirt=${product.form}`);
+                        }}
+                        style={{
+                          background:   ui.accentColor,
+                          border:       "none",
+                          borderRadius: 8,
+                          fontWeight:   600,
+                          height:       36,
+                          fontSize:     12,
+                          padding:      "0 12px",
+                        }}
+                      >
+                        Thiết kế
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
