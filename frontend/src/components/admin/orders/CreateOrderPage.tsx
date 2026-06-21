@@ -373,11 +373,11 @@ function SectionPanel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-border bg-surface p-5 shadow-admin-card">
-      <div className="mb-4">
-        <h3 className="text-card-title text-text-main">{title}</h3>
+    <section className="rounded-xl border border-border bg-surface p-4 shadow-admin-card">
+      <div className="mb-3">
+        <h3 className="text-sm font-bold text-text-main">{title}</h3>
         {description ? (
-          <p className="mt-1 text-body-sm text-text-secondary">{description}</p>
+          <p className="mt-0.5 text-xs text-text-secondary">{description}</p>
         ) : null}
       </div>
       {children}
@@ -398,13 +398,14 @@ function CustomerSection({
 }) {
   return (
     <SectionPanel
-      title="1. Chọn khách hàng & Địa chỉ giao hàng"
-      description="Tìm chọn khách hàng, form sẽ tự động điền địa chỉ mặc định. Admin có thể nhập thẳng địa chỉ mới trên form."
+      title="1. Khách hàng & Địa chỉ giao hàng"
+      description="Tìm khách hàng — form tự điền địa chỉ mặc định. Admin có thể chỉnh sửa trực tiếp."
     >
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <Form.Item
           label="Khách hàng"
           name="userId"
+          className="mb-0"
           rules={[{ required: true, message: "Vui lòng chọn khách hàng" }]}
         >
           <Select
@@ -419,10 +420,8 @@ function CustomerSection({
             options={customers.map((customer) => ({
               value: customer.id,
               label: (
-                <div className="flex flex-col py-1">
-                  <span className="font-semibold text-text-main">
-                    {customer.hoTen}
-                  </span>
+                <div className="flex flex-col py-0.5">
+                  <span className="font-semibold text-text-main">{customer.hoTen}</span>
                   <span className="text-xs text-text-secondary">
                     {customer.soDienThoai || "Chưa có SĐT"} · {customer.email}
                   </span>
@@ -438,6 +437,7 @@ function CustomerSection({
         <Form.Item
           label="Tên người nhận"
           name="recipientName"
+          className="mb-0"
           rules={[{ required: true, message: "Vui lòng nhập tên người nhận" }]}
         >
           <Input placeholder="Nhập tên người nhận..." disabled={!customers.length} />
@@ -446,16 +446,17 @@ function CustomerSection({
         <Form.Item
           label="Số điện thoại"
           name="phone"
+          className="mb-0"
           rules={[{ required: true, message: "Vui lòng nhập số điện thoại" }]}
         >
           <Input placeholder="Nhập số điện thoại..." disabled={!customers.length} />
         </Form.Item>
 
         <Form.Item
-          label="Địa chỉ giao hàng (Số nhà, Đường, Xã/Phường, Quận/Huyện, Tỉnh/TP)"
+          label="Địa chỉ giao hàng"
           name="addressLine"
+          className="mb-0 md:col-span-3"
           rules={[{ required: true, message: "Vui lòng nhập địa chỉ giao hàng" }]}
-          className="xl:col-span-2"
         >
           <Input.TextArea
             rows={2}
@@ -464,7 +465,6 @@ function CustomerSection({
           />
         </Form.Item>
       </div>
-
     </SectionPanel>
   );
 }
@@ -602,22 +602,35 @@ function ProductItemRow({
   const colorOptions = getProductColorOptions(product);
 
   return (
-    <div className="rounded-xl border border-border bg-surface-alt p-4">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h4 className="text-sm font-bold text-text-main">
-            Sản phẩm #{fieldName + 1}
-          </h4>
-          <p className="mt-1 text-xs text-text-secondary">
-            Chọn loại mua cho từng dòng; áo mẫu tự chọn phôi, áo POD khóa phôi và màu theo thiết kế.
-          </p>
-        </div>
-
+    <div className="rounded-xl border border-border bg-surface-alt p-3">
+      {/* Header inline: tiêu đề + loại SP + nút xóa */}
+      <div className="mb-3 flex items-center gap-3">
+        <span className="shrink-0 text-xs font-bold text-text-main">
+          Sản phẩm #{fieldName + 1}
+        </span>
+        <Form.Item
+          name={[fieldName, "productType"]}
+          className="mb-0 flex-1"
+          rules={[{ required: true, message: "Chọn loại" }]}
+        >
+          <Radio.Group
+            optionType="button"
+            buttonStyle="solid"
+            size="small"
+            onChange={(event) =>
+              onProductTypeChange(fieldName, event.target.value as ProductLineType)
+            }
+          >
+            <Radio.Button value="STANDARD">Áo mẫu / phôi trơn</Radio.Button>
+            <Radio.Button value="CUSTOM">Áo in POD</Radio.Button>
+          </Radio.Group>
+        </Form.Item>
         {canRemove ? (
           <Tooltip title="Xóa dòng sản phẩm">
             <Button
               danger
               type="text"
+              size="small"
               icon={<DeleteOutlined />}
               onClick={onRemove}
               aria-label="Xóa dòng sản phẩm"
@@ -626,25 +639,8 @@ function ProductItemRow({
         ) : null}
       </div>
 
-      <Form.Item
-        label="Loại sản phẩm"
-        name={[fieldName, "productType"]}
-        rules={[{ required: true, message: "Vui lòng chọn loại sản phẩm" }]}
-      >
-        <Radio.Group
-          optionType="button"
-          buttonStyle="solid"
-          onChange={(event) =>
-            onProductTypeChange(fieldName, event.target.value as ProductLineType)
-          }
-        >
-          <Radio.Button value="STANDARD">Áo mẫu / phôi trơn</Radio.Button>
-          <Radio.Button value="CUSTOM">Áo in POD</Radio.Button>
-        </Radio.Group>
-      </Form.Item>
-
       {isCustomProduct ? (
-        <div className="rounded-lg border border-primary-container/25 bg-sky-50 p-3">
+        <div className="mb-2 rounded-lg border border-primary-container/25 bg-sky-50 p-2">
           <DesignPicker
             rowIndex={fieldName}
             userId={userId}
@@ -656,7 +652,7 @@ function ProductItemRow({
         </div>
       ) : null}
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.35fr_0.8fr_0.8fr_150px]">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1.6fr_0.7fr_0.7fr_120px]">
         <Form.Item
           label="Sản phẩm / phôi áo"
           name={[fieldName, "productId"]}
@@ -792,7 +788,7 @@ function ProductItemRow({
         </Form.Item>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-xs text-text-secondary">
+      <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-text-secondary">
         {variant ? (
           <Tag color={variant.tonKho > 0 ? "blue" : "red"} className="m-0">
             Tồn kho hiện tại: {variant.tonKho}
@@ -916,16 +912,20 @@ function ProductsSection({
   );
 }
 
-function PaymentSection({
+function PaymentShippingSection({
   preview,
   paymentMethod,
   paymentType,
   hasCustomDesign,
+  promotions,
+  isLoadingPromotions,
 }: {
   preview: OrderPreview;
   paymentMethod?: TaoMoiDonHangInput["paymentMethod"];
   paymentType?: TaoMoiDonHangInput["paymentType"];
   hasCustomDesign: boolean;
+  promotions: KhuyenMai[];
+  isLoadingPromotions: boolean;
 }) {
   const { depositAmount, codAmount } = getPaymentBreakdown(
     preview.totalAmount,
@@ -934,19 +934,20 @@ function PaymentSection({
   );
 
   return (
-    <SectionPanel title="3. Thanh toán">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <SectionPanel title="3. Thanh toán, Vận chuyển & Khuyến mãi">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
         <Form.Item
           label="Phương thức thanh toán"
           name="paymentMethod"
-          rules={[{ required: true, message: "Vui lòng chọn phương thức thanh toán" }]}
+          className="mb-0"
+          rules={[{ required: true, message: "Chọn phương thức" }]}
         >
           <Radio.Group>
             <Space wrap>
-              <Tooltip title={hasCustomDesign ? "Áo POD bắt buộc thanh toán VNPAY" : ""}>
-                <Radio.Button value="COD" disabled={hasCustomDesign}>COD (Thu hộ)</Radio.Button>
+              <Tooltip title={hasCustomDesign ? "Áo POD bắt buộc VNPAY" : ""}>
+                <Radio.Button value="COD" disabled={hasCustomDesign}>COD</Radio.Button>
               </Tooltip>
-              <Radio.Button value="VNPAY">VNPAY (Online)</Radio.Button>
+              <Radio.Button value="VNPAY">VNPAY</Radio.Button>
             </Space>
           </Radio.Group>
         </Form.Item>
@@ -954,58 +955,94 @@ function PaymentSection({
         <Form.Item
           label="Loại thanh toán"
           name="paymentType"
-          rules={[{ required: true, message: "Vui lòng chọn loại thanh toán" }]}
+          className="mb-0"
+          rules={[{ required: true, message: "Chọn loại" }]}
         >
           <Radio.Group>
             <Space wrap>
-              <Radio.Button value="FULL">FULL (Thanh toán đủ)</Radio.Button>
-              <Tooltip title={!hasCustomDesign ? "Áo mẫu không yêu cầu đặt cọc" : ""}>
-                <Radio.Button value="DEPOSIT" disabled={!hasCustomDesign}>DEPOSIT (Đặt cọc)</Radio.Button>
+              <Radio.Button value="FULL">FULL</Radio.Button>
+              <Tooltip title={!hasCustomDesign ? "Chỉ áo POD mới được đặt cọc" : ""}>
+                <Radio.Button value="DEPOSIT" disabled={!hasCustomDesign}>ĐẶT CỌC</Radio.Button>
               </Tooltip>
             </Space>
           </Radio.Group>
         </Form.Item>
+
+        <Form.Item
+          label="Phí giao hàng"
+          name="shippingFee"
+          className="mb-0"
+          rules={[
+            {
+              validator: async (_, value: number | null) => {
+                if (Number(value) < 0) throw new Error("Phí ship không được âm");
+              },
+            },
+          ]}
+        >
+          <ShippingFeeInput />
+        </Form.Item>
+
+        <Form.Item label="Mã khuyến mãi" name="promotionId" className="mb-0">
+          <Select
+            allowClear
+            loading={isLoadingPromotions}
+            placeholder="Chọn mã KM nếu có"
+            options={promotions.map((promo) => {
+              const disabled = preview.promotionBaseAmount < promo.donHangToiThieu;
+              const discountLabel =
+                promo.loaiGiam === "PERCENT"
+                  ? `Giảm ${promo.giaTriGiam}%`
+                  : promo.loaiGiam === "FIXED"
+                    ? `Giảm ${formatCurrency(promo.giaTriGiam)}`
+                    : "Miễn phí VC";
+              return {
+                value: promo.id,
+                disabled,
+                label: `${promo.ma} · ${discountLabel}`,
+              };
+            })}
+            notFoundContent={
+              isLoadingPromotions ? "Đang tải..." : "Không có mã"
+            }
+          />
+        </Form.Item>
       </div>
 
+      {/* Cảnh báo khuyến mãi không đủ điều kiện */}
+      {preview.promotionNotEligible && preview.selectedPromotion ? (
+        <Alert
+          className="mt-3"
+          showIcon
+          type="warning"
+          title={`Đơn cần đạt tối thiểu ${formatCurrency(
+            preview.selectedPromotion.donHangToiThieu
+          )} để dùng mã ${preview.selectedPromotion.ma}.`}
+        />
+      ) : null}
+
+      {/* Thông tin đặt cọc */}
       {paymentType === "DEPOSIT" ? (
-        <div className="rounded-xl border border-primary-container/25 bg-sky-50 p-4">
-          <div className="mb-3">
-            <div className="font-bold text-text-main">
-              Thông tin đặt cọc ({DEPOSIT_PERCENT}% tổng đơn)
-            </div>
-            <p className="mt-1 text-xs text-text-secondary">
-              Dùng số tiền này để thông báo ngay cho khách hàng.
-            </p>
+        <div className="mt-3 rounded-lg border border-primary-container/25 bg-sky-50 p-3">
+          <div className="mb-2 text-sm font-bold text-text-main">
+            Thông tin đặt cọc ({DEPOSIT_PERCENT}% tổng đơn)
           </div>
-
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-text-secondary">
-                Số tiền cần thanh toán trước (Cọc qua VNPAY)
-              </span>
-              <strong className="text-base text-primary-container">
-                {formatCurrency(depositAmount)}
-              </strong>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-text-secondary">Tiền cọc (VNPAY)</span>
+              <strong className="text-primary-container">{formatCurrency(depositAmount)}</strong>
             </div>
-
-            <div className="flex items-center justify-between gap-4 border-t border-primary-container/15 pt-2">
-              <span className="text-text-secondary">
-                Số tiền thu hộ (COD) khi giao hàng
-              </span>
-              <strong className="text-base text-text-main">
-                {formatCurrency(codAmount)}
-              </strong>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-text-secondary">Thu hộ COD khi giao</span>
+              <strong className="text-text-main">{formatCurrency(codAmount)}</strong>
             </div>
           </div>
-
           {paymentMethod === "VNPAY" ? (
             <Alert
-              className="mt-3"
+              className="mt-2"
               showIcon
               type="info"
-              title={`Link VNPAY sẽ yêu cầu khách thanh toán tiền cọc ${formatCurrency(
-                depositAmount
-              )}. 50% còn lại sẽ mặc định thu COD khi giao hàng thành công.`}
+              title={`VNPAY yêu cầu khách cọc ${formatCurrency(depositAmount)}. Phần còn lại thu COD khi giao.`}
             />
           ) : null}
         </div>
@@ -1048,74 +1085,6 @@ function ShippingFeeInput({
   );
 }
 
-function ShippingSection({
-  promotions,
-  isLoadingPromotions,
-  preview,
-}: {
-  promotions: KhuyenMai[];
-  isLoadingPromotions: boolean;
-  preview: OrderPreview;
-}) {
-  return (
-    <SectionPanel title="4. Vận chuyển & khuyến mãi">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Form.Item
-          label="Phí giao hàng"
-          name="shippingFee"
-          rules={[
-            {
-              validator: async (_, value: number | null) => {
-                if (Number(value) < 0) throw new Error("Phí ship không được âm");
-              },
-            },
-          ]}
-        >
-          <ShippingFeeInput />
-        </Form.Item>
-
-        <Form.Item label="Mã khuyến mãi" name="promotionId">
-          <Select
-            allowClear
-            loading={isLoadingPromotions}
-            placeholder="Chọn mã khuyến mãi nếu có"
-            options={promotions.map((promo) => {
-              const disabled = preview.promotionBaseAmount < promo.donHangToiThieu;
-              const discountLabel =
-                promo.loaiGiam === "PERCENT"
-                  ? `Giảm ${promo.giaTriGiam}%`
-                  : promo.loaiGiam === "FIXED"
-                    ? `Giảm ${formatCurrency(promo.giaTriGiam)}`
-                    : "Miễn phí vận chuyển";
-
-              return {
-                value: promo.id,
-                disabled,
-                label: `${promo.ma} · ${discountLabel} · tối thiểu ${formatCurrency(
-                  promo.donHangToiThieu
-                )}`,
-              };
-            })}
-            notFoundContent={
-              isLoadingPromotions ? "Đang tải mã..." : "Không có mã còn hiệu lực"
-            }
-          />
-        </Form.Item>
-      </div>
-
-      {preview.promotionNotEligible && preview.selectedPromotion ? (
-        <Alert
-          showIcon
-          type="warning"
-          title={`Đơn cần đạt tối thiểu ${formatCurrency(
-            preview.selectedPromotion.donHangToiThieu
-          )} để dùng mã ${preview.selectedPromotion.ma}.`}
-        />
-      ) : null}
-    </SectionPanel>
-  );
-}
-
 function OrderSummary({
   preview,
   isSubmitting,
@@ -1133,51 +1102,21 @@ function OrderSummary({
   ] as const;
 
   return (
-    <aside className="sticky top-5 rounded-xl border border-border bg-surface p-5 shadow-admin-card">
-      <div className="mb-4">
-        <h3 className="text-card-title text-text-main">5. Tóm tắt giá</h3>
-        <p className="mt-1 text-body-sm text-text-secondary">
-          Số tiền này chỉ là preview, backend sẽ tự tính lại từ database.
+    <aside className="sticky top-5 rounded-xl border border-border bg-surface p-4 shadow-admin-card">
+      <div className="mb-3">
+        <h3 className="text-sm font-bold text-text-main">Tóm tắt giá (preview)</h3>
+        <p className="mt-0.5 text-xs text-text-secondary">
+          Backend sẽ tính lại chính xác từ database.
         </p>
       </div>
 
-      <div className="space-y-3">
-        {rows.map(([label, amount]) => (
-          <div key={label} className="flex items-center justify-between gap-3">
-            <span className="text-sm text-text-secondary">{label}</span>
-            <span
-              className={`text-sm font-bold ${
-                amount < 0 ? "text-success" : "text-text-main"
-              }`}
-            >
-              {amount < 0 ? `-${formatCurrency(Math.abs(amount))}` : formatCurrency(amount)}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <Divider className="my-4" />
-
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <div className="text-xs font-bold uppercase tracking-wide text-text-muted">
-            Tổng tiền
-          </div>
-          <div className="mt-1 text-xs text-text-secondary">
-            Payment amount backend sẽ lưu
-          </div>
-        </div>
-        <div className="text-right text-2xl font-extrabold text-primary-container">
-          {formatCurrency(preview.totalAmount)}
-        </div>
-      </div>
-
+      {/* Chi tiết từng dòng sản phẩm */}
       {preview.lines.length > 0 ? (
-        <div className="mt-5 space-y-2 rounded-lg border border-border bg-surface-alt p-3">
+        <div className="mb-3 space-y-1.5 rounded-lg border border-border bg-surface-alt p-2">
           {preview.lines.map((line, index) => (
             <div
               key={`${line.product?.id ?? "empty"}-${index}`}
-              className="flex items-start justify-between gap-3 text-xs"
+              className="flex items-start justify-between gap-2 text-xs"
             >
               <div className="min-w-0 text-text-secondary">
                 <div className="truncate font-semibold text-text-main">
@@ -1190,7 +1129,7 @@ function OrderSummary({
                   · SL {line.quantity}
                 </div>
               </div>
-              <span className="font-bold text-text-main">
+              <span className="shrink-0 font-bold text-text-main">
                 {formatCurrency(line.lineTotal)}
               </span>
             </div>
@@ -1198,11 +1137,36 @@ function OrderSummary({
         </div>
       ) : null}
 
-      <Divider className="my-4" />
+      {/* Bảng tổng */}
+      <div className="space-y-1.5">
+        {rows.map(([label, amount]) => (
+          <div key={label} className="flex items-center justify-between gap-3">
+            <span className="text-xs text-text-secondary">{label}</span>
+            <span
+              className={`text-xs font-bold ${
+                amount < 0 ? "text-success" : "text-text-main"
+              }`}
+            >
+              {amount < 0 ? `-${formatCurrency(Math.abs(amount))}` : formatCurrency(amount)}
+            </span>
+          </div>
+        ))}
+      </div>
 
-      <div className="flex flex-col gap-3">
+      <Divider className="my-3" />
+
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-bold uppercase tracking-wide text-text-muted">Tổng cộng</span>
+        <span className="text-xl font-extrabold text-primary-container">
+          {formatCurrency(preview.totalAmount)}
+        </span>
+      </div>
+
+      <Divider className="my-3" />
+
+      <div className="flex flex-col gap-2">
         <Button
-          className="h-10 rounded-[10px] font-semibold"
+          className="h-9 rounded-[10px] font-semibold"
           onClick={onCancel}
         >
           Hủy
@@ -1212,7 +1176,7 @@ function OrderSummary({
           htmlType="submit"
           icon={<PlusOutlined />}
           loading={isSubmitting}
-          className="h-10 rounded-[10px] font-semibold"
+          className="h-9 rounded-[10px] font-semibold"
         >
           Tạo đơn hàng
         </Button>
@@ -1422,245 +1386,156 @@ export default function CreateOrderPage() {
     },
   });
 
-  function handleCustomerChange(customerId?: number) {
-    const selectedCustomer = foundCustomers.find(
-      (customer) => customer.id === customerId
-    );
-
-    if (selectedCustomer) {
-      setSelectedCustomerById((current) => ({
-        ...current,
-        [selectedCustomer.id]: selectedCustomer,
-      }));
-    }
-
-    const currentItems = (form.getFieldValue("items") ??
-      []) as NonNullable<CreateOrderFormValues["items"]>;
-    form.setFieldsValue({
-      recipientName: undefined,
-      phone: undefined,
-      addressLine: undefined,
-      items: currentItems.map((item) => {
-        const productType = getItemProductType(item);
-
-        if (productType === "STANDARD") {
-          return {
-            ...item,
-            productType,
-            quantity: item.quantity ?? 1,
-          };
-        }
-
-        return {
-          productType,
-          productId: undefined,
-          variantId: undefined,
-          designId: undefined,
-          color: undefined,
-          quantity: item.quantity ?? 1,
-        };
-      }),
-    });
-    setDesignKeyword("");
-    setSelectedDesignById({});
-  }
-
-  function handleProductTypeChange(
-    rowIndex: number,
-    productType: ProductLineType
-  ) {
-    const currentItem =
-      (form.getFieldValue(["items", rowIndex]) as NonNullable<
-        CreateOrderFormValues["items"]
-      >[number]) ?? {};
-
-    form.setFieldValue(["items", rowIndex], {
-      ...currentItem,
-      productType,
-      productId: undefined,
-      variantId: undefined,
-      designId: undefined,
-      color: undefined,
-      quantity: currentItem.quantity ?? 1,
-    });
-  }
-
-  function handleDesignChange(rowIndex: number, designId?: number) {
-    const selectedDesign = designs.find((design) => design.id === designId);
-    const currentItem =
-      (form.getFieldValue(["items", rowIndex]) as NonNullable<
-        CreateOrderFormValues["items"]
-      >[number]) ?? {};
-
-    if (!selectedDesign) {
-      form.setFieldValue(["items", rowIndex], {
-        ...currentItem,
-        productType: "CUSTOM",
-        productId: undefined,
-        variantId: undefined,
-        designId: undefined,
-        color: undefined,
-        quantity: currentItem.quantity ?? 1,
+  function handleCustomerChange(userId?: number) {
+    if (!userId) {
+      form.setFieldsValue({
+        userId: undefined,
+        recipientName: "",
+        phone: "",
+        addressLine: "",
       });
       return;
     }
+    const customer = customers.find((c) => c.id === userId);
+    if (customer) {
+      setSelectedCustomerById((prev) => ({ ...prev, [customer.id]: customer }));
+      form.setFieldsValue({
+        userId: customer.id,
+        recipientName: customer.hoTen,
+        phone: customer.soDienThoai ?? "",
+      });
+    }
+  }
 
-    const syncedProduct = productById[selectedDesign.productId] ?? selectedDesign.sanPham;
-    const syncedDesign = { ...selectedDesign, sanPham: syncedProduct };
-
-    setSelectedDesignById((current) => ({
-      ...current,
-      [syncedDesign.id]: syncedDesign,
-    }));
-
-    setSelectedProductById((current) => ({
-      ...current,
-      [syncedProduct.id]: syncedProduct,
-    }));
-
-    form.setFieldValue(["items", rowIndex], {
-      ...currentItem,
-      productType: "CUSTOM",
-      productId: syncedDesign.productId,
-      variantId: undefined,
-      designId: syncedDesign.id,
+  function handleProductTypeChange(rowIndex: number, productType: ProductLineType) {
+    const items = form.getFieldValue("items") || [];
+    items[rowIndex] = {
+      ...items[rowIndex],
+      productType,
+      productId: undefined,
       color: undefined,
-      quantity: currentItem.quantity ?? 1,
-    });
+      variantId: undefined,
+      designId: undefined,
+    };
+    form.setFieldsValue({ items });
   }
 
   function handleProductChange(rowIndex: number, productId?: number) {
-    const currentItem =
-      (form.getFieldValue(["items", rowIndex]) as NonNullable<
-        CreateOrderFormValues["items"]
-      >[number]) ?? {};
-    const selectedProduct =
-      (productId ? productById[productId] : undefined) ??
-      foundProducts.find((product) => product.id === productId);
+    const items = form.getFieldValue("items") || [];
+    const product = productOptions.find((p) => p.id === productId);
 
-    if (selectedProduct) {
-      setSelectedProductById((current) => ({
-        ...current,
-        [selectedProduct.id]: selectedProduct,
-      }));
+    if (product) {
+      setSelectedProductById((prev) => ({ ...prev, [product.id]: product }));
     }
 
-    form.setFieldValue(["items", rowIndex], {
-      ...currentItem,
-      productType: getItemProductType(currentItem),
+    items[rowIndex] = {
+      ...items[rowIndex],
       productId,
-      variantId: undefined,
-      designId: undefined,
       color: undefined,
-      quantity: currentItem.quantity ?? 1,
-    });
+      variantId: undefined,
+    };
+    form.setFieldsValue({ items });
   }
 
   function handleColorChange(rowIndex: number, color?: string) {
-    const currentItem =
-      (form.getFieldValue(["items", rowIndex]) as NonNullable<
-        CreateOrderFormValues["items"]
-      >[number]) ?? {};
-
-    form.setFieldValue(["items", rowIndex], {
-      ...currentItem,
+    const items = form.getFieldValue("items") || [];
+    items[rowIndex] = {
+      ...items[rowIndex],
       color,
       variantId: undefined,
-      quantity: currentItem.quantity ?? 1,
-    });
-  }
-
-  function handleVariantChange() {
-    // Chọn size không làm thay đổi phôi, màu hoặc thiết kế đã chọn của dòng hiện tại.
-  }
-
-  function buildPayload(valuesToSubmit: CreateOrderFormValues): TaoMoiDonHangInput {
-    const payload: TaoMoiDonHangInput = {
-      userId: Number(valuesToSubmit.userId),
-      recipientName: valuesToSubmit.recipientName || "",
-      phone: valuesToSubmit.phone || "",
-      addressLine: valuesToSubmit.addressLine || "",
-      items: (valuesToSubmit.items ?? []).map((item) => {
-        const productType = getItemProductType(item);
-
-        return {
-          variantId: Number(item.variantId),
-          quantity: Number(item.quantity),
-          designId:
-            productType === "CUSTOM" && item.designId
-              ? Number(item.designId)
-              : null,
-        };
-      }),
-      paymentMethod: valuesToSubmit.paymentMethod ?? "COD",
-      paymentType: valuesToSubmit.paymentType ?? "FULL",
-      shippingFee: Math.max(0, Number(valuesToSubmit.shippingFee) || 0),
     };
-
-    if (valuesToSubmit.promotionId) {
-      payload.promotionId = Number(valuesToSubmit.promotionId);
-    }
-
-    return payload;
+    form.setFieldsValue({ items });
   }
 
-  async function handleFinish(valuesToSubmit: CreateOrderFormValues) {
-    if (preview.promotionNotEligible && preview.selectedPromotion) {
-      messageApi.error(
-        `Đơn chưa đạt điều kiện tối thiểu của mã ${preview.selectedPromotion.ma}`
-      );
+  function handleVariantChange(rowIndex: number) {
+    // Form Item tự xử lý value update
+  }
+
+  function handleDesignChange(rowIndex: number, designId?: number) {
+    const items = form.getFieldValue("items") || [];
+    const design = designs.find((d) => d.id === designId);
+
+    if (design) {
+      setSelectedDesignById((prev) => ({ ...prev, [design.id]: design }));
+      
+      const productType = items[rowIndex]?.productType ?? "CUSTOM";
+      
+      items[rowIndex] = {
+        ...items[rowIndex],
+        productType,
+        designId,
+        productId: design.sanPham?.id,
+        color: design.mauSanPham || design.mauNen,
+        variantId: design.variantId ?? undefined,
+      };
+      
+      if (design.sanPham) {
+        setSelectedProductById((prev) => ({ ...prev, [design.sanPham.id]: design.sanPham }));
+      }
+    } else {
+      items[rowIndex] = {
+        ...items[rowIndex],
+        designId,
+      };
+    }
+    
+    form.setFieldsValue({ items });
+  }
+
+  function handleFinish(formValues: CreateOrderFormValues) {
+    if (!formValues.items || formValues.items.length === 0) {
+      messageApi.error("Vui lòng thêm ít nhất 1 sản phẩm");
       return;
     }
 
-    createOrderMutation.mutate(buildPayload(valuesToSubmit));
+    const items = formValues.items.map((item) => ({
+      variantId: item.variantId!,
+      quantity: item.quantity!,
+      designId: item.productType === "CUSTOM" ? item.designId : undefined,
+    }));
+
+    createOrderMutation.mutate({
+      userId: formValues.userId!,
+      recipientName: formValues.recipientName!,
+      phone: formValues.phone!,
+      addressLine: formValues.addressLine!,
+      items,
+      paymentMethod: formValues.paymentMethod!,
+      paymentType: formValues.paymentType!,
+      shippingFee: formValues.shippingFee ?? 0,
+      promotionId: formValues.promotionId,
+    });
   }
 
-  function handleFinishFailed({
-    errorFields,
-  }: {
-    errorFields: Array<{ name: Array<string | number> }>;
-  }) {
-    const firstError = errorFields[0];
-    if (!firstError) return;
-
-    window.setTimeout(() => {
-      form.scrollToField(firstError.name, {
-        behavior: "smooth",
-        block: "center",
-      });
-
-      const fieldInstance = form.getFieldInstance(firstError.name) as
-        | { focus?: () => void }
-        | undefined;
-      fieldInstance?.focus?.();
-    }, 0);
+  function handleFinishFailed({ errorFields }: any) {
+    if (errorFields.length > 0) {
+      messageApi.error("Vui lòng kiểm tra lại thông tin biểu mẫu");
+    }
   }
 
   return (
     <div>
       {messageContextHolder}
 
-      <section className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
-        <div>
+      <section className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
           <Button
             type="text"
             icon={<ArrowLeftOutlined />}
-            className="mb-3 px-0 font-semibold text-text-secondary hover:text-primary-container"
+            className="px-0 font-semibold text-text-secondary hover:text-primary-container"
             onClick={() => router.push("/admin/don-hang")}
           >
-            Quay lại danh sách
+            Quay lại
           </Button>
-          <h2 className="font-extrabold text-headline-lg-mobile text-text-main md:text-headline-lg">
-            Tạo đơn mới
-          </h2>
-          <p className="mt-1 text-body-md text-text-secondary">
-            Admin tạo đơn thay khách, kiểm tra tồn kho và preview giá trước khi gửi backend.
+          <h2 className="text-lg font-extrabold text-text-main">Tạo đơn mới</h2>
+          <p className="hidden text-xs text-text-secondary md:block">
+            Admin tạo đơn thay khách — kiểm tra tồn kho và preview giá.
           </p>
         </div>
-
         <Button
           icon={<ReloadOutlined />}
-          className="h-10 rounded-[10px] font-semibold"
+          size="small"
+          className="h-8 rounded-[10px] font-semibold"
           onClick={() => {
             form.resetFields();
             setDesignKeyword("");
@@ -1668,7 +1543,7 @@ export default function CreateOrderPage() {
             setSelectedProductById({});
           }}
         >
-          Làm mới form
+          Làm mới
         </Button>
       </section>
 
@@ -1679,10 +1554,10 @@ export default function CreateOrderPage() {
         onFinish={handleFinish}
         onFinishFailed={handleFinishFailed}
         requiredMark={false}
-        className="rounded-2xl border border-border bg-surface-alt p-3 shadow-admin-card md:p-5"
+        className="rounded-2xl border border-border bg-surface-alt p-3 shadow-admin-card md:p-4"
       >
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="space-y-5">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="space-y-4">
             <CustomerSection
               customers={customers}
               isSearchingCustomers={isSearchingCustomers}
@@ -1706,17 +1581,13 @@ export default function CreateOrderPage() {
               onDesignChange={handleDesignChange}
             />
 
-            <PaymentSection
+            <PaymentShippingSection
               preview={preview}
               paymentMethod={values.paymentMethod}
               paymentType={values.paymentType}
               hasCustomDesign={hasCustomDesign}
-            />
-
-            <ShippingSection
               promotions={promotions}
               isLoadingPromotions={isLoadingPromotions}
-              preview={preview}
             />
 
             {createOrderMutation.isError ? (
@@ -1726,7 +1597,6 @@ export default function CreateOrderPage() {
                 title={getApiErrorMessage(createOrderMutation.error)}
               />
             ) : null}
-
           </div>
 
           <div>
