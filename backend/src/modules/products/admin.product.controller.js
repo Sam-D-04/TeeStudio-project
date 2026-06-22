@@ -3,7 +3,7 @@
  * Không chứa logic nghiệp vụ hay câu SQL – chỉ điều phối.
  */
 
-const productService = require("./product.service");
+const productService = require("./admin.product.service");
 
 // =====================================================================
 // KPI THỐNG KÊ

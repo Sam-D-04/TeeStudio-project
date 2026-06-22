@@ -19,7 +19,7 @@
 
 const router = require("express").Router();
 const { verifyToken, requireAdmin } = require("../../common/middlewares/auth.middleware");
-const productController = require("./product.controller");
+const productController = require("./admin.product.controller");
 
 // ─── Tất cả routes đều yêu cầu đăng nhập + quyền Admin ───────────────────────
 router.use(verifyToken, requireAdmin);

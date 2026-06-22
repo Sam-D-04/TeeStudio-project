@@ -1,4 +1,4 @@
-const pricingService = require("./pricing.service");
+const pricingService = require("./admin.pricing.service");
 
 const calculateQuote = async (req, res, next) => {
   try {

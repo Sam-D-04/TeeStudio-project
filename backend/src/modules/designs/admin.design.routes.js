@@ -8,7 +8,7 @@
  */
 
 const router = require("express").Router();
-const controller = require("./design.controller");
+const controller = require("./admin.design.controller");
 const { verifyToken, requireRoles } = require("../../common/middlewares/auth.middleware");
 const { ROLES } = require("../../common/constants/roles");
 

@@ -5,7 +5,7 @@
  * Chỉ làm: đọc params/body → gọi service → trả JSON.
  */
 
-const designService = require("./design.service");
+const designService = require("./admin.design.service");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KPI THỐNG KÊ

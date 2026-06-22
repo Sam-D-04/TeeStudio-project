@@ -9,7 +9,7 @@ const express = require("express");
 
 const { verifyToken, requireRoles } = require("../../common/middlewares/auth.middleware");
 const { ROLES } = require("../../common/constants/roles");
-const paymentController = require("./payment.controller");
+const paymentController = require("./admin.payment.controller");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PHẦN 1: ROUTE CÔNG KHAI (VNPAY)

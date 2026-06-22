@@ -3,7 +3,7 @@
  * Không chứa logic nghiệp vụ hay câu SQL – chỉ điều phối.
  */
 
-const orderService = require("./order.service");
+const orderService = require("./admin.order.service");
 
 // =====================================================================
 // CONTROLLER DANH SÁCH / CHI TIẾT / TRẠNG THÁI (đã có từ trước)

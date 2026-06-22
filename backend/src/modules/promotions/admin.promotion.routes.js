@@ -1,7 +1,7 @@
 const router = require("express").Router();
 const { verifyToken, requireAdmin } = require("../../common/middlewares/auth.middleware");
 const validate = require("../../common/middlewares/validate.middleware");
-const controller = require("./promotion.controller");
+const controller = require("./admin.promotion.controller");
 const validation = require("./promotion.validation");
 
 router.use(verifyToken, requireAdmin);

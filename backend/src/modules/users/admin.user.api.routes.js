@@ -1,5 +1,5 @@
 const router = require("express").Router();
-const userController = require("./user.controller");
+const userController = require("./admin.user.controller");
 const validate = require("../../common/middlewares/validate.middleware");
 const {
   verifyToken,

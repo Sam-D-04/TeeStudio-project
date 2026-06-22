@@ -1,4 +1,4 @@
-const userService = require("./user.service");
+const userService = require("./admin.user.service");
 
 const getProfile = async (req, res, next) => {
   try {

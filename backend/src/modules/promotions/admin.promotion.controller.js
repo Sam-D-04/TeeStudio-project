@@ -1,4 +1,4 @@
-const service = require("./promotion.service");
+const service = require("./admin.promotion.service");
 
 const dieuPhoi = (handler) => async (req, res, next) => {
   try {

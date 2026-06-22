@@ -3,7 +3,7 @@
  * Không chứa logic nghiệp vụ hay câu SQL – chỉ điều phối.
  */
 
-const inventoryService = require("./inventory.service");
+const inventoryService = require("./admin.inventory.service");
 
 // =====================================================================
 // THỐNG KÊ KPI

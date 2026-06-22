@@ -6,7 +6,7 @@
  * - Phần 2: Admin quản lý thanh toán (mới)
  */
 
-const paymentService = require("./payment.service");
+const paymentService = require("./admin.payment.service");
 
 // =====================================================================
 // PHẦN 1: VNPAY RETURN / IPN (GIỮ NGUYÊN)

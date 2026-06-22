@@ -17,7 +17,7 @@ const router = require("express").Router();
 const { verifyToken, requireRoles } = require("../../common/middlewares/auth.middleware");
 const { ROLES } = require("../../common/constants/roles");
 const validate = require("../../common/middlewares/validate.middleware");
-const orderController = require("./order.controller");
+const orderController = require("./admin.order.controller");
 const {
   updateStatusSchema,
   cancelOrderSchema,

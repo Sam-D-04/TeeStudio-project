@@ -33,7 +33,7 @@ const {
   ghiGiaoDich,
   getDanhSachSanPhamVaBienThe,
   getDanhSachNhaCungCap,
-} = require("./inventory.controller");
+} = require("./admin.inventory.controller");
 
 // Áp dụng xác thực JWT + quyền Admin cho toàn bộ routes này
 router.use(verifyToken, requireAdmin);
