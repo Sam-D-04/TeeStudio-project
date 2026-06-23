@@ -8,153 +8,193 @@ import {
   ScissorOutlined,
   ShoppingOutlined,
 } from "@ant-design/icons";
-import BestSellingProductsCard, {
-  type BestSellingProduct,
-} from "./components/BestSellingProductsCard";
+import { useQuery } from "@tanstack/react-query";
+import dayjs from "dayjs";
+import { useState } from "react";
+import * as dashboardService from "@/services/admin/dashboardService";
+import type { DesignOrder } from "./components/DesignReviewTable";
+import BestSellingProductsCard from "./components/BestSellingProductsCard";
 import DashboardFilterToolbar from "./components/DashboardFilterToolbar";
-import DesignReviewTable, { type DesignOrder } from "./components/DesignReviewTable";
+import DesignReviewTable from "./components/DesignReviewTable";
 import InventoryWarningCard from "./components/InventoryWarningCard";
 import MetricCard from "./components/MetricCard";
 import RevenueOverviewChart from "./components/RevenueOverviewChart";
 
 // ---------------------------------------------------------------------------
-// Dữ liệu mẫu — Thẻ thống kê (hàng 1: chỉ số tài chính & đơn hàng)
+// Tiện ích định dạng
 // ---------------------------------------------------------------------------
-const primaryMetrics = [
-  {
-    label: "Doanh thu tháng này",
-    value: "18.450.000đ",
-    icon: <RiseOutlined />,
-    iconClassName: "text-success",
-  },
-  {
-    label: "Doanh thu từ thiết kế",
-    value: "6.820.000đ",
-    icon: <ScissorOutlined />,
-    iconClassName: "text-accent",
-  },
-  {
-    label: "Đơn hàng mới",
-    value: "42",
-    icon: <ShoppingOutlined />,
-    iconClassName: "text-primary-container",
-  },
-  {
-    label: "Tồn kho mức thấp",
-    value: "23",
-    icon: <InboxOutlined />,
-    iconClassName: "text-error",
-    valueClassName: "text-error",
-  },
-];
+
+/** Định dạng số tiền VND có dấu chấm ngàn */
+function formatTienVnd(amount: number | undefined): string {
+  if (amount === undefined || amount === null) return "—";
+  return amount.toLocaleString("vi-VN") + "đ";
+}
+
+/** Định dạng phần trăm có 1 chữ số thập phân */
+function formatPhanTram(value: number | undefined): string {
+  if (value === undefined || value === null) return "—";
+  return `${value.toFixed(1).replace(".", ",")}%`;
+}
 
 // ---------------------------------------------------------------------------
-// Thẻ thống kê — cột trái hàng 2: 3 chỉ số vận hành
+// Khoảng ngày mặc định: từ đầu tháng đến hôm nay
 // ---------------------------------------------------------------------------
-const operationMetrics = [
-  {
-    label: "Giá trị trung bình đơn",
-    value: "439.286đ",
-    icon: <PercentageOutlined />,
-    iconClassName: "text-primary-container",
-  },
-  {
-    label: "Tỷ lệ đơn hàng thành công",
-    value: "94,3%",
-    icon: <RiseOutlined />,
-    iconClassName: "text-success",
-    valueClassName: "text-success",
-  },
-  {
-    label: "Doanh thu khác / Đền bù",
-    value: "1.200.000đ",
-    icon: <AlertOutlined />,
-    iconClassName: "text-warning",
-    subLabel: "Tỷ lệ hủy",
-    subValue: "5,7%",
-    subValueClassName: "text-error",
-  },
-];
-
-// ---------------------------------------------------------------------------
-// Dữ liệu mẫu — Bảng thiết kế cần xử lý
-// ---------------------------------------------------------------------------
-const designOrders: DesignOrder[] = [
-  {
-    code: "DH-20260522-001",
-    customerName: "Nguyễn Văn A",
-    technique: "In PET",
-    status: "pending",
-  },
-  {
-    code: "DH-20260522-002",
-    customerName: "Trần Thị B",
-    technique: "In lụa",
-    status: "revision",
-  },
-  {
-    code: "DH-20260523-007",
-    customerName: "Lê Minh C",
-    technique: "In DTG",
-    status: "pending",
-    isUrgent: true,
-  },
-  {
-    code: "DH-20260523-010",
-    customerName: "Phạm Thu D",
-    technique: "In PET",
-    status: "revision",
-  },
-  {
-    code: "DH-20260523-015",
-    customerName: "Hoàng Văn E",
-    technique: "In lụa",
-    status: "pending",
-    isUrgent: true,
-  },
-];
-
-// ---------------------------------------------------------------------------
-// Dữ liệu mẫu — Tồn kho & sản phẩm bán chạy
-// ---------------------------------------------------------------------------
-const inventoryItems = [
-  {
-    name: "Áo thun cotton 100%",
-    detail: "Màu: Đen | Cỡ: M",
-    quantity: 12,
-  },
-  {
-    name: "Áo polo cổ điển",
-    detail: "Màu: Trắng | Cỡ: L",
-    quantity: 8,
-  },
-];
-
-const bestSellingProducts: BestSellingProduct[] = [
-  {
-    name: "Áo thun cotton 100%",
-    variant: "Đen / Cỡ M",
-    revenue: "7.850.000đ",
-    thumbnailClassName: "bg-sky-100 text-sky-700",
-  },
-  {
-    name: "Áo polo cổ điển",
-    variant: "Trắng / Cỡ L",
-    revenue: "6.420.000đ",
-    thumbnailClassName: "bg-emerald-100 text-emerald-700",
-  },
-  {
-    name: "Áo nhóm",
-    variant: "Xanh đậm / Cỡ XL",
-    revenue: "5.980.000đ",
-    thumbnailClassName: "bg-indigo-100 text-indigo-700",
-  },
-];
+function getDefaultRange(): { tuNgay: string; denNgay: string } {
+  const today = dayjs();
+  return {
+    tuNgay: today.startOf("month").format("YYYY-MM-DD"),
+    denNgay: today.format("YYYY-MM-DD"),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Component chính
 // ---------------------------------------------------------------------------
 export default function AdminDashboard() {
+  const defaultRange = getDefaultRange();
+  const [tuNgay, setTuNgay] = useState(defaultRange.tuNgay);
+  const [denNgay, setDenNgay] = useState(defaultRange.denNgay);
+
+  // ── Truy vấn 1: Thẻ chỉ số tổng quan ──
+  const {
+    data: chiSo,
+    isLoading: isLoadingChiSo,
+  } = useQuery({
+    queryKey: ["dashboard/tong-quan", tuNgay, denNgay],
+    queryFn: () => dashboardService.layTongQuanChiSo(tuNgay, denNgay),
+    staleTime: 60_000,
+  });
+
+  // ── Truy vấn 2: Biểu đồ doanh thu ──
+  const {
+    data: bieuDo,
+    isLoading: isLoadingBieuDo,
+    isError: isErrorBieuDo,
+  } = useQuery({
+    queryKey: ["dashboard/bieu-do", tuNgay, denNgay],
+    queryFn: () => dashboardService.layDuLieuBieuDo(tuNgay, denNgay),
+    staleTime: 60_000,
+  });
+
+  // ── Truy vấn 3: Thiết kế cần xử lý ──
+  const {
+    data: thietKeRaw,
+    isLoading: isLoadingThietKe,
+  } = useQuery({
+    queryKey: ["dashboard/thiet-ke-can-xu-ly"],
+    queryFn: () => dashboardService.layThietKeCanXuLy(),
+    staleTime: 30_000,
+  });
+
+  // ── Truy vấn 4: Tồn kho cảnh báo ──
+  const {
+    data: tonKhoRaw,
+    isLoading: isLoadingTonKho,
+  } = useQuery({
+    queryKey: ["dashboard/ton-kho-canh-bao"],
+    queryFn: () => dashboardService.layTonKhoCanhBao(15, 10),
+    staleTime: 120_000,
+  });
+
+  // ── Truy vấn 5: Sản phẩm bán chạy ──
+  const {
+    data: sanPhamBanChayRaw,
+    isLoading: isLoadingSanPham,
+  } = useQuery({
+    queryKey: ["dashboard/san-pham-ban-chay", tuNgay, denNgay],
+    queryFn: () => dashboardService.laySanPhamBanChay(tuNgay, denNgay, 3),
+    staleTime: 60_000,
+  });
+
+  // ── Xử lý callback đổi khoảng thời gian ──
+  function handleRangeChange(tu: string, den: string) {
+    setTuNgay(tu);
+    setDenNgay(den);
+  }
+
+  // ── Chuẩn hóa dữ liệu thiết kế sang type DesignOrder ──
+  const designOrders: DesignOrder[] = (thietKeRaw ?? []).map((d) => ({
+    designId: d.designId,
+    code: d.code,
+    customerName: d.customerName,
+    technique: d.technique,
+    status: d.status,
+    isUrgent: d.isUrgent,
+  }));
+
+  // ── Chuẩn hóa dữ liệu tồn kho ──
+  const inventoryItems = (tonKhoRaw ?? []).map((item) => ({
+    variantId: item.variantId,
+    name: item.name,
+    detail: item.detail,
+    quantity: item.quantity,
+  }));
+
+  // ── Chuẩn hóa dữ liệu sản phẩm bán chạy ──
+  const bestSellingProducts = (sanPhamBanChayRaw ?? []).map((sp) => ({
+    productId: sp.productId,
+    name: sp.name,
+    variant: sp.variant,
+    revenue: sp.revenue,
+    soldQty: sp.soldQty,
+    thumbnailClassName: sp.thumbnailClassName,
+  }));
+
+  // ── Cấu hình thẻ chỉ số hàng 1 ──
+  const primaryMetrics = [
+    {
+      label: "Doanh thu tháng này",
+      value: isLoadingChiSo ? "..." : formatTienVnd(chiSo?.doanhThuThangVnd),
+      icon: <RiseOutlined />,
+      iconClassName: "text-success",
+    },
+    {
+      label: "Doanh thu từ thiết kế",
+      value: isLoadingChiSo ? "..." : formatTienVnd(chiSo?.doanhThuThietKeVnd),
+      icon: <ScissorOutlined />,
+      iconClassName: "text-accent",
+    },
+    {
+      label: "Đơn hàng mới",
+      value: isLoadingChiSo ? "..." : String(chiSo?.soDonMoi ?? "—"),
+      icon: <ShoppingOutlined />,
+      iconClassName: "text-primary-container",
+    },
+    {
+      label: "Tồn kho mức thấp",
+      value: isLoadingChiSo ? "..." : String(chiSo?.soVariantTonKhoThap ?? "—"),
+      icon: <InboxOutlined />,
+      iconClassName: "text-error",
+      valueClassName: "text-error",
+    },
+  ];
+
+  // ── Cấu hình thẻ chỉ số hàng 2 (cột trái) ──
+  const operationMetrics = [
+    {
+      label: "Giá trị trung bình đơn",
+      value: isLoadingChiSo ? "..." : formatTienVnd(chiSo?.giaTriTrungBinhDonVnd),
+      icon: <PercentageOutlined />,
+      iconClassName: "text-primary-container",
+    },
+    {
+      label: "Tỷ lệ đơn hàng thành công",
+      value: isLoadingChiSo ? "..." : formatPhanTram(chiSo?.tyLeThanhCongPhanTram),
+      icon: <RiseOutlined />,
+      iconClassName: "text-success",
+      valueClassName: "text-success",
+    },
+    {
+      label: "Doanh thu khác / Đền bù",
+      value: isLoadingChiSo ? "..." : formatTienVnd(chiSo?.doanhThuKhacDenBuVnd),
+      icon: <AlertOutlined />,
+      iconClassName: "text-warning",
+      subLabel: "Tỷ lệ hủy",
+      subValue: isLoadingChiSo ? "..." : formatPhanTram(chiSo?.tyLeHuyPhanTram),
+      subValueClassName: "text-error",
+    },
+  ];
+
   return (
     <>
       {/* Tiêu đề trang */}
@@ -170,7 +210,7 @@ export default function AdminDashboard() {
       </section>
 
       {/* Bộ lọc thời gian */}
-      <DashboardFilterToolbar />
+      <DashboardFilterToolbar onRangeChange={handleRangeChange} />
 
       {/* ── Hàng 1: Thẻ chỉ số tài chính & đơn hàng (4 thẻ chính) ── */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -204,8 +244,12 @@ export default function AdminDashboard() {
             />
           ))}
         </div>
-        {/* Cột phải: Biểu đồ doanh thu tổng quan — khớp chiều cao 3 thẻ */}
-        <RevenueOverviewChart />
+        {/* Cột phải: Biểu đồ doanh thu tổng quan */}
+        <RevenueOverviewChart
+          data={bieuDo?.danhSach ?? []}
+          isLoading={isLoadingBieuDo}
+          isError={isErrorBieuDo}
+        />
       </section>
 
       {/* ── Bảng thiết kế cần xử lý (To-do list) ── */}
@@ -216,7 +260,9 @@ export default function AdminDashboard() {
               Thiết kế cần xử lý
             </h3>
             <p className="mt-0.5 text-xs text-text-secondary">
-              Hiển thị tối đa 5 thiết kế &nbsp;·&nbsp; Lọc: Chờ duyệt, Cần sửa, Gấp
+              {isLoadingThietKe
+                ? "Đang tải..."
+                : `Hiển thị ${designOrders.length} thiết kế · Lọc: Chờ duyệt, Cần sửa`}
             </p>
           </div>
           <a

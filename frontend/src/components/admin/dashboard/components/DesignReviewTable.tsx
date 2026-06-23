@@ -2,6 +2,7 @@ import { EditOutlined, ThunderboltFilled } from "@ant-design/icons";
 import StatusBadge, { type DesignStatus } from "../../common/StatusBadge";
 
 export type DesignOrder = {
+  designId?: number;
   code: string;
   customerName: string;
   technique: string;
@@ -11,34 +12,27 @@ export type DesignOrder = {
 
 type DesignReviewTableProps = {
   orders: DesignOrder[];
+  /** Callback khi admin nhấn "Duyệt thiết kế" */
+  onDuyetThietKe?: (order: DesignOrder) => void;
 };
 
-/** Chỉ hiển thị các đơn có trạng thái PENDING_REVIEW, NEEDS_REVISION hoặc cờ Gấp.
- *  Giới hạn tối đa 5 dòng mới nhất. */
-function filterOrders(orders: DesignOrder[]): DesignOrder[] {
-  return orders
-    .filter(
-      (o) => o.status === "pending" || o.status === "revision" || o.isUrgent,
-    )
-    .slice(0, 5);
-}
-
-export default function DesignReviewTable({ orders }: DesignReviewTableProps) {
-  const filtered = filterOrders(orders);
-
+export default function DesignReviewTable({
+  orders,
+  onDuyetThietKe,
+}: DesignReviewTableProps) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[460px] border-collapse text-left leading-5">
         <thead>
           <tr className="border-b border-border bg-surface-alt text-label-bold uppercase text-text-secondary">
-            <th className="p-3 pl-5 font-bold">Mã đơn</th>
+            <th className="p-3 pl-5 font-bold">Mã đơn / Thiết kế</th>
             <th className="p-3 font-bold">Khách hàng</th>
             <th className="p-3 font-bold">Trạng thái</th>
             <th className="p-3 pr-5 text-right font-bold">Thao tác</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {filtered.length === 0 ? (
+          {orders.length === 0 ? (
             <tr>
               <td
                 colSpan={4}
@@ -48,7 +42,7 @@ export default function DesignReviewTable({ orders }: DesignReviewTableProps) {
               </td>
             </tr>
           ) : (
-            filtered.map((order) => (
+            orders.map((order) => (
               <tr
                 key={order.code}
                 className="transition-colors hover:bg-surface-alt/70"
@@ -74,6 +68,7 @@ export default function DesignReviewTable({ orders }: DesignReviewTableProps) {
                   <button
                     type="button"
                     className="inline-flex items-center justify-end gap-1.5 text-sm font-medium text-primary-container transition-colors hover:text-[#0284c7]"
+                    onClick={() => onDuyetThietKe?.(order)}
                   >
                     <EditOutlined className="text-[14px]" />
                     <span>Duyệt thiết kế</span>
