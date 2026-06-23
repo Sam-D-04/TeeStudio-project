@@ -221,7 +221,7 @@ function PlaceholderPanel({
 
       {/* Thông báo đang phát triển */}
       <span className="rounded-full bg-[#fef9c3] px-3 py-1 text-xs font-semibold text-[#854d0e]">
-        Đang phát triển
+
       </span>
     </div>
   );

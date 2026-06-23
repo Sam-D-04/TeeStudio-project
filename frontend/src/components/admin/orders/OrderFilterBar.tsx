@@ -1,6 +1,7 @@
 import { CalendarOutlined } from "@ant-design/icons";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
+import type { ReactNode } from "react";
 import type { Dayjs } from "dayjs";
 import type { RangePickerProps } from "antd/es/date-picker";
 import type { OrderStatus } from "./OrderStatusBadge";
@@ -56,6 +57,8 @@ type OrderFilterBarProps = {
 
   typeFilter: string;
   onTypeFilterChange: (value: string) => void;
+
+  searchSlot?: ReactNode;
 };
 
 export default function OrderFilterBar({
@@ -67,6 +70,7 @@ export default function OrderFilterBar({
   onDateRangeChange,
   typeFilter,
   onTypeFilterChange,
+  searchSlot,
 }: OrderFilterBarProps) {
   const today = dayjs();
   const [weekStart, weekEnd] = getWeekRange();
@@ -86,8 +90,8 @@ export default function OrderFilterBar({
   };
 
   return (
-    // Khu vực filter: nền xám nhạt, viền dưới, padding 16px
-    <div className="space-y-4 border-b border-border bg-surface-alt px-4 py-4">
+    // Khu vực filter: nền xám nhạt, viền dưới, padding gọn
+    <div className="space-y-3 border-b border-border bg-surface-alt px-4 py-3">
 
       {/* ---- Hàng 1: Các pill lọc trạng thái ---- */}
       <div className="flex flex-wrap gap-2">
@@ -104,7 +108,7 @@ export default function OrderFilterBar({
               key={tab.key}
               type="button"
               onClick={() => onTabChange(tab.key)}
-              className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${activeClass}`}
+              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${activeClass}`}
             >
               {tab.label}
             </button>
@@ -113,14 +117,15 @@ export default function OrderFilterBar({
       </div>
 
       {/* ---- Hàng 2: Các select box lọc nâng cao ---- */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        {searchSlot}
 
         {/* Select lọc theo thanh toán */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <select
             value={paymentFilter}
             onChange={(e) => onPaymentFilterChange(e.target.value)}
-            className="h-control-h appearance-none rounded-lg border border-border bg-surface pl-4 pr-10 text-sm text-text-main outline-none focus:border-primary-container"
+            className="h-control-h appearance-none rounded-lg border border-border bg-surface pl-3 pr-9 text-sm text-text-main outline-none focus:border-primary-container"
           >
             <option value="tat_ca">Tất cả thanh toán</option>
             <option value="da_thanh_toan">Đã thanh toán</option>
@@ -133,7 +138,7 @@ export default function OrderFilterBar({
         </div>
 
         {/* Lọc theo thời gian */}
-        <div className="w-full sm:w-auto">
+        <div className="w-full shrink-0 sm:w-auto">
           <RangePicker
             aria-label="Chọn khoảng thời gian"
             value={dateRange}
@@ -144,16 +149,16 @@ export default function OrderFilterBar({
             suffixIcon={<CalendarOutlined />}
             allowClear
             onChange={handleDateRangeChange}
-            className="h-control-h w-full min-w-[260px] sm:w-[320px]"
+            className="h-control-h w-full min-w-[240px] sm:w-[280px]"
           />
         </div>
 
         {/* Select lọc theo loại đơn */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <select
             value={typeFilter}
             onChange={(e) => onTypeFilterChange(e.target.value)}
-            className="h-control-h appearance-none rounded-lg border border-border bg-surface pl-4 pr-10 text-sm text-text-main outline-none focus:border-primary-container"
+            className="h-control-h appearance-none rounded-lg border border-border bg-surface pl-3 pr-9 text-sm text-text-main outline-none focus:border-primary-container"
           >
             <option value="tat_ca">Loại đơn: Tất cả</option>
             <option value="custom_design">Thiết kế tùy chỉnh</option>

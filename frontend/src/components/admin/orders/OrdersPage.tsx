@@ -179,30 +179,28 @@ export default function OrdersPage() {
   return (
     <div>
       {/* ======== Tiêu đề trang + nút hành động ======== */}
-      <section className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
-        <div>
+      <section className="mb-8 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-baseline gap-4">
           <h2 className="font-extrabold text-headline-lg-mobile text-text-main md:text-headline-lg">
             Quản lý đơn hàng
           </h2>
-          <p className="mt-1 text-body-md text-text-secondary">
-            Theo dõi đơn áo tùy chỉnh, thanh toán, sản xuất và giao hàng
+          <p className="text-body-md text-text-secondary">
+            (Theo dõi đơn áo tùy chỉnh, thanh toán, sản xuất và giao hàng)
           </p>
         </div>
 
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => router.push("/admin/don-hang/tao-moi")}
-            className="flex h-control-h items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-4 text-button-text font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7]"
-          >
-            <PlusOutlined />
-            Tạo đơn mới
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => router.push("/admin/don-hang/tao-moi")}
+          className="flex h-control-h shrink-0 items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-4 text-button-text font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7]"
+        >
+          <PlusOutlined />
+          Tạo đơn mới
+        </button>
       </section>
 
       {/* ======== 4 thẻ KPI thống kê ======== */}
-      <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="mb-6 grid grid-cols-4 gap-3">
         {KPI_CONFIG.map((kpi) => (
           <OrderStatCard
             key={kpi.key}
@@ -218,26 +216,6 @@ export default function OrdersPage() {
       {/* ======== Bảng đơn hàng chính ======== */}
       <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
 
-        {/* Thanh tìm kiếm */}
-        <div className="flex items-center gap-4 border-b border-border px-4 py-3">
-          <AdminSearchInput
-            placeholder="Tìm mã đơn hàng, tên khách hàng..."
-            className="max-w-sm"
-            // Gọi search sau 500ms người dùng ngừng gõ (debounce đơn giản)
-            onChange={(e) => {
-              const val = (e.target as HTMLInputElement).value;
-              // Tạm dùng setTimeout đơn giản để debounce
-              if (searchTimeoutRef.current) {
-                clearTimeout(searchTimeoutRef.current);
-              }
-              searchTimeoutRef.current = setTimeout(() => {
-                setTuKhoa(val);
-                setCurrentPage(1);
-              }, 500);
-            }}
-          />
-        </div>
-
         {/* Thanh filter */}
         <OrderFilterBar
           activeTab={activeTab}
@@ -248,6 +226,24 @@ export default function OrdersPage() {
           onDateRangeChange={handleDateRangeChange}
           typeFilter={typeFilter}
           onTypeFilterChange={handleTypeChange}
+          searchSlot={(
+            <AdminSearchInput
+              placeholder="Tìm mã đơn hàng, tên khách hàng..."
+              className="w-full shrink-0 sm:w-[280px]"
+              // Gọi search sau 500ms người dùng ngừng gõ (debounce đơn giản)
+              onChange={(e) => {
+                const val = (e.target as HTMLInputElement).value;
+                // Tạm dùng setTimeout đơn giản để debounce
+                if (searchTimeoutRef.current) {
+                  clearTimeout(searchTimeoutRef.current);
+                }
+                searchTimeoutRef.current = setTimeout(() => {
+                  setTuKhoa(val);
+                  setCurrentPage(1);
+                }, 500);
+              }}
+            />
+          )}
         />
 
         {/* Trạng thái lỗi */}

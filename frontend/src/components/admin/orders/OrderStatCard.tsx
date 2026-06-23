@@ -23,19 +23,19 @@ export default function OrderStatCard({
     // Card nền trắng, bo góc 12px, viền 1px, shadow nhẹ
     // Khi hover: dịch lên 2px, đổi màu viền
     <div
-      className="flex items-center justify-between rounded-xl border border-border bg-surface p-5 shadow-[0_1px_4px_rgba(0,0,0,0.05)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#76a1b6]"
+      className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#76a1b6]"
     >
       {/* Phần chữ bên trái */}
-      <div>
+      <div className="min-w-0">
         {/* Nhãn nhỏ màu xám */}
-        <p className="mb-1 text-body-sm text-text-secondary">{label}</p>
+        <p className="whitespace-nowrap text-body-sm text-text-secondary">{label}</p>
         {/* Con số lớn, đậm */}
-        <p className="text-3xl font-bold text-text-main">{value}</p>
+        <p className="text-2xl font-bold leading-tight text-text-main">{value}</p>
       </div>
 
       {/* Vòng tròn icon bên phải */}
       <div
-        className={`flex h-12 w-12 items-center justify-center rounded-full text-xl ${iconWrapperClassName}`}
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg ${iconWrapperClassName}`}
       >
         {icon}
       </div>
