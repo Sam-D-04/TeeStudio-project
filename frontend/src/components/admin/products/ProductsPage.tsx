@@ -9,9 +9,7 @@
  * Cấu trúc layout:
  * - Tiêu đề + nút hành động (đầu trang)
  * - 4 thẻ KPI thống kê
- * - Grid 12 cột:
- *     - Cột trái (9/12): bảng phôi áo
- *     - Cột phải (3/12): panel cảnh báo tồn kho
+ * - Bảng phôi áo
  */
 
 import {
@@ -24,7 +22,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import * as productService from "@/services/admin/productService";
 import type { SanPham } from "@/services/admin/productService";
-import InventoryAlertPanel from "./InventoryAlertPanel";
 import ProductFilterBar from "./ProductFilterBar";
 import ProductPagination from "./ProductPagination";
 import ProductStatCard from "./ProductStatCard";
@@ -86,13 +83,6 @@ export default function ProductsPage() {
       }),
     staleTime: 15_000,
     placeholderData: (previousData) => previousData,
-  });
-
-  /** Cảnh báo tồn kho thấp (panel bên phải) */
-  const { data: danhSachCanhBao } = useQuery({
-    queryKey: ["products", "inventory-alerts"],
-    queryFn: productService.layCanhBaoTonKho,
-    staleTime: 60_000,
   });
 
   // ===== MUTATION XÓA =====
@@ -159,7 +149,6 @@ export default function ProductsPage() {
   const danhSachSanPham = ketQuaDanhSach?.danhSach ?? [];
   const tongSo = ketQuaDanhSach?.tongSo ?? 0;
   const tongSoTrang = ketQuaDanhSach?.tongSoTrang ?? 1;
-  const danhSachCanhBaoHienThi = danhSachCanhBao ?? [];
 
   return (
     <div>
@@ -230,11 +219,11 @@ export default function ProductsPage() {
           />
         </section>
 
-        {/* ===== BẢNG + CẢNH BÁO TỒN KHO ===== */}
+        {/* ===== BẢNG DỮ LIỆU ===== */}
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
 
-          {/* === Cột trái: Bảng phôi áo (9/12 cột) === */}
-          <div className="xl:col-span-9">
+          {/* === Bảng phôi áo === */}
+          <div className="xl:col-span-12">
             <section className="overflow-hidden rounded-[20px] border border-border bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
               {/* Thanh filter: tìm kiếm + dropdown + pill filter */}
               <ProductFilterBar
@@ -295,13 +284,6 @@ export default function ProductsPage() {
             </section>
           </div>
 
-          {/* === Cột phải: Panel cảnh báo tồn kho (3/12 cột) === */}
-          <div className="xl:col-span-3">
-            <InventoryAlertPanel
-              alerts={danhSachCanhBaoHienThi}
-              totalAlertCount={danhSachCanhBaoHienThi.length}
-            />
-          </div>
         </div>
       </div>
 

@@ -298,7 +298,7 @@ export default function ProductTable({
 
                     {/* Số biến thể: "X màu · Y kích thước" */}
                     <td className="px-5 py-3 text-center">
-                      <span className="inline-flex h-6 items-center justify-center rounded-md bg-surface-container px-2 text-[13px] font-medium text-text-secondary">
+                      <span className="inline-flex min-h-7 max-w-[112px] items-center justify-center rounded-[4px] bg-surface-container px-3 py-1 text-center text-[13px] font-medium leading-5 text-text-secondary">
                         {countColors(product.variants)} màu ·{" "}
                         {countSizes(product.variants)} kích thước
                       </span>

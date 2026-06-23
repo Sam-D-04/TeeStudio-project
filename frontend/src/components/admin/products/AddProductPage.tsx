@@ -131,6 +131,22 @@ function validateHangBienThe(hang: HangBienThe): string[] {
   return loi;
 }
 
+function layIdTruongThongTinDauTien(
+  loi: Partial<Record<keyof FormBuoc1, string>>
+): string | null {
+  const thuTuTruong: Array<[keyof FormBuoc1, string]> = [
+    ["tenSanPham", "add-product-ten"],
+    ["danhMucId", "add-product-danh-muc"],
+    ["giaNen", "add-product-gia"],
+    ["chatLieu", "add-product-chat-lieu"],
+    ["formDang", "add-product-form-dang"],
+    ["xuatXu", "add-product-xuat-xu"],
+    ["moTa", "add-product-mo-ta"],
+  ];
+
+  return thuTuTruong.find(([field]) => Boolean(loi[field]))?.[1] ?? null;
+}
+
 // ===== COMPONENT FIELD NHẬP LIỆU =====
 function FormField({
   label,
@@ -216,6 +232,7 @@ export default function AddProductPage() {
     onError: (error: unknown) => {
       const msg = error instanceof Error ? error.message : "Đã xảy ra lỗi khi thêm biến thể";
       setLoiBuoc2Chung(`Lỗi: ${msg}`);
+      cuonDenTruongLoi("add-product-variant-error");
     },
   });
 
@@ -233,6 +250,7 @@ export default function AddProductPage() {
     onError: (error: unknown) => {
       const msg = error instanceof Error ? error.message : "Đã xảy ra lỗi khi tạo phôi áo";
       setLoiBuoc1({ tenSanPham: msg });
+      cuonDenTruongLoi("add-product-ten");
     },
   });
 
@@ -312,6 +330,43 @@ export default function AddProductPage() {
     }));
   }
 
+  function cuonDenTruongLoi(id: string) {
+    window.requestAnimationFrame(() => {
+      const element = document.getElementById(id);
+      if (!element) return;
+
+      element.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+
+      if (
+        element instanceof HTMLInputElement ||
+        element instanceof HTMLSelectElement ||
+        element instanceof HTMLTextAreaElement ||
+        element instanceof HTMLButtonElement
+      ) {
+        element.focus({ preventScroll: true });
+      }
+    });
+  }
+
+  function layIdTruongBienTheLoiDauTien(): string | null {
+    for (const hang of danhSachBienThe) {
+      if (!hang.mauSac.trim()) return `add-product-variant-color-${hang.key}`;
+      if (!hang.kichThuoc.trim()) return `add-product-variant-size-${hang.key}`;
+      if (!hang.maSKU.trim()) return `add-product-variant-sku-${hang.key}`;
+      if (
+        hang.tonKhoBanDau.trim() &&
+        (isNaN(Number(hang.tonKhoBanDau)) || Number(hang.tonKhoBanDau) < 0)
+      ) {
+        return `add-product-variant-stock-${hang.key}`;
+      }
+    }
+
+    return "add-product-variant-error";
+  }
+
   function xuLyLuu() {
     const loiThongTin = validateBuoc1(formBuoc1);
     setLoiBuoc1(loiThongTin);
@@ -343,6 +398,10 @@ export default function AddProductPage() {
     setLoiBuoc2Chung(tatCaLoi[0] ?? "");
 
     if (Object.keys(loiThongTin).length > 0 || tatCaLoi.length > 0) {
+      const idTruongLoi =
+        layIdTruongThongTinDauTien(loiThongTin) ??
+        layIdTruongBienTheLoiDauTien();
+      if (idTruongLoi) cuonDenTruongLoi(idTruongLoi);
       return;
     }
 
@@ -586,7 +645,10 @@ export default function AddProductPage() {
 
                 {/* Thông báo lỗi chung của phần biến thể */}
                 {loiBuoc2Chung && (
-                  <div className="flex items-center gap-2 rounded-[8px] border border-error/30 bg-error/5 px-4 py-2.5 text-[13px] text-error">
+                  <div
+                    id="add-product-variant-error"
+                    className="flex items-center gap-2 rounded-[8px] border border-error/30 bg-error/5 px-4 py-2.5 text-[13px] text-error"
+                  >
                     <span>⚠️</span>
                     {loiBuoc2Chung}
                   </div>
@@ -631,6 +693,7 @@ export default function AddProductPage() {
                                 title="Chọn màu nhanh"
                               />
                               <input
+                                id={`add-product-variant-color-${hang.key}`}
                                 type="text"
                                 value={hang.mauSac}
                                 onChange={(e) =>
@@ -681,6 +744,11 @@ export default function AddProductPage() {
                           <div className="flex flex-wrap gap-1">
                             {DS_SIZE_GOI_Y.map((sz) => (
                               <button
+                                id={
+                                  sz === DS_SIZE_GOI_Y[0]
+                                    ? `add-product-variant-size-${hang.key}`
+                                    : undefined
+                                }
                                 key={sz}
                                 type="button"
                                 onClick={() =>
@@ -701,6 +769,7 @@ export default function AddProductPage() {
                         {/* SKU */}
                         <td className="px-3 py-2">
                           <input
+                            id={`add-product-variant-sku-${hang.key}`}
                             type="text"
                             value={hang.maSKU}
                             onChange={(e) =>
@@ -715,6 +784,7 @@ export default function AddProductPage() {
                         {/* Tồn kho */}
                         <td className="px-3 py-2">
                           <input
+                            id={`add-product-variant-stock-${hang.key}`}
                             type="number"
                             value={hang.tonKhoBanDau}
                             onChange={(e) =>
