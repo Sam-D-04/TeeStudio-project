@@ -35,14 +35,18 @@ export type TongQuanChiSo = {
 
 /** Một điểm dữ liệu trên biểu đồ doanh thu */
 export type DiemBieuDo = {
+  ngay: string;       // Ngày đầy đủ "YYYY-MM-DD"
   nhan: string;       // Nhãn ngày "DD/MM"
   doanhThuVnd: number;
+  soDonHoanTat: number;
 };
 
 /** Dữ liệu biểu đồ doanh thu */
 export type DuLieuBieuDo = {
   danhSach: DiemBieuDo[];
   tongDoanhThuVnd: number;
+  tongDonHoanTat: number;
+  doanhThuLonNhatVnd: number;
   khoangThoiGian: KhoangThoiGian;
 };
 

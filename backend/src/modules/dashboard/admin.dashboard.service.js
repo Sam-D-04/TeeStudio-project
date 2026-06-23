@@ -187,36 +187,74 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
 
 /**
  * Trả về mảng doanh thu theo từng ngày trong khoảng [tuNgay, denNgay].
- * Mỗi phần tử: { ngay: "DD/MM", doanhThuVnd: number }
+ * Luôn trả đủ các ngày trong khoảng, kể cả ngày không có doanh thu, để biểu đồ
+ * phía frontend không bị nhảy cột hoặc thiếu mốc thời gian.
+ * Mỗi phần tử: { ngay: "YYYY-MM-DD", nhan: "DD/MM", doanhThuVnd: number, soDonHoanTat: number }
  */
 async function layDuLieuBieuDo(tuNgay, denNgay) {
   const [batDau, ketThuc] = chuanHoaKhoangNgay(tuNgay, denNgay);
 
   const [rows] = await db.pool.query(
     `SELECT
-       DATE(updatedAt)          AS ngay_raw,
-       COALESCE(SUM(totalAmount), 0) AS doanh_thu
+       DATE_FORMAT(updatedAt, '%Y-%m-%d') AS ngay_raw,
+       COALESCE(SUM(totalAmount), 0)      AS doanh_thu,
+       COUNT(*)                           AS so_don_hoan_tat
      FROM CustomerOrder
      WHERE status = 'COMPLETED'
        AND DATE(updatedAt) >= ? AND DATE(updatedAt) <= ?
-     GROUP BY DATE(updatedAt)
-     ORDER BY DATE(updatedAt) ASC`,
+     GROUP BY DATE_FORMAT(updatedAt, '%Y-%m-%d')
+     ORDER BY DATE_FORMAT(updatedAt, '%Y-%m-%d') ASC`,
     [batDau, ketThuc]
   );
 
-  const danhSachNgay = rows.map((row) => {
-    const d = new Date(row.ngay_raw);
-    const ngay = String(d.getDate()).padStart(2, "0");
-    const thang = String(d.getMonth() + 1).padStart(2, "0");
-    return {
-      nhan: `${ngay}/${thang}`,
-      doanhThuVnd: Number(row.doanh_thu) || 0,
+  const doanhThuTheoNgay = new Map(
+    rows.map((row) => [
+      row.ngay_raw,
+      {
+        doanhThuVnd: Number(row.doanh_thu) || 0,
+        soDonHoanTat: Number(row.so_don_hoan_tat) || 0,
+      },
+    ])
+  );
+
+  const danhSachNgay = [];
+  const [namBatDau, thangBatDau, ngayBatDau] = batDau.split("-").map(Number);
+  const [namKetThuc, thangKetThuc, ngayKetThuc] = ketThuc.split("-").map(Number);
+  const cursor = new Date(Date.UTC(namBatDau, thangBatDau - 1, ngayBatDau));
+  const endDate = new Date(Date.UTC(namKetThuc, thangKetThuc - 1, ngayKetThuc));
+
+  while (cursor <= endDate) {
+    const nam = cursor.getUTCFullYear();
+    const thang = String(cursor.getUTCMonth() + 1).padStart(2, "0");
+    const ngay = String(cursor.getUTCDate()).padStart(2, "0");
+    const ngayRaw = `${nam}-${thang}-${ngay}`;
+    const thongKe = doanhThuTheoNgay.get(ngayRaw) || {
+      doanhThuVnd: 0,
+      soDonHoanTat: 0,
     };
-  });
+
+    danhSachNgay.push({
+      ngay: ngayRaw,
+      nhan: `${ngay}/${thang}`,
+      doanhThuVnd: thongKe.doanhThuVnd,
+      soDonHoanTat: thongKe.soDonHoanTat,
+    });
+
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  const tongDoanhThuVnd = danhSachNgay.reduce((sum, r) => sum + r.doanhThuVnd, 0);
+  const tongDonHoanTat = danhSachNgay.reduce((sum, r) => sum + r.soDonHoanTat, 0);
+  const doanhThuLonNhatVnd = danhSachNgay.reduce(
+    (max, r) => Math.max(max, r.doanhThuVnd),
+    0
+  );
 
   return {
     danhSach: danhSachNgay,
-    tongDoanhThuVnd: danhSachNgay.reduce((sum, r) => sum + r.doanhThuVnd, 0),
+    tongDoanhThuVnd,
+    tongDonHoanTat,
+    doanhThuLonNhatVnd,
     khoangThoiGian: { tuNgay: batDau, denNgay: ketThuc },
   };
 }
