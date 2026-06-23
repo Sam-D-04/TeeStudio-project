@@ -9,6 +9,7 @@ import useAuthStore from "@/store/useAuthStore";
 import { userDesignService, SavedDesign } from "@/services/userDesignService";
 import { calcDesignFee } from "@/utils/designFeeCalculator";
 import { Modal } from "antd";
+import html2canvas from "html2canvas";
 
 import Toolbar from "./Toolbar";
 import Sidebar from "./Sidebar";
@@ -158,7 +159,7 @@ export default function DesignStudioApp() {
 
   const handleSaveClick = useCallback(() => {
     if (!isAuthenticated || !accessToken) {
-      alert("Vui lòng đăng nhập tài khoản để lưu thiết kế của bạn!");
+      alert("Vui lòng đăng nhập tài khoản để lưu thiết kế của bạn");
       return;
     }
     setIsSaveModalOpen(true);
@@ -193,11 +194,11 @@ export default function DesignStudioApp() {
 
       if (currentDesignId) {
         await userDesignService.updateDesign(accessToken, currentDesignId, payload);
-        showToast("Đã cập nhật thiết kế thành công!");
+        showToast("Đã cập nhật thiết kế thành công");
       } else {
         const res = await userDesignService.createDesign(accessToken, payload);
         setCurrentDesignId(res.id);
-        showToast("Đã lưu thiết kế mới thành công!");
+        showToast("Đã lưu thiết kế mới thành công");
       }
       setIsSaveModalOpen(false);
     } catch (err: any) {
@@ -243,7 +244,46 @@ export default function DesignStudioApp() {
     }
   }, [showToast]);
 
-  const handleDownloadImage = useCallback(() => { showToast("Tính năng xuất file đang được phát triển"); }, [showToast]);
+  const handleDownloadImage = useCallback(async () => {
+    if (!shirtContainerRef.current) return;
+
+    // Bỏ chọn element để ẩn khung transform
+    setSelectedId(null);
+    showToast("Đang chuẩn bị ảnh tải xuống...");
+
+    try {
+      // Ẩn khung đứt nét của vùng in
+      const boundaries = shirtContainerRef.current.querySelectorAll('.ds-print-boundary');
+      boundaries.forEach((el: any) => el.style.display = 'none');
+
+      // Đợi 1 chút để React render lại DOM
+      await new Promise(r => setTimeout(r, 100));
+
+      const canvas = await html2canvas(shirtContainerRef.current, {
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+      });
+
+      // Hiển thị lại khung đứt nét
+      boundaries.forEach((el: any) => el.style.display = '');
+
+      // Tải về máy
+      const link = document.createElement("a");
+      const name = useDesignStore.getState().designName || "thiet-ke";
+      const safeName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      link.download = `teestudio-${safeName}.png`;
+      link.href = canvas.toDataURL("image/png");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast("Đã tải ảnh xuống máy!");
+    } catch (err) {
+      console.error(err);
+      showToast("Lỗi khi tải ảnh. Vui lòng thử lại.");
+    }
+  }, [showToast, setSelectedId]);
 
   /* ── Print area (logical coordinates) ── */
   const pa = getPrintAreaBoundary(shirtType, shirtView, CONTAINER_W, CONTAINER_H);
@@ -341,6 +381,7 @@ export default function DesignStudioApp() {
             {usePolygon && polygonPoints ? (
               /* SVG polygon — vẽ chính xác hình khoét cổ cho polo */
               <svg
+                className="ds-print-boundary"
                 style={{
                   position: "absolute",
                   top: 0,
@@ -378,18 +419,21 @@ export default function DesignStudioApp() {
               </svg>
             ) : (
               /* Rectangle — tất cả loại áo khác */
-              <div style={{
-                position:  "absolute",
-                top:       pa.top   * zoom,
-                left:      pa.left  * zoom,
-                width:     pa.width * zoom,
-                height:    pa.height * zoom,
-                border:    `1.5px dashed ${borderColor}`,
-                borderRadius: 4,
-                pointerEvents: "none",
-                zIndex:    3,
-                boxSizing: "border-box",
-              }}>
+              <div 
+                className="ds-print-boundary"
+                style={{
+                  position:  "absolute",
+                  top:       pa.top   * zoom,
+                  left:      pa.left  * zoom,
+                  width:     pa.width * zoom,
+                  height:    pa.height * zoom,
+                  border:    `1.5px dashed ${borderColor}`,
+                  borderRadius: 4,
+                  pointerEvents: "none",
+                  zIndex:    3,
+                  boxSizing: "border-box",
+                }}
+              >
                 <span style={{
                   position: "absolute",
                   top: -18,
