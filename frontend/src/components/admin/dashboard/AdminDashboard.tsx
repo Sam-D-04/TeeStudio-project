@@ -28,12 +28,6 @@ const primaryMetrics = [
     iconClassName: "text-success",
   },
   {
-    label: "Giá trị trung bình đơn",
-    value: "439.286đ",
-    icon: <PercentageOutlined />,
-    iconClassName: "text-primary-container",
-  },
-  {
     label: "Doanh thu từ thiết kế",
     value: "6.820.000đ",
     icon: <ScissorOutlined />,
@@ -55,9 +49,15 @@ const primaryMetrics = [
 ];
 
 // ---------------------------------------------------------------------------
-// Thẻ thống kê — hàng 2: chỉ số sức khỏe vận hành (nhỏ hơn, vai phụ)
+// Thẻ thống kê — cột trái hàng 2: 3 chỉ số vận hành
 // ---------------------------------------------------------------------------
 const operationMetrics = [
+  {
+    label: "Giá trị trung bình đơn",
+    value: "439.286đ",
+    icon: <PercentageOutlined />,
+    iconClassName: "text-primary-container",
+  },
   {
     label: "Tỷ lệ đơn hàng thành công",
     value: "94,3%",
@@ -149,18 +149,6 @@ const bestSellingProducts: BestSellingProduct[] = [
     revenue: "5.980.000đ",
     thumbnailClassName: "bg-indigo-100 text-indigo-700",
   },
-  {
-    name: "Áo nỉ cơ bản",
-    variant: "Xám / Cỡ L",
-    revenue: "4.760.000đ",
-    thumbnailClassName: "bg-slate-100 text-slate-700",
-  },
-  {
-    name: "Áo sự kiện cao cấp",
-    variant: "Đỏ đô / Cỡ M",
-    revenue: "3.940.000đ",
-    thumbnailClassName: "bg-rose-100 text-rose-700",
-  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -171,21 +159,21 @@ export default function AdminDashboard() {
     <>
       {/* Tiêu đề trang */}
       <section className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
+        <div className="flex items-baseline gap-3">
           <h2 className="text-headline-lg-mobile font-extrabold leading-8 text-text-main md:text-headline-lg">
             Tổng quan vận hành
           </h2>
-          <p className="mt-0.5 max-w-2xl text-sm text-text-secondary">
-            Theo dõi doanh thu, đơn hàng, thiết kế và tồn kho theo thời gian thực.
-          </p>
+          <span className="text-sm text-text-secondary">
+            (Theo dõi doanh thu, đơn hàng, thiết kế và tồn kho theo thời gian thực.)
+          </span>
         </div>
       </section>
 
       {/* Bộ lọc thời gian */}
       <DashboardFilterToolbar />
 
-      {/* ── Hàng 1: Thẻ chỉ số tài chính & đơn hàng (5 thẻ chính) ── */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {/* ── Hàng 1: Thẻ chỉ số tài chính & đơn hàng (4 thẻ chính) ── */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {primaryMetrics.map((metric) => (
           <MetricCard
             key={metric.label}
@@ -198,22 +186,25 @@ export default function AdminDashboard() {
         ))}
       </section>
 
-      {/* ── Hàng 2: Thẻ chỉ số sức khỏe vận hành (2 thẻ nhỏ + biểu đồ) ── */}
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_2fr]">
-        {operationMetrics.map((metric) => (
-          <MetricCard
-            key={metric.label}
-            label={metric.label}
-            value={metric.value}
-            icon={metric.icon}
-            iconClassName={metric.iconClassName}
-            valueClassName={metric.valueClassName}
-            subLabel={metric.subLabel}
-            subValue={metric.subValue}
-            subValueClassName={metric.subValueClassName}
-          />
-        ))}
-        {/* Biểu đồ doanh thu tổng quan — chiều cao ngắn gọn */}
+      {/* ── Hàng 2: 3 thẻ chỉ số (1/4 bên trái, xếp dọc) + Biểu đồ (3/4 bên phải) ── */}
+      <section className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-[1fr_3fr]">
+        {/* Cột trái: 3 thẻ xếp dọc */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-1">
+          {operationMetrics.map((metric) => (
+            <MetricCard
+              key={metric.label}
+              label={metric.label}
+              value={metric.value}
+              icon={metric.icon}
+              iconClassName={metric.iconClassName}
+              valueClassName={metric.valueClassName}
+              subLabel={metric.subLabel}
+              subValue={metric.subValue}
+              subValueClassName={metric.subValueClassName}
+            />
+          ))}
+        </div>
+        {/* Cột phải: Biểu đồ doanh thu tổng quan — khớp chiều cao 3 thẻ */}
         <RevenueOverviewChart />
       </section>
 
@@ -238,8 +229,8 @@ export default function AdminDashboard() {
         <DesignReviewTable orders={designOrders} />
       </section>
 
-      {/* ── Tồn kho & Sản phẩm bán chạy ── */}
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {/* ── Tồn kho & 3 Sản phẩm bán chạy nhất ── */}
+      <section className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
         <InventoryWarningCard items={inventoryItems} />
         <BestSellingProductsCard products={bestSellingProducts} />
       </section>

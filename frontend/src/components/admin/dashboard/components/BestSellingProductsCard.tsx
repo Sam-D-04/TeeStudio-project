@@ -18,7 +18,7 @@ export default function BestSellingProductsCard({
     <section className="admin-card p-6">
       <div className="mb-4 flex items-center justify-between gap-4">
         <h3 className="text-card-title font-bold text-text-main">
-          5 sản phẩm bán chạy nhất
+          3 sản phẩm bán chạy nhất
         </h3>
         <a href="#" className="text-sm font-medium text-primary-container hover:underline">
           Xem tất cả

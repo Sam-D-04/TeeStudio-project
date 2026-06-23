@@ -1,4 +1,4 @@
-import { EditOutlined, SkinOutlined, ThunderboltFilled } from "@ant-design/icons";
+import { EditOutlined, ThunderboltFilled } from "@ant-design/icons";
 import StatusBadge, { type DesignStatus } from "../../common/StatusBadge";
 
 export type DesignOrder = {
@@ -28,13 +28,11 @@ export default function DesignReviewTable({ orders }: DesignReviewTableProps) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[680px] border-collapse text-left leading-5">
+      <table className="w-full min-w-[460px] border-collapse text-left leading-5">
         <thead>
           <tr className="border-b border-border bg-surface-alt text-label-bold uppercase text-text-secondary">
             <th className="p-3 pl-5 font-bold">Mã đơn</th>
             <th className="p-3 font-bold">Khách hàng</th>
-            <th className="p-3 font-bold">Bản xem trước</th>
-            <th className="p-3 font-bold">Gia công</th>
             <th className="p-3 font-bold">Trạng thái</th>
             <th className="p-3 pr-5 text-right font-bold">Thao tác</th>
           </tr>
@@ -43,7 +41,7 @@ export default function DesignReviewTable({ orders }: DesignReviewTableProps) {
           {filtered.length === 0 ? (
             <tr>
               <td
-                colSpan={6}
+                colSpan={4}
                 className="p-6 text-center text-sm text-text-secondary"
               >
                 Không có thiết kế nào cần xử lý.
@@ -68,14 +66,6 @@ export default function DesignReviewTable({ orders }: DesignReviewTableProps) {
                 </td>
                 <td className="p-3 align-middle text-text-secondary">
                   {order.customerName}
-                </td>
-                <td className="p-3 align-middle">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-[8px] border border-border bg-surface-variant text-text-muted">
-                    <SkinOutlined className="text-[18px]" />
-                  </div>
-                </td>
-                <td className="p-3 align-middle text-text-secondary">
-                  {order.technique}
                 </td>
                 <td className="p-3 align-middle">
                   <StatusBadge status={order.status} />
