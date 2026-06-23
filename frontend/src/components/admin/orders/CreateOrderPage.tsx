@@ -25,6 +25,7 @@ import {
   Input,
 } from "antd";
 import { isAxiosError } from "axios";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
@@ -369,7 +370,7 @@ function SectionPanel({
   children,
 }: {
   title: string;
-  description?: string;
+  description?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -399,7 +400,18 @@ function CustomerSection({
   return (
     <SectionPanel
       title="1. Khách hàng & Địa chỉ giao hàng"
-      description="Tìm khách hàng — form tự điền địa chỉ mặc định. Admin có thể chỉnh sửa trực tiếp."
+      description={
+        <>
+          Khách chưa có tài khoản?{" "}
+          <Link
+            href="/admin/tai-khoan"
+            className="font-semibold text-primary-container hover:underline"
+          >
+            Tạo tài khoản khách hàng
+          </Link>{" "}
+          trước khi tạo đơn.
+        </>
+      }
     >
       <div className="grid grid-cols-1 gap-x-3 gap-y-2 md:grid-cols-3">
         <Form.Item
