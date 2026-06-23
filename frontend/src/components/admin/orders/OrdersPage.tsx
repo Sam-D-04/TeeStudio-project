@@ -16,6 +16,7 @@ import OrderFilterBar, { type DateRange } from "./OrderFilterBar";
 import OrderPagination from "./OrderPagination";
 import OrderStatCard from "./OrderStatCard";
 import OrderTable, { type Order } from "./OrderTable";
+import UpdateOrderStatusModal from "./UpdateOrderStatusModal";
 
 /**
  * OrdersPage – Trang quản lý đơn hàng (đã kết nối API thực tế).
@@ -95,6 +96,10 @@ export default function OrdersPage() {
   // ---- State phân trang ----
   const [currentPage, setCurrentPage] = useState(1);
 
+  // ---- State modal cập nhật trạng thái ----
+  const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+
   const tuNgay = dateRange?.[0].format("YYYY-MM-DD") ?? "";
   const denNgay = dateRange?.[1].format("YYYY-MM-DD") ?? "";
 
@@ -147,6 +152,14 @@ export default function OrdersPage() {
   // Mỗi đơn chỉ có một trang chi tiết chính thức theo ID.
   function handleRowClick(order: Order) {
     router.push(`/admin/don-hang/${order.id}`);
+  }
+
+  function handleEditStatus(order: Order) {
+    if (order.status === "hoan_tat" || order.status === "da_huy") {
+      return; // Không cho phép chỉnh sửa trạng thái
+    }
+    setEditingOrderId(order.id);
+    setIsUpdateModalOpen(true);
   }
 
   // Hàm xử lý khi filter thay đổi → reset về trang 1
@@ -256,7 +269,11 @@ export default function OrdersPage() {
                 <span className="text-sm text-text-secondary">Đang tải...</span>
               </div>
             )}
-            <OrderTable orders={danhSachOrder} onRowClick={handleRowClick} />
+            <OrderTable
+              orders={danhSachOrder}
+              onRowClick={handleRowClick}
+              onEditStatus={handleEditStatus}
+            />
           </div>
         )}
 
@@ -272,6 +289,11 @@ export default function OrdersPage() {
         )}
       </section>
 
+      <UpdateOrderStatusModal
+        orderId={editingOrderId}
+        open={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+      />
     </div>
   );
 }

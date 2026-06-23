@@ -1,16 +1,18 @@
 const router = require("express").Router();
 
 const authRoutes = require("../modules/auth/auth.api.routes");
-const userRoutes = require("../modules/users/user.api.routes");
-const pricingRoutes = require("../modules/pricing/pricing.routes");
-const adminOrderRoutes = require("../modules/orders/order.routes");
-const adminDesignRoutes = require("../modules/designs/design.routes");
-const paymentRoutes = require("../modules/payments/payment.routes");
-const adminProductRoutes = require("../modules/products/product.routes");
-const adminInventoryRoutes = require("../modules/inventory/inventory.routes");
+const userRoutes = require("../modules/users/admin.user.api.routes");
+const pricingRoutes = require("../modules/pricing/admin.pricing.routes");
+const adminOrderRoutes = require("../modules/orders/admin.order.routes");
+const adminDesignRoutes = require("../modules/designs/admin.design.routes");
+const paymentRoutes = require("../modules/payments/admin.payment.routes");
+const adminPaymentRoutes = require("../modules/payments/admin.payment.routes").adminRouter;
+const adminProductRoutes = require("../modules/products/admin.product.routes");
+const adminInventoryRoutes = require("../modules/inventory/admin.inventory.routes");
+const adminPromotionRoutes = require("../modules/promotions/admin.promotion.routes");
 
 // Import controller cho 2 public endpoints (vi-tri-in, stickers dành cho Design Studio)
-const designController = require("../modules/designs/design.controller");
+const designController = require("../modules/designs/admin.design.controller");
 
 // Import controller cho public endpoints trang chủ
 const publicController = require("../modules/public/public.controller");
@@ -66,5 +68,11 @@ router.use("/admin/products", adminProductRoutes);
 
 // Quản lý kho hàng – /api/admin/inventory/...
 router.use("/admin/inventory", adminInventoryRoutes);
+
+// Quản lý khuyến mãi và cấu hình báo giá – /api/admin/promotions/...
+router.use("/admin/promotions", adminPromotionRoutes);
+
+// Quản lý thanh toán – /api/admin/payments/...
+router.use("/admin/payments", adminPaymentRoutes);
 
 module.exports = router;

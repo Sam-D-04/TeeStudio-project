@@ -130,9 +130,98 @@ const updateStaffSchema = {
   },
 };
 
+const createCustomerSchema = {
+  body: {
+    email: {
+      label: "Email",
+      required: true,
+      type: "string",
+      email: true,
+      maxLength: 255,
+    },
+    password: {
+      label: "Mật khẩu",
+      required: true,
+      type: "string",
+      minLength: 8,
+      maxLength: 100,
+      pattern: /^(?=.*[A-Za-z])(?=.*\d).+$/,
+    },
+    fullName: {
+      label: "Họ và tên",
+      required: true,
+      type: "string",
+      minLength: 2,
+      maxLength: 255,
+      custom: (value) => value.trim().length >= 2 || "Họ và tên không hợp lệ",
+    },
+    phone: {
+      label: "Số điện thoại",
+      required: true,
+      type: "string",
+      minLength: 9,
+      maxLength: 20,
+      pattern: /^(?=.*\d)[0-9+\s().-]+$/,
+    },
+  },
+};
+
+const updateCustomerSchema = {
+  params: {
+    id: {
+      label: "ID khách hàng",
+      required: true,
+      type: "integer",
+      min: 1,
+    },
+  },
+  body: {
+    fullName: {
+      label: "Họ và tên",
+      type: "string",
+      minLength: 2,
+      maxLength: 255,
+      custom: (value) => value.trim().length >= 2 || "Họ và tên không hợp lệ",
+    },
+    phone: {
+      label: "Số điện thoại",
+      type: "string",
+      minLength: 9,
+      maxLength: 20,
+      pattern: /^(?=.*\d)[0-9+\s().-]+$/,
+    },
+    status: {
+      label: "Trạng thái",
+      type: "string",
+      enum: ["ACTIVE", "INACTIVE", "SUSPENDED"],
+    },
+  },
+};
+
+const softDeleteCustomerSchema = {
+  params: {
+    id: {
+      label: "ID khách hàng",
+      required: true,
+      type: "integer",
+      min: 1,
+    },
+  },
+  body: {
+    targetStatus: {
+      label: "Trạng thái mới",
+      type: "string",
+      enum: ["INACTIVE", "SUSPENDED"],
+    },
+  },
+};
+
 module.exports = {
   updateProfileSchema,
   createAddressSchema,
   createStaffSchema,
   updateStaffSchema,
+  createCustomerSchema,
+  updateCustomerSchema,
+  softDeleteCustomerSchema,
 };

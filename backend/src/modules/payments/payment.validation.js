@@ -1,3 +1,7 @@
+/**
+ * payment.validation.js – Schema validate cho module Thanh toán Admin.
+ */
+
 const createPaymentSchema = {
   body: {
     orderId: {
@@ -18,7 +22,7 @@ const createPaymentSchema = {
     paymentType: {
       required: true,
       type: "string",
-      enum: ["FULL", "DEPOSIT"],
+      enum: ["FULL_PAYMENT", "DEPOSIT", "COD_FINAL"],
     },
   },
 };
@@ -40,7 +44,59 @@ const updatePaymentStatusSchema = {
   },
 };
 
+// Schema cho GET /admin/payments (danh sách)
+const getDanhSachThanhToanSchema = {
+  query: {
+    trang: {
+      required: false,
+      type: "integer",
+      min: 1,
+    },
+    soMoiTrang: {
+      required: false,
+      type: "integer",
+      min: 1,
+      max: 100,
+    },
+    trangThai: {
+      required: false,
+      type: "string",
+      enum: [
+        "tat_ca",
+        "cho_thanh_toan",
+        "da_thanh_toan",
+        "that_bai",
+        "hoan_tien",
+        "can_doi_soat",
+      ],
+    },
+    phuongThuc: {
+      required: false,
+      type: "string",
+      enum: ["tat_ca", "vnpay", "cod"],
+    },
+    tuKhoa: {
+      required: false,
+      type: "string",
+      maxLength: 200,
+    },
+  },
+};
+
+// Schema cho params có :id
+const paymentIdParamSchema = {
+  params: {
+    id: {
+      required: true,
+      type: "integer",
+      min: 1,
+    },
+  },
+};
+
 module.exports = {
   createPaymentSchema,
   updatePaymentStatusSchema,
+  getDanhSachThanhToanSchema,
+  paymentIdParamSchema,
 };

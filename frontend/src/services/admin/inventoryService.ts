@@ -114,6 +114,77 @@ export type KetQuaGhiGiaoDich = {
   transactionType: LoaiGiaoDich;
 };
 
+/** Một biến thể trong danh sách biến thể của sản phẩm (dùng trang nhập kho) */
+export type BienTheNhapKho = {
+  id: number;
+  mau: string;
+  size: string;
+  sku: string;
+  tonHienTai: number;
+};
+
+/** Một sản phẩm kèm danh sách biến thể (dùng trang nhập kho) */
+export type SanPhamVaBienThe = {
+  id: number;
+  ten: string;
+  danhSachBienThe: BienTheNhapKho[];
+};
+
+/** Một nhà cung cấp (dùng trang nhập kho) */
+export type NhaCungCap = {
+  id: number;
+  ten: string;
+  soDienThoai: string;
+};
+
+/** Một giao dịch kho trong lịch sử toàn kho */
+export type GiaoDichKho = {
+  id: number;
+  /** Loại giao dịch gốc (IMPORT, EXPORT, ...) */
+  loaiGiaoDich: "IMPORT" | "EXPORT" | "ADJUSTMENT" | "ORDER_EXPORT" | "RETURN";
+  /** Nhãn tiếng Việt, ví dụ: "Nhập kho" */
+  nhanLoai: string;
+  /** Số lượng thay đổi (dương = nhập, âm = xuất) */
+  soLuong: number;
+  /** Mã SKU biến thể */
+  sku: string;
+  /** Tên sản phẩm */
+  tenSanPham: string;
+  /** Màu sắc */
+  mau: string;
+  /** Kích cỡ */
+  size: string;
+  /** Mô tả chi tiết tiếng Việt */
+  moTa: string;
+  /** Tên nhà cung cấp (nếu có) */
+  tenNhaCungCap: string | null;
+  /** Mã đơn hàng (nếu là ORDER_EXPORT) */
+  maDonHang: string | null;
+  /** Ngày dạng dd/MM/yyyy */
+  ngay: string;
+  /** Giờ dạng HH:mm */
+  gio: string;
+  /** ISO timestamp gốc */
+  thoiGianISO: string;
+};
+
+/** Kết quả trả về khi lấy lịch sử toàn kho (phân trang) */
+export type KetQuaLichSuKho = {
+  danhSach: GiaoDichKho[];
+  tongSo: number;
+  trang: number;
+  soMoiTrang: number;
+  tongSoTrang: number;
+};
+
+/** Tham số lọc khi lấy lịch sử kho */
+export type ThamSoLichSuKho = {
+  trang?: number;
+  soMoiTrang?: number;
+  loaiGiaoDich?: string;
+  tuKhoa?: string;
+};
+
 // =====================================================================
 // CÁC HÀM GỌI API
 // =====================================================================
@@ -197,5 +268,53 @@ export async function ghiGiaoDichKho(
     message: string;
     data: KetQuaGhiGiaoDich;
   }>("/admin/inventory/transactions", payload);
+  return res.data.data;
+}
+
+/**
+ * Lấy danh sách sản phẩm đang ACTIVE kèm toàn bộ biến thể.
+ * Dùng trên trang Nhập kho để chọn sản phẩm → màu/size.
+ * GET /api/admin/inventory/products-with-variants
+ */
+export async function layDanhSachSanPhamVaBienThe(): Promise<SanPhamVaBienThe[]> {
+  const res = await apiClient.get<{
+    success: boolean;
+    data: SanPhamVaBienThe[];
+  }>("/admin/inventory/products-with-variants");
+  return res.data.data;
+}
+
+/**
+ * Lấy danh sách tất cả nhà cung cấp.
+ * Dùng trên trang Nhập kho để chọn nhà cung cấp.
+ * GET /api/admin/inventory/suppliers
+ */
+export async function layDanhSachNhaCungCap(): Promise<NhaCungCap[]> {
+  const res = await apiClient.get<{ success: boolean; data: NhaCungCap[] }>(
+    "/admin/inventory/suppliers"
+  );
+  return res.data.data;
+}
+
+/**
+ * Lấy lịch sử giao dịch kho toàn bộ (có phân trang + lọc loại + tìm kiếm).
+ * Dùng trên trang Lịch sử kho.
+ * GET /api/admin/inventory/history
+ */
+export async function layLichSuKho(
+  thamSo: ThamSoLichSuKho = {}
+): Promise<KetQuaLichSuKho> {
+  const params: Record<string, string | number> = {};
+  if (thamSo.trang) params.trang = thamSo.trang;
+  if (thamSo.soMoiTrang) params.soMoiTrang = thamSo.soMoiTrang;
+  if (thamSo.loaiGiaoDich && thamSo.loaiGiaoDich !== "tat_ca")
+    params.loaiGiaoDich = thamSo.loaiGiaoDich;
+  if (thamSo.tuKhoa && thamSo.tuKhoa.trim())
+    params.tuKhoa = thamSo.tuKhoa.trim();
+
+  const res = await apiClient.get<{
+    success: boolean;
+    data: KetQuaLichSuKho;
+  }>("/admin/inventory/history", { params });
   return res.data.data;
 }

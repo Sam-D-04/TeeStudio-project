@@ -1,12 +1,12 @@
 "use client";
 
 import {
-  BgColorsOutlined,
-  CreditCardOutlined,
+  AlertOutlined,
   InboxOutlined,
+  PercentageOutlined,
   RiseOutlined,
+  ScissorOutlined,
   ShoppingOutlined,
-  ToolOutlined,
 } from "@ant-design/icons";
 import BestSellingProductsCard, {
   type BestSellingProduct,
@@ -16,56 +16,69 @@ import DesignReviewTable, { type DesignOrder } from "./components/DesignReviewTa
 import InventoryWarningCard from "./components/InventoryWarningCard";
 import MetricCard from "./components/MetricCard";
 import RevenueOverviewChart from "./components/RevenueOverviewChart";
-import SegmentedTabs from "../common/SegmentedTabs";
 
-const metrics = [
+// ---------------------------------------------------------------------------
+// Dữ liệu mẫu — Thẻ thống kê (hàng 1: chỉ số tài chính & đơn hàng)
+// ---------------------------------------------------------------------------
+const primaryMetrics = [
   {
-    label: "Doanh thu",
+    label: "Doanh thu tháng này",
     value: "18.450.000đ",
     icon: <RiseOutlined />,
     iconClassName: "text-success",
   },
   {
-    label: "Đơn mới",
+    label: "Giá trị trung bình đơn",
+    value: "439.286đ",
+    icon: <PercentageOutlined />,
+    iconClassName: "text-primary-container",
+  },
+  {
+    label: "Doanh thu từ thiết kế",
+    value: "6.820.000đ",
+    icon: <ScissorOutlined />,
+    iconClassName: "text-accent",
+  },
+  {
+    label: "Đơn hàng mới",
     value: "42",
     icon: <ShoppingOutlined />,
     iconClassName: "text-primary-container",
   },
   {
-    label: "Thiết kế chờ duyệt",
-    value: "9",
-    icon: <BgColorsOutlined />,
-    iconClassName: "text-warning",
-  },
-  {
-    label: "Đang xử lý in",
-    value: "17",
-    icon: <ToolOutlined />,
-    iconClassName: "text-accent",
-  },
-  {
-    label: "Cảnh báo tồn kho",
+    label: "Tồn kho mức thấp",
     value: "23",
     icon: <InboxOutlined />,
     iconClassName: "text-error",
     valueClassName: "text-error",
   },
+];
+
+// ---------------------------------------------------------------------------
+// Thẻ thống kê — hàng 2: chỉ số sức khỏe vận hành (nhỏ hơn, vai phụ)
+// ---------------------------------------------------------------------------
+const operationMetrics = [
   {
-    label: "Thanh toán cần đối soát",
-    value: "6",
-    icon: <CreditCardOutlined />,
-    iconClassName: "text-tertiary",
+    label: "Tỷ lệ đơn hàng thành công",
+    value: "94,3%",
+    icon: <RiseOutlined />,
+    iconClassName: "text-success",
+    valueClassName: "text-success",
+  },
+  {
+    label: "Doanh thu khác / Đền bù",
+    value: "1.200.000đ",
+    icon: <AlertOutlined />,
+    iconClassName: "text-warning",
+    subLabel: "Tỷ lệ hủy",
+    subValue: "5,7%",
+    subValueClassName: "text-error",
   },
 ];
 
-const reviewTabs = [
-  { key: "all", label: "Tất cả" },
-  { key: "pending", label: "Chờ duyệt" },
-  { key: "revision", label: "Cần sửa" },
-  { key: "ready", label: "Sẵn sàng in" },
-  { key: "urgent", label: "Gấp", danger: true },
-];
-
+// ---------------------------------------------------------------------------
+// Dữ liệu mẫu — Bảng thiết kế cần xử lý
+// ---------------------------------------------------------------------------
 const designOrders: DesignOrder[] = [
   {
     code: "DH-20260522-001",
@@ -79,8 +92,31 @@ const designOrders: DesignOrder[] = [
     technique: "In lụa",
     status: "revision",
   },
+  {
+    code: "DH-20260523-007",
+    customerName: "Lê Minh C",
+    technique: "In DTG",
+    status: "pending",
+    isUrgent: true,
+  },
+  {
+    code: "DH-20260523-010",
+    customerName: "Phạm Thu D",
+    technique: "In PET",
+    status: "revision",
+  },
+  {
+    code: "DH-20260523-015",
+    customerName: "Hoàng Văn E",
+    technique: "In lụa",
+    status: "pending",
+    isUrgent: true,
+  },
 ];
 
+// ---------------------------------------------------------------------------
+// Dữ liệu mẫu — Tồn kho & sản phẩm bán chạy
+// ---------------------------------------------------------------------------
 const inventoryItems = [
   {
     name: "Áo thun cotton 100%",
@@ -127,24 +163,30 @@ const bestSellingProducts: BestSellingProduct[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Component chính
+// ---------------------------------------------------------------------------
 export default function AdminDashboard() {
   return (
     <>
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      {/* Tiêu đề trang */}
+      <section className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h2 className="text-headline-lg-mobile font-extrabold leading-8 text-text-main md:text-headline-lg">
             Tổng quan vận hành
           </h2>
-          <p className="mt-1 max-w-2xl text-text-secondary">
-            Theo dõi số liệu doanh thu, đơn hàng, thiết kế, sản xuất và tồn kho theo thời gian.
+          <p className="mt-0.5 max-w-2xl text-sm text-text-secondary">
+            Theo dõi doanh thu, đơn hàng, thiết kế và tồn kho theo thời gian thực.
           </p>
         </div>
       </section>
 
+      {/* Bộ lọc thời gian */}
       <DashboardFilterToolbar />
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {metrics.map((metric) => (
+      {/* ── Hàng 1: Thẻ chỉ số tài chính & đơn hàng (5 thẻ chính) ── */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {primaryMetrics.map((metric) => (
           <MetricCard
             key={metric.label}
             label={metric.label}
@@ -156,19 +198,48 @@ export default function AdminDashboard() {
         ))}
       </section>
 
-      <RevenueOverviewChart />
+      {/* ── Hàng 2: Thẻ chỉ số sức khỏe vận hành (2 thẻ nhỏ + biểu đồ) ── */}
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_2fr]">
+        {operationMetrics.map((metric) => (
+          <MetricCard
+            key={metric.label}
+            label={metric.label}
+            value={metric.value}
+            icon={metric.icon}
+            iconClassName={metric.iconClassName}
+            valueClassName={metric.valueClassName}
+            subLabel={metric.subLabel}
+            subValue={metric.subValue}
+            subValueClassName={metric.subValueClassName}
+          />
+        ))}
+        {/* Biểu đồ doanh thu tổng quan — chiều cao ngắn gọn */}
+        <RevenueOverviewChart />
+      </section>
 
+      {/* ── Bảng thiết kế cần xử lý (To-do list) ── */}
       <section className="admin-card overflow-hidden">
-        <div className="flex flex-col gap-4 border-b border-border p-6 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-card-title font-bold text-text-main">
-            Thiết kế cần xử lý
-          </h3>
-          <SegmentedTabs tabs={reviewTabs} activeKey="all" />
+        <div className="flex flex-col gap-3 border-b border-border px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-card-title font-bold text-text-main">
+              Thiết kế cần xử lý
+            </h3>
+            <p className="mt-0.5 text-xs text-text-secondary">
+              Hiển thị tối đa 5 thiết kế &nbsp;·&nbsp; Lọc: Chờ duyệt, Cần sửa, Gấp
+            </p>
+          </div>
+          <a
+            href="#"
+            className="shrink-0 text-sm font-medium text-primary-container hover:underline"
+          >
+            Xem tất cả thiết kế →
+          </a>
         </div>
         <DesignReviewTable orders={designOrders} />
       </section>
 
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
+      {/* ── Tồn kho & Sản phẩm bán chạy ── */}
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <InventoryWarningCard items={inventoryItems} />
         <BestSellingProductsCard products={bestSellingProducts} />
       </section>

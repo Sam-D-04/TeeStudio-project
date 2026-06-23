@@ -28,6 +28,8 @@ export default function HeaderAuthActions({
   const logout = async () => {
     try {
       await authService.logout();
+    } catch {
+      // Server-side token revocation is best-effort; always clear the local session.
     } finally {
       clearSession();
       onNavigate?.();

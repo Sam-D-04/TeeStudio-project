@@ -1,3 +1,4 @@
+import type { MouseEvent } from "react";
 import type { PaymentStatus } from "./PaymentStatusBadge";
 import PaymentStatusBadge from "./PaymentStatusBadge";
 
@@ -9,28 +10,53 @@ import PaymentStatusBadge from "./PaymentStatusBadge";
  * - Mã Đơn (mã đơn hàng liên kết, ví dụ ORD-20260602-001)
  * - Khách hàng (tên người mua)
  * - Số tiền (căn phải)
+ * - Loại thanh toán (cọc / toàn bộ — ánh xạ từ paymentType trong DB)
  * - Phương thức (VNPAY / COD)
  * - Trạng thái (badge màu)
  * - Mã cổng TT (mã từ cổng thanh toán VNPAY)
+ * - Thời gian giao dịch (paidAt — khớp với cột paidAt trong DB)
+ * - Thao tác (xem chi tiết, xác nhận)
  *
  * Khi bấm vào một hàng → gọi onRowClick để mở ngăn kéo chi tiết.
+ * Khi bấm icon thao tác → gọi onActionClick thay vì mở ngăn kéo.
  */
+
+// Loại thanh toán ánh xạ từ cột paymentType trong bảng Payment (DB)
+export type PaymentType = "DEPOSIT" | "FULL_PAYMENT" | "COD_FINAL";
+
+// Nhãn tiếng Việt cho từng loại thanh toán
+const PAYMENT_TYPE_LABEL: Record<PaymentType, string> = {
+  DEPOSIT: "Thanh toán cọc",
+  FULL_PAYMENT: "Thanh toán toàn bộ",
+  COD_FINAL: "Thanh toán COD",
+};
+
+// Màu sắc badge loại thanh toán
+const PAYMENT_TYPE_CLASS: Record<PaymentType, string> = {
+  DEPOSIT: "bg-[#fef3c7] text-[#b45309]",       // Vàng nhạt – thanh toán cọc
+  FULL_PAYMENT: "bg-[#dbeafe] text-[#1d4ed8]",  // Xanh dương nhạt – toàn bộ
+  COD_FINAL: "bg-[#f0fdf4] text-[#15803d]",     // Xanh lá nhạt – COD
+};
 
 // Kiểu dữ liệu của một giao dịch thanh toán
 export type Payment = {
   id: number;
-  payCode: string;         // Mã GD nội bộ, ví dụ "PAY-000128"
-  orderCode: string;       // Mã đơn hàng liên kết, ví dụ "ORD-20260602-001"
-  customerName: string;    // Tên khách hàng
-  amountVnd: number;       // Số tiền (đơn vị VNĐ)
-  method: "VNPAY" | "COD"; // Phương thức thanh toán
-  status: PaymentStatus;   // Trạng thái giao dịch
-  gatewayCode: string;     // Mã cổng thanh toán từ VNPAY (ví dụ: "VNPAY-842193")
+  payCode: string;           // Mã GD nội bộ, ví dụ "PAY-000128"
+  orderCode: string;         // Mã đơn hàng liên kết, ví dụ "ORD-20260602-001"
+  customerName: string;      // Tên khách hàng
+  amountVnd: number;         // Số tiền (đơn vị VNĐ)
+  paymentType: PaymentType;  // Loại thanh toán: cọc / toàn bộ / COD (ánh xạ từ DB.paymentType)
+  method: "VNPAY" | "COD";  // Phương thức thanh toán
+  status: PaymentStatus;     // Trạng thái giao dịch
+  gatewayCode: string;       // Mã cổng thanh toán từ VNPAY (ví dụ: "VNPAY-842193")
+  paidAt?: string;           // Thời gian giao dịch thành công (ánh xạ từ DB.paidAt)
 };
 
 type PaymentTableProps = {
-  payments: Payment[];                  // Danh sách giao dịch
+  payments: Payment[];                   // Danh sách giao dịch
   onRowClick: (payment: Payment) => void; // Khi bấm vào hàng
+  onViewDetail?: (payment: Payment, e: MouseEvent) => void; // Xem chi tiết (icon 👁️)
+  onConfirmAction?: (payment: Payment, e: MouseEvent) => void; // Xác nhận (icon ✅)
 };
 
 // Hàm định dạng số tiền sang dạng "850.000đ"
@@ -38,7 +64,12 @@ function formatVnd(amount: number): string {
   return amount.toLocaleString("vi-VN") + "đ";
 }
 
-export default function PaymentTable({ payments, onRowClick }: PaymentTableProps) {
+export default function PaymentTable({
+  payments,
+  onRowClick,
+  onViewDetail,
+  onConfirmAction,
+}: PaymentTableProps) {
   return (
     // Bảng có thể cuộn ngang trên màn hình nhỏ
     <div className="overflow-x-auto">
@@ -51,9 +82,12 @@ export default function PaymentTable({ payments, onRowClick }: PaymentTableProps
             <th className="p-4">Mã Đơn</th>
             <th className="p-4">Khách hàng</th>
             <th className="p-4 text-right">Số tiền</th>
+            <th className="p-4">Loại thanh toán</th>
             <th className="p-4">Phương thức</th>
             <th className="p-4">Trạng thái</th>
             <th className="p-4">Mã cổng TT</th>
+            <th className="p-4">Thời gian giao dịch</th>
+            <th className="p-4 text-center">Thao tác</th>
           </tr>
         </thead>
 
@@ -71,6 +105,12 @@ export default function PaymentTable({ payments, onRowClick }: PaymentTableProps
               payment.status === "that_bai"
                 ? "text-[#b91c1c]"
                 : "text-text-main group-hover:text-[#0ea5e9]";
+
+            // Tooltip và icon cho nút xác nhận theo phương thức
+            const confirmLabel =
+              payment.method === "COD"
+                ? "Xác nhận thu COD"
+                : "Đồng bộ lại VNPAY";
 
             return (
               // Mỗi hàng có thể bấm vào để mở chi tiết (ngăn kéo)
@@ -93,6 +133,17 @@ export default function PaymentTable({ payments, onRowClick }: PaymentTableProps
                 {/* Số tiền – căn phải, chữ đậm */}
                 <td className="p-4 text-right font-medium text-text-main">
                   {formatVnd(payment.amountVnd)}
+                </td>
+
+                {/* Loại thanh toán: cọc / toàn bộ / COD */}
+                <td className="p-4">
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                      PAYMENT_TYPE_CLASS[payment.paymentType]
+                    }`}
+                  >
+                    {PAYMENT_TYPE_LABEL[payment.paymentType]}
+                  </span>
                 </td>
 
                 {/* Phương thức thanh toán: hiển thị badge nhỏ + tên */}
@@ -125,6 +176,104 @@ export default function PaymentTable({ payments, onRowClick }: PaymentTableProps
                 {/* Mã cổng thanh toán – font mono để dễ đọc */}
                 <td className="p-4 font-mono text-xs text-text-muted">
                   {payment.gatewayCode}
+                </td>
+
+                {/* Thời gian giao dịch – ánh xạ từ DB.paidAt */}
+                <td className="p-4 text-sm text-text-secondary whitespace-nowrap">
+                  {payment.paidAt ?? (
+                    <span className="italic text-text-muted">Chưa có</span>
+                  )}
+                </td>
+
+                {/* Cột thao tác: icon Xem chi tiết và Xác nhận */}
+                <td
+                  className="p-4"
+                  // Ngăn click cột thao tác lan ra hàng (đã có onClick riêng)
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-center gap-2">
+
+                    {/* Nút 👁️ Xem chi tiết / Xem Gateway Response */}
+                    <button
+                      type="button"
+                      title="Xem chi tiết giao dịch"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewDetail?.(payment, e);
+                        // Fallback: mở ngăn kéo nếu không có handler riêng
+                        if (!onViewDetail) onRowClick(payment);
+                      }}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-text-secondary transition-colors hover:border-[#0ea5e9] hover:bg-[#f0f9ff] hover:text-[#0ea5e9]"
+                    >
+                      {/* Icon mắt */}
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    </button>
+
+                    {/* Nút ✅ Xác nhận thu COD / Đồng bộ lại VNPAY */}
+                    <button
+                      type="button"
+                      title={confirmLabel}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onConfirmAction?.(payment, e);
+                      }}
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
+                        payment.method === "COD"
+                          ? "border-[#bbf7d0] bg-surface text-[#15803d] hover:bg-[#f0fdf4] hover:border-[#15803d]"
+                          : "border-border bg-surface text-text-secondary hover:border-[#0ea5e9] hover:bg-[#f0f9ff] hover:text-[#0ea5e9]"
+                      }`}
+                    >
+                      {payment.method === "COD" ? (
+                        // Icon dấu tích – Xác nhận thu COD
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            d="M20 6L9 17l-5-5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      ) : (
+                        // Icon đồng bộ – Đồng bộ lại VNPAY
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            d="M4 12v.01M4 12a8 8 0 018-8 8 8 0 015.657 2.343M20 12a8 8 0 01-8 8 8 8 0 01-5.657-2.343"
+                            strokeLinecap="round"
+                          />
+                          <path
+                            d="M20 4v4h-4M4 20v-4h4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </button>
+
+                  </div>
                 </td>
               </tr>
             );

@@ -5,7 +5,9 @@ import {
   CheckCircleFilled,
   CopyOutlined,
   EditOutlined,
+  HistoryOutlined,
   PlusOutlined,
+  QrcodeOutlined,
   ReloadOutlined,
   ShoppingCartOutlined,
   StopOutlined,
@@ -16,7 +18,7 @@ import {
   AutoComplete,
   Button,
   Descriptions,
-  Divider,
+  Drawer,
   Input,
   Modal,
   QRCode,
@@ -45,25 +47,6 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   da_huy: { label: "Đã hủy", color: "red" },
 };
 
-const ORDER_STATUS_OPTIONS = [
-  { value: "cho_xac_nhan", label: "Chờ xác nhận" },
-  { value: "da_xac_nhan", label: "Đã xác nhận" },
-  { value: "dang_xu_ly_in", label: "Đang xử lý in" },
-  { value: "cho_giao", label: "Chờ giao" },
-  { value: "dang_giao", label: "Đang giao hàng" },
-  { value: "hoan_tat", label: "Hoàn tất" },
-];
-
-const ALLOWED_NEXT_STATUS: Record<string, string[]> = {
-  cho_xac_nhan: ["da_xac_nhan"],
-  da_xac_nhan: ["dang_xu_ly_in"],
-  dang_xu_ly_in: ["cho_giao"],
-  cho_giao: ["dang_giao"],
-  dang_giao: ["hoan_tat"],
-  hoan_tat: [],
-  da_huy: [],
-};
-
 const CANCELLABLE_STATUSES = new Set(["cho_xac_nhan", "da_xac_nhan", "dang_xu_ly_in", "cho_giao", "dang_giao"]);
 const EDITABLE_ADDRESS_STATUSES = new Set([
   "cho_xac_nhan",
@@ -71,26 +54,6 @@ const EDITABLE_ADDRESS_STATUSES = new Set([
   "dang_xu_ly_in",
   "cho_giao",
 ]);
-
-function hasCustomDesignOrder(order?: ChiTietDonHang | null) {
-  if (!order) return false;
-
-  return Boolean(
-    order.items?.some((item) => item.loai === "custom_design" || Boolean(item.designId)) ||
-      order.sanPham?.loai === "custom_design" ||
-      order.anhXemTruocThietKe
-  );
-}
-
-function getAllowedNextStatuses(order?: ChiTietDonHang | null) {
-  if (!order) return [];
-
-  if (order.trangThai === "da_xac_nhan" && !hasCustomDesignOrder(order)) {
-    return ["cho_giao"];
-  }
-
-  return ALLOWED_NEXT_STATUS[order.trangThai] ?? [];
-}
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("vi-VN", {
@@ -147,6 +110,7 @@ function PriceRow({ label, value }: { label: string; value: number }) {
   );
 }
 
+/** Bảng sản phẩm compact – ảnh nhỏ 48px, gộp tên/màu/size/SKU vào 1 cột */
 function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
   const items = order.items?.length
     ? order.items
@@ -173,16 +137,14 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
       ];
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border">
-      <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-border bg-surface-alt text-xs font-bold uppercase text-text-secondary">
-            <th className="p-3">Hình ảnh</th>
-            <th className="p-3">Tên áo</th>
-            <th className="p-3">Phân loại</th>
-            <th className="p-3 text-center">Số lượng</th>
-            <th className="p-3 text-right">Đơn giá</th>
-            <th className="p-3 text-right">Thành tiền</th>
+            <th className="px-2 py-2">Sản phẩm</th>
+            <th className="px-2 py-2 text-center">SL</th>
+            <th className="px-2 py-2 text-right">Đơn giá</th>
+            <th className="px-2 py-2 text-right">Thành tiền</th>
           </tr>
         </thead>
         <tbody>
@@ -191,56 +153,63 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
 
             return (
               <tr key={item.id} className="border-b border-border last:border-b-0">
-                <td className="p-3 align-top">
-                  <div className="h-14 w-14 overflow-hidden rounded-lg border border-border bg-surface-alt">
-                    {imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={imageUrl}
-                        alt={item.tenSanPham}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-xs text-text-muted">
-                        Ảnh
+                {/* Cột sản phẩm: ảnh nhỏ + thông tin gộp */}
+                <td className="px-2 py-2 align-middle">
+                  <div className="flex items-center gap-2">
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-border bg-surface-alt">
+                      {imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={imageUrl}
+                          alt={item.tenSanPham}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-xs text-text-muted">
+                          Ảnh
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold text-text-main leading-tight">
+                        {item.tenSanPham}
                       </div>
-                    )}
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                        {item.loai === "custom_design" ? (
+                          <Tag color="blue" className="m-0 text-xs">Áo POD</Tag>
+                        ) : (
+                          <Tag className="m-0 text-xs">Áo mẫu</Tag>
+                        )}
+                        {item.designId ? (
+                          <Tag color="geekblue" className="m-0 text-xs">
+                            Design #{item.designId}
+                          </Tag>
+                        ) : null}
+                      </div>
+                      <div className="mt-0.5 text-xs text-text-secondary">
+                        {[
+                          item.mauSac ? `Màu: ${item.mauSac}` : null,
+                          item.kichCo ? `Size: ${item.kichCo}` : null,
+                          item.sku ? `SKU: ${item.sku}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                    </div>
                   </div>
                 </td>
-                <td className="p-3 align-top">
-                  <div className="font-semibold text-text-main">{item.tenSanPham}</div>
-                  <div className="mt-1 flex flex-wrap gap-2">
-                    {item.loai === "custom_design" ? (
-                      <Tag color="blue" className="m-0">
-                        Áo POD
-                      </Tag>
-                    ) : (
-                      <Tag className="m-0">Áo mẫu</Tag>
-                    )}
-                    {item.designId ? (
-                      <Tag color="geekblue" className="m-0">
-                        Design #{item.designId}
-                      </Tag>
-                    ) : null}
-                  </div>
-                </td>
-                <td className="p-3 align-top text-text-secondary">
-                  <div>Màu: {item.mauSac || "Chưa có"}</div>
-                  <div>Size: {item.kichCo || "Chưa có"}</div>
-                  {item.sku ? <div className="text-xs text-text-muted">SKU: {item.sku}</div> : null}
-                </td>
-                <td className="p-3 text-center align-top font-bold text-text-main">
+                <td className="px-2 py-2 text-center align-middle font-bold text-text-main">
                   {item.soLuong}
                 </td>
-                <td className="p-3 text-right align-top text-text-main">
+                <td className="px-2 py-2 text-right align-middle text-text-main">
                   <div className="font-semibold">{formatCurrency(item.donGiaVnd)}</div>
                   {item.phiThietKeVnd > 0 ? (
-                    <div className="mt-1 text-xs text-text-secondary">
-                      Phí TK: {formatCurrency(item.phiThietKeVnd)}
+                    <div className="mt-0.5 text-xs text-text-secondary">
+                      + phí TK: {formatCurrency(item.phiThietKeVnd)}
                     </div>
                   ) : null}
                 </td>
-                <td className="p-3 text-right align-top font-bold text-primary-container">
+                <td className="px-2 py-2 text-right align-middle font-bold text-primary-container">
                   {formatCurrency(item.thanhTienVnd)}
                 </td>
               </tr>
@@ -252,9 +221,11 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
   );
 }
 
-function VnpayPaymentPanel({ order }: { order: ChiTietDonHang }) {
+/** Nút "Hiển thị mã QR" → modal popup. Ẩn khi đơn PAID hoặc CANCELLED. */
+function VnpayQrButton({ order }: { order: ChiTietDonHang }) {
   const queryClient = useQueryClient();
   const [messageApi, messageContextHolder] = message.useMessage();
+  const [isQrOpen, setIsQrOpen] = useState(false);
   const [now, setNow] = useState<number | null>(null);
   const payment = order.thanhToan;
   const expiresAtMs = Date.parse(payment.expiresAt || "");
@@ -307,221 +278,277 @@ function VnpayPaymentPanel({ order }: { order: ChiTietDonHang }) {
     }
   }
 
-  return (
-    <section className="rounded-xl border border-border bg-surface p-5 shadow-admin-card">
-      {messageContextHolder}
-      <div className="mb-4">
-        <h3 className="text-card-title text-text-main">Thanh toán VNPAY</h3>
-        <p className="mt-1 text-body-sm text-text-secondary">
-          Gửi link hoặc mã QR này cho khách hàng để hoàn tất thanh toán.
-        </p>
-      </div>
+  // Ẩn nút khi đã thanh toán hoặc đã hủy
+  if (isPaid || isCancelled) return null;
 
-      {isCancelled ? (
-        <Alert
-          showIcon
-          type="error"
-          title="Đơn hàng đã bị hủy"
-          description="Mã thanh toán VNPAY đã được ẩn vĩnh viễn."
-        />
-      ) : isPaid ? (
-        <div className="rounded-xl border border-green-200 bg-green-50 p-5 text-center">
-          <CheckCircleFilled className="text-5xl text-green-600" />
-          <p className="mt-3 text-lg font-extrabold text-green-700">
-            Đã thanh toán thành công
-          </p>
-          <p className="mt-1 text-sm font-semibold text-green-700">
-            Lúc {formatDateTime(payment.paidAt)}
-          </p>
+  return (
+    <>
+      {messageContextHolder}
+      <Button
+        size="small"
+        icon={<QrcodeOutlined />}
+        onClick={() => setIsQrOpen(true)}
+        className="h-7 rounded-md text-xs font-semibold"
+      >
+        Hiển thị mã QR
+      </Button>
+
+      <Modal
+        open={isQrOpen}
+        title="Mã QR thanh toán VNPAY"
+        footer={null}
+        width={340}
+        centered
+        onCancel={() => setIsQrOpen(false)}
+      >
+        <div className="flex flex-col items-center gap-4 py-2">
+          {isExpired ? (
+            <div className="w-full space-y-3">
+              <Alert
+                showIcon
+                type="error"
+                title="Mã thanh toán đã hết hạn"
+                description="Hãy tạo lại mã mới trước khi gửi cho khách hàng."
+              />
+              <Button
+                type="primary"
+                danger
+                block
+                icon={<ReloadOutlined />}
+                loading={recreateMutation.isPending}
+                onClick={() => recreateMutation.mutate()}
+              >
+                Tạo lại mã thanh toán
+              </Button>
+            </div>
+          ) : isActive && payment.paymentUrl ? (
+            <>
+              <div className="rounded-xl border border-border bg-white p-3">
+                <QRCode value={payment.paymentUrl} size={200} />
+              </div>
+              <div className="text-center">
+                <Tag color="processing" className="rounded-full px-3 py-0.5 font-bold">
+                  Mã QR đang hoạt động
+                </Tag>
+                <p className="mt-2 text-xs text-text-secondary">
+                  Hết hạn lúc:{" "}
+                  <strong className="text-text-main">
+                    {formatExpiryTime(payment.expiresAt)}
+                  </strong>
+                </p>
+              </div>
+              <div className="flex w-full flex-col gap-2">
+                <Button
+                  type="primary"
+                  block
+                  icon={<CopyOutlined />}
+                  onClick={copyPaymentLink}
+                >
+                  Sao chép link thanh toán
+                </Button>
+                <Button block href={payment.paymentUrl} target="_blank">
+                  Mở link VNPAY
+                </Button>
+              </div>
+            </>
+          ) : now === null && isPending ? (
+            <Skeleton active paragraph={{ rows: 3 }} />
+          ) : (
+            <Alert
+              showIcon
+              type="warning"
+              title="Không có mã QR khả dụng"
+              description={`Trạng thái thanh toán: ${payment.status || "Không xác định"}.`}
+            />
+          )}
         </div>
-      ) : isExpired ? (
+      </Modal>
+    </>
+  );
+}
+
+/** Drawer lịch sử thay đổi trạng thái */
+function OrderHistoryDrawer({ order }: { order: ChiTietDonHang }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        size="small"
+        icon={<HistoryOutlined />}
+        onClick={() => setOpen(true)}
+        className="h-7 rounded-md text-xs font-semibold"
+      >
+        Lịch sử xử lý
+      </Button>
+
+      <Drawer
+        title="Lịch sử thay đổi trạng thái"
+        placement="right"
+        size="default"
+        open={open}
+        onClose={() => setOpen(false)}
+      >
         <div className="space-y-4">
-          <Alert
-            showIcon
-            type="error"
-            title="Mã thanh toán đã hết hạn"
-            description="Hãy tạo lại mã mới trước khi gửi cho khách hàng."
-          />
-          <Button
-            type="primary"
-            danger
-            icon={<ReloadOutlined />}
-            loading={recreateMutation.isPending}
-            onClick={() => recreateMutation.mutate()}
-          >
-            Tạo lại mã thanh toán VNPAY
-          </Button>
+          {order.thoiGianXuLy.map((step, index) => (
+            <div key={`${step.thoiGian}-${index}`} className="flex gap-3">
+              <div className="flex flex-col items-center">
+                <span
+                  className={`mt-1 h-3 w-3 shrink-0 rounded-full border-2 ${
+                    step.laDangHienTai
+                      ? "border-primary-container bg-primary-container"
+                      : "border-border bg-white"
+                  }`}
+                />
+                {index < order.thoiGianXuLy.length - 1 && (
+                  <span className="mt-1 w-0.5 flex-1 bg-border" />
+                )}
+              </div>
+              <div className="pb-4">
+                <p className="text-sm font-semibold text-text-main leading-tight">{step.moTa}</p>
+                <p className="mt-0.5 text-xs text-text-secondary">
+                  {step.thoiGian} · {step.nguoiThucHien}
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
-      ) : isActive && payment.paymentUrl ? (
-        <div className="grid gap-5 md:grid-cols-[260px_minmax(0,1fr)] md:items-center">
-          <div className="flex justify-center rounded-xl border border-border bg-white p-4">
-            <QRCode value={payment.paymentUrl} size={220} />
-          </div>
-          <div>
-            <Tag color="processing" className="m-0 rounded-full px-3 py-1 font-bold">
-              Mã QR đang hoạt động
-            </Tag>
-            <p className="mt-4 text-sm text-text-secondary">
-              Mã thanh toán sẽ hết hạn vào lúc:{" "}
-              <strong className="text-text-main">
-                {formatExpiryTime(payment.expiresAt)}
-              </strong>
-            </p>
-            <Space wrap className="mt-4">
-              <Button icon={<CopyOutlined />} onClick={copyPaymentLink}>
-                Sao chép link
-              </Button>
-              <Button href={payment.paymentUrl} target="_blank">
-                Mở link VNPAY
-              </Button>
-            </Space>
-          </div>
-        </div>
-      ) : now === null && isPending ? (
-        <Skeleton active paragraph={{ rows: 3 }} />
-      ) : (
-        <Alert
-          showIcon
-          type="warning"
-          title="Không có mã thanh toán VNPAY khả dụng"
-          description={`Trạng thái thanh toán hiện tại: ${payment.status || "Không xác định"}.`}
-        />
-      )}
-    </section>
+      </Drawer>
+    </>
   );
 }
 
 function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
+  const isVnpay = order.thanhToan.phuongThuc === "VNPAY";
+  const isPaid = order.thanhToan.status === "COMPLETED";
+
   return (
-    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="space-y-5">
-        <section className="rounded-xl border border-border bg-surface p-5 shadow-admin-card">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-primary-container">
-                <ShoppingCartOutlined />
-                {order.maDonHang}
-              </div>
-              <h2 className="mt-2 font-extrabold text-headline-lg-mobile text-text-main md:text-headline-lg">
-                Chi tiết đơn hàng
-              </h2>
-              <p className="mt-1 text-body-sm text-text-secondary">
-                Tạo lúc {order.ngayTao}
-              </p>
-            </div>
-            <StatusTag status={order.trangThai} />
+    <section className="rounded-xl border border-border bg-surface shadow-admin-card">
+      {/* ── Header thẻ ── */}
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-primary-container">
+            <ShoppingCartOutlined />
+            <span>{order.maDonHang}</span>
           </div>
-
-          <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
-            <Descriptions.Item label="Khách hàng">
-              {order.tenKhachHang}
-            </Descriptions.Item>
-            <Descriptions.Item label="Số điện thoại">
-              {order.sdtKhachHang}
-            </Descriptions.Item>
-            <Descriptions.Item label="Email">
-              {order.emailKhachHang || "Chưa có"}
-            </Descriptions.Item>
-            <Descriptions.Item label="Thanh toán">
-              {order.thanhToan.phuongThuc} · {order.thanhToan.loai || "FULL"} ·{" "}
-              {order.thanhToan.daThanh ? "Đã thanh toán" : "Chờ thanh toán"}
-            </Descriptions.Item>
-            <Descriptions.Item label="Địa chỉ giao hàng" span={2}>
-              {order.diaChiGiaoHang}
-            </Descriptions.Item>
-            <Descriptions.Item label="Vận chuyển">
-              {order.donViVanChuyen || "Chưa chọn"}
-            </Descriptions.Item>
-            <Descriptions.Item label="Mã vận đơn">
-              {order.maVanDon || "Chưa có"}
-            </Descriptions.Item>
-          </Descriptions>
-        </section>
-
-        {order.thanhToan.phuongThuc === "VNPAY" ? (
-          <VnpayPaymentPanel order={order} />
-        ) : null}
-
-        <section className="rounded-xl border border-border bg-surface p-5 shadow-admin-card">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <h3 className="text-card-title text-text-main">Sản phẩm</h3>
-              <p className="mt-1 text-body-sm text-text-secondary">
-                Danh sách đầy đủ để nhân viên kho nhặt hàng và đóng gói chính xác.
-              </p>
-            </div>
-          </div>
-
-          <OrderItemsTable order={order} />
-        </section>
-
-        <section className="rounded-xl border border-border bg-surface p-5 shadow-admin-card">
-          <h3 className="text-card-title text-text-main">Lịch sử xử lý</h3>
-          <div className="mt-4 space-y-3">
-            {order.thoiGianXuLy.map((step, index) => (
-              <div key={`${step.thoiGian}-${index}`} className="flex gap-3">
-                <span
-                  className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
-                    step.laDangHienTai ? "bg-primary-container" : "bg-border"
-                  }`}
-                />
-                <div>
-                  <p className="text-sm font-semibold text-text-main">{step.moTa}</p>
-                  <p className="mt-1 text-xs text-text-secondary">
-                    {step.thoiGian} · {step.nguoiThucHien}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+          <h2 className="text-base font-extrabold text-text-main">Chi tiết đơn hàng</h2>
+          <span className="text-xs text-text-secondary">· Tạo lúc {order.ngayTao}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <OrderHistoryDrawer order={order} />
+          <StatusTag status={order.trangThai} />
+        </div>
       </div>
 
-      <aside className="sticky top-5 h-fit rounded-xl border border-border bg-surface p-5 shadow-admin-card">
-        <h3 className="text-card-title text-text-main">Tổng tiền</h3>
-        <div className="mt-4 space-y-3">
-          <PriceRow label="Tạm tính" value={order.tamTinhVnd} />
-          <PriceRow label="Phí thiết kế" value={order.phiThietKeVnd} />
-          <PriceRow label="Giảm giá" value={-order.giamGiaVnd} />
-          <PriceRow label="Phí vận chuyển" value={order.phiVanChuyenVnd} />
-        </div>
-
-        <Divider className="my-4" />
-
-        <div className="flex items-end justify-between gap-3">
-          <span className="text-sm font-semibold text-text-secondary">
-            Tổng cộng
-          </span>
-          <span className="text-2xl font-extrabold text-primary-container">
-            {formatCurrency(order.tongTienVnd)}
-          </span>
-        </div>
-
-        {order.tienCocVnd > 0 || order.tienThuHoCodVnd > 0 ? (
-          <>
-            <Divider className="my-4" />
-            <div className="space-y-3 rounded-lg border border-primary-container/20 bg-sky-50 p-3">
-              {order.tienCocVnd > 0 ? (
-                <PriceRow label="Thanh toán trước (Cọc)" value={order.tienCocVnd} />
+      {/* ── Thông tin chính ── */}
+      <div className="px-4 pt-3 pb-0">
+        <Descriptions column={{ xs: 1, sm: 2, lg: 3 }} bordered size="small">
+          <Descriptions.Item label="Khách hàng">
+            {order.tenKhachHang}
+          </Descriptions.Item>
+          <Descriptions.Item label="Số điện thoại">
+            {order.sdtKhachHang}
+          </Descriptions.Item>
+          <Descriptions.Item label="Email">
+            {order.emailKhachHang || "Chưa có"}
+          </Descriptions.Item>
+          <Descriptions.Item label="Thanh toán">
+            <div className="flex flex-wrap items-center gap-1">
+              <span>{order.thanhToan.phuongThuc}</span>
+              <span className="text-text-muted">·</span>
+              <span>{order.thanhToan.loai || "FULL"}</span>
+              <span className="text-text-muted">·</span>
+              <span>{order.thanhToan.daThanh ? "Đã thanh toán" : "Chờ thanh toán"}</span>
+              {isVnpay && !isPaid && order.trangThai !== "da_huy" ? (
+                <VnpayQrButton order={order} />
               ) : null}
-              {order.tienThuHoCodVnd > 0 ? (
-                <PriceRow label="Thu hộ COD khi giao" value={order.tienThuHoCodVnd} />
+              {isPaid ? (
+                <Tag color="green" className="m-0 text-xs">
+                  <CheckCircleFilled className="mr-1" />
+                  Đã thanh toán lúc {formatDateTime(order.thanhToan.paidAt)}
+                </Tag>
               ) : null}
             </div>
-          </>
-        ) : null}
+          </Descriptions.Item>
+          <Descriptions.Item label="Vận chuyển">
+            {order.donViVanChuyen || "Chưa chọn"}
+          </Descriptions.Item>
+          <Descriptions.Item label="Mã vận đơn">
+            {order.maVanDon || "Chưa có"}
+          </Descriptions.Item>
+          <Descriptions.Item label="Địa chỉ giao hàng" span={3}>
+            {order.diaChiGiaoHang}
+          </Descriptions.Item>
+        </Descriptions>
+      </div>
 
-        {order.lyDoHuy ? (
+      {/* ── Lý do hủy (nếu có) ── */}
+      {order.lyDoHuy ? (
+        <div className="px-4 pt-3">
           <Alert
             showIcon
             type="warning"
-            className="mt-4"
-            title="Lý do hủy"
+            title="Lý do hủy đơn"
             description={order.lyDoHuy}
           />
-        ) : null}
-      </aside>
-    </div>
+        </div>
+      ) : null}
+
+      {/* ── Divider + tiêu đề bảng sản phẩm ── */}
+      <div className="flex items-center justify-between gap-2 border-t border-border px-4 pt-3 pb-1 mt-3">
+        <span className="text-xs font-bold uppercase tracking-wide text-text-secondary">
+          Sản phẩm đặt hàng
+        </span>
+      </div>
+
+      {/* ── Bảng sản phẩm ── */}
+      <div className="px-4">
+        <OrderItemsTable order={order} />
+      </div>
+
+      {/* ── Tổng tiền – 2 cột ── */}
+      <div className="border-t border-border px-4 py-3">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-0">
+          {/* Cột trái: chi tiết các khoản */}
+          <div className="space-y-1.5 border-r border-border pr-6">
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-text-secondary">
+              Chi tiết các khoản
+            </p>
+            <PriceRow label="Tạm tính" value={order.tamTinhVnd} />
+            {order.phiThietKeVnd > 0 ? (
+              <PriceRow label="Phí thiết kế" value={order.phiThietKeVnd} />
+            ) : null}
+            {order.giamGiaVnd > 0 ? (
+              <PriceRow label="Giảm giá" value={-order.giamGiaVnd} />
+            ) : null}
+            <PriceRow label="Phí vận chuyển" value={order.phiVanChuyenVnd} />
+          </div>
+
+          {/* Cột phải: tổng cộng + thanh toán đặc biệt */}
+          <div className="space-y-1.5">
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-text-secondary">
+              Tổng thanh toán
+            </p>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-text-secondary">Tổng cộng</span>
+              <span className="text-xl font-extrabold text-primary-container">
+                {formatCurrency(order.tongTienVnd)}
+              </span>
+            </div>
+            {order.tienCocVnd > 0 || order.tienThuHoCodVnd > 0 ? (
+              <div className="mt-1 space-y-1 rounded-lg border border-primary-container/20 bg-sky-50 p-2">
+                {order.tienCocVnd > 0 ? (
+                  <PriceRow label="Thanh toán trước (Cọc)" value={order.tienCocVnd} />
+                ) : null}
+                {order.tienThuHoCodVnd > 0 ? (
+                  <PriceRow label="Thu hộ COD khi giao" value={order.tienThuHoCodVnd} />
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -532,10 +559,6 @@ export default function OrderDetailRouteClient() {
   const orderId = Number(params.id);
   const [messageApi, messageContextHolder] = message.useMessage();
   const [modal, modalContextHolder] = Modal.useModal();
-  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-  const [newStatus, setNewStatus] = useState("");
-  const [shippingCarrier, setShippingCarrier] = useState<string | undefined>(undefined);
-  const [trackingCode, setTrackingCode] = useState("");
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
@@ -573,24 +596,15 @@ export default function OrderDetailRouteClient() {
     ]);
   }
 
-  const updateStatusMutation = useMutation({
-    mutationFn: (payload: { trangThai: string; shippingCarrier?: string; trackingCode?: string }) =>
-      orderService.capNhatTrangThaiDonHang({
-        id: orderId,
-        ...payload,
-      }),
-    onSuccess: async () => {
-      setIsUpdateModalOpen(false);
-      setNewStatus("");
-      setShippingCarrier(undefined);
-      setTrackingCode("");
-      messageApi.success("Cập nhật trạng thái đơn hàng thành công");
-      await refreshOrderData();
-    },
-    onError: (mutationError) => {
-      messageApi.error(getApiErrorMessage(mutationError));
-    },
-  });
+  async function refreshStockData() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["admin-order-product-search"] }),
+      queryClient.invalidateQueries({ queryKey: ["admin-order-design-search"] }),
+      queryClient.invalidateQueries({ queryKey: ["products"] }),
+      queryClient.invalidateQueries({ queryKey: ["inventory"] }),
+    ]);
+  }
+
 
   const cancelOrderMutation = useMutation({
     mutationFn: (reason: string) => orderService.huyDonHang(orderId, reason),
@@ -598,7 +612,7 @@ export default function OrderDetailRouteClient() {
       setIsCancelModalOpen(false);
       setCancelReason("");
       messageApi.success("Đã hủy đơn hàng thành công");
-      await refreshOrderData();
+      await Promise.all([refreshOrderData(), refreshStockData()]);
     },
     onError: (mutationError) => {
       messageApi.error(getApiErrorMessage(mutationError));
@@ -633,18 +647,18 @@ export default function OrderDetailRouteClient() {
     <div>
       {messageContextHolder}
       {modalContextHolder}
-      <section className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
+      <section className="mb-4 flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
         <div>
           <Button
             type="text"
             icon={<ArrowLeftOutlined />}
-            className="mb-3 px-0 font-semibold text-text-secondary hover:text-primary-container"
+            className="mb-1 px-0 font-semibold text-text-secondary hover:text-primary-container"
             onClick={() => router.push("/admin/don-hang")}
           >
             Quay lại danh sách
           </Button>
-          <p className="text-body-md text-text-secondary">
-            Xem thông tin đơn hàng vừa tạo hoặc tiếp tục thao tác trong danh sách.
+          <p className="text-xs text-text-secondary">
+            Xem thông tin đơn hàng hoặc tiếp tục thao tác.
           </p>
         </div>
 
@@ -662,7 +676,7 @@ export default function OrderDetailRouteClient() {
                   danger
                   icon={<StopOutlined />}
                   disabled={!canCancelOrder}
-                  className="h-10 rounded-[10px] font-semibold"
+                  className="h-9 rounded-[10px] font-semibold"
                   onClick={() => setIsCancelModalOpen(true)}
                 >
                   Hủy đơn
@@ -671,7 +685,7 @@ export default function OrderDetailRouteClient() {
               {canEditAddress ? (
                 <Button
                   icon={<EditOutlined />}
-                  className="h-10 rounded-[10px] font-semibold"
+                  className="h-9 rounded-[10px] font-semibold"
                   onClick={() => {
                     if (order) {
                       setAddrRecipientName(order.tenNguoiNhanGiaoHang || order.tenKhachHang || "");
@@ -684,20 +698,13 @@ export default function OrderDetailRouteClient() {
                   Sửa địa chỉ
                 </Button>
               ) : null}
-              <Button
-                icon={<EditOutlined />}
-                className="h-10 rounded-[10px] font-semibold"
-                onClick={() => setIsUpdateModalOpen(true)}
-              >
-                Cập nhật trạng thái
-              </Button>
             </>
           ) : null}
 
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            className="h-10 rounded-[10px] font-semibold"
+            className="h-9 rounded-[10px] font-semibold"
             onClick={() => router.push("/admin/don-hang/tao-moi")}
           >
             Tạo đơn khác
@@ -705,7 +712,7 @@ export default function OrderDetailRouteClient() {
         </Space>
       </section>
 
-      {isLoading ? <Skeleton active paragraph={{ rows: 12 }} /> : null}
+      {isLoading ? <Skeleton active paragraph={{ rows: 10 }} /> : null}
 
       {isError ? (
         <Alert
@@ -718,102 +725,8 @@ export default function OrderDetailRouteClient() {
 
       {!isLoading && !isError && order ? <OrderDetailContent order={order} /> : null}
 
-      <Modal
-        open={isUpdateModalOpen}
-        title="Cập nhật trạng thái đơn hàng"
-        okText="Xác nhận"
-        cancelText="Đóng"
-        confirmLoading={updateStatusMutation.isPending}
-        okButtonProps={{ disabled: !newStatus }}
-        mask={{ closable: true }}
-        onCancel={() => {
-          setIsUpdateModalOpen(false);
-          setNewStatus("");
-          setShippingCarrier(undefined);
-          setTrackingCode("");
-        }}
-        onOk={() => {
-          if (newStatus === "dang_giao") {
-            if (!shippingCarrier) {
-              messageApi.error("Vui lòng chọn hoặc nhập đơn vị vận chuyển");
-              return;
-            }
-          }
 
-          const performUpdate = () => {
-            updateStatusMutation.mutate({
-              trangThai: newStatus,
-              shippingCarrier: newStatus === "dang_giao" ? shippingCarrier : undefined,
-              trackingCode: newStatus === "dang_giao" ? trackingCode : undefined,
-            });
-          };
-
-          if (newStatus) {
-            const statusLabel = ORDER_STATUS_OPTIONS.find((s) => s.value === newStatus)?.label || "";
-            let confirmContent = "Hệ thống không cho phép lùi trạng thái sau khi đã cập nhật. Bạn có chắc chắn muốn chuyển sang trạng thái này?";
-            
-            if (newStatus === "dang_giao") {
-              confirmContent = "Hệ thống không cho phép lùi trạng thái sau khi đã cập nhật. Bạn có chắc chắn đơn hàng này đã được bàn giao cho đơn vị vận chuyển?";
-            } else if (newStatus === "hoan_tat") {
-              confirmContent = "Hệ thống không cho phép lùi trạng thái sau khi đã cập nhật. Bạn có chắc chắn khách hàng đã nhận được hàng và thanh toán đủ?";
-            }
-
-            modal.confirm({
-              title: `Xác nhận chuyển sang "${statusLabel}"?`,
-              content: confirmContent,
-              okText: "Đồng ý",
-              cancelText: "Hủy",
-              okButtonProps: { danger: true, type: "primary" },
-              onOk: performUpdate,
-            });
-          }
-        }}
-      >
-        <p className="mb-2 text-sm font-semibold text-text-main">
-          Trạng thái mới
-        </p>
-        <Select
-          value={newStatus || undefined}
-          placeholder="Chọn trạng thái"
-          className="w-full"
-          options={ORDER_STATUS_OPTIONS.filter(
-            (status) => getAllowedNextStatuses(order).includes(status.value)
-          )}
-          onChange={setNewStatus}
-        />
-        {newStatus === "dang_giao" && (
-          <div className="mt-4 space-y-3 rounded-lg border border-border bg-surface-alt p-4">
-            <div>
-              <p className="mb-1 text-sm font-semibold text-text-main">
-                Đơn vị vận chuyển <span className="text-red-500">*</span>
-              </p>
-              <AutoComplete
-                value={shippingCarrier}
-                options={[
-                  { value: "GHTK" },
-                  { value: "Viettel Post" },
-                  { value: "J&T Express" },
-                  { value: "Ahamove" },
-                  { value: "Lalamove" },
-                  { value: "VNPost" },
-                ]}
-                placeholder="Chọn hoặc nhập ĐVVC"
-                className="w-full"
-                onChange={setShippingCarrier}
-              />
-            </div>
-            <div>
-              <p className="mb-1 text-sm font-semibold text-text-main">Mã vận đơn</p>
-              <Input
-                value={trackingCode}
-                placeholder="Nhập mã vận đơn (nếu có)"
-                onChange={(e) => setTrackingCode(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-      </Modal>
-
+      {/* Modal hủy đơn */}
       <Modal
         open={isCancelModalOpen}
         title="Hủy đơn hàng"
@@ -853,6 +766,7 @@ export default function OrderDetailRouteClient() {
         ) : null}
       </Modal>
 
+      {/* Modal sửa địa chỉ giao hàng */}
       <Modal
         open={isAddressModalOpen}
         title="Sửa địa chỉ giao hàng"
@@ -882,6 +796,16 @@ export default function OrderDetailRouteClient() {
           </p>
           <div>
             <p className="mb-1 text-sm font-semibold text-text-main">
+              Tên người nhận <span className="text-red-500">*</span>
+            </p>
+            <Input
+              value={addrRecipientName}
+              placeholder="Nhập tên người nhận..."
+              onChange={(e) => setAddrRecipientName(e.target.value)}
+            />
+          </div>
+          <div>
+            <p className="mb-1 text-sm font-semibold text-text-main">
               Số điện thoại <span className="text-red-500">*</span>
             </p>
             <Input
@@ -899,18 +823,6 @@ export default function OrderDetailRouteClient() {
               rows={3}
               placeholder="Ví dụ: 123 Đường ABC, Phường XYZ, Quận 1, TP HCM..."
               onChange={(e) => setAddrLine(e.target.value)}
-            />
-          </div>
-        </div>
-        <div className="space-y-4 py-2">
-          <div>
-            <p className="mb-1 text-sm font-semibold text-text-main">
-              Tên người nhận <span className="text-red-500">*</span>
-            </p>
-            <Input
-              value={addrRecipientName}
-              placeholder="Nhập tên người nhận..."
-              onChange={(e) => setAddrRecipientName(e.target.value)}
             />
           </div>
         </div>

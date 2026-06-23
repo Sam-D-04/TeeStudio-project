@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
   HistoryOutlined,
@@ -154,38 +155,23 @@ export default function InventoryPage() {
 
         {/* Nhóm nút hành động */}
         <div className="flex items-center gap-3">
-          {/* Nút phụ: xem lịch sử kho */}
-          <button
-            type="button"
+          {/* Nút phụ: xem lịch sử kho – điều hướng sang trang lịch sử */}
+          <Link
+            href="/admin/kho-hang/lich-su"
             className="flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-text-secondary transition-colors hover:bg-surface-alt"
           >
             <HistoryOutlined />
             Lịch sử kho
-          </button>
+          </Link>
 
-          {/* Nút chính: nhập kho phôi áo */}
-          <button
-            type="button"
-            onClick={() => {
-              // Mở modal nhập kho không gắn với biến thể cụ thể (chọn từ modal)
-              setItemGiaoDich({
-                id: 0,
-                ten: "",
-                mau: "",
-                mauHex: "",
-                size: "",
-                sku: "",
-                tonHienTai: 0,
-                daGiu: 0,
-                khaDung: 0,
-                trangThai: "con_hang",
-              });
-            }}
+          {/* Nút chính: nhập kho phôi áo – điều hướng sang trang nhập kho */}
+          <Link
+            href="/admin/kho-hang/nhap-kho"
             className="flex h-10 items-center gap-2 rounded-lg bg-primary-container px-4 text-sm font-semibold text-on-primary shadow-sm transition-colors hover:bg-[#0284c7]"
           >
             <PlusSquareOutlined />
             Nhập kho phôi áo
-          </button>
+          </Link>
         </div>
       </div>
 
