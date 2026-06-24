@@ -1,4 +1,5 @@
 import { SkinOutlined } from "@ant-design/icons";
+import Link from "next/link";
 
 export type BestSellingProduct = {
   productId?: number;
@@ -29,9 +30,12 @@ export default function BestSellingProductsCard({
             ? `${products.length} sản phẩm bán chạy nhất`
             : "Sản phẩm bán chạy nhất"}
         </h3>
-        <a href="#" className="text-sm font-medium text-primary-container hover:underline">
+        <Link
+          href="/admin/san-pham-phoi-ao"
+          className="text-sm font-medium text-primary-container hover:underline"
+        >
           Xem tất cả
-        </a>
+        </Link>
       </div>
 
       {products.length === 0 ? (

@@ -1,4 +1,5 @@
 import { WarningOutlined } from "@ant-design/icons";
+import Link from "next/link";
 
 type InventoryItem = {
   variantId?: number;
@@ -21,9 +22,12 @@ export default function InventoryWarningCard({
           <WarningOutlined className="text-error" />
           <span>Tồn kho cần chú ý</span>
         </h3>
-        <a href="#" className="text-sm font-medium text-primary-container hover:underline">
+        <Link
+          href="/admin/kho-hang"
+          className="text-sm font-medium text-primary-container hover:underline"
+        >
           Xem tất cả
-        </a>
+        </Link>
       </div>
 
       {items.length === 0 ? (
