@@ -12,9 +12,12 @@ import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useState } from "react";
 import * as dashboardService from "@/services/admin/dashboardService";
+import type { DashboardGroupBy } from "@/services/admin/dashboardService";
 import type { DesignOrder } from "./components/DesignReviewTable";
 import BestSellingProductsCard from "./components/BestSellingProductsCard";
-import DashboardFilterToolbar from "./components/DashboardFilterToolbar";
+import DashboardFilterToolbar, {
+  type DashboardDateRange,
+} from "./components/DashboardFilterToolbar";
 import DesignReviewTable from "./components/DesignReviewTable";
 import InventoryWarningCard from "./components/InventoryWarningCard";
 import MetricCard from "./components/MetricCard";
@@ -37,23 +40,29 @@ function formatPhanTram(value: number | undefined): string {
 }
 
 // ---------------------------------------------------------------------------
-// Khoảng ngày mặc định: từ đầu tháng đến hôm nay
+// Khoảng ngày mặc định: toàn bộ tháng hiện tại
 // ---------------------------------------------------------------------------
-function getDefaultRange(): { tuNgay: string; denNgay: string } {
+function getDefaultRange(): DashboardDateRange {
   const today = dayjs();
-  return {
-    tuNgay: today.startOf("month").format("YYYY-MM-DD"),
-    denNgay: today.format("YYYY-MM-DD"),
-  };
+  return [today.startOf("month"), today.endOf("month")];
+}
+
+function getChartGroupBy(dates: DashboardDateRange): DashboardGroupBy {
+  const [startDate, endDate] = dates;
+
+  if (!startDate || !endDate) return "day";
+  if (startDate.isSame(endDate, "day")) return "hour";
+  return endDate.diff(startDate, "day") > 60 ? "month" : "day";
 }
 
 // ---------------------------------------------------------------------------
 // Component chính
 // ---------------------------------------------------------------------------
 export default function AdminDashboard() {
-  const defaultRange = getDefaultRange();
-  const [tuNgay, setTuNgay] = useState(defaultRange.tuNgay);
-  const [denNgay, setDenNgay] = useState(defaultRange.denNgay);
+  const [dates, setDates] = useState<DashboardDateRange>(getDefaultRange);
+  const tuNgay = dates[0]?.format("YYYY-MM-DD") ?? "";
+  const denNgay = dates[1]?.format("YYYY-MM-DD") ?? "";
+  const groupBy = getChartGroupBy(dates);
 
   // ── Truy vấn 1: Thẻ chỉ số tổng quan ──
   const {
@@ -71,7 +80,7 @@ export default function AdminDashboard() {
     isLoading: isLoadingBieuDo,
     isError: isErrorBieuDo,
   } = useQuery({
-    queryKey: ["dashboard/bieu-do", tuNgay, denNgay],
+    queryKey: ["dashboard/bieu-do", tuNgay, denNgay, groupBy],
     queryFn: () => dashboardService.layDuLieuBieuDo(tuNgay, denNgay),
     staleTime: 60_000,
   });
@@ -105,12 +114,6 @@ export default function AdminDashboard() {
     queryFn: () => dashboardService.laySanPhamBanChay(tuNgay, denNgay, 3),
     staleTime: 60_000,
   });
-
-  // ── Xử lý callback đổi khoảng thời gian ──
-  function handleRangeChange(tu: string, den: string) {
-    setTuNgay(tu);
-    setDenNgay(den);
-  }
 
   // ── Chuẩn hóa dữ liệu thiết kế sang type DesignOrder ──
   const designOrders: DesignOrder[] = (thietKeRaw ?? []).map((d) => ({
@@ -210,7 +213,7 @@ export default function AdminDashboard() {
       </section>
 
       {/* Bộ lọc thời gian */}
-      <DashboardFilterToolbar onRangeChange={handleRangeChange} />
+      <DashboardFilterToolbar dates={dates} onDatesChange={setDates} />
 
       {/* ── Hàng 1: Thẻ chỉ số tài chính & đơn hàng (4 thẻ chính) ── */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -247,6 +250,8 @@ export default function AdminDashboard() {
         {/* Cột phải: Biểu đồ doanh thu tổng quan */}
         <RevenueOverviewChart
           data={bieuDo?.danhSach ?? []}
+          groupBy={bieuDo?.groupBy ?? groupBy}
+          dateRange={bieuDo?.khoangThoiGian}
           isLoading={isLoadingBieuDo}
           isError={isErrorBieuDo}
         />

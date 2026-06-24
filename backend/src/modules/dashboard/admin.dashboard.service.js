@@ -3,7 +3,7 @@
  *
  * Gồm 5 nhóm chức năng:
  *   1. Thẻ chỉ số tổng quan (7 chỉ số: doanh thu, đơn hàng, thiết kế, tồn kho, v.v.)
- *   2. Dữ liệu biểu đồ doanh thu theo ngày
+ *   2. Dữ liệu biểu đồ doanh thu tự động theo giờ/ngày/tháng
  *   3. Danh sách thiết kế cần xử lý (PENDING_REVIEW / NEEDS_REVISION / Gấp)
  *   4. Tồn kho cảnh báo (variant dưới ngưỡng tối thiểu)
  *   5. Top sản phẩm bán chạy (theo doanh thu)
@@ -182,41 +182,59 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
 }
 
 // =====================================================================
-// SERVICE 2: Dữ liệu biểu đồ doanh thu theo ngày
+// SERVICE 2: Dữ liệu biểu đồ doanh thu theo giờ/ngày/tháng
 // =====================================================================
 
 /**
- * Trả về mảng doanh thu theo từng ngày trong khoảng [tuNgay, denNgay].
- * Luôn trả đủ các ngày trong khoảng, kể cả ngày không có doanh thu, để biểu đồ
- * phía frontend không bị nhảy cột hoặc thiếu mốc thời gian.
- * Mỗi phần tử: { ngay: "YYYY-MM-DD", nhan: "DD/MM", doanhThuVnd: number, soDonHoanTat: number }
+ * Tự chọn độ phân giải phù hợp cho biểu đồ:
+ *  - Cùng một ngày: theo giờ (00:00 → 23:00)
+ *  - Trên 60 ngày: theo tháng
+ *  - Còn lại: theo ngày
+ *
+ * API vẫn chỉ cần tuNgay và denNgay; frontend không phải gửi thêm tham số nhóm.
  */
-async function layDuLieuBieuDo(tuNgay, denNgay) {
-  const [batDau, ketThuc] = chuanHoaKhoangNgay(tuNgay, denNgay);
+function xacDinhDonViNhom(batDau, ketThuc) {
+  if (batDau === ketThuc) return "hour";
 
-  const [rows] = await db.pool.query(
-    `SELECT
-       DATE_FORMAT(updatedAt, '%Y-%m-%d') AS ngay_raw,
-       COALESCE(SUM(totalAmount), 0)      AS doanh_thu,
-       COUNT(*)                           AS so_don_hoan_tat
-     FROM CustomerOrder
-     WHERE status = 'COMPLETED'
-       AND DATE(updatedAt) >= ? AND DATE(updatedAt) <= ?
-     GROUP BY DATE_FORMAT(updatedAt, '%Y-%m-%d')
-     ORDER BY DATE_FORMAT(updatedAt, '%Y-%m-%d') ASC`,
-    [batDau, ketThuc]
+  const startDate = new Date(`${batDau}T00:00:00Z`);
+  const endDate = new Date(`${ketThuc}T00:00:00Z`);
+  const soNgayChenhLe = Math.round(
+    (endDate.getTime() - startDate.getTime()) / 86_400_000
   );
 
-  const doanhThuTheoNgay = new Map(
+  return soNgayChenhLe > 60 ? "month" : "day";
+}
+
+function taoBanDoDoanhThu(rows) {
+  return new Map(
     rows.map((row) => [
-      row.ngay_raw,
+      row.moc_raw,
       {
         doanhThuVnd: Number(row.doanh_thu) || 0,
         soDonHoanTat: Number(row.so_don_hoan_tat) || 0,
       },
     ])
   );
+}
 
+function taoDanhSachTheoGio(batDau, doanhThuTheoMoc) {
+  return Array.from({ length: 24 }, (_, hour) => {
+    const gio = String(hour).padStart(2, "0");
+    const thongKe = doanhThuTheoMoc.get(gio) || {
+      doanhThuVnd: 0,
+      soDonHoanTat: 0,
+    };
+
+    return {
+      ngay: `${batDau}T${gio}:00:00`,
+      nhan: `${gio}:00`,
+      doanhThuVnd: thongKe.doanhThuVnd,
+      soDonHoanTat: thongKe.soDonHoanTat,
+    };
+  });
+}
+
+function taoDanhSachTheoNgay(batDau, ketThuc, doanhThuTheoMoc) {
   const danhSachNgay = [];
   const [namBatDau, thangBatDau, ngayBatDau] = batDau.split("-").map(Number);
   const [namKetThuc, thangKetThuc, ngayKetThuc] = ketThuc.split("-").map(Number);
@@ -228,7 +246,7 @@ async function layDuLieuBieuDo(tuNgay, denNgay) {
     const thang = String(cursor.getUTCMonth() + 1).padStart(2, "0");
     const ngay = String(cursor.getUTCDate()).padStart(2, "0");
     const ngayRaw = `${nam}-${thang}-${ngay}`;
-    const thongKe = doanhThuTheoNgay.get(ngayRaw) || {
+    const thongKe = doanhThuTheoMoc.get(ngayRaw) || {
       doanhThuVnd: 0,
       soDonHoanTat: 0,
     };
@@ -243,18 +261,109 @@ async function layDuLieuBieuDo(tuNgay, denNgay) {
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
-  const tongDoanhThuVnd = danhSachNgay.reduce((sum, r) => sum + r.doanhThuVnd, 0);
-  const tongDonHoanTat = danhSachNgay.reduce((sum, r) => sum + r.soDonHoanTat, 0);
-  const doanhThuLonNhatVnd = danhSachNgay.reduce(
+  return danhSachNgay;
+}
+
+function taoDanhSachTheoThang(batDau, ketThuc, doanhThuTheoMoc) {
+  const danhSachThang = [];
+  const [namBatDau, thangBatDau] = batDau.split("-").map(Number);
+  const [namKetThuc, thangKetThuc] = ketThuc.split("-").map(Number);
+  const cursor = new Date(Date.UTC(namBatDau, thangBatDau - 1, 1));
+  const endMonth = new Date(Date.UTC(namKetThuc, thangKetThuc - 1, 1));
+  const quaNhieuNam = namBatDau !== namKetThuc;
+
+  while (cursor <= endMonth) {
+    const nam = cursor.getUTCFullYear();
+    const thangSo = cursor.getUTCMonth() + 1;
+    const thang = String(thangSo).padStart(2, "0");
+    const thangRaw = `${nam}-${thang}`;
+    const thongKe = doanhThuTheoMoc.get(thangRaw) || {
+      doanhThuVnd: 0,
+      soDonHoanTat: 0,
+    };
+
+    danhSachThang.push({
+      ngay: `${thangRaw}-01`,
+      nhan: quaNhieuNam ? `T${thangSo}/${nam}` : `Tháng ${thangSo}`,
+      doanhThuVnd: thongKe.doanhThuVnd,
+      soDonHoanTat: thongKe.soDonHoanTat,
+    });
+
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+
+  return danhSachThang;
+}
+
+function taoTongHopBieuDo(danhSach) {
+  const tongDoanhThuVnd = danhSach.reduce((sum, row) => sum + row.doanhThuVnd, 0);
+  const tongDonHoanTat = danhSach.reduce((sum, row) => sum + row.soDonHoanTat, 0);
+  const doanhThuLonNhatVnd = danhSach.reduce(
     (max, r) => Math.max(max, r.doanhThuVnd),
     0
   );
 
+  return { tongDoanhThuVnd, tongDonHoanTat, doanhThuLonNhatVnd };
+}
+
+async function layDuLieuBieuDo(tuNgay, denNgay) {
+  const [batDau, ketThuc] = chuanHoaKhoangNgay(tuNgay, denNgay);
+  const groupBy = xacDinhDonViNhom(batDau, ketThuc);
+  let rows;
+  let danhSach;
+
+  if (groupBy === "hour") {
+    [rows] = await db.pool.query(
+      `SELECT
+         DATE_FORMAT(updatedAt, '%H') AS moc_raw,
+         COALESCE(SUM(totalAmount), 0) AS doanh_thu,
+         COUNT(*)                      AS so_don_hoan_tat
+       FROM CustomerOrder
+       WHERE status = 'COMPLETED'
+         AND DATE(updatedAt) = ?
+       GROUP BY DATE_FORMAT(updatedAt, '%H')
+       ORDER BY DATE_FORMAT(updatedAt, '%H') ASC`,
+      [batDau]
+    );
+    danhSach = taoDanhSachTheoGio(batDau, taoBanDoDoanhThu(rows));
+  } else if (groupBy === "month") {
+    [rows] = await db.pool.query(
+      `SELECT
+         DATE_FORMAT(updatedAt, '%Y-%m') AS moc_raw,
+         COALESCE(SUM(totalAmount), 0)   AS doanh_thu,
+         COUNT(*)                        AS so_don_hoan_tat
+       FROM CustomerOrder
+       WHERE status = 'COMPLETED'
+         AND DATE(updatedAt) >= ? AND DATE(updatedAt) <= ?
+       GROUP BY DATE_FORMAT(updatedAt, '%Y-%m')
+       ORDER BY DATE_FORMAT(updatedAt, '%Y-%m') ASC`,
+      [batDau, ketThuc]
+    );
+    danhSach = taoDanhSachTheoThang(
+      batDau,
+      ketThuc,
+      taoBanDoDoanhThu(rows)
+    );
+  } else {
+    [rows] = await db.pool.query(
+      `SELECT
+         DATE_FORMAT(updatedAt, '%Y-%m-%d') AS moc_raw,
+         COALESCE(SUM(totalAmount), 0)      AS doanh_thu,
+         COUNT(*)                           AS so_don_hoan_tat
+       FROM CustomerOrder
+       WHERE status = 'COMPLETED'
+         AND DATE(updatedAt) >= ? AND DATE(updatedAt) <= ?
+       GROUP BY DATE_FORMAT(updatedAt, '%Y-%m-%d')
+       ORDER BY DATE_FORMAT(updatedAt, '%Y-%m-%d') ASC`,
+      [batDau, ketThuc]
+    );
+    danhSach = taoDanhSachTheoNgay(batDau, ketThuc, taoBanDoDoanhThu(rows));
+  }
+
   return {
-    danhSach: danhSachNgay,
-    tongDoanhThuVnd,
-    tongDonHoanTat,
-    doanhThuLonNhatVnd,
+    danhSach,
+    ...taoTongHopBieuDo(danhSach),
+    groupBy,
     khoangThoiGian: { tuNgay: batDau, denNgay: ketThuc },
   };
 }

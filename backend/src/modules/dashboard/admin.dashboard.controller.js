@@ -6,6 +6,7 @@
 "use strict";
 
 const dashboardService = require("./admin.dashboard.service");
+const dashboardReportService = require("./admin.dashboard.report.service");
 
 // =====================================================================
 // CONTROLLER 1: Thẻ chỉ số tổng quan
@@ -32,7 +33,7 @@ const getTongQuanChiSo = async (req, res, next) => {
 
 /**
  * GET /api/admin/dashboard/bieu-do-doanh-thu
- * Trả về doanh thu theo từng ngày trong khoảng thời gian.
+ * Trả về doanh thu tự động nhóm theo giờ, ngày hoặc tháng.
  * Query params: tuNgay (YYYY-MM-DD), denNgay (YYYY-MM-DD)
  */
 const getBieuDoDoanhThu = async (req, res, next) => {
@@ -119,6 +120,41 @@ const getSanPhamBanChay = async (req, res, next) => {
 };
 
 // =====================================================================
+// CONTROLLER 6: Xuất báo cáo Excel
+// =====================================================================
+
+/**
+ * GET /api/admin/dashboard/xuat-bao-cao
+ * Trả về file Excel dữ liệu thô gồm đơn hàng, chi tiết sản phẩm, tồn kho và thiết kế.
+ * Query params: tuNgay (YYYY-MM-DD), denNgay (YYYY-MM-DD)
+ */
+const exportBaoCaoDashboard = async (req, res, next) => {
+  try {
+    const { tuNgay, denNgay } = req.query;
+    const report = await dashboardReportService.taoBaoCaoDashboard(
+      tuNgay,
+      denNgay
+    );
+
+    const encodedFileName = encodeURIComponent(report.fileName);
+    res.set({
+      "Content-Type": report.contentType,
+      "Content-Disposition":
+        `attachment; filename="${report.fileName}"; ` +
+        `filename*=UTF-8''${encodedFileName}`,
+      "Content-Length": report.buffer.length,
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Access-Control-Expose-Headers": "Content-Disposition",
+    });
+
+    return res.status(200).send(report.buffer);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// =====================================================================
 // EXPORTS
 // =====================================================================
 
@@ -128,4 +164,5 @@ module.exports = {
   getThietKeCanXuLy,
   getTonKhoCanhBao,
   getSanPhamBanChay,
+  exportBaoCaoDashboard,
 };

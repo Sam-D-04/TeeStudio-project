@@ -78,4 +78,16 @@ router.get(
   dashboardController.getSanPhamBanChay
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/admin/dashboard/xuat-bao-cao
+// Trả về file Excel gồm đơn hàng, chi tiết sản phẩm, tồn kho và thiết kế.
+// Query params: tuNgay, denNgay
+// ─────────────────────────────────────────────────────────────────────────────
+router.get(
+  "/xuat-bao-cao",
+  verifyToken,
+  requireAdmin,
+  dashboardController.exportBaoCaoDashboard
+);
+
 module.exports = router;

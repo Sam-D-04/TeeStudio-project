@@ -35,11 +35,13 @@ export type TongQuanChiSo = {
 
 /** Một điểm dữ liệu trên biểu đồ doanh thu */
 export type DiemBieuDo = {
-  ngay: string;       // Ngày đầy đủ "YYYY-MM-DD"
-  nhan: string;       // Nhãn ngày "DD/MM"
+  ngay: string;       // Mốc thời gian của điểm dữ liệu
+  nhan: string;       // Nhãn hiển thị trên trục X
   doanhThuVnd: number;
   soDonHoanTat: number;
 };
+
+export type DashboardGroupBy = "hour" | "day" | "month";
 
 /** Dữ liệu biểu đồ doanh thu */
 export type DuLieuBieuDo = {
@@ -47,6 +49,7 @@ export type DuLieuBieuDo = {
   tongDoanhThuVnd: number;
   tongDonHoanTat: number;
   doanhThuLonNhatVnd: number;
+  groupBy: DashboardGroupBy;
   khoangThoiGian: KhoangThoiGian;
 };
 
@@ -90,6 +93,11 @@ export type ThamSoThoiGian = {
   denNgay?: string;
 };
 
+export type TepBaoCaoDashboard = {
+  blob: Blob;
+  fileName: string;
+};
+
 // =====================================================================
 // CÁC HÀM GỌI API
 // =====================================================================
@@ -114,7 +122,8 @@ export async function layTongQuanChiSo(
 }
 
 /**
- * Lấy dữ liệu biểu đồ doanh thu theo ngày.
+ * Lấy dữ liệu biểu đồ doanh thu. Backend tự chọn nhóm theo giờ/ngày/tháng
+ * dựa trên độ dài khoảng thời gian.
  * GET /api/admin/dashboard/bieu-do-doanh-thu
  */
 export async function layDuLieuBieuDo(
@@ -124,7 +133,6 @@ export async function layDuLieuBieuDo(
   const params: Record<string, string> = {};
   if (tuNgay) params.tuNgay = tuNgay;
   if (denNgay) params.denNgay = denNgay;
-
   const res = await apiClient.get<{ success: boolean; data: DuLieuBieuDo }>(
     "/admin/dashboard/bieu-do-doanh-thu",
     { params }
@@ -176,4 +184,50 @@ export async function laySanPhamBanChay(
     { params }
   );
   return res.data.data;
+}
+
+function layTenTepTuHeader(
+  contentDisposition: string | undefined,
+  fallback: string
+): string {
+  if (!contentDisposition) return fallback;
+
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1].trim());
+    } catch {
+      return fallback;
+    }
+  }
+
+  const fileNameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+  return fileNameMatch?.[1]?.trim() || fallback;
+}
+
+/**
+ * Xuất dữ liệu thô đơn hàng, chi tiết sản phẩm, tồn kho và thiết kế.
+ * GET /api/admin/dashboard/xuat-bao-cao
+ */
+export async function xuatBaoCaoDashboard(
+  tuNgay: string,
+  denNgay: string
+): Promise<TepBaoCaoDashboard> {
+  const fallbackFileName = `bao-cao-dashboard-${tuNgay}-den-${denNgay}.xlsx`;
+  const response = await apiClient.get<Blob>(
+    "/admin/dashboard/xuat-bao-cao",
+    {
+      params: { tuNgay, denNgay },
+      responseType: "blob",
+      timeout: 60_000,
+    }
+  );
+
+  return {
+    blob: response.data,
+    fileName: layTenTepTuHeader(
+      response.headers["content-disposition"],
+      fallbackFileName
+    ),
+  };
 }

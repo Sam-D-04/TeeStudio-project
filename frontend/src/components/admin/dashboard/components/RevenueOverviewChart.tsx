@@ -1,8 +1,15 @@
 import { BarChartOutlined, LoadingOutlined } from "@ant-design/icons";
-import type { DiemBieuDo } from "@/services/admin/dashboardService";
+import dayjs from "dayjs";
+import type {
+  DashboardGroupBy,
+  DiemBieuDo,
+  KhoangThoiGian,
+} from "@/services/admin/dashboardService";
 
 type RevenueOverviewChartProps = {
   data?: DiemBieuDo[];
+  groupBy?: DashboardGroupBy;
+  dateRange?: KhoangThoiGian;
   isLoading?: boolean;
   isError?: boolean;
 };
@@ -24,12 +31,15 @@ function rutGonTienVnd(amount: number): string {
   return `${Math.round(amount).toLocaleString("vi-VN")}đ`;
 }
 
-function taoTapChiSoNhan(soDiem: number): Set<number> {
-  if (soDiem <= 7) {
+function taoTapChiSoNhan(
+  soDiem: number,
+  groupBy: DashboardGroupBy
+): Set<number> {
+  if (soDiem <= 7 || (groupBy === "month" && soDiem <= 12)) {
     return new Set(Array.from({ length: soDiem }, (_, index) => index));
   }
 
-  const soNhanToiDa = soDiem <= 16 ? 5 : 4;
+  const soNhanToiDa = groupBy === "hour" ? 7 : soDiem <= 16 ? 5 : 4;
   return new Set(
     Array.from({ length: soNhanToiDa }, (_, index) =>
       Math.round((index * (soDiem - 1)) / (soNhanToiDa - 1))
@@ -37,8 +47,29 @@ function taoTapChiSoNhan(soDiem: number): Set<number> {
   );
 }
 
+function formatKhoangThoiGian(dateRange?: KhoangThoiGian): string {
+  if (!dateRange) return "";
+
+  const batDau = dayjs(dateRange.tuNgay);
+  const ketThuc = dayjs(dateRange.denNgay);
+
+  if (batDau.isSame(ketThuc, "day")) {
+    return batDau.format("DD/MM/YYYY");
+  }
+
+  return `${batDau.format("DD/MM/YYYY")} - ${ketThuc.format("DD/MM/YYYY")}`;
+}
+
+const groupByDescriptions: Record<DashboardGroupBy, string> = {
+  hour: "theo từng giờ",
+  day: "theo từng ngày",
+  month: "theo từng tháng",
+};
+
 export default function RevenueOverviewChart({
   data = [],
+  groupBy = "day",
+  dateRange,
   isLoading = false,
   isError = false,
 }: RevenueOverviewChartProps) {
@@ -47,10 +78,11 @@ export default function RevenueOverviewChart({
   const tongDonHoanTat = data.reduce((sum, item) => sum + (item.soDonHoanTat || 0), 0);
   const giaTriTrungBinh = tongDonHoanTat > 0 ? tongDoanhThu / tongDonHoanTat : 0;
   const coDoanhThu = maxValue > 0;
-  const nhanTrucX = taoTapChiSoNhan(data.length);
+  const nhanTrucX = taoTapChiSoNhan(data.length, groupBy);
   const chartMinWidth = Math.max(560, data.length * 28);
   const khoangThoiGian =
-    data.length > 0 ? `${data[0]?.nhan} - ${data[data.length - 1]?.nhan}` : "Tháng này";
+    formatKhoangThoiGian(dateRange) ||
+    (data.length > 0 ? `${data[0]?.nhan} - ${data[data.length - 1]?.nhan}` : "Tháng này");
 
   return (
     <section className="admin-card flex h-full flex-col p-5">
@@ -61,7 +93,7 @@ export default function RevenueOverviewChart({
             <span>Biểu đồ doanh thu tổng quan</span>
           </h3>
           <p className="mt-1 text-xs text-text-secondary">
-            Doanh thu từ đơn hàng đã hoàn tất theo từng ngày.
+            Doanh thu từ đơn hàng đã hoàn tất {groupByDescriptions[groupBy]}.
           </p>
         </div>
         <span className="shrink-0 text-sm font-medium text-text-secondary">
@@ -135,8 +167,6 @@ export default function RevenueOverviewChart({
                       item.doanhThuVnd > 0
                         ? Math.max(8, (item.doanhThuVnd / maxValue) * 100)
                         : 1;
-                    const hienNhanGiaTri = data.length <= 12 && item.doanhThuVnd > 0;
-
                     return (
                       <div
                         key={item.ngay || `${item.nhan}-${index}`}
@@ -144,9 +174,7 @@ export default function RevenueOverviewChart({
                         title={`${item.nhan}: ${formatTienVnd(item.doanhThuVnd)} | ${item.soDonHoanTat || 0} đơn hoàn tất`}
                       >
                         <span
-                          className={`pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-[6px] bg-text-main px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm transition-opacity ${
-                            hienNhanGiaTri ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                          }`}
+                          className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-[6px] bg-text-main px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
                           style={{
                             bottom: `min(calc(${heightPct}% + 0.35rem), calc(100% - 1.75rem))`,
                           }}
