@@ -91,20 +91,10 @@ export default function DashboardFilterToolbar({
 
     setIsExporting(true);
     try {
-      const { blob, fileName } = await xuatBaoCaoDashboard(
+      await xuatBaoCaoDashboard(
         startDate.format("YYYY-MM-DD"),
         endDate.format("YYYY-MM-DD")
       );
-      const downloadUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-
-      link.href = downloadUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
-
       messageApi.success("Đã xuất báo cáo Excel thành công.");
     } catch (error) {
       messageApi.error(

@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import type { MouseEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { message } from "antd";
 import PaymentDetailDrawer, { type PaymentDetail } from "./PaymentDetailDrawer";
 import PaymentFilterBar from "./PaymentFilterBar";
 import PaymentPagination from "./PaymentPagination";
@@ -16,6 +17,7 @@ import {
   dongBoLaiVnpay,
   hoanTienGiaoDich,
   luuGhiChu,
+  xuatBaoCaoThanhToan,
   type ThamSoLocGiaoDich,
 } from "@/services/admin/paymentService";
 import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
@@ -34,6 +36,7 @@ import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 
 export default function PaymentPage() {
   const queryClient = useQueryClient();
+  const [messageApi, messageContextHolder] = message.useMessage();
 
   // ===== STATE BỘ LỌC =====
   const [searchValue, setSearchValue] = useState("");
@@ -49,6 +52,7 @@ export default function PaymentPage() {
   // State chi tiết giao dịch
   const [selectedPaymentId, setSelectedPaymentId] = useState<number | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // ===== QUERY: THỐNG KÊ KPI =====
   const statsQuery = useQuery({
@@ -66,8 +70,9 @@ export default function PaymentPage() {
       phuongThuc: methodFilter !== "tat_ca" ? methodFilter : undefined,
       tuKhoa: searchValue || undefined,
       tab: activeTab !== "tat_ca" ? activeTab : undefined,
+      thoiGian: timeFilter === "Hôm nay" ? "hom_nay" : undefined,
     };
-  }, [currentPage, statusFilter, methodFilter, searchValue, activeTab]);
+  }, [currentPage, statusFilter, methodFilter, searchValue, activeTab, timeFilter]);
 
   const listQuery = useQuery({
     queryKey: ["admin-payments", buildFilterParams()],
@@ -199,6 +204,29 @@ export default function PaymentPage() {
     setCurrentPage(1);
   }
 
+  async function handleExportReport() {
+    if (isExporting) return;
+    setIsExporting(true);
+
+    try {
+      const currentFilters = buildFilterParams();
+      await xuatBaoCaoThanhToan({
+        trangThai: currentFilters.trangThai,
+        phuongThuc: currentFilters.phuongThuc,
+        tuKhoa: currentFilters.tuKhoa,
+        tab: currentFilters.tab,
+        thoiGian: currentFilters.thoiGian,
+      });
+      messageApi.success("Đã xuất báo cáo thanh toán thành công.");
+    } catch (error) {
+      messageApi.error(
+        getApiErrorMessage(error, "Không thể xuất báo cáo thanh toán.")
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   // ===== DỮ LIỆU TỪ QUERY =====
   const stats = statsQuery.data;
   const payments = listQuery.data?.danhSach ?? [];
@@ -227,6 +255,7 @@ export default function PaymentPage() {
 
   return (
     <div>
+      {messageContextHolder}
 
       {/* ======== Tiêu đề trang + nút hành động ======== */}
       <section className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
@@ -247,13 +276,15 @@ export default function PaymentPage() {
           {/* Nút phụ: Xuất báo cáo */}
           <button
             type="button"
-            className="flex h-control-h items-center gap-2 rounded-[10px] border border-border bg-surface px-4 text-sm font-semibold text-text-secondary transition-colors hover:bg-surface-alt"
+            disabled={isExporting}
+            onClick={handleExportReport}
+            className="flex h-control-h items-center gap-2 rounded-[10px] border border-border bg-surface px-4 text-sm font-semibold text-text-secondary transition-colors hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-60"
           >
             {/* Icon download */}
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Xuất báo cáo
+            {isExporting ? "Đang xuất..." : "Xuất báo cáo"}
           </button>
 
           {/* Nút chính: Kiểm tra VNPAY */}

@@ -1,8 +1,7 @@
 "use strict";
 
-const ExcelJS = require("exceljs");
 const db = require("../../database/mysql");
-const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const { taoBaoCaoExcel } = require("../../common/utils/excel-report");
 
 function chuanHoaKhoangNgay(tuNgay, denNgay) {
   const ngayHopLe = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -13,12 +12,6 @@ function chuanHoaKhoangNgay(tuNgay, denNgay) {
   const batDau = ngayHopLe(tuNgay) ? tuNgay : `${nam}-${thang}-01`;
   const ketThuc = ngayHopLe(denNgay) ? denNgay : `${nam}-${thang}-${ngay}`;
   return batDau <= ketThuc ? [batDau, ketThuc] : [ketThuc, batDau];
-}
-
-function themSheet(workbook, tenSheet, headers, rows) {
-  const worksheet = workbook.addWorksheet(tenSheet);
-  worksheet.addRow(headers);
-  worksheet.addRows(rows);
 }
 
 async function taoBaoCaoDashboard(tuNgay, denNgay) {
@@ -86,62 +79,52 @@ async function taoBaoCaoDashboard(tuNgay, denNgay) {
     ),
   ]);
 
-  const workbook = new ExcelJS.Workbook();
-  themSheet(
-    workbook,
-    "Đơn hàng",
-    ["ID", "Mã đơn", "Khách hàng", "Email", "Người nhận", "Điện thoại", "Trạng thái",
-      "Số dòng SP", "Tổng số lượng", "Tạm tính", "Giảm giá", "Phí vận chuyển",
-      "Tổng tiền", "Tiền đặt cọc", "Tiền COD", "Lý do hủy", "Phương thức TT",
-      "Trạng thái TT", "Ngày tạo"],
-    donHangResult[0].map((row) => [
-      row.id, row.orderCode, row.fullName, row.email, row.recipientName, row.phone,
-      row.status, Number(row.itemLines), Number(row.totalQty), Number(row.subtotal),
-      Number(row.discountAmount), Number(row.shippingFee), Number(row.totalAmount),
-      Number(row.depositAmount), Number(row.codAmount), row.cancelReason || "",
-      row.paymentMethod || "", row.paymentStatus || "", row.createdAt,
-    ])
-  );
-  themSheet(
-    workbook,
-    "Chi tiết sản phẩm",
-    ["ID dòng", "Mã đơn", "ID sản phẩm", "Sản phẩm", "SKU", "Màu", "Kích cỡ",
-      "Số lượng", "Đơn giá", "Phí thiết kế", "Thành tiền", "Trạng thái sản xuất",
-      "Mã thiết kế", "Trạng thái đơn", "Ngày tạo đơn"],
-    chiTietResult[0].map((row) => [
-      row.id, row.orderCode, row.productId, row.productName, row.sku, row.color,
-      row.size, Number(row.quantity), Number(row.unitPrice), Number(row.designFee),
-      Number(row.lineTotal), row.productionStatus,
-      row.designId ? `DESIGN-${row.designId}` : "", row.orderStatus, row.orderCreatedAt,
-    ])
-  );
-  themSheet(
-    workbook,
-    "Tồn kho",
-    ["ID biến thể", "SKU", "Sản phẩm", "Danh mục", "Màu", "Kích cỡ", "Số lượng tồn",
-      "Trạng thái sản phẩm", "Ngày tạo"],
-    tonKhoResult[0].map((row) => [
-      row.id, row.sku, row.productName, row.categoryName, row.color, row.size,
-      Number(row.stockQty), row.status, row.createdAt,
-    ])
-  );
-  themSheet(
-    workbook,
-    "Quản lý thiết kế",
-    ["Mã thiết kế", "Mã đơn hàng", "Trạng thái thiết kế", "Phí thiết kế",
-      "Ghi chú admin", "Link file thiết kế", "Ngày tạo", "Ngày cập nhật"],
-    thietKeResult[0].map((row) => [
-      `DESIGN-${row.id}`, row.orderCode || "", row.status, Number(row.designFee),
-      row.adminNote || "", row.previewUrl || "", row.createdAt, row.updatedAt,
-    ])
-  );
-
-  const rawBuffer = await workbook.xlsx.writeBuffer();
-  return {
-    buffer: Buffer.isBuffer(rawBuffer) ? rawBuffer : Buffer.from(rawBuffer),
-    fileName: `bao-cao-dashboard-${batDau}-den-${ketThuc}.xlsx`,
-    contentType: XLSX_MIME_TYPE,
-  };
+  return taoBaoCaoExcel(`bao-cao-dashboard-${batDau}-den-${ketThuc}.xlsx`, [
+    {
+      name: "Đơn hàng",
+      headers: ["ID", "Mã đơn", "Khách hàng", "Email", "Người nhận", "Điện thoại",
+        "Trạng thái", "Số dòng SP", "Tổng số lượng", "Tạm tính", "Giảm giá",
+        "Phí vận chuyển", "Tổng tiền", "Tiền đặt cọc", "Tiền COD", "Lý do hủy",
+        "Phương thức TT", "Trạng thái TT", "Ngày tạo"],
+      rows: donHangResult[0].map((row) => [
+        row.id, row.orderCode, row.fullName, row.email, row.recipientName, row.phone,
+        row.status, Number(row.itemLines), Number(row.totalQty), Number(row.subtotal),
+        Number(row.discountAmount), Number(row.shippingFee), Number(row.totalAmount),
+        Number(row.depositAmount), Number(row.codAmount), row.cancelReason || "",
+        row.paymentMethod || "", row.paymentStatus || "", row.createdAt,
+      ]),
+    },
+    {
+      name: "Chi tiết sản phẩm",
+      headers: ["ID dòng", "Mã đơn", "ID sản phẩm", "Sản phẩm", "SKU", "Màu",
+        "Kích cỡ", "Số lượng", "Đơn giá", "Phí thiết kế", "Thành tiền",
+        "Trạng thái sản xuất", "Mã thiết kế", "Trạng thái đơn", "Ngày tạo đơn"],
+      rows: chiTietResult[0].map((row) => [
+        row.id, row.orderCode, row.productId, row.productName, row.sku, row.color,
+        row.size, Number(row.quantity), Number(row.unitPrice), Number(row.designFee),
+        Number(row.lineTotal), row.productionStatus,
+        row.designId ? `DESIGN-${row.designId}` : "", row.orderStatus, row.orderCreatedAt,
+      ]),
+    },
+    {
+      name: "Tồn kho",
+      headers: ["ID biến thể", "SKU", "Sản phẩm", "Danh mục", "Màu", "Kích cỡ",
+        "Số lượng tồn", "Trạng thái sản phẩm", "Ngày tạo"],
+      rows: tonKhoResult[0].map((row) => [
+        row.id, row.sku, row.productName, row.categoryName, row.color, row.size,
+        Number(row.stockQty), row.status, row.createdAt,
+      ]),
+    },
+    {
+      name: "Quản lý thiết kế",
+      headers: ["Mã thiết kế", "Mã đơn hàng", "Trạng thái thiết kế", "Phí thiết kế",
+        "Ghi chú admin", "Link file thiết kế", "Ngày tạo", "Ngày cập nhật"],
+      rows: thietKeResult[0].map((row) => [
+        `DESIGN-${row.id}`, row.orderCode || "", row.status, Number(row.designFee),
+        row.adminNote || "", row.previewUrl || "", row.createdAt, row.updatedAt,
+      ]),
+    },
+  ]);
 }
 
 module.exports = { taoBaoCaoDashboard };

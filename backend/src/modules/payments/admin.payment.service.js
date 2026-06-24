@@ -13,6 +13,7 @@ const {
   PAYMENT_METHOD,
   mapStatusToFrontend,
 } = require("../../common/constants/paymentStatus");
+const { taoBoLocThanhToan } = require("./payment-filter.util");
 
 // =====================================================================
 // PHẦN 1: LOGIC VNPAY RETURN / IPN (GIỮ NGUYÊN)
@@ -254,50 +255,7 @@ async function layDanhSachThanhToan(queryParams) {
   const soMoiTrang = Math.min(100, Math.max(1, parseInt(queryParams.soMoiTrang) || 10));
   const offset = (trang - 1) * soMoiTrang;
 
-  const trangThai = queryParams.trangThai || "tat_ca";
-  const phuongThuc = queryParams.phuongThuc || "tat_ca";
-  const tuKhoa = (queryParams.tuKhoa || "").trim();
-  const tab = queryParams.tab || "tat_ca"; // Tab pill nhanh
-
-  // Xây dựng WHERE động
-  const conditions = [];
-  const params = [];
-
-  // Lọc theo tab (pill nhanh) – tab ưu tiên hơn dropdown trangThai
-  const filterKey = tab !== "tat_ca" ? tab : trangThai;
-
-  if (filterKey && filterKey !== "tat_ca") {
-    if (filterKey === "can_doi_soat") {
-      conditions.push("p.status = 'PENDING' AND p.paymentMethod = 'COD'");
-    } else if (filterKey === "cho_thanh_toan") {
-      conditions.push("p.status = 'PENDING' AND p.paymentMethod = 'VNPAY'");
-    } else if (filterKey === "da_thanh_toan") {
-      conditions.push("p.status = 'COMPLETED'");
-    } else if (filterKey === "that_bai") {
-      conditions.push("p.status IN ('FAILED', 'CANCELLED')");
-    } else if (filterKey === "hoan_tien") {
-      conditions.push("p.status = 'REFUNDED'");
-    }
-  }
-
-  // Lọc theo phương thức thanh toán
-  if (phuongThuc !== "tat_ca") {
-    conditions.push("p.paymentMethod = ?");
-    params.push(phuongThuc.toUpperCase());
-  }
-
-  // Tìm kiếm theo mã đơn hoặc mã giao dịch (transactionId)
-  if (tuKhoa) {
-    conditions.push(
-      "(co.orderCode LIKE ? OR p.transactionId LIKE ? OR a.fullName LIKE ?)"
-    );
-    const like = `%${tuKhoa}%`;
-    params.push(like, like, like);
-  }
-
-  const whereClause = conditions.length > 0
-    ? `WHERE ${conditions.join(" AND ")}`
-    : "";
+  const { whereClause, params } = taoBoLocThanhToan(queryParams);
 
   // Đếm tổng
   const [countRows] = await db.pool.query(

@@ -9,6 +9,7 @@
  */
 
 import apiClient from "@/lib/apiClient";
+import { downloadExcelReport } from "@/lib/downloadExcelReport";
 import type { PaymentStatus } from "@/components/admin/payment/PaymentStatusBadge";
 import type { PaymentType } from "@/components/admin/payment/PaymentTable";
 
@@ -79,6 +80,7 @@ export type ThamSoLocGiaoDich = {
   phuongThuc?: string;
   tuKhoa?: string;
   tab?: string;
+  thoiGian?: string;
 };
 
 // =====================================================================
@@ -185,4 +187,14 @@ export async function luuGhiChu(
     data: { id: number; note: string };
   }>(`/admin/payments/${id}/note`, { note });
   return res.data.data;
+}
+
+export async function xuatBaoCaoThanhToan(
+  thamSo: ThamSoLocGiaoDich = {}
+): Promise<string> {
+  return downloadExcelReport(
+    "/admin/payments/xuat-bao-cao",
+    thamSo,
+    `bao-cao-thanh-toan-${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
 }

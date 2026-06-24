@@ -7,6 +7,8 @@
  */
 
 const paymentService = require("./admin.payment.service");
+const paymentReportService = require("./admin.payment.report.service");
+const { guiBaoCaoExcel } = require("../../common/utils/excel-report");
 
 // =====================================================================
 // PHẦN 1: VNPAY RETURN / IPN (GIỮ NGUYÊN)
@@ -57,6 +59,15 @@ const getDanhSachThanhToan = async (req, res, next) => {
     res.json({ success: true, data });
   } catch (error) {
     next(error);
+  }
+};
+
+const exportBaoCaoThanhToan = async (req, res, next) => {
+  try {
+    const report = await paymentReportService.taoBaoCaoThanhToan(req.query);
+    return guiBaoCaoExcel(res, report);
+  } catch (error) {
+    return next(error);
   }
 };
 
@@ -168,6 +179,7 @@ module.exports = {
   // Admin quản lý thanh toán
   getThongKeThanhToan,
   getDanhSachThanhToan,
+  exportBaoCaoThanhToan,
   getChiTietThanhToan,
   xacNhanThuCod,
   dongBoLaiVnpay,

@@ -7,6 +7,7 @@
 
 const dashboardService = require("./admin.dashboard.service");
 const dashboardReportService = require("./admin.dashboard.report.service");
+const { guiBaoCaoExcel } = require("../../common/utils/excel-report");
 
 // =====================================================================
 // CONTROLLER 1: Thẻ chỉ số tổng quan
@@ -136,19 +137,7 @@ const exportBaoCaoDashboard = async (req, res, next) => {
       denNgay
     );
 
-    const encodedFileName = encodeURIComponent(report.fileName);
-    res.set({
-      "Content-Type": report.contentType,
-      "Content-Disposition":
-        `attachment; filename="${report.fileName}"; ` +
-        `filename*=UTF-8''${encodedFileName}`,
-      "Content-Length": report.buffer.length,
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff",
-      "Access-Control-Expose-Headers": "Content-Disposition",
-    });
-
-    return res.status(200).send(report.buffer);
+    return guiBaoCaoExcel(res, report);
   } catch (error) {
     return next(error);
   }

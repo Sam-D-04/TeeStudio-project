@@ -9,6 +9,7 @@
  */
 
 import apiClient from "@/lib/apiClient";
+import { downloadExcelReport } from "@/lib/downloadExcelReport";
 
 // =====================================================================
 // KIỂU DỮ LIỆU (Types) – khớp với response từ Backend
@@ -91,11 +92,6 @@ export type SanPhamBanChay = {
 export type ThamSoThoiGian = {
   tuNgay?: string;
   denNgay?: string;
-};
-
-export type TepBaoCaoDashboard = {
-  blob: Blob;
-  fileName: string;
 };
 
 // =====================================================================
@@ -186,25 +182,6 @@ export async function laySanPhamBanChay(
   return res.data.data;
 }
 
-function layTenTepTuHeader(
-  contentDisposition: string | undefined,
-  fallback: string
-): string {
-  if (!contentDisposition) return fallback;
-
-  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
-  if (utf8Match?.[1]) {
-    try {
-      return decodeURIComponent(utf8Match[1].trim());
-    } catch {
-      return fallback;
-    }
-  }
-
-  const fileNameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
-  return fileNameMatch?.[1]?.trim() || fallback;
-}
-
 /**
  * Xuất dữ liệu thô đơn hàng, chi tiết sản phẩm, tồn kho và thiết kế.
  * GET /api/admin/dashboard/xuat-bao-cao
@@ -212,22 +189,10 @@ function layTenTepTuHeader(
 export async function xuatBaoCaoDashboard(
   tuNgay: string,
   denNgay: string
-): Promise<TepBaoCaoDashboard> {
-  const fallbackFileName = `bao-cao-dashboard-${tuNgay}-den-${denNgay}.xlsx`;
-  const response = await apiClient.get<Blob>(
+): Promise<string> {
+  return downloadExcelReport(
     "/admin/dashboard/xuat-bao-cao",
-    {
-      params: { tuNgay, denNgay },
-      responseType: "blob",
-      timeout: 60_000,
-    }
+    { tuNgay, denNgay },
+    `bao-cao-dashboard-${tuNgay}-den-${denNgay}.xlsx`
   );
-
-  return {
-    blob: response.data,
-    fileName: layTenTepTuHeader(
-      response.headers["content-disposition"],
-      fallbackFileName
-    ),
-  };
 }

@@ -37,6 +37,13 @@ adminRouter.get(
   paymentController.getThongKeThanhToan
 );
 
+adminRouter.get(
+  "/xuat-bao-cao",
+  verifyToken,
+  requireAdmin,
+  paymentController.exportBaoCaoThanhToan
+);
+
 // GET /api/admin/payments – Danh sách giao dịch (phân trang + lọc)
 adminRouter.get(
   "/",
