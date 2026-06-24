@@ -131,22 +131,6 @@ function validateHangBienThe(hang: HangBienThe): string[] {
   return loi;
 }
 
-function layIdTruongThongTinDauTien(
-  loi: Partial<Record<keyof FormBuoc1, string>>
-): string | null {
-  const thuTuTruong: Array<[keyof FormBuoc1, string]> = [
-    ["tenSanPham", "add-product-ten"],
-    ["danhMucId", "add-product-danh-muc"],
-    ["giaNen", "add-product-gia"],
-    ["chatLieu", "add-product-chat-lieu"],
-    ["formDang", "add-product-form-dang"],
-    ["xuatXu", "add-product-xuat-xu"],
-    ["moTa", "add-product-mo-ta"],
-  ];
-
-  return thuTuTruong.find(([field]) => Boolean(loi[field]))?.[1] ?? null;
-}
-
 // ===== COMPONENT FIELD NHẬP LIỆU =====
 function FormField({
   label,
@@ -160,7 +144,10 @@ function FormField({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div
+      data-error-anchor={error ? "true" : undefined}
+      className="flex flex-col gap-1"
+    >
       <label className="text-[13px] font-semibold text-text-secondary">
         {label}
         {required && <span className="ml-0.5 text-error">*</span>}
@@ -232,7 +219,7 @@ export default function AddProductPage() {
     onError: (error: unknown) => {
       const msg = error instanceof Error ? error.message : "Đã xảy ra lỗi khi thêm biến thể";
       setLoiBuoc2Chung(`Lỗi: ${msg}`);
-      cuonDenTruongLoi("add-product-variant-error");
+      cuonDenLoiDauTien();
     },
   });
 
@@ -250,7 +237,7 @@ export default function AddProductPage() {
     onError: (error: unknown) => {
       const msg = error instanceof Error ? error.message : "Đã xảy ra lỗi khi tạo phôi áo";
       setLoiBuoc1({ tenSanPham: msg });
-      cuonDenTruongLoi("add-product-ten");
+      cuonDenLoiDauTien();
     },
   });
 
@@ -330,9 +317,13 @@ export default function AddProductPage() {
     }));
   }
 
-  function cuonDenTruongLoi(id: string) {
+  function cuonDenLoiDauTien() {
     window.requestAnimationFrame(() => {
-      const element = document.getElementById(id);
+      const element = document.querySelector<HTMLElement>("[data-error-anchor='true']");
+      const focusTarget =
+        element?.matches("input, select, textarea, button")
+          ? element
+          : element?.querySelector<HTMLElement>("input, select, textarea, button");
       if (!element) return;
 
       element.scrollIntoView({
@@ -340,31 +331,8 @@ export default function AddProductPage() {
         block: "center",
       });
 
-      if (
-        element instanceof HTMLInputElement ||
-        element instanceof HTMLSelectElement ||
-        element instanceof HTMLTextAreaElement ||
-        element instanceof HTMLButtonElement
-      ) {
-        element.focus({ preventScroll: true });
-      }
+      focusTarget?.focus({ preventScroll: true });
     });
-  }
-
-  function layIdTruongBienTheLoiDauTien(): string | null {
-    for (const hang of danhSachBienThe) {
-      if (!hang.mauSac.trim()) return `add-product-variant-color-${hang.key}`;
-      if (!hang.kichThuoc.trim()) return `add-product-variant-size-${hang.key}`;
-      if (!hang.maSKU.trim()) return `add-product-variant-sku-${hang.key}`;
-      if (
-        hang.tonKhoBanDau.trim() &&
-        (isNaN(Number(hang.tonKhoBanDau)) || Number(hang.tonKhoBanDau) < 0)
-      ) {
-        return `add-product-variant-stock-${hang.key}`;
-      }
-    }
-
-    return "add-product-variant-error";
   }
 
   function xuLyLuu() {
@@ -398,10 +366,7 @@ export default function AddProductPage() {
     setLoiBuoc2Chung(tatCaLoi[0] ?? "");
 
     if (Object.keys(loiThongTin).length > 0 || tatCaLoi.length > 0) {
-      const idTruongLoi =
-        layIdTruongThongTinDauTien(loiThongTin) ??
-        layIdTruongBienTheLoiDauTien();
-      if (idTruongLoi) cuonDenTruongLoi(idTruongLoi);
+      cuonDenLoiDauTien();
       return;
     }
 
@@ -430,6 +395,17 @@ export default function AddProductPage() {
 
   const textareaClass =
     "w-full resize-none rounded-[8px] border border-border bg-surface-alt px-3 py-2.5 text-body-md text-text-main outline-none transition-all placeholder:text-text-muted focus:border-primary-container focus:ring-1 focus:ring-primary-container";
+
+  const coLoiTruongBienThe =
+    Boolean(loiBuoc2Chung) &&
+    danhSachBienThe.some(
+      (hang) =>
+        !hang.mauSac.trim() ||
+        !hang.kichThuoc.trim() ||
+        !hang.maSKU.trim() ||
+        (hang.tonKhoBanDau.trim() &&
+          (isNaN(Number(hang.tonKhoBanDau)) || Number(hang.tonKhoBanDau) < 0))
+    );
 
   return (
     <div className="pb-12">
@@ -646,7 +622,7 @@ export default function AddProductPage() {
                 {/* Thông báo lỗi chung của phần biến thể */}
                 {loiBuoc2Chung && (
                   <div
-                    id="add-product-variant-error"
+                    data-error-anchor={!coLoiTruongBienThe ? "true" : undefined}
                     className="flex items-center gap-2 rounded-[8px] border border-error/30 bg-error/5 px-4 py-2.5 text-[13px] text-error"
                   >
                     <span>⚠️</span>
@@ -693,7 +669,9 @@ export default function AddProductPage() {
                                 title="Chọn màu nhanh"
                               />
                               <input
-                                id={`add-product-variant-color-${hang.key}`}
+                                data-error-anchor={
+                                  loiBuoc2Chung && !hang.mauSac.trim() ? "true" : undefined
+                                }
                                 type="text"
                                 value={hang.mauSac}
                                 onChange={(e) =>
@@ -741,14 +719,14 @@ export default function AddProductPage() {
 
                         {/* Ô kích thước và các lựa chọn nhanh */}
                         <td className="px-3 py-2">
-                          <div className="flex flex-wrap gap-1">
+                          <div
+                            data-error-anchor={
+                              loiBuoc2Chung && !hang.kichThuoc.trim() ? "true" : undefined
+                            }
+                            className="flex flex-wrap gap-1"
+                          >
                             {DS_SIZE_GOI_Y.map((sz) => (
                               <button
-                                id={
-                                  sz === DS_SIZE_GOI_Y[0]
-                                    ? `add-product-variant-size-${hang.key}`
-                                    : undefined
-                                }
                                 key={sz}
                                 type="button"
                                 onClick={() =>
@@ -769,7 +747,9 @@ export default function AddProductPage() {
                         {/* SKU */}
                         <td className="px-3 py-2">
                           <input
-                            id={`add-product-variant-sku-${hang.key}`}
+                            data-error-anchor={
+                              loiBuoc2Chung && !hang.maSKU.trim() ? "true" : undefined
+                            }
                             type="text"
                             value={hang.maSKU}
                             onChange={(e) =>
@@ -784,7 +764,14 @@ export default function AddProductPage() {
                         {/* Tồn kho */}
                         <td className="px-3 py-2">
                           <input
-                            id={`add-product-variant-stock-${hang.key}`}
+                            data-error-anchor={
+                              loiBuoc2Chung &&
+                              hang.tonKhoBanDau.trim() &&
+                              (isNaN(Number(hang.tonKhoBanDau)) ||
+                                Number(hang.tonKhoBanDau) < 0)
+                                ? "true"
+                                : undefined
+                            }
                             type="number"
                             value={hang.tonKhoBanDau}
                             onChange={(e) =>
