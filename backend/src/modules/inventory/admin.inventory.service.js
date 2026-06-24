@@ -21,14 +21,26 @@ const db = require("../../database/mysql");
 /** Số lượng ≤ ngưỡng này → trạng thái "sap_het" */
 const NGUONG_SAP_HET = 20;
 
+const RESERVED_STOCK_JOIN = `
+  LEFT JOIN (
+    SELECT oi.variantId, SUM(oi.quantity) AS daGiu
+    FROM OrderItem oi
+    INNER JOIN CustomerOrder co ON co.id = oi.orderId
+    WHERE co.status IN ('PENDING','CONFIRMED','PRINTING','PRINTED','PACKING')
+    GROUP BY oi.variantId
+  ) reservedStock ON reservedStock.variantId = pv.id
+`;
+
+const AVAILABLE_STOCK_SQL = `(pv.stockQty - COALESCE(reservedStock.daGiu, 0))`;
+
 /**
- * Tính trạng thái tồn kho từ stockQty.
- * @param {number} stockQty
+ * Tính trạng thái tồn kho từ số lượng khả dụng.
+ * @param {number} availableQty
  * @returns {"con_hang"|"sap_het"|"het_hang"}
  */
-function tinhTrangThaiTonKho(stockQty) {
-  if (stockQty <= 0) return "het_hang";
-  if (stockQty <= NGUONG_SAP_HET) return "sap_het";
+function tinhTrangThaiTonKho(availableQty) {
+  if (availableQty <= 0) return "het_hang";
+  if (availableQty <= NGUONG_SAP_HET) return "sap_het";
   return "con_hang";
 }
 
@@ -39,27 +51,29 @@ function tinhTrangThaiTonKho(stockQty) {
 /**
  * Lấy 4 thẻ thống kê KPI đầu trang kho hàng.
  * - Tổng phôi còn tồn (SUM stockQty)
- * - Biến thể sắp hết (stockQty > 0 AND <= NGUONG_SAP_HET)
+ * - Biến thể sắp hết (available > 0 AND <= NGUONG_SAP_HET)
  * - Cần xuất cho đơn in (tổng số áo đang bị giữ = quantityChanged âm chưa hoàn)
  * - Nhập kho trong tháng này (SUM quantityChanged > 0 trong tháng)
  */
 async function layThongKeKho() {
   // Tổng phôi còn tồn
-  const [tongPhoi] = await db.query(
+  const tongPhoi = await db.query(
     `SELECT COALESCE(SUM(stockQty), 0) AS tongPhoi FROM ProductVariant`
   );
 
   // Biến thể sắp hết
-  const [sapHet] = await db.query(
+  const sapHet = await db.query(
     `SELECT COUNT(*) AS sapHet
-     FROM ProductVariant
-     WHERE stockQty > 0 AND stockQty <= ?`,
+     FROM ProductVariant pv
+     ${RESERVED_STOCK_JOIN}
+     WHERE ${AVAILABLE_STOCK_SQL} > 0
+       AND ${AVAILABLE_STOCK_SQL} <= ?`,
     [NGUONG_SAP_HET]
   );
 
   // Số áo đang bị giữ = SUM của các giao dịch ORDER_EXPORT âm chưa RETURN
   // Đơn giản hóa: tổng số lượng đặt hàng đang chờ xử lý
-  const [daGiu] = await db.query(
+  const daGiu = await db.query(
     `SELECT COALESCE(SUM(oi.quantity), 0) AS daGiu
      FROM OrderItem oi
      INNER JOIN CustomerOrder co ON co.id = oi.orderId
@@ -67,7 +81,7 @@ async function layThongKeKho() {
   );
 
   // Nhập kho trong tháng hiện tại
-  const [nhapThang] = await db.query(
+  const nhapThang = await db.query(
     `SELECT COALESCE(SUM(quantityChanged), 0) AS nhapThang
      FROM InventoryTransaction
      WHERE transactionType IN ('IMPORT')
@@ -116,11 +130,13 @@ async function layDanhSachTonKho(params = {}) {
 
   // Lọc theo trạng thái tồn kho
   if (boLoc === "sap_het") {
-    conditions.push(`pv.stockQty > 0 AND pv.stockQty <= ${NGUONG_SAP_HET}`);
+    conditions.push(
+      `${AVAILABLE_STOCK_SQL} > 0 AND ${AVAILABLE_STOCK_SQL} <= ${NGUONG_SAP_HET}`
+    );
   } else if (boLoc === "het_hang") {
-    conditions.push(`pv.stockQty <= 0`);
+    conditions.push(`${AVAILABLE_STOCK_SQL} <= 0`);
   } else if (boLoc === "con_hang") {
-    conditions.push(`pv.stockQty > ${NGUONG_SAP_HET}`);
+    conditions.push(`${AVAILABLE_STOCK_SQL} > ${NGUONG_SAP_HET}`);
   } else if (boLoc !== "tat_ca") {
     // Lọc theo tên sản phẩm (partial match)
     conditions.push(`p.name LIKE ?`);
@@ -134,6 +150,7 @@ async function layDanhSachTonKho(params = {}) {
     `SELECT COUNT(*) AS total
      FROM ProductVariant pv
      INNER JOIN Product p ON p.id = pv.productId
+     ${RESERVED_STOCK_JOIN}
      ${whereClause}`,
     values
   );
@@ -148,15 +165,10 @@ async function layDanhSachTonKho(params = {}) {
        pv.size,
        pv.sku,
        pv.stockQty AS tonHienTai,
-       COALESCE((
-         SELECT SUM(oi.quantity)
-         FROM OrderItem oi
-         INNER JOIN CustomerOrder co ON co.id = oi.orderId
-         WHERE oi.variantId = pv.id
-           AND co.status IN ('PENDING','CONFIRMED','PRINTING','PRINTED','PACKING')
-       ), 0) AS daGiu
+       COALESCE(reservedStock.daGiu, 0) AS daGiu
      FROM ProductVariant pv
      INNER JOIN Product p ON p.id = pv.productId
+     ${RESERVED_STOCK_JOIN}
      ${whereClause}
      ORDER BY p.name ASC, pv.color ASC, FIELD(pv.size,'XS','S','M','L','XL','XXL','2XL','3XL')
      LIMIT ? OFFSET ?`,
@@ -166,7 +178,7 @@ async function layDanhSachTonKho(params = {}) {
   const danhSach = rows.map((row) => {
     const daGiu = Number(row.daGiu);
     const tonHienTai = Number(row.tonHienTai);
-    const khaDung = Math.max(0, tonHienTai - daGiu);
+    const khaDung = tonHienTai - daGiu;
     return {
       id: row.id,
       ten: row.ten,
@@ -176,7 +188,7 @@ async function layDanhSachTonKho(params = {}) {
       tonHienTai,
       daGiu,
       khaDung,
-      trangThai: tinhTrangThaiTonKho(tonHienTai),
+      trangThai: tinhTrangThaiTonKho(khaDung),
     };
   });
 
@@ -206,15 +218,10 @@ async function layChiTietBienThe(variantId) {
        pv.size,
        pv.sku,
        pv.stockQty AS tonHienTai,
-       COALESCE((
-         SELECT SUM(oi.quantity)
-         FROM OrderItem oi
-         INNER JOIN CustomerOrder co ON co.id = oi.orderId
-         WHERE oi.variantId = pv.id
-           AND co.status IN ('PENDING','CONFIRMED','PRINTING','PRINTED','PACKING')
-       ), 0) AS daGiu
+       COALESCE(reservedStock.daGiu, 0) AS daGiu
      FROM ProductVariant pv
      INNER JOIN Product p ON p.id = pv.productId
+     ${RESERVED_STOCK_JOIN}
      WHERE pv.id = ?`,
     [variantId]
   );
@@ -228,7 +235,7 @@ async function layChiTietBienThe(variantId) {
   const row = rows[0];
   const daGiu = Number(row.daGiu);
   const tonHienTai = Number(row.tonHienTai);
-  const khaDung = Math.max(0, tonHienTai - daGiu);
+  const khaDung = tonHienTai - daGiu;
 
   return {
     id: row.id,
@@ -239,7 +246,7 @@ async function layChiTietBienThe(variantId) {
     tonHienTai,
     daGiu,
     khaDung,
-    trangThai: tinhTrangThaiTonKho(tonHienTai),
+    trangThai: tinhTrangThaiTonKho(khaDung),
   };
 }
 

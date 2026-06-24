@@ -63,7 +63,8 @@ const getCanhBaoTonKho = async (req, res, next) => {
 /**
  * GET /api/admin/products
  * Lấy danh sách phôi áo có phân trang và bộ lọc.
- * Query params: trang, soMoiTrang, tuKhoa, danhMuc, trangThai, tonKho
+ * Query params: trang, soMoiTrang, tuKhoa, danhMuc, trangThai,
+ * tonKho (tat_ca | ban_chay | con_hang | sap_het | het_hang)
  */
 const getDanhSachSanPham = async (req, res, next) => {
   try {

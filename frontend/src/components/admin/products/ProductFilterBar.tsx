@@ -5,7 +5,7 @@
  * 1. Ô tìm kiếm (theo tên phôi áo)
  * 2. Dropdown lọc danh mục – lấy từ API (không hardcode)
  * 3. Dropdown lọc trạng thái (Đang hiển thị / Đang ẩn)
- * 4. Nhóm pill filter: Tất cả / Còn hàng / Sắp hết / Hết hàng
+ * 4. Nhóm pill filter: Tất cả / Bán chạy / Còn hàng / Sắp hết / Hết hàng
  *
  * Tất cả state lọc được quản lý ở ProductsPage và truyền xuống qua props.
  */
@@ -16,7 +16,12 @@ import * as productService from "@/services/admin/productService";
 
 // ===== KIỂU DỮ LIỆU CHO FILTER =====
 // Mỗi pill filter kho có giá trị (value) và nhãn hiển thị (label)
-type StockPillFilter = "tat_ca" | "con_hang" | "sap_het" | "het_hang";
+type StockPillFilter =
+  | "tat_ca"
+  | "ban_chay"
+  | "con_hang"
+  | "sap_het"
+  | "het_hang";
 
 type ProductFilterBarProps = {
   /** Từ khóa tìm kiếm hiện tại */
@@ -43,6 +48,7 @@ type ProductFilterBarProps = {
 // Cấu hình các pill filter tồn kho
 const stockPills: { value: StockPillFilter; label: string; dotColor?: string }[] = [
   { value: "tat_ca", label: "Tất cả" },
+  { value: "ban_chay", label: "Bán chạy", dotColor: "#0ea5e9" },
   { value: "con_hang", label: "Còn hàng" },
   { value: "sap_het", label: "Sắp hết", dotColor: "#f59e0b" },
   { value: "het_hang", label: "Hết hàng", dotColor: "#ea580c" },
@@ -66,11 +72,39 @@ export default function ProductFilterBar({
   });
 
   return (
-    // Thanh filter: nền trắng ngà nhẹ, border bên dưới
-    <div className="flex flex-col gap-4 border-b border-border bg-surface-alt/30 p-5 lg:flex-row lg:items-center lg:justify-between">
-      
-      {/* ===== Nhóm trái: tìm kiếm + dropdown ===== */}
-      <div className="flex flex-col gap-3 sm:flex-row">
+    // Thanh filter: nhóm pill ở hàng riêng phía trên, các trường lọc ở dưới
+    <div className="flex flex-col gap-4 border-b border-border bg-surface-alt/30 p-5">
+      {/* ===== Hàng 1: pill filter ===== */}
+      {/* overflow-x-auto để scroll ngang trên mobile */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {stockPills.map((pill) => {
+          const isActive = stockFilter === pill.value;
+
+          return (
+            <button
+              key={pill.value}
+              type="button"
+              onClick={() => onStockFilterChange(pill.value)}
+              className={`flex shrink-0 items-center gap-1 rounded-full px-4 py-1.5 text-label-bold font-bold transition-colors ${
+                isActive
+                  ? "border border-primary-container/40 bg-primary-container/10 text-primary-container"
+                  : "border border-border bg-surface text-text-secondary hover:bg-surface-alt"
+              }`}
+            >
+              {pill.label}
+              {pill.dotColor && (
+                <span
+                  className="inline-block h-2 w-2 rounded-full"
+                  style={{ backgroundColor: pill.dotColor }}
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ===== Hàng 2: tìm kiếm + dropdown ===== */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         
         {/* Ô tìm kiếm theo tên phôi áo */}
         <label className="relative flex h-control-h w-full items-center rounded-[10px] border border-border bg-surface-alt px-3 text-text-secondary transition-all focus-within:border-primary-container focus-within:ring-1 focus-within:ring-primary-container sm:w-[280px]">
@@ -113,39 +147,6 @@ export default function ProductFilterBar({
           <option value="dang_hien_thi">Đang hiển thị</option>
           <option value="dang_an">Đang ẩn</option>
         </select>
-      </div>
-
-      {/* ===== Nhóm phải: pill filter tồn kho ===== */}
-      {/* overflow-x-auto để scroll ngang trên mobile */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
-        {stockPills.map((pill) => {
-          // Kiểm tra pill đang được chọn
-          const isActive = stockFilter === pill.value;
-
-          return (
-            <button
-              key={pill.value}
-              type="button"
-              onClick={() => onStockFilterChange(pill.value)}
-              className={`flex shrink-0 items-center gap-1 rounded-full px-4 py-1.5 text-label-bold font-bold transition-colors ${
-                isActive
-                  ? // Active: nền xanh nhạt + viền xanh + chữ xanh
-                    "border border-primary-container/40 bg-primary-container/10 text-primary-container"
-                  : // Inactive: nền trắng + viền xám + chữ xám
-                    "border border-border bg-surface text-text-secondary hover:bg-surface-alt"
-              }`}
-            >
-              {pill.label}
-              {/* Chấm màu nhỏ bên cạnh (chỉ có ở "Sắp hết" và "Hết hàng") */}
-              {pill.dotColor && (
-                <span
-                  className="inline-block h-2 w-2 rounded-full"
-                  style={{ backgroundColor: pill.dotColor }}
-                />
-              )}
-            </button>
-          );
-        })}
       </div>
     </div>
   );

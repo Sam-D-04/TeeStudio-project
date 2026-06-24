@@ -75,7 +75,11 @@ export type TonKhoItem = {
   name: string;
   detail: string;
   sku: string;
+  stockQty: number;
+  reservedQty: number;
+  availableQty: number;
   quantity: number;
+  status: "con_hang" | "sap_het" | "het_hang";
 };
 
 /** Một sản phẩm bán chạy */

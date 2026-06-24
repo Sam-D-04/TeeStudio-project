@@ -10,6 +10,21 @@ const db = require("../../database/mysql");
 // =====================================================================
 /** Ngưỡng cảnh báo sắp hết hàng */
 const NGUONG_SAP_HET = 10;
+const TRANG_THAI_DON_GIU_HANG =
+  "'PENDING','CONFIRMED','PRINTING','PRINTED','PACKING'";
+
+const RESERVED_STOCK_JOIN = `
+  LEFT JOIN (
+    SELECT oi.variantId, SUM(oi.quantity) AS reservedQty
+    FROM OrderItem oi
+    INNER JOIN CustomerOrder co ON co.id = oi.orderId
+    WHERE co.status IN (${TRANG_THAI_DON_GIU_HANG})
+    GROUP BY oi.variantId
+  ) reservedStock ON reservedStock.variantId = pv.id
+`;
+
+const AVAILABLE_STOCK_SQL =
+  "(pv.stockQty - COALESCE(reservedStock.reservedQty, 0))";
 
 // =====================================================================
 // MAP TRẠNG THÁI: DB (tiếng Anh) ↔ Frontend (tiếng Việt snake_case)
@@ -25,11 +40,11 @@ const MAP_TRANG_THAI_FE_SANG_DB = {
 };
 
 /**
- * Tính trạng thái tồn kho từ số lượng
+ * Tính trạng thái tồn kho từ số lượng khả dụng.
  */
-function tinhTrangThaiTonKho(stockQty) {
-  if (stockQty === 0) return "het_hang";
-  if (stockQty <= NGUONG_SAP_HET) return "sap_het";
+function tinhTrangThaiTonKho(availableQty) {
+  if (availableQty <= 0) return "het_hang";
+  if (availableQty <= NGUONG_SAP_HET) return "sap_het";
   return "con_hang";
 }
 
@@ -62,7 +77,11 @@ async function layThongKe() {
     "SELECT COUNT(*) AS so_luong FROM ProductVariant pv JOIN Product p ON p.id = pv.productId"
   );
   const [rowsSapHet] = await db.pool.query(
-    `SELECT COUNT(*) AS so_luong FROM ProductVariant WHERE stockQty > 0 AND stockQty <= ?`,
+    `SELECT COUNT(*) AS so_luong
+     FROM ProductVariant pv
+     ${RESERVED_STOCK_JOIN}
+     WHERE ${AVAILABLE_STOCK_SQL} > 0
+       AND ${AVAILABLE_STOCK_SQL} <= ?`,
     [NGUONG_SAP_HET]
   );
 
@@ -94,6 +113,25 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
 
   const dieuKien = [];
   const thamSo = [];
+  const laLocBanChay = tonKho === "ban_chay";
+  const bestSellerJoin = laLocBanChay
+    ? `
+      INNER JOIN (
+        SELECT
+          pvSales.productId,
+          SUM(oiSales.lineTotal) AS salesRevenue
+        FROM OrderItem oiSales
+        INNER JOIN ProductVariant pvSales ON pvSales.id = oiSales.variantId
+        INNER JOIN CustomerOrder coSales ON coSales.id = oiSales.orderId
+        WHERE coSales.status IN ('COMPLETED', 'SHIPPING')
+          AND DATE(coSales.updatedAt) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+          AND DATE(coSales.updatedAt) <= LAST_DAY(CURDATE())
+        GROUP BY pvSales.productId
+        ORDER BY salesRevenue DESC
+        LIMIT 3
+      ) bestSeller ON bestSeller.productId = p.id
+    `
+    : "";
 
   if (tuKhoa && tuKhoa.trim()) {
     dieuKien.push("(p.name LIKE ? OR p.slug LIKE ?)");
@@ -113,6 +151,33 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
     }
   }
 
+  if (tonKho && tonKho !== "tat_ca" && !laLocBanChay) {
+    let dieuKienTonKho;
+    if (tonKho === "het_hang") {
+      dieuKienTonKho = `${AVAILABLE_STOCK_SQL} <= 0`;
+    } else if (tonKho === "sap_het") {
+      dieuKienTonKho =
+        `${AVAILABLE_STOCK_SQL} > 0 AND ${AVAILABLE_STOCK_SQL} <= ?`;
+    } else if (tonKho === "con_hang") {
+      dieuKienTonKho = `${AVAILABLE_STOCK_SQL} > ?`;
+    }
+
+    if (dieuKienTonKho) {
+      dieuKien.push(`
+        EXISTS (
+          SELECT 1
+          FROM ProductVariant pv
+          ${RESERVED_STOCK_JOIN}
+          WHERE pv.productId = p.id
+            AND ${dieuKienTonKho}
+        )
+      `);
+      if (tonKho === "sap_het" || tonKho === "con_hang") {
+        thamSo.push(NGUONG_SAP_HET);
+      }
+    }
+  }
+
   const menh_de_where =
     dieuKien.length > 0 ? "WHERE " + dieuKien.join(" AND ") : "";
 
@@ -121,6 +186,7 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
     SELECT COUNT(DISTINCT p.id) AS tong_so
     FROM Product p
     LEFT JOIN Category c ON c.id = p.categoryId
+    ${bestSellerJoin}
     ${menh_de_where}
   `;
   const [rowsDem] = await db.pool.query(sqlDem, thamSo);
@@ -139,8 +205,9 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
       c.name AS categoryName
     FROM Product p
     LEFT JOIN Category c ON c.id = p.categoryId
+    ${bestSellerJoin}
     ${menh_de_where}
-    ORDER BY p.id DESC
+    ORDER BY ${laLocBanChay ? "bestSeller.salesRevenue DESC" : "p.id DESC"}
     LIMIT ? OFFSET ?
   `;
   const [rowsProduct] = await db.pool.query(sqlData, [...thamSo, soMoi, offset]);
@@ -152,8 +219,16 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
   // Lấy biến thể của các sản phẩm này
   const productIds = rowsProduct.map((p) => p.id);
   const [rowsVariants] = await db.pool.query(
-    `SELECT id, productId, color, size, sku, stockQty
-     FROM ProductVariant
+    `SELECT
+       pv.id,
+       pv.productId,
+       pv.color,
+       pv.size,
+       pv.sku,
+       pv.stockQty,
+       COALESCE(reservedStock.reservedQty, 0) AS reservedQty
+     FROM ProductVariant pv
+     ${RESERVED_STOCK_JOIN}
      WHERE productId IN (?)
      ORDER BY productId, color, size`,
     [productIds]
@@ -167,19 +242,27 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
   }
 
   // Lọc theo tồn kho (client-side sau khi lấy variants)
-  let danhSach = rowsProduct.map((p) => {
+  const danhSach = rowsProduct.map((p) => {
     const variants = variantMap[p.id] || [];
 
     // Xác định màu hex từ tên màu (frontend dùng colorHex để vẽ chấm màu)
-    const mappedVariants = variants.map((v) => ({
-      id: v.id,
-      colorName: v.color,
-      colorHex: mapMauSangHex(v.color),
-      size: v.size,
-      sku: v.sku,
-      stock: v.stockQty,
-      inventoryStatus: tinhTrangThaiTonKho(v.stockQty),
-    }));
+    const mappedVariants = variants.map((v) => {
+      const stock = Number(v.stockQty);
+      const reserved = Number(v.reservedQty);
+      const available = stock - reserved;
+
+      return {
+        id: v.id,
+        colorName: v.color,
+        colorHex: mapMauSangHex(v.color),
+        size: v.size,
+        sku: v.sku,
+        stock,
+        reserved,
+        available,
+        inventoryStatus: tinhTrangThaiTonKho(available),
+      };
+    });
 
     return {
       id: p.id,
@@ -193,13 +276,6 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
       variants: mappedVariants,
     };
   });
-
-  // Lọc theo tồn kho nếu có
-  if (tonKho && tonKho !== "tat_ca") {
-    danhSach = danhSach.filter((p) =>
-      p.variants.some((v) => v.inventoryStatus === tonKho)
-    );
-  }
 
   return {
     danhSach,
@@ -246,25 +322,36 @@ async function layCanhBaoTonKho() {
        pv.size,
        pv.sku,
        pv.stockQty,
+       COALESCE(reservedStock.reservedQty, 0) AS reservedQty,
+       ${AVAILABLE_STOCK_SQL} AS availableQty,
        p.name AS tenSanPham
      FROM ProductVariant pv
      JOIN Product p ON p.id = pv.productId
-     WHERE pv.stockQty <= ?
-     ORDER BY pv.stockQty ASC, p.name ASC
+     ${RESERVED_STOCK_JOIN}
+     WHERE ${AVAILABLE_STOCK_SQL} <= ?
+     ORDER BY availableQty ASC, p.name ASC
      LIMIT 20`,
     [NGUONG_SAP_HET]
   );
 
-  return rows.map((r) => ({
-    id: r.id,
-    productName: r.tenSanPham,
-    colorName: r.color,
-    colorHex: mapMauSangHex(r.color),
-    size: r.size,
-    sku: r.sku,
-    stock: r.stockQty,
-    severity: tinhTrangThaiTonKho(r.stockQty),
-  }));
+  return rows.map((r) => {
+    const stock = Number(r.stockQty);
+    const reserved = Number(r.reservedQty);
+    const available = stock - reserved;
+
+    return {
+      id: r.id,
+      productName: r.tenSanPham,
+      colorName: r.color,
+      colorHex: mapMauSangHex(r.color),
+      size: r.size,
+      sku: r.sku,
+      stock,
+      reserved,
+      available,
+      severity: tinhTrangThaiTonKho(available),
+    };
+  });
 }
 
 // =====================================================================
@@ -289,7 +376,17 @@ async function layChiTietSanPham(id) {
   const p = rows[0];
 
   const [variants] = await db.pool.query(
-    "SELECT id, color, size, sku, stockQty FROM ProductVariant WHERE productId = ? ORDER BY color, size",
+    `SELECT
+       pv.id,
+       pv.color,
+       pv.size,
+       pv.sku,
+       pv.stockQty,
+       COALESCE(reservedStock.reservedQty, 0) AS reservedQty
+     FROM ProductVariant pv
+     ${RESERVED_STOCK_JOIN}
+     WHERE pv.productId = ?
+     ORDER BY pv.color, pv.size`,
     [id]
   );
 
@@ -310,15 +407,23 @@ async function layChiTietSanPham(id) {
     description: p.description,
     basePrice: Number(p.basePrice),
     displayStatus: MAP_TRANG_THAI_DB_SANG_FE[p.status] || "dang_hien_thi",
-    variants: variants.map((v) => ({
-      id: v.id,
-      colorName: v.color,
-      colorHex: mapMauSangHex(v.color),
-      size: v.size,
-      sku: v.sku,
-      stock: v.stockQty,
-      inventoryStatus: tinhTrangThaiTonKho(v.stockQty),
-    })),
+    variants: variants.map((v) => {
+      const stock = Number(v.stockQty);
+      const reserved = Number(v.reservedQty);
+      const available = stock - reserved;
+
+      return {
+        id: v.id,
+        colorName: v.color,
+        colorHex: mapMauSangHex(v.color),
+        size: v.size,
+        sku: v.sku,
+        stock,
+        reserved,
+        available,
+        inventoryStatus: tinhTrangThaiTonKho(available),
+      };
+    }),
     images: images.map((img) => ({
       id: img.id,
       url: img.imageUrl,
@@ -484,14 +589,18 @@ async function themBienThe(productId, { color, size, sku, stockQty }) {
     [productId, color, size, sku, stockQty || 0]
   );
 
+  const stock = Number(stockQty) || 0;
+
   return {
     id: result.insertId,
     colorName: color,
     colorHex: mapMauSangHex(color),
     size,
     sku,
-    stock: stockQty || 0,
-    inventoryStatus: tinhTrangThaiTonKho(stockQty || 0),
+    stock,
+    reserved: 0,
+    available: stock,
+    inventoryStatus: tinhTrangThaiTonKho(stock),
   };
 }
 
@@ -527,10 +636,22 @@ async function capNhatBienThe(productId, variantId, { color, size, sku, stockQty
   await db.execute(`UPDATE ProductVariant SET ${fields.join(", ")} WHERE id = ?`, params);
 
   const [updated] = await db.pool.query(
-    "SELECT id, color, size, sku, stockQty FROM ProductVariant WHERE id = ?",
+    `SELECT
+       pv.id,
+       pv.color,
+       pv.size,
+       pv.sku,
+       pv.stockQty,
+       COALESCE(reservedStock.reservedQty, 0) AS reservedQty
+     FROM ProductVariant pv
+     ${RESERVED_STOCK_JOIN}
+     WHERE pv.id = ?`,
     [variantId]
   );
   const v = updated[0];
+  const stock = Number(v.stockQty);
+  const reserved = Number(v.reservedQty);
+  const available = stock - reserved;
 
   return {
     id: v.id,
@@ -538,8 +659,10 @@ async function capNhatBienThe(productId, variantId, { color, size, sku, stockQty
     colorHex: mapMauSangHex(v.color),
     size: v.size,
     sku: v.sku,
-    stock: v.stockQty,
-    inventoryStatus: tinhTrangThaiTonKho(v.stockQty),
+    stock,
+    reserved,
+    available,
+    inventoryStatus: tinhTrangThaiTonKho(available),
   };
 }
 

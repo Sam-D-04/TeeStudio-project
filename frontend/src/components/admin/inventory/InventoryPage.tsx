@@ -43,6 +43,13 @@ import * as inventoryService from "@/services/admin/inventoryService";
 
 // Số dòng hiển thị mỗi trang
 const SO_MOI_TRANG = 10;
+const NGUONG_SAP_HET = 20;
+
+function tinhTrangThaiTheoKhaDung(khaDung: number): InventoryItem["trangThai"] {
+  if (khaDung <= 0) return "het_hang";
+  if (khaDung <= NGUONG_SAP_HET) return "sap_het";
+  return "con_hang";
+}
 
 export default function InventoryPage() {
   // ===== TRẠNG THÁI UI =====
@@ -93,7 +100,16 @@ export default function InventoryPage() {
     placeholderData: (prev) => prev, // giữ dữ liệu cũ khi đang tải trang mới
   });
 
-  const danhSachHienThi = ketQuaDanhSach?.danhSach ?? [];
+  const danhSachHienThi: InventoryItem[] = (ketQuaDanhSach?.danhSach ?? []).map(
+    (item) => {
+      const khaDung = item.tonHienTai - item.daGiu;
+      return {
+        ...item,
+        khaDung,
+        trangThai: tinhTrangThaiTheoKhaDung(khaDung),
+      };
+    }
+  );
   const tongSo = ketQuaDanhSach?.tongSo ?? 0;
   const tongSoTrang = ketQuaDanhSach?.tongSoTrang ?? 1;
 

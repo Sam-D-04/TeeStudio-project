@@ -130,7 +130,8 @@ export default function AdminDashboard() {
     variantId: item.variantId,
     name: item.name,
     detail: item.detail,
-    quantity: item.quantity,
+    stockQty: item.stockQty,
+    reservedQty: item.reservedQty,
   }));
 
   // ── Chuẩn hóa dữ liệu sản phẩm bán chạy ──

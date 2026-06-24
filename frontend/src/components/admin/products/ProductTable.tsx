@@ -36,6 +36,8 @@ export type ProductVariant = BienTheSanPham;
 type ProductTableProps = {
   /** Danh sách phôi áo */
   products: SanPham[];
+  /** Thông báo hiển thị khi danh sách sau lọc không có kết quả */
+  emptyMessage?: string;
   /** Đang có thao tác loading (ví dụ: đang xóa) */
   isLoading?: boolean;
   /** Hàm gọi khi bấm nút Xem chi tiết */
@@ -167,6 +169,7 @@ function VariantExpandedRow({ variants }: { variants: BienTheSanPham[] }) {
 
 export default function ProductTable({
   products,
+  emptyMessage = "Chưa có phôi áo nào. Bấm “Thêm phôi áo” để bắt đầu.",
   isLoading = false,
   onView,
   onEdit,
@@ -223,7 +226,7 @@ export default function ProductTable({
                 colSpan={9}
                 className="py-16 text-center text-body-md text-text-muted"
               >
-                Chưa có phôi áo nào. Bấm &ldquo;Thêm phôi áo&rdquo; để bắt đầu.
+                {emptyMessage}
               </td>
             </tr>
           ) : (

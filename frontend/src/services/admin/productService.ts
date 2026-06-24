@@ -33,7 +33,11 @@ export type BienTheSanPham = {
   sku: string;
   /** Số lượng tồn kho */
   stock: number;
-  /** Trạng thái tồn kho tự động tính từ stockQty */
+  /** Số lượng đang được giữ cho các đơn đang xử lý */
+  reserved: number;
+  /** Số lượng khả dụng = stock - reserved */
+  available: number;
+  /** Trạng thái tồn kho tự động tính từ available */
   inventoryStatus: TrangThaiTonKho;
 };
 
@@ -90,6 +94,8 @@ export type CanhBaoTonKho = {
   size: string;
   sku: string;
   stock: number;
+  reserved: number;
+  available: number;
   severity: MucDoCanhBao;
 };
 
@@ -109,7 +115,7 @@ export type ThamSoLocSanPham = {
   tuKhoa?: string;
   danhMuc?: string;
   trangThai?: string;
-  tonKho?: string;
+  tonKho?: "tat_ca" | "ban_chay" | "con_hang" | "sap_het" | "het_hang";
 };
 
 /** Payload tạo phôi áo mới */

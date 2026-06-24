@@ -29,6 +29,13 @@ import ProductTable from "./ProductTable";
 
 // ===== HẰNG SỐ =====
 const SO_MOI_TRANG = 10;
+const NGUONG_SAP_HET = 10;
+
+function tinhTrangThaiTheoKhaDung(khaDung: number) {
+  if (khaDung <= 0) return "het_hang" as const;
+  if (khaDung <= NGUONG_SAP_HET) return "sap_het" as const;
+  return "con_hang" as const;
+}
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -39,7 +46,7 @@ export default function ProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [stockFilter, setStockFilter] = useState<
-    "tat_ca" | "con_hang" | "sap_het" | "het_hang"
+    "tat_ca" | "ban_chay" | "con_hang" | "sap_het" | "het_hang"
   >("tat_ca");
 
   // ===== STATE PHÂN TRANG =====
@@ -117,7 +124,9 @@ export default function ProductsPage() {
     setCurrentPage(1);
   }
 
-  function handleStockFilterChange(value: "tat_ca" | "con_hang" | "sap_het" | "het_hang") {
+  function handleStockFilterChange(
+    value: "tat_ca" | "ban_chay" | "con_hang" | "sap_het" | "het_hang"
+  ) {
     setStockFilter(value);
     setCurrentPage(1);
   }
@@ -146,9 +155,40 @@ export default function ProductsPage() {
   }
 
   // ===== DỮ LIỆU HIỂN THỊ =====
-  const danhSachSanPham = ketQuaDanhSach?.danhSach ?? [];
+  const danhSachSanPham = (ketQuaDanhSach?.danhSach ?? []).map((product) => ({
+    ...product,
+    variants: product.variants.map((variant) => {
+      const available = variant.stock - variant.reserved;
+      return {
+        ...variant,
+        available,
+        inventoryStatus: tinhTrangThaiTheoKhaDung(available),
+      };
+    }),
+  }));
   const tongSo = ketQuaDanhSach?.tongSo ?? 0;
   const tongSoTrang = ketQuaDanhSach?.tongSoTrang ?? 1;
+
+  const dangCoBoLoc =
+    searchKeyword.trim() !== "" ||
+    categoryFilter !== "" ||
+    statusFilter !== "" ||
+    stockFilter !== "tat_ca";
+  const dangCoBoLocKhac =
+    searchKeyword.trim() !== "" ||
+    categoryFilter !== "" ||
+    statusFilter !== "";
+
+  const emptyMessage =
+    stockFilter === "ban_chay"
+      ? dangCoBoLocKhac
+        ? "Không tìm thấy sản phẩm bán chạy nào phù hợp với bộ lọc hiện tại."
+        : "Chưa có dữ liệu sản phẩm bán chạy trong tháng hiện tại."
+      : stockFilter === "het_hang"
+      ? "Không có phôi áo nào hết hàng theo điều kiện lọc hiện tại."
+      : dangCoBoLoc
+        ? "Không tìm thấy phôi áo nào phù hợp với bộ lọc hiện tại."
+        : "Chưa có phôi áo nào. Bấm “Thêm phôi áo” để bắt đầu.";
 
   return (
     <div>
@@ -265,6 +305,7 @@ export default function ProductsPage() {
                 <>
                   <ProductTable
                     products={danhSachSanPham}
+                    emptyMessage={emptyMessage}
                     isLoading={dangXoa}
                     onView={handleView}
                     onEdit={handleEdit}

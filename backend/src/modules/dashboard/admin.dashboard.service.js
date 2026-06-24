@@ -13,6 +13,24 @@
 
 const db = require("../../database/mysql");
 
+const RESERVED_STOCK_JOIN = `
+  LEFT JOIN (
+    SELECT oi.variantId, SUM(oi.quantity) AS reservedQty
+    FROM OrderItem oi
+    INNER JOIN CustomerOrder co ON co.id = oi.orderId
+    WHERE co.status IN ('PENDING','CONFIRMED','PRINTING','PRINTED','PACKING')
+    GROUP BY oi.variantId
+  ) reservedStock ON reservedStock.variantId = pv.id
+`;
+
+const AVAILABLE_STOCK_SQL = `(pv.stockQty - COALESCE(reservedStock.reservedQty, 0))`;
+
+function tinhTrangThaiTonKho(availableQty, warningThreshold) {
+  if (availableQty <= 0) return "het_hang";
+  if (availableQty <= warningThreshold) return "sap_het";
+  return "con_hang";
+}
+
 // =====================================================================
 // TIỆN ÍCH NỘI BỘ
 // =====================================================================
@@ -74,7 +92,7 @@ function formatNgay(date) {
  *  - Doanh thu tháng (tổng totalAmount đơn COMPLETED)
  *  - Doanh thu từ thiết kế (tổng designFee trong khoảng)
  *  - Đơn hàng mới (PENDING trong khoảng)
- *  - Tồn kho mức thấp (variant stockQty <= 15, bất kể thời gian)
+ *  - Tồn kho mức thấp (variant available <= 15, bất kể thời gian)
  *  - Giá trị trung bình đơn (AOV = tổng / số đơn COMPLETED)
  *  - Tỷ lệ đơn hàng thành công (COMPLETED / (COMPLETED + CANCELLED))
  *  - Doanh thu khác / đền bù + Tỷ lệ hủy
@@ -111,12 +129,13 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
     [batDau, ketThuc]
   );
 
-  // --- Tồn kho mức thấp: variant có stockQty <= 15 (bất kể thời gian) ---
+  // --- Tồn kho mức thấp: variant có available <= 15 (bất kể thời gian) ---
   const NGUONG_TON_KHO = 15;
   const [rowsTonKho] = await db.pool.query(
     `SELECT COUNT(*) AS so_variant_thap
-     FROM ProductVariant
-     WHERE stockQty >= 0 AND stockQty <= ?`,
+     FROM ProductVariant pv
+     ${RESERVED_STOCK_JOIN}
+     WHERE ${AVAILABLE_STOCK_SQL} <= ?`,
     [NGUONG_TON_KHO]
   );
 
@@ -430,8 +449,8 @@ async function layThietKeCanXuLy() {
 // =====================================================================
 
 /**
- * Lấy danh sách ProductVariant có stockQty <= nguong,
- * sắp xếp theo stockQty tăng dần (nguy hiểm nhất trước).
+ * Lấy danh sách ProductVariant có available <= nguong,
+ * sắp xếp theo available tăng dần (nguy hiểm nhất trước).
  */
 async function layTonKhoCanhBao(nguong = 15, limit = 10) {
   const [rows] = await db.pool.query(
@@ -441,23 +460,36 @@ async function layTonKhoCanhBao(nguong = 15, limit = 10) {
        pv.color       AS mauSac,
        pv.size        AS kichCo,
        pv.sku         AS sku,
-       pv.stockQty    AS soLuongTon
+       pv.stockQty    AS stockQty,
+       COALESCE(reservedStock.reservedQty, 0) AS reservedQty,
+       ${AVAILABLE_STOCK_SQL} AS availableQty
      FROM ProductVariant pv
      JOIN Product p ON p.id = pv.productId
-     WHERE pv.stockQty >= 0 AND pv.stockQty <= ?
+     ${RESERVED_STOCK_JOIN}
+     WHERE ${AVAILABLE_STOCK_SQL} <= ?
        AND p.status = 'ACTIVE'
-     ORDER BY pv.stockQty ASC
+     ORDER BY availableQty ASC
      LIMIT ?`,
     [nguong, limit]
   );
 
-  return rows.map((row) => ({
-    variantId: row.variantId,
-    name: row.tenSanPham,
-    detail: `Màu: ${row.mauSac} | Cỡ: ${row.kichCo}`,
-    sku: row.sku,
-    quantity: Number(row.soLuongTon),
-  }));
+  return rows.map((row) => {
+    const stockQty = Number(row.stockQty);
+    const reservedQty = Number(row.reservedQty);
+    const availableQty = stockQty - reservedQty;
+
+    return {
+      variantId: row.variantId,
+      name: row.tenSanPham,
+      detail: `Màu: ${row.mauSac} | Cỡ: ${row.kichCo}`,
+      sku: row.sku,
+      stockQty,
+      reservedQty,
+      availableQty,
+      quantity: availableQty,
+      status: tinhTrangThaiTonKho(availableQty, nguong),
+    };
+  });
 }
 
 // =====================================================================
