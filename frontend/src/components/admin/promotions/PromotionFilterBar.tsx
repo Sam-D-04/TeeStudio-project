@@ -15,6 +15,7 @@ export type BoDucMaKhuyenMai = {
 type Props = {
   boDuc: BoDucMaKhuyenMai;
   onThayDoi: (boDucMoi: BoDucMaKhuyenMai) => void;
+  onReset: () => void;
 };
 
 const controlStyle: React.CSSProperties = {
@@ -28,7 +29,7 @@ const controlStyle: React.CSSProperties = {
   outline: "none",
 };
 
-export default function PromotionFilterBar({ boDuc, onThayDoi }: Props) {
+export default function PromotionFilterBar({ boDuc, onThayDoi, onReset }: Props) {
   function capNhat<K extends keyof BoDucMaKhuyenMai>(
     truong: K,
     giaTri: BoDucMaKhuyenMai[K],
@@ -118,6 +119,27 @@ export default function PromotionFilterBar({ boDuc, onThayDoi }: Props) {
           rangePickerClassName="h-10 sm:w-[280px]"
         />
       </div>
+
+      <button
+        onClick={onReset}
+        style={{
+          height: 40,
+          padding: "0 16px",
+          background: "#f1f5f9",
+          border: "1px solid #e2e8f0",
+          borderRadius: 8,
+          fontSize: 14,
+          fontWeight: 500,
+          color: "#475569",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }}
+        className="hover:bg-slate-200 transition-colors"
+      >
+        Đặt lại
+      </button>
     </div>
   );
 }

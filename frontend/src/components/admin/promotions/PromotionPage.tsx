@@ -2,15 +2,9 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  CheckCircleOutlined,
-  ClockCircleOutlined,
-  DollarOutlined,
-  LoadingOutlined,
-  PlusOutlined,
-  TagOutlined,
-} from "@ant-design/icons";
+import { PlusOutlined, TagOutlined, ClockCircleOutlined, DollarOutlined, LoadingOutlined, CheckCircleOutlined } from "@ant-design/icons";
 import { App } from "antd";
+import { useRouter } from "next/navigation";
 
 import PromotionStatCard from "./PromotionStatCard";
 import PromotionFilterBar, { type BoDucMaKhuyenMai } from "./PromotionFilterBar";
@@ -64,7 +58,9 @@ const doiFormSangPayload = (
 
 function PromotionContent({ initialFilters }: PromotionPageProps) {
   const { message } = App.useApp();
+  const router = useRouter();
   const queryClient = useQueryClient();
+  const [resetKey, setResetKey] = useState(0);
   const [tabDangChon, setTabDangChon] = useState<TenTab>("ma_khuyen_mai");
   const [trang, setTrang] = useState(1);
   const [dsIDDaChon, setDsIDDaChon] = useState<number[]>([]);
@@ -164,6 +160,21 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
     setTrang(1);
     setDsIDDaChon([]);
   }
+
+  const handleResetFilter = () => {
+    router.push('/admin/khuyen-mai-bao-gia');
+    setBoDuc({
+      tuKhoa: "",
+      trangThai: "",
+      loaiGiam: "",
+      tuNgay: "",
+      denNgay: "",
+    });
+    setBoLocNhanh({});
+    setTrang(1);
+    setDsIDDaChon([]);
+    setResetKey(prev => prev + 1);
+  };
 
   const khongCoBoLocChiTiet =
     boDuc.tuKhoa.trim() === "" &&
@@ -317,7 +328,7 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
               overflow: "hidden",
             }}
           >
-            <PromotionFilterBar boDuc={boDuc} onThayDoi={doiBoLoc} />
+            <PromotionFilterBar key={resetKey} boDuc={boDuc} onThayDoi={doiBoLoc} onReset={handleResetFilter} />
             {listQuery.isLoading && !listQuery.data ? (
               <div style={{ padding: 48, textAlign: "center", color: "#475569" }}>
                 <LoadingOutlined style={{ marginRight: 8 }} />
