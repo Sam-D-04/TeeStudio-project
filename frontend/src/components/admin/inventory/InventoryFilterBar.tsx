@@ -41,6 +41,7 @@ type InventoryFilterBarProps = {
 
   onDateChange: (startDate: string, endDate: string) => void;
   onDateClear: () => void;
+  onResetFilters?: () => void;            // Hàm đặt lại tất cả bộ lọc
 };
 
 export default function InventoryFilterBar({
@@ -50,6 +51,7 @@ export default function InventoryFilterBar({
   onFilterChange,
   onDateChange,
   onDateClear,
+  onResetFilters,
 }: InventoryFilterBarProps) {
   return (
     // Khu vực filter: nền xám rất nhạt, viền dưới, padding đều 16px
@@ -109,17 +111,30 @@ export default function InventoryFilterBar({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 border-t border-border pt-3 lg:flex-row lg:items-center">
-        <span className="shrink-0 text-xs font-bold uppercase text-text-secondary">
-          SKU có biến động trong khoảng
-        </span>
-        <DateRangeFilter
-          initialPreset="custom"
-          allowClear
-          onChange={onDateChange}
-          onClear={onDateClear}
-          rangePickerClassName="sm:w-[280px]"
-        />
+      <div className="flex flex-col gap-3 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <span className="shrink-0 text-xs font-bold uppercase text-text-secondary">
+            SKU có biến động trong khoảng
+          </span>
+          <DateRangeFilter
+            initialPreset="custom"
+            allowClear
+            onChange={onDateChange}
+            onClear={onDateClear}
+            rangePickerClassName="sm:w-[280px]"
+          />
+        </div>
+
+        {/* Nút Đặt lại */}
+        {onResetFilters && (
+          <button
+            type="button"
+            onClick={onResetFilters}
+            className="flex h-9 items-center justify-center rounded-[10px] bg-surface-alt px-4 text-sm font-semibold text-text-secondary transition-colors hover:bg-border hover:text-text-main sm:ml-auto"
+          >
+            Đặt lại
+          </button>
+        )}
       </div>
 
     </div>

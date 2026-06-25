@@ -63,8 +63,7 @@ type PaymentFilterBarProps = {
   onDateChange: (startDate: string, endDate: string) => void;
   onDateClear: () => void;
 
-  // Nút lọc và đặt lại
-  onFilter: () => void;
+  // Nút đặt lại
   onReset: () => void;
 
   // Số lượng cho mỗi tab pill (từ API)
@@ -86,7 +85,6 @@ export default function PaymentFilterBar({
   initialEndDate,
   onDateChange,
   onDateClear,
-  onFilter,
   onReset,
   tabCounts,
 }: PaymentFilterBarProps) {
@@ -188,17 +186,8 @@ export default function PaymentFilterBar({
           />
         </div>
 
-        {/* Nút Lọc và Đặt lại */}
-        <div className="flex w-full gap-2 sm:w-auto">
-          {/* Nút Lọc – màu xanh chính */}
-          <button
-            type="button"
-            onClick={onFilter}
-            className="h-control-h flex-1 rounded-lg bg-[#0ea5e9] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0284c7] sm:flex-none"
-          >
-            Lọc
-          </button>
-          {/* Nút Đặt lại – màu xám phụ */}
+        {/* Nút Đặt lại */}
+        <div className="flex w-full sm:w-auto">
           <button
             type="button"
             onClick={onReset}

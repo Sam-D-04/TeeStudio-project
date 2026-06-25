@@ -88,6 +88,9 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
   const [tuKhoa, setTuKhoa] = useState("");
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ---- State reset filter ----
+  const [resetKey, setResetKey] = useState(0);
+
   // ---- State phân trang ----
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -166,6 +169,9 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
       setCompletionHour("");
     }
     setCurrentPage(1);
+    if (key === "tat_ca") {
+      router.push("/admin/don-hang");
+    }
   }
   function handlePaymentChange(v: string) { setPaymentFilter(v); setCurrentPage(1); }
   function handleDateChange(startDate: string, endDate: string) {
@@ -181,6 +187,19 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
     setCurrentPage(1);
   }
   function handleTypeChange(v: string) { setTypeFilter(v); setCurrentPage(1); }
+
+  function handleResetFilters() {
+    setActiveTab("tat_ca");
+    setPaymentFilter("tat_ca");
+    setTypeFilter("tat_ca");
+    setTuKhoa("");
+    setTuNgay("");
+    setDenNgay("");
+    setCompletionHour("");
+    setCurrentPage(1);
+    setResetKey((prev) => prev + 1);
+    router.push("/admin/don-hang");
+  }
 
   // Chuyển đổi dữ liệu từ API sang kiểu FE
   const danhSachOrder: Order[] = (ketQuaDanhSach?.danhSach ?? []).map(chuyenDoiSangOrder);
@@ -283,16 +302,18 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
 
         {/* Thanh filter */}
         <OrderFilterBar
+          key={resetKey}
           activeTab={activeTab}
           onTabChange={handleTabChange}
           paymentFilter={paymentFilter}
           onPaymentFilterChange={handlePaymentChange}
           onDateChange={handleDateChange}
           onDateClear={handleDateClear}
-          initialStartDate={initialFilters?.startDate}
-          initialEndDate={initialFilters?.endDate}
+          initialStartDate={tuNgay || undefined}
+          initialEndDate={denNgay || undefined}
           typeFilter={typeFilter}
           onTypeFilterChange={handleTypeChange}
+          onResetFilters={handleResetFilters}
           searchSlot={(
             <AdminSearchInput
               placeholder="Tìm mã đơn hàng, tên khách hàng..."

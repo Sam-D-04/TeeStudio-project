@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SyncOutlined } from "@ant-design/icons";
 import DateRangeFilter from "@/components/admin/common/DateRangeFilter";
 import type { OrderStatus } from "./OrderStatusBadge";
 
@@ -46,6 +47,7 @@ type OrderFilterBarProps = {
   onTypeFilterChange: (value: string) => void;
 
   searchSlot?: ReactNode;
+  onResetFilters?: () => void;
 };
 
 export default function OrderFilterBar({
@@ -60,6 +62,7 @@ export default function OrderFilterBar({
   typeFilter,
   onTypeFilterChange,
   searchSlot,
+  onResetFilters,
 }: OrderFilterBarProps) {
   return (
     // Khu vực filter: nền xám nhạt, viền dưới, padding gọn
@@ -137,6 +140,17 @@ export default function OrderFilterBar({
             ▾
           </span>
         </div>
+
+        {/* Nút Đặt lại */}
+        {onResetFilters && (
+          <button
+            type="button"
+            onClick={onResetFilters}
+            className="h-control-h flex shrink-0 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-dim hover:text-text-main"
+          >
+            <SyncOutlined /> Đặt lại
+          </button>
+        )}
       </div>
     </div>
   );

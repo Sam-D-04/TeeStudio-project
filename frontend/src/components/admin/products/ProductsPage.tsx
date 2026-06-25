@@ -325,6 +325,7 @@ export default function ProductsPage({ initialFilters }: ProductsPageProps) {
                 onStatusChange={handleStatusChange}
                 stockFilter={stockFilter}
                 onStockFilterChange={handleStockFilterChange}
+                onResetFilters={handleResetFilters}
               />
 
               {/* Trạng thái loading */}

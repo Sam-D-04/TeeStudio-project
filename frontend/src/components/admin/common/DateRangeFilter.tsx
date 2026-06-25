@@ -160,6 +160,7 @@ export default function DateRangeFilter({
         disabled={disabled}
         className={`w-full sm:w-[170px] ${selectClassName}`}
         onChange={handlePresetChange}
+        listHeight={320}
       />
       <RangePicker
         aria-label="Chọn khoảng thời gian"

@@ -43,6 +43,8 @@ type ProductFilterBarProps = {
   stockFilter: StockPillFilter;
   /** Hàm cập nhật bộ lọc tồn kho */
   onStockFilterChange: (value: StockPillFilter) => void;
+  /** Hàm đặt lại tất cả bộ lọc */
+  onResetFilters?: () => void;
 };
 
 // Cấu hình các pill filter tồn kho
@@ -63,6 +65,7 @@ export default function ProductFilterBar({
   onStatusChange,
   stockFilter,
   onStockFilterChange,
+  onResetFilters,
 }: ProductFilterBarProps) {
   // Lấy danh sách danh mục từ API để hiển thị trong dropdown
   const { data: danhSachDanhMuc = [] } = useQuery({
@@ -147,6 +150,17 @@ export default function ProductFilterBar({
           <option value="dang_hien_thi">Đang hiển thị</option>
           <option value="dang_an">Đang ẩn</option>
         </select>
+
+        {/* Nút Đặt lại */}
+        {onResetFilters && (
+          <button
+            type="button"
+            onClick={onResetFilters}
+            className="flex h-control-h items-center justify-center rounded-[10px] bg-surface-alt px-4 text-body-md font-semibold text-text-secondary transition-colors hover:bg-border hover:text-text-main sm:ml-auto"
+          >
+            Đặt lại
+          </button>
+        )}
       </div>
     </div>
   );

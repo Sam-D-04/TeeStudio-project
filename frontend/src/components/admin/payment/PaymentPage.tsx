@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import type { MouseEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { message } from "antd";
 import dayjs from "dayjs";
 import PaymentDetailDrawer, { type PaymentDetail } from "./PaymentDetailDrawer";
@@ -49,6 +50,7 @@ type PaymentPageProps = {
 
 export default function PaymentPage({ initialFilters }: PaymentPageProps) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [messageApi, messageContextHolder] = message.useMessage();
 
   // ===== STATE BỘ LỌC =====
@@ -69,6 +71,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
   const [dateFilterReady, setDateFilterReady] = useState(
     initialFilters?.isExplicit ?? false
   );
+  const [hasReset, setHasReset] = useState(false);
 
   // State phân trang
   const [currentPage, setCurrentPage] = useState(1);
@@ -202,10 +205,19 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
     saveNoteMutation.mutate({ id, note });
   }
 
-  // Nút "Lọc"
-  function handleFilter() {
+  function handleSearchChange(val: string) {
+    setSearchValue(val);
     setCurrentPage(1);
-    // Query sẽ tự refetch do queryKey thay đổi
+  }
+
+  function handleStatusChange(val: string) {
+    setStatusFilter(val);
+    setCurrentPage(1);
+  }
+
+  function handleMethodChange(val: string) {
+    setMethodFilter(val);
+    setCurrentPage(1);
   }
 
   // Nút "Đặt lại"
@@ -215,15 +227,22 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
     setMethodFilter("tat_ca");
     setActiveTab("tat_ca");
     setDateField("created");
+    setTuNgay("");
+    setDenNgay("");
     setCurrentPage(1);
-    setDateFilterReady(false);
+    setDateFilterReady(true);
     setDateFilterKey((current) => current + 1);
+    setHasReset(true);
+    router.push("/admin/thanh-toan");
   }
 
   // Khi chuyển tab → reset trang về 1
   function handleTabChange(tab: string) {
     setActiveTab(tab);
     setCurrentPage(1);
+    if (tab === "tat_ca") {
+      router.push("/admin/thanh-toan");
+    }
   }
 
   function handleDateChange(startDate: string, endDate: string) {
@@ -478,22 +497,19 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
         {/* Thanh lọc giao dịch */}
         <PaymentFilterBar
           searchValue={searchValue}
-          onSearchChange={setSearchValue}
+          onSearchChange={handleSearchChange}
           activeTab={activeTab}
           onTabChange={handleTabChange}
           statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
+          onStatusFilterChange={handleStatusChange}
           methodFilter={methodFilter}
-          onMethodFilterChange={setMethodFilter}
+          onMethodFilterChange={handleMethodChange}
           dateFilterKey={dateFilterKey}
-          initialDatePreset={
-            initialFilters?.isExplicit ? "custom" : "today"
-          }
-          initialStartDate={initialFilters?.startDate}
-          initialEndDate={initialFilters?.endDate}
+          initialDatePreset="custom"
+          initialStartDate={tuNgay || undefined}
+          initialEndDate={denNgay || undefined}
           onDateChange={handleDateChange}
           onDateClear={handleDateClear}
-          onFilter={handleFilter}
           onReset={handleReset}
           tabCounts={tabCounts}
         />

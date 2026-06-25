@@ -72,6 +72,9 @@ export default function InventoryPage({
   const [tuNgay, setTuNgay] = useState("");
   const [denNgay, setDenNgay] = useState("");
 
+  /** Key để force re-render components bộ lọc (vd: xoá ngày tháng về null) */
+  const [filterKey, setFilterKey] = useState(0);
+
   /** Trang hiện tại trong phân trang */
   const [trangHienTai, setTrangHienTai] = useState(1);
 
@@ -198,6 +201,7 @@ export default function InventoryPage({
 
   function xuLyResetBoLoc() {
     xuLyKpiFilter("tat_ca");
+    setFilterKey((prev) => prev + 1);
     router.replace("/admin/kho-hang");
   }
 
@@ -314,12 +318,14 @@ export default function InventoryPage({
 
         {/* Thanh lọc */}
         <InventoryFilterBar
+          key={`filter-bar-${filterKey}`}
           searchValue={tuKhoaTimKiem}
           onSearchChange={xuLyTimKiem}
           activeFilter={boLocHienTai}
           onFilterChange={xuLyDoiBoLoc}
           onDateChange={xuLyDoiNgay}
           onDateClear={xuLyXoaNgay}
+          onResetFilters={xuLyResetBoLoc}
         />
 
         {/* Trạng thái lỗi */}
