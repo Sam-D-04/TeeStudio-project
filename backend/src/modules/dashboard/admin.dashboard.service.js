@@ -18,12 +18,13 @@ const RESERVED_STOCK_JOIN = `
     SELECT oi.variantId, SUM(oi.quantity) AS reservedQty
     FROM OrderItem oi
     INNER JOIN CustomerOrder co ON co.id = oi.orderId
-    WHERE co.status IN ('PENDING','CONFIRMED','PRINTING','PRINTED','PACKING')
+    WHERE co.status IN ('PENDING','CONFIRMED','PROCESSING','PRINTING','READY_TO_SHIP')
     GROUP BY oi.variantId
   ) reservedStock ON reservedStock.variantId = pv.id
 `;
 
-const AVAILABLE_STOCK_SQL = `(pv.stockQty - COALESCE(reservedStock.reservedQty, 0))`;
+// stockQty đã là lượng còn lại sau khi giữ hàng cho đơn.
+const AVAILABLE_STOCK_SQL = "pv.stockQty";
 
 function tinhTrangThaiTonKho(availableQty, warningThreshold) {
   if (availableQty <= 0) return "het_hang";
@@ -476,7 +477,7 @@ async function layTonKhoCanhBao(nguong = 15, limit = 10) {
   return rows.map((row) => {
     const stockQty = Number(row.stockQty);
     const reservedQty = Number(row.reservedQty);
-    const availableQty = stockQty - reservedQty;
+    const availableQty = stockQty;
 
     return {
       variantId: row.variantId,

@@ -33,11 +33,24 @@ export default async function KhoHangPage({
   searchParams: SearchParams;
 }) {
   const params = await searchParams;
-  const stock = layGiaTriDauTien(params.stock).toLowerCase();
+  const stock = layGiaTriDauTien(params.stock).toUpperCase();
+  const transaction = layGiaTriDauTien(params.transaction).toUpperCase();
+  const period = layGiaTriDauTien(params.period).toUpperCase();
+  const initialStockFilter =
+    stock === "LOW"
+      ? "ton_thap"
+      : stock === "LOW_STOCK"
+        ? "sap_het"
+        : stock === "RESERVED"
+          ? "can_xuat"
+          : transaction === "IMPORT" && period === "THIS_MONTH"
+            ? "nhap_thang"
+            : "tat_ca";
 
   return (
     <InventoryClient
-      initialStockFilter={stock === "low" ? "ton_thap" : "tat_ca"}
+      key={initialStockFilter}
+      initialStockFilter={initialStockFilter}
     />
   );
 }

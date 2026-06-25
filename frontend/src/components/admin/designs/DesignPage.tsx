@@ -53,14 +53,29 @@ const DANH_SACH_TAB = [
 
 type TenTab = (typeof DANH_SACH_TAB)[number]["key"];
 
+export type DesignInitialFilters = {
+  tab?: TenTab;
+  designStatus?: string;
+  printStatus?: string;
+};
+
+type DesignPageProps = {
+  initialFilters?: DesignInitialFilters;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Component chính
 // ─────────────────────────────────────────────────────────────────────────────
-export default function DesignPage() {
+export default function DesignPage({ initialFilters }: DesignPageProps) {
   const queryClient = useQueryClient();
 
   // ── State điều hướng tab ──
-  const [tabDangChon, setTabDangChon] = useState<TenTab>("thiet_ke_khach_hang");
+  const [tabDangChon, setTabDangChon] = useState<TenTab>(
+    initialFilters?.tab ?? "thiet_ke_khach_hang"
+  );
+  const [locTrangThaiDonIn, setLocTrangThaiDonIn] = useState(
+    initialFilters?.printStatus ?? ""
+  );
 
   // ── State phân trang bảng thiết kế ──
   const [trangHienTai, setTrangHienTai] = useState(1);
@@ -68,7 +83,7 @@ export default function DesignPage() {
   // ── State bộ lọc bảng thiết kế ──
   const [boDuc, setBoDuc] = useState<BoDucThietKe>({
     tuKhoa: "",
-    trangThai: "",
+    trangThai: initialFilters?.designStatus ?? "",
     viTriIn: "",
   });
 
@@ -327,6 +342,13 @@ export default function DesignPage() {
           nhanBadge="CẦN XỬ LÝ"
           mauNenBadge="#fef3c7"
           mauChuBadge="#d97706"
+          href="/admin/thiet-ke?tab=DESIGNS&status=PENDING_REVIEW"
+          isActive={
+            tabDangChon === "thiet_ke_khach_hang" &&
+            boDuc.trangThai === "cho_kiem_tra" &&
+            boDuc.tuKhoa === "" &&
+            boDuc.viTriIn === ""
+          }
         />
 
         <DesignStatCard
@@ -338,6 +360,13 @@ export default function DesignPage() {
           nhanBadge="ĐANG CHỜ"
           mauNenBadge="#f8fafc"
           mauChuBadge="#475569"
+          href="/admin/thiet-ke?tab=DESIGNS&status=NEEDS_REVISION"
+          isActive={
+            tabDangChon === "thiet_ke_khach_hang" &&
+            boDuc.trangThai === "can_chinh_sua" &&
+            boDuc.tuKhoa === "" &&
+            boDuc.viTriIn === ""
+          }
         />
 
         <DesignStatCard
@@ -349,6 +378,11 @@ export default function DesignPage() {
           nhanBadge="SẴN SÀNG"
           mauNenBadge="#e0f2fe"
           mauChuBadge="#0ea5e9"
+          href="/admin/thiet-ke?tab=PRINT_ORDERS&status=APPROVED"
+          isActive={
+            tabDangChon === "don_can_in" &&
+            locTrangThaiDonIn === "cho_gui_xuong"
+          }
         />
 
         <DesignStatCard
@@ -360,6 +394,11 @@ export default function DesignPage() {
           nhanBadge="ĐANG TIẾN HÀNH"
           mauNenBadge="#dcfce7"
           mauChuBadge="#10b981"
+          href="/admin/thiet-ke?tab=PRINT_ORDERS&status=PRINTING"
+          isActive={
+            tabDangChon === "don_can_in" &&
+            locTrangThaiDonIn === "dang_in"
+          }
         />
       </div>
 
@@ -579,7 +618,12 @@ export default function DesignPage() {
         )}
 
         {/* ── Nội dung Tab 2: Đơn cần in ── */}
-        {tabDangChon === "don_can_in" && <PrintOrderTab />}
+        {tabDangChon === "don_can_in" && (
+          <PrintOrderTab
+            statusFilter={locTrangThaiDonIn}
+            onStatusFilterChange={setLocTrangThaiDonIn}
+          />
+        )}
 
         {/* ── Nội dung Tab 3: Tài nguyên thiết kế ── */}
         {tabDangChon === "tai_nguyen" && <DesignResourceTab />}

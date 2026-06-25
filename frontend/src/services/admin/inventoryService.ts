@@ -34,7 +34,7 @@ export type MucTonKho = {
   tonHienTai: number;
   /** Số áo đang bị giữ cho đơn hàng đang xử lý */
   daGiu: number;
-  /** Số áo khả dụng = tonHienTai - daGiu */
+  /** Số áo khả dụng; tonHienTai đã được giảm ngay khi đơn được tạo */
   khaDung: number;
   /** Trạng thái tồn kho */
   trangThai: TrangThaiTonKho;

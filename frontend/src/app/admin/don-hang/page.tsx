@@ -31,10 +31,22 @@ function chuyenTrangThaiSangBoLoc(value: string): string {
     .filter(Boolean);
 
   if (statuses.includes("PENDING")) return "cho_xac_nhan";
+  if (statuses.includes("PROCESSING") || statuses.includes("PRINTING")) {
+    return "dang_xu_ly_in";
+  }
   if (statuses.includes("CANCELLED")) return "da_huy";
   if (statuses.includes("COMPLETED") || statuses.includes("DELIVERED")) {
     return "hoan_tat";
   }
+
+  return "tat_ca";
+}
+
+function chuyenThanhToanSangBoLoc(value: string): string {
+  const payment = value.trim().toUpperCase();
+
+  if (payment === "PENDING") return "cho_thanh_toan";
+  if (payment === "COMPLETED") return "da_thanh_toan";
 
   return "tat_ca";
 }
@@ -53,19 +65,23 @@ export default async function AdminOrdersPage({
   const from = layGiaTriDauTien(params.from);
   const to = layGiaTriDauTien(params.to);
   const hour = layGiaTriDauTien(params.hour);
+  const initialFilters = {
+    status: chuyenTrangThaiSangBoLoc(layGiaTriDauTien(params.status)),
+    payment: chuyenThanhToanSangBoLoc(layGiaTriDauTien(params.payment)),
+    startDate: laNgayHopLe(date) ? date : laNgayHopLe(from) ? from : "",
+    endDate: laNgayHopLe(date) ? date : laNgayHopLe(to) ? to : "",
+    dateField:
+      layGiaTriDauTien(params.dateField) === "completed"
+        ? ("completed" as const)
+        : ("created" as const),
+    hour: /^(?:[01]\d|2[0-3])$/.test(hour) ? hour : "",
+  };
+  const filterKey = JSON.stringify(initialFilters);
 
   return (
     <OrdersClient
-      initialFilters={{
-        status: chuyenTrangThaiSangBoLoc(layGiaTriDauTien(params.status)),
-        startDate: laNgayHopLe(date) ? date : laNgayHopLe(from) ? from : "",
-        endDate: laNgayHopLe(date) ? date : laNgayHopLe(to) ? to : "",
-        dateField:
-          layGiaTriDauTien(params.dateField) === "completed"
-            ? "completed"
-            : "created",
-        hour: /^(?:[01]\d|2[0-3])$/.test(hour) ? hour : "",
-      }}
+      key={filterKey}
+      initialFilters={initialFilters}
     />
   );
 }

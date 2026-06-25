@@ -22,7 +22,6 @@ const MAP_TRANG_THAI_THIET_KE_DB_FE = {
   PENDING_REVIEW: "cho_kiem_tra",
   NEEDS_REVISION: "can_chinh_sua",
   APPROVED: "da_duyet",
-  DRAFT: "cho_kiem_tra", // DRAFT cũng coi là chờ kiểm tra
 };
 
 /** FE trangThai → DB status (dùng khi nhận request cập nhật) */
@@ -81,7 +80,7 @@ async function layThongKe() {
   const [rowsChoKiemTra] = await db.pool.query(
     `SELECT COUNT(*) AS so_luong
      FROM CustomDesign
-     WHERE status IN ('PENDING_REVIEW', 'DRAFT')`
+     WHERE status = 'PENDING_REVIEW'`
   );
 
   // Đếm thiết kế cần chỉnh sửa
@@ -123,19 +122,19 @@ async function layDanhSachThietKe({ page, limit, tu_khoa, trang_thai, vi_tri_in 
   const offset = (trangHienTai - 1) * soMoi;
 
   // Xây dựng điều kiện WHERE động
-  const dieuKien = [];
+  // Trang Admin chỉ quản lý các thiết kế khách đã gửi hoặc đã được xử lý.
+  // DRAFT là bản khách còn đang soạn nên không được hiển thị hay tính là "Chờ kiểm tra".
+  const dieuKien = [
+    "cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION', 'APPROVED')",
+  ];
   const thamSo = [];
 
   // Lọc theo trạng thái
   if (trang_thai) {
     const statusDB = MAP_TRANG_THAI_THIET_KE_FE_DB[trang_thai];
     if (statusDB) {
-      if (trang_thai === "cho_kiem_tra") {
-        dieuKien.push("cd.status IN ('PENDING_REVIEW', 'DRAFT')");
-      } else {
-        dieuKien.push("cd.status = ?");
-        thamSo.push(statusDB);
-      }
+      dieuKien.push("cd.status = ?");
+      thamSo.push(statusDB);
     }
   }
 

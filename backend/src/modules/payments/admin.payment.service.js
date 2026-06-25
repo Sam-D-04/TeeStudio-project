@@ -256,6 +256,14 @@ async function layDanhSachThanhToan(queryParams) {
   const offset = (trang - 1) * soMoiTrang;
 
   const { whereClause, params } = taoBoLocThanhToan(queryParams);
+  const {
+    whereClause: tabCountWhereClause,
+    params: tabCountParams,
+  } = taoBoLocThanhToan({
+    ...queryParams,
+    tab: "tat_ca",
+    trangThai: "tat_ca",
+  });
 
   // Đếm tổng
   const [countRows] = await db.pool.query(
@@ -293,7 +301,7 @@ async function layDanhSachThanhToan(queryParams) {
     [...params, soMoiTrang, offset]
   );
 
-  // Đếm số lượng cho các tab pill
+  // Đếm theo cùng bộ lọc chung của danh sách, chỉ bỏ điều kiện trạng thái pill.
   const [tabCountRows] = await db.pool.query(
     `SELECT
        COUNT(*) AS tatCa,
@@ -301,7 +309,11 @@ async function layDanhSachThanhToan(queryParams) {
        SUM(CASE WHEN p.status = 'COMPLETED' THEN 1 ELSE 0 END) AS daThanhToan,
        SUM(CASE WHEN p.status IN ('FAILED', 'CANCELLED') THEN 1 ELSE 0 END) AS thatBai,
        SUM(CASE WHEN p.status = 'PENDING' AND p.paymentMethod = 'COD' THEN 1 ELSE 0 END) AS canDoiSoat
-     FROM Payment p`
+     FROM Payment p
+     JOIN CustomerOrder co ON co.id = p.orderId
+     JOIN Account a ON a.id = co.userId
+     ${tabCountWhereClause}`,
+    tabCountParams
   );
 
   const tabCounts = {

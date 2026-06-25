@@ -52,11 +52,17 @@ const CAU_HINH_TRANG_THAI: Record<
   },
 };
 
-export default function PrintOrderTab() {
+type PrintOrderTabProps = {
+  statusFilter: string;
+  onStatusFilterChange: (status: string) => void;
+};
+
+export default function PrintOrderTab({
+  statusFilter,
+  onStatusFilterChange,
+}: PrintOrderTabProps) {
   const queryClient = useQueryClient();
 
-  // ── State lọc theo trạng thái ──
-  const [locTrangThai, setLocTrangThai] = useState("");
   // ── State phân trang ──
   const [trang, setTrang] = useState(1);
 
@@ -66,12 +72,12 @@ export default function PrintOrderTab() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["don-can-in", trang, locTrangThai],
+    queryKey: ["don-can-in", trang, statusFilter],
     queryFn: () =>
       designService.layDanhSachDonCanIn({
         page: trang,
         limit: 10,
-        trang_thai: locTrangThai || undefined,
+        trang_thai: statusFilter || undefined,
       }),
     staleTime: 15_000,
   });
@@ -154,8 +160,11 @@ export default function PrintOrderTab() {
 
         {/* Dropdown lọc trạng thái */}
         <select
-          value={locTrangThai}
-          onChange={(e) => { setLocTrangThai(e.target.value); setTrang(1); }}
+          value={statusFilter}
+          onChange={(e) => {
+            onStatusFilterChange(e.target.value);
+            setTrang(1);
+          }}
           style={{
             height: 36,
             padding: "0 12px",
@@ -163,7 +172,7 @@ export default function PrintOrderTab() {
             border: "1px solid #e2e8f0",
             borderRadius: 8,
             fontSize: 13,
-            color: locTrangThai ? "#0f172a" : "#94a3b8",
+            color: statusFilter ? "#0f172a" : "#94a3b8",
             outline: "none",
             cursor: "pointer",
             minWidth: 160,

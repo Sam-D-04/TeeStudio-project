@@ -8,6 +8,8 @@ function taoBoLocThanhToan(queryParams = {}) {
   const thoiGian = queryParams.thoiGian || "";
   const tuNgay = String(queryParams.tuNgay || "");
   const denNgay = String(queryParams.denNgay || "");
+  const cotNgay =
+    queryParams.kieuNgay === "ngay_thanh_toan" ? "p.paidAt" : "p.createdAt";
   const conditions = [];
   const params = [];
   const filterKey = tab !== "tat_ca" ? tab : trangThai;
@@ -38,14 +40,14 @@ function taoBoLocThanhToan(queryParams = {}) {
   }
 
   if (thoiGian === "hom_nay") {
-    conditions.push("DATE(p.createdAt) = CURDATE()");
+    conditions.push(`DATE(${cotNgay}) = CURDATE()`);
   }
   if (/^\d{4}-\d{2}-\d{2}$/.test(tuNgay)) {
-    conditions.push("DATE(p.createdAt) >= ?");
+    conditions.push(`DATE(${cotNgay}) >= ?`);
     params.push(tuNgay);
   }
   if (/^\d{4}-\d{2}-\d{2}$/.test(denNgay)) {
-    conditions.push("DATE(p.createdAt) <= ?");
+    conditions.push(`DATE(${cotNgay}) <= ?`);
     params.push(denNgay);
   }
 

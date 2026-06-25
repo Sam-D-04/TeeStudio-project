@@ -8,6 +8,7 @@ import {
   WalletOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
+import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
@@ -24,34 +25,6 @@ import UpdateOrderStatusModal from "./UpdateOrderStatusModal";
  * Dùng React Query để tự động quản lý cache, loading, error.
  * Không còn mock data – tất cả dữ liệu lấy từ Backend qua orderService.
  */
-
-// Cấu hình icon cho 4 thẻ KPI (phần style/icon không thay đổi)
-const KPI_CONFIG = [
-  {
-    key: "donMoi" as const,
-    label: "Đơn mới",
-    iconWrapperClassName: "bg-[#cce5ff] text-[#0284c7]",
-    icon: <ShoppingCartOutlined />,
-  },
-  {
-    key: "dangXuLyIn" as const,
-    label: "Đang xử lý in",
-    iconWrapperClassName: "bg-[#cce5ff] text-[#0284c7]",
-    icon: <SyncOutlined spin />,
-  },
-  {
-    key: "choThanhToan" as const,
-    label: "Chờ thanh toán",
-    iconWrapperClassName: "bg-[#ffdad6] text-[#ea580c]",
-    icon: <WalletOutlined />,
-  },
-  {
-    key: "hoanTatHomNay" as const,
-    label: "Hoàn tất hôm nay",
-    iconWrapperClassName: "bg-[#dcfce7] text-[#059669]",
-    icon: <CheckCircleOutlined />,
-  },
-];
 
 // Hàm chuyển đổi dữ liệu từ service sang kiểu Order của OrderTable
 function chuyenDoiSangOrder(don: orderService.DonHang): Order {
@@ -84,6 +57,7 @@ const SO_MOI_TRANG = 10;
 
 export type OrdersInitialFilters = {
   status?: string;
+  payment?: string;
   startDate?: string;
   endDate?: string;
   dateField?: "created" | "completed";
@@ -99,7 +73,9 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
 
   // ---- State bộ lọc ----
   const [activeTab, setActiveTab] = useState(initialFilters?.status ?? "tat_ca");
-  const [paymentFilter, setPaymentFilter] = useState("tat_ca");
+  const [paymentFilter, setPaymentFilter] = useState(
+    initialFilters?.payment ?? "tat_ca"
+  );
   const [tuNgay, setTuNgay] = useState(initialFilters?.startDate ?? "");
   const [denNgay, setDenNgay] = useState(initialFilters?.endDate ?? "");
   const [dateField, setDateField] = useState(
@@ -210,6 +186,58 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
   const danhSachOrder: Order[] = (ketQuaDanhSach?.danhSach ?? []).map(chuyenDoiSangOrder);
   const tongSo = ketQuaDanhSach?.tongSo ?? 0;
   const tongSoTrang = ketQuaDanhSach?.tongSoTrang ?? 1;
+  const today = dayjs().format("YYYY-MM-DD");
+  const kpiConfig = [
+    {
+      key: "donMoi" as const,
+      label: "Đơn mới",
+      href: "/admin/don-hang?status=PENDING",
+      isActive:
+        activeTab === "cho_xac_nhan" &&
+        paymentFilter === "tat_ca" &&
+        !tuNgay &&
+        !denNgay,
+      iconWrapperClassName: "bg-[#cce5ff] text-[#0284c7]",
+      icon: <ShoppingCartOutlined />,
+    },
+    {
+      key: "dangXuLyIn" as const,
+      label: "Đang xử lý in",
+      href: "/admin/don-hang?status=PROCESSING%2CPRINTING",
+      isActive:
+        activeTab === "dang_xu_ly_in" &&
+        paymentFilter === "tat_ca" &&
+        !tuNgay &&
+        !denNgay,
+      iconWrapperClassName: "bg-[#cce5ff] text-[#0284c7]",
+      icon: <SyncOutlined spin />,
+    },
+    {
+      key: "choThanhToan" as const,
+      label: "Chờ thanh toán",
+      href: "/admin/don-hang?payment=PENDING",
+      isActive:
+        activeTab === "tat_ca" &&
+        paymentFilter === "cho_thanh_toan" &&
+        !tuNgay &&
+        !denNgay,
+      iconWrapperClassName: "bg-[#ffdad6] text-[#ea580c]",
+      icon: <WalletOutlined />,
+    },
+    {
+      key: "hoanTatHomNay" as const,
+      label: "Hoàn tất hôm nay",
+      href: `/admin/don-hang?status=COMPLETED&date=${today}&dateField=completed`,
+      isActive:
+        activeTab === "hoan_tat" &&
+        paymentFilter === "tat_ca" &&
+        tuNgay === today &&
+        denNgay === today &&
+        dateField === "completed",
+      iconWrapperClassName: "bg-[#dcfce7] text-[#059669]",
+      icon: <CheckCircleOutlined />,
+    },
+  ];
 
   return (
     <div>
@@ -236,12 +264,14 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
 
       {/* ======== 4 thẻ KPI thống kê ======== */}
       <section className="mb-6 grid grid-cols-4 gap-3">
-        {KPI_CONFIG.map((kpi) => (
+        {kpiConfig.map((kpi) => (
           <OrderStatCard
             key={kpi.key}
             label={kpi.label}
             // Hiển thị "--" khi đang tải, hoặc số thực từ API
             value={isLoadingThongKe ? "--" : (thongKe?.[kpi.key] ?? 0)}
+            href={kpi.href}
+            isActive={kpi.isActive}
             icon={kpi.icon}
             iconWrapperClassName={kpi.iconWrapperClassName}
           />

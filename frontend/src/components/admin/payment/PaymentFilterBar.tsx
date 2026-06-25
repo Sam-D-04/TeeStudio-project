@@ -1,4 +1,6 @@
-import DateRangeFilter from "@/components/admin/common/DateRangeFilter";
+import DateRangeFilter, {
+  type DateFilterPreset,
+} from "@/components/admin/common/DateRangeFilter";
 import type { PaymentStatus } from "./PaymentStatusBadge";
 
 /**
@@ -20,6 +22,7 @@ const FILTER_PILLS: FilterPill[] = [
   { key: "tat_ca",        label: "Tất cả" },
   { key: "cho_thanh_toan", label: "Chờ thanh toán" },
   { key: "da_thanh_toan",  label: "Đã thanh toán" },
+  { key: "can_doi_soat",   label: "Cần đối soát" },
   {
     key: "that_bai",
     label: "Thất bại",
@@ -55,6 +58,9 @@ type PaymentFilterBarProps = {
   onMethodFilterChange: (value: string) => void;
 
   dateFilterKey: number;
+  initialDatePreset?: DateFilterPreset;
+  initialStartDate?: string;
+  initialEndDate?: string;
   onDateChange: (startDate: string, endDate: string) => void;
   onDateClear: () => void;
 
@@ -76,6 +82,9 @@ export default function PaymentFilterBar({
   methodFilter,
   onMethodFilterChange,
   dateFilterKey,
+  initialDatePreset = "today",
+  initialStartDate,
+  initialEndDate,
   onDateChange,
   onDateClear,
   onFilter,
@@ -131,6 +140,7 @@ export default function PaymentFilterBar({
               <option value="tat_ca">Tất cả</option>
               <option value="da_thanh_toan">Đã thanh toán</option>
               <option value="cho_thanh_toan">Chờ thanh toán</option>
+              <option value="can_doi_soat">Cần đối soát</option>
               <option value="that_bai">Thất bại</option>
             </select>
             {/* Icon mũi tên xuống */}
@@ -168,7 +178,9 @@ export default function PaymentFilterBar({
           </label>
           <DateRangeFilter
             key={dateFilterKey}
-            initialPreset="today"
+            initialPreset={initialDatePreset}
+            initialStartDate={initialStartDate}
+            initialEndDate={initialEndDate}
             allowClear
             onChange={onDateChange}
             onClear={onDateClear}
@@ -226,9 +238,7 @@ export default function PaymentFilterBar({
               >
                 {/* Hiển thị số lượng trong ngoặc nếu có */}
                 {pill.label}
-                {count !== undefined && count > 0 && !isActive
-                  ? ` (${count})`
-                  : ""}
+                {count !== undefined ? ` (${count})` : ""}
               </button>
             );
           })}

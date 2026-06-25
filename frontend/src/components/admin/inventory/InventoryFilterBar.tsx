@@ -24,10 +24,11 @@ type PillFilter = {
 // Danh sách các pill filter – mỗi pill tương ứng với một điều kiện lọc
 const PILL_FILTERS: PillFilter[] = [
   { key: "tat_ca",      label: "Tất cả" },
-  { key: "ao_basic",    label: "Áo thun Basic" },
-  { key: "premium",     label: "Premium Cotton" },
   { key: "ton_thap",    label: "Tồn kho thấp" },
   { key: "sap_het",     label: "Sắp hết hàng" },
+  { key: "het_hang",    label: "Hết hàng" },
+  { key: "can_xuat",    label: "Cần xuất đơn in" },
+  { key: "nhap_thang",  label: "Nhập tháng này" },
 ];
 
 // Kiểu dữ liệu props nhận từ component cha (InventoryPage)

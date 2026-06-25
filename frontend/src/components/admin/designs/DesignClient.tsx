@@ -16,10 +16,15 @@
  */
 
 import DesignPage from "./DesignPage";
+import type { DesignInitialFilters } from "./DesignPage";
 
-export default function DesignClient() {
+export default function DesignClient({
+  initialFilters,
+}: {
+  initialFilters?: DesignInitialFilters;
+}) {
   // Chỉ render DesignPage – toàn bộ logic nằm trong đó
   // File này chỉ đóng vai trò "cầu nối" giữa Server Component (page.tsx)
   // và Client Component (DesignPage.tsx)
-  return <DesignPage />;
+  return <DesignPage initialFilters={initialFilters} />;
 }

@@ -82,6 +82,7 @@ export type ThamSoLocGiaoDich = {
   tab?: string;
   tuNgay?: string;
   denNgay?: string;
+  kieuNgay?: "ngay_tao" | "ngay_thanh_toan";
 };
 
 // =====================================================================
@@ -116,6 +117,7 @@ export async function layDanhSachGiaoDich(
   if (thamSo.tab && thamSo.tab !== "tat_ca") params.tab = thamSo.tab;
   if (thamSo.tuNgay) params.tuNgay = thamSo.tuNgay;
   if (thamSo.denNgay) params.denNgay = thamSo.denNgay;
+  if (thamSo.kieuNgay) params.kieuNgay = thamSo.kieuNgay;
 
   const res = await apiClient.get<{ success: boolean; data: KetQuaDanhSachGiaoDich }>(
     "/admin/payments",

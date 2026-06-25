@@ -17,6 +17,48 @@ export const metadata: Metadata = {
  * File này chỉ khai báo metadata và render DesignClient.
  * Toàn bộ logic tương tác (state, event) nằm trong DesignClient và DesignPage.
  */
-export default function ThietKePage() {
-  return <DesignClient />;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function layGiaTriDauTien(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+export default async function ThietKePage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const params = await searchParams;
+  const tabParam = layGiaTriDauTien(params.tab).toUpperCase();
+  const statusParam = layGiaTriDauTien(params.status).toUpperCase();
+  const laTabDonIn = tabParam === "PRINT_ORDERS";
+
+  const initialFilters = {
+    tab: laTabDonIn
+      ? ("don_can_in" as const)
+      : ("thiet_ke_khach_hang" as const),
+    designStatus:
+      statusParam === "PENDING_REVIEW"
+        ? "cho_kiem_tra"
+        : statusParam === "NEEDS_REVISION"
+          ? "can_chinh_sua"
+          : statusParam === "APPROVED" && !laTabDonIn
+            ? "da_duyet"
+            : "",
+    printStatus:
+      laTabDonIn && statusParam === "APPROVED"
+        ? "cho_gui_xuong"
+        : laTabDonIn && statusParam === "PRINTING"
+          ? "dang_in"
+          : laTabDonIn && statusParam === "PACKED"
+            ? "da_in_xong"
+            : "",
+  };
+
+  return (
+    <DesignClient
+      key={JSON.stringify(initialFilters)}
+      initialFilters={initialFilters}
+    />
+  );
 }

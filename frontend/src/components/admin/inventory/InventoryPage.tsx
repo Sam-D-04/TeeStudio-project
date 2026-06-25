@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import {
   HistoryOutlined,
   PlusSquareOutlined,
@@ -58,6 +59,7 @@ type InventoryPageProps = {
 export default function InventoryPage({
   initialStockFilter = "tat_ca",
 }: InventoryPageProps) {
+  const router = useRouter();
   // ===== TRẠNG THÁI UI =====
 
   /** Từ khóa tìm kiếm trong ô search */
@@ -122,7 +124,9 @@ export default function InventoryPage({
 
   const danhSachHienThi: InventoryItem[] = (ketQuaDanhSach?.danhSach ?? []).map(
     (item) => {
-      const khaDung = item.tonHienTai - item.daGiu;
+      // Backend đã giảm tonHienTai ngay khi đơn được tạo.
+      // daGiu là lượng thuộc các đơn đang hoạt động, không trừ thêm lần nữa.
+      const khaDung = item.khaDung ?? item.tonHienTai;
       return {
         ...item,
         khaDung,
@@ -183,6 +187,20 @@ export default function InventoryPage({
     setIdDaChon([]);
   }
 
+  function xuLyKpiFilter(boLoc: string) {
+    setTuKhoaTimKiem("");
+    setBoLocHienTai(boLoc);
+    setTuNgay("");
+    setDenNgay("");
+    setTrangHienTai(1);
+    setIdDaChon([]);
+  }
+
+  function xuLyResetBoLoc() {
+    xuLyKpiFilter("tat_ca");
+    router.replace("/admin/kho-hang");
+  }
+
   // ===== HIỂN THỊ GIÁ TRỊ THỐNG KÊ =====
   const tongPhoi = thongKe?.tongPhoi ?? 0;
   const sapHet = thongKe?.sapHet ?? 0;
@@ -234,6 +252,13 @@ export default function InventoryPage({
           value={dangTaiThongKe ? "..." : tongPhoi.toLocaleString("vi-VN")}
           badge="+5%"
           colorScheme="default"
+          onClick={xuLyResetBoLoc}
+          isActive={
+            boLocHienTai === "tat_ca" &&
+            tuKhoaTimKiem === "" &&
+            tuNgay === "" &&
+            denNgay === ""
+          }
         />
         {/* Thẻ 2: Biến thể sắp hết */}
         <InventoryStatCard
@@ -243,6 +268,14 @@ export default function InventoryPage({
           valueSuffix="SKU"
           badge="Cảnh báo"
           colorScheme="warning"
+          href="/admin/kho-hang?stock=LOW_STOCK"
+          onClick={() => xuLyKpiFilter("sap_het")}
+          isActive={
+            boLocHienTai === "sap_het" &&
+            tuKhoaTimKiem === "" &&
+            tuNgay === "" &&
+            denNgay === ""
+          }
         />
         {/* Thẻ 3: Cần xuất cho đơn in */}
         <InventoryStatCard
@@ -250,6 +283,14 @@ export default function InventoryPage({
           title="Cần xuất cho đơn in"
           value={dangTaiThongKe ? "..." : daGiu}
           colorScheme="accent"
+          href="/admin/kho-hang?stock=RESERVED"
+          onClick={() => xuLyKpiFilter("can_xuat")}
+          isActive={
+            boLocHienTai === "can_xuat" &&
+            tuKhoaTimKiem === "" &&
+            tuNgay === "" &&
+            denNgay === ""
+          }
         />
         {/* Thẻ 4: Nhập kho trong tháng */}
         <InventoryStatCard
@@ -257,6 +298,14 @@ export default function InventoryPage({
           title="Nhập kho trong tháng"
           value={dangTaiThongKe ? "..." : `+${nhapThang.toLocaleString("vi-VN")}`}
           colorScheme="success"
+          href="/admin/kho-hang?transaction=IMPORT&period=THIS_MONTH"
+          onClick={() => xuLyKpiFilter("nhap_thang")}
+          isActive={
+            boLocHienTai === "nhap_thang" &&
+            tuKhoaTimKiem === "" &&
+            tuNgay === "" &&
+            denNgay === ""
+          }
         />
       </div>
 

@@ -11,7 +11,7 @@ const db = require("../../database/mysql");
 /** Ngưỡng cảnh báo sắp hết hàng */
 const NGUONG_SAP_HET = 10;
 const TRANG_THAI_DON_GIU_HANG =
-  "'PENDING','CONFIRMED','PRINTING','PRINTED','PACKING'";
+  "'PENDING','CONFIRMED','PROCESSING','PRINTING','READY_TO_SHIP'";
 
 const RESERVED_STOCK_JOIN = `
   LEFT JOIN (
@@ -23,8 +23,8 @@ const RESERVED_STOCK_JOIN = `
   ) reservedStock ON reservedStock.variantId = pv.id
 `;
 
-const AVAILABLE_STOCK_SQL =
-  "(pv.stockQty - COALESCE(reservedStock.reservedQty, 0))";
+// stockQty đã được giảm khi tạo đơn; reservedQty chỉ dùng để tham khảo.
+const AVAILABLE_STOCK_SQL = "pv.stockQty";
 
 // =====================================================================
 // MAP TRẠNG THÁI: DB (tiếng Anh) ↔ Frontend (tiếng Việt snake_case)
@@ -249,7 +249,7 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
     const mappedVariants = variants.map((v) => {
       const stock = Number(v.stockQty);
       const reserved = Number(v.reservedQty);
-      const available = stock - reserved;
+      const available = stock;
 
       return {
         id: v.id,
@@ -337,7 +337,7 @@ async function layCanhBaoTonKho() {
   return rows.map((r) => {
     const stock = Number(r.stockQty);
     const reserved = Number(r.reservedQty);
-    const available = stock - reserved;
+    const available = stock;
 
     return {
       id: r.id,
@@ -410,7 +410,7 @@ async function layChiTietSanPham(id) {
     variants: variants.map((v) => {
       const stock = Number(v.stockQty);
       const reserved = Number(v.reservedQty);
-      const available = stock - reserved;
+      const available = stock;
 
       return {
         id: v.id,
@@ -651,7 +651,7 @@ async function capNhatBienThe(productId, variantId, { color, size, sku, stockQty
   const v = updated[0];
   const stock = Number(v.stockQty);
   const reserved = Number(v.reservedQty);
-  const available = stock - reserved;
+  const available = stock;
 
   return {
     id: v.id,

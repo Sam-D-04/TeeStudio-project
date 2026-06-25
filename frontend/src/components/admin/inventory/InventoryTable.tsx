@@ -25,7 +25,7 @@ export type InventoryItem = {
   sku: string;           // Mã SKU duy nhất, ví dụ "TS-TEE-WHT-M"
   tonHienTai: number;    // Tổng số áo đang có trong kho
   daGiu: number;         // Số áo đang bị giữ lại cho các đơn đang xử lý (Reserved)
-  khaDung: number;       // Số áo có thể bán/xuất = tonHienTai - daGiu
+  khaDung: number;       // Số áo còn có thể bán/xuất; stock đã được trừ khi tạo đơn
   trangThai: InventoryStatus; // Trạng thái: "con_hang" | "sap_het" | "het_hang"
 };
 

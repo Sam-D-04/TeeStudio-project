@@ -37,17 +37,26 @@ function tinhTrangThaiTheoKhaDung(khaDung: number) {
   return "con_hang" as const;
 }
 
-export default function ProductsPage() {
+export type ProductsInitialFilters = {
+  status?: string;
+  stock?: "tat_ca" | "ban_chay" | "con_hang" | "sap_het" | "het_hang";
+};
+
+type ProductsPageProps = {
+  initialFilters?: ProductsInitialFilters;
+};
+
+export default function ProductsPage({ initialFilters }: ProductsPageProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
   // ===== STATE QUẢN LÝ FILTER =====
   const [searchKeyword, setSearchKeyword] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState(initialFilters?.status ?? "");
   const [stockFilter, setStockFilter] = useState<
     "tat_ca" | "ban_chay" | "con_hang" | "sap_het" | "het_hang"
-  >("tat_ca");
+  >(initialFilters?.stock ?? "tat_ca");
 
   // ===== STATE PHÂN TRANG =====
   const [currentPage, setCurrentPage] = useState(1);
@@ -131,6 +140,29 @@ export default function ProductsPage() {
     setCurrentPage(1);
   }
 
+  function handleResetFilters() {
+    setSearchKeyword("");
+    setCategoryFilter("");
+    setStatusFilter("");
+    setStockFilter("tat_ca");
+    setCurrentPage(1);
+    router.replace("/admin/san-pham-phoi-ao");
+  }
+
+  function handleKpiFilter({
+    status = "",
+    stock = "tat_ca",
+  }: {
+    status?: string;
+    stock?: "tat_ca" | "ban_chay" | "con_hang" | "sap_het" | "het_hang";
+  }) {
+    setSearchKeyword("");
+    setCategoryFilter("");
+    setStatusFilter(status);
+    setStockFilter(stock);
+    setCurrentPage(1);
+  }
+
   // ===== XỬ LÝ HÀNH ĐỘNG =====
 
   /** Xem chi tiết: chuyển tới trang xem và sửa phôi áo */
@@ -158,7 +190,7 @@ export default function ProductsPage() {
   const danhSachSanPham = (ketQuaDanhSach?.danhSach ?? []).map((product) => ({
     ...product,
     variants: product.variants.map((variant) => {
-      const available = variant.stock - variant.reserved;
+      const available = variant.available ?? variant.stock;
       return {
         ...variant,
         available,
@@ -231,12 +263,22 @@ export default function ProductsPage() {
           <ProductStatCard
             label="Tổng phôi áo"
             value={dangTaiThongKe ? "..." : (thongKe?.tongPhoi ?? 0)}
+            onClick={handleResetFilters}
+            isActive={!dangCoBoLoc}
           />
 
           {/* Số phôi đang hiển thị trên cửa hàng */}
           <ProductStatCard
             label="Đang hiển thị"
             value={dangTaiThongKe ? "..." : (thongKe?.dangHienThi ?? 0)}
+            href="/admin/san-pham-phoi-ao?status=ACTIVE"
+            onClick={() => handleKpiFilter({ status: "dang_hien_thi" })}
+            isActive={
+              statusFilter === "dang_hien_thi" &&
+              stockFilter === "tat_ca" &&
+              searchKeyword.trim() === "" &&
+              categoryFilter === ""
+            }
           />
 
           {/* Tổng số biến thể (tổng tất cả màu × kích thước) */}
@@ -249,6 +291,14 @@ export default function ProductsPage() {
           <ProductStatCard
             label="Sắp hết hàng"
             value={dangTaiThongKe ? "..." : (thongKe?.sapHetHang ?? 0)}
+            href="/admin/san-pham-phoi-ao?stock=LOW"
+            onClick={() => handleKpiFilter({ stock: "sap_het" })}
+            isActive={
+              stockFilter === "sap_het" &&
+              statusFilter === "" &&
+              searchKeyword.trim() === "" &&
+              categoryFilter === ""
+            }
             accentColor="#f59e0b"
             extraContent={
               <span className="flex items-center gap-1 rounded-full bg-warning/10 px-2.5 py-0.5 text-[11px] font-bold tracking-wider text-warning">

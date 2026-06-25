@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import type { MouseEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { message } from "antd";
+import dayjs from "dayjs";
 import PaymentDetailDrawer, { type PaymentDetail } from "./PaymentDetailDrawer";
 import PaymentFilterBar from "./PaymentFilterBar";
 import PaymentPagination from "./PaymentPagination";
@@ -34,19 +35,41 @@ import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
  * Dữ liệu được lấy từ API backend thông qua paymentService.
  */
 
-export default function PaymentPage() {
+export type PaymentInitialFilters = {
+  activeTab?: string;
+  method?: string;
+  startDate?: string;
+  endDate?: string;
+  dateField?: "created" | "paid";
+  isExplicit?: boolean;
+};
+
+type PaymentPageProps = {
+  initialFilters?: PaymentInitialFilters;
+};
+
+export default function PaymentPage({ initialFilters }: PaymentPageProps) {
   const queryClient = useQueryClient();
   const [messageApi, messageContextHolder] = message.useMessage();
 
   // ===== STATE BỘ LỌC =====
   const [searchValue, setSearchValue] = useState("");
-  const [activeTab, setActiveTab] = useState("tat_ca");
+  const [activeTab, setActiveTab] = useState(
+    initialFilters?.activeTab ?? "tat_ca"
+  );
   const [statusFilter, setStatusFilter] = useState("tat_ca");
-  const [methodFilter, setMethodFilter] = useState("tat_ca");
-  const [tuNgay, setTuNgay] = useState("");
-  const [denNgay, setDenNgay] = useState("");
+  const [methodFilter, setMethodFilter] = useState(
+    initialFilters?.method ?? "tat_ca"
+  );
+  const [tuNgay, setTuNgay] = useState(initialFilters?.startDate ?? "");
+  const [denNgay, setDenNgay] = useState(initialFilters?.endDate ?? "");
+  const [dateField, setDateField] = useState(
+    initialFilters?.dateField ?? "created"
+  );
   const [dateFilterKey, setDateFilterKey] = useState(0);
-  const [dateFilterReady, setDateFilterReady] = useState(false);
+  const [dateFilterReady, setDateFilterReady] = useState(
+    initialFilters?.isExplicit ?? false
+  );
 
   // State phân trang
   const [currentPage, setCurrentPage] = useState(1);
@@ -75,8 +98,18 @@ export default function PaymentPage() {
       tab: activeTab !== "tat_ca" ? activeTab : undefined,
       tuNgay: tuNgay || undefined,
       denNgay: denNgay || undefined,
+      kieuNgay: dateField === "paid" ? "ngay_thanh_toan" : "ngay_tao",
     };
-  }, [currentPage, statusFilter, methodFilter, searchValue, activeTab, tuNgay, denNgay]);
+  }, [
+    currentPage,
+    statusFilter,
+    methodFilter,
+    searchValue,
+    activeTab,
+    tuNgay,
+    denNgay,
+    dateField,
+  ]);
 
   const listQuery = useQuery({
     queryKey: ["admin-payments", buildFilterParams()],
@@ -199,6 +232,7 @@ export default function PaymentPage() {
     setStatusFilter("tat_ca");
     setMethodFilter("tat_ca");
     setActiveTab("tat_ca");
+    setDateField("created");
     setCurrentPage(1);
     setDateFilterReady(false);
     setDateFilterKey((current) => current + 1);
@@ -237,6 +271,7 @@ export default function PaymentPage() {
         tab: currentFilters.tab,
         tuNgay: currentFilters.tuNgay,
         denNgay: currentFilters.denNgay,
+        kieuNgay: currentFilters.kieuNgay,
       });
       messageApi.success("Đã xuất báo cáo thanh toán thành công.");
     } catch (error) {
@@ -273,6 +308,9 @@ export default function PaymentPage() {
   const errorMessage = listQuery.error
     ? getApiErrorMessage(listQuery.error, "Không thể tải danh sách giao dịch")
     : null;
+  const today = dayjs().format("YYYY-MM-DD");
+  const hasNoSecondaryFilters =
+    searchValue === "" && statusFilter === "tat_ca";
 
   return (
     <div>
@@ -323,8 +361,8 @@ export default function PaymentPage() {
         </div>
       </section>
 
-      {/* ======== 3 thẻ KPI thống kê ======== */}
-      <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+      {/* ======== 4 thẻ KPI thống kê ======== */}
+      <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
 
         {/* KPI 1: Tổng tiền đã thanh toán hôm nay – có badge % */}
         <PaymentStatCard
@@ -336,6 +374,15 @@ export default function PaymentPage() {
               <rect x="2" y="5" width="20" height="14" rx="2" />
               <path d="M2 10h20" strokeLinecap="round" />
             </svg>
+          }
+          href={`/admin/thanh-toan?status=COMPLETED&date=${today}&dateField=paid`}
+          isActive={
+            activeTab === "da_thanh_toan" &&
+            methodFilter === "tat_ca" &&
+            tuNgay === today &&
+            denNgay === today &&
+            dateField === "paid" &&
+            hasNoSecondaryFilters
           }
           badge={
             stats && stats.phanTramThayDoi !== 0 ? (
@@ -353,7 +400,8 @@ export default function PaymentPage() {
                     <path d="M22 17l-10-10L7 12l-5-5" strokeLinecap="round" strokeLinejoin="round" />
                   )}
                 </svg>
-                {Math.abs(stats.phanTramThayDoi)}%
+                {stats.phanTramThayDoi > 0 ? "+" : "-"}
+                {Math.abs(stats.phanTramThayDoi)}% vs hôm qua
               </span>
             ) : undefined
           }
@@ -375,9 +423,43 @@ export default function PaymentPage() {
               <path d="M12 6v6l4 2" strokeLinecap="round" />
             </svg>
           }
+          href="/admin/thanh-toan?status=PENDING&method=VNPAY"
+          isActive={
+            activeTab === "cho_thanh_toan" &&
+            methodFilter === "vnpay" &&
+            tuNgay === "" &&
+            denNgay === "" &&
+            hasNoSecondaryFilters
+          }
         />
 
-        {/* KPI 3: Giao dịch thất bại – dạng alert (viền đỏ bên phải) */}
+        {/* KPI 3: Giao dịch COD cần kế toán đối soát */}
+        <PaymentStatCard
+          label="Giao dịch cần đối soát"
+          value={
+            <>
+              {stats?.canDoiSoat ?? "—"}{" "}
+              <span className="text-base font-normal text-text-muted">đơn</span>
+            </>
+          }
+          iconWrapperClassName="border border-[#fde047] bg-[#fef9c3] text-[#854d0e]"
+          icon={
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="12" cy="12" r="9" />
+            </svg>
+          }
+          href="/admin/thanh-toan?status=PENDING&method=COD"
+          isActive={
+            activeTab === "can_doi_soat" &&
+            methodFilter === "cod" &&
+            tuNgay === "" &&
+            denNgay === "" &&
+            hasNoSecondaryFilters
+          }
+        />
+
+        {/* KPI 4: Giao dịch thất bại – dạng alert (viền đỏ bên phải) */}
         <PaymentStatCard
           label="Giao dịch thất bại"
           value={
@@ -396,6 +478,14 @@ export default function PaymentPage() {
             </svg>
           }
           isAlert={true}
+          href="/admin/thanh-toan?status=FAILED%2CCANCELLED"
+          isActive={
+            activeTab === "that_bai" &&
+            methodFilter === "tat_ca" &&
+            tuNgay === "" &&
+            denNgay === "" &&
+            hasNoSecondaryFilters
+          }
         />
 
 
@@ -414,6 +504,11 @@ export default function PaymentPage() {
           methodFilter={methodFilter}
           onMethodFilterChange={setMethodFilter}
           dateFilterKey={dateFilterKey}
+          initialDatePreset={
+            initialFilters?.isExplicit ? "custom" : "today"
+          }
+          initialStartDate={initialFilters?.startDate}
+          initialEndDate={initialFilters?.endDate}
           onDateChange={handleDateChange}
           onDateClear={handleDateClear}
           onFilter={handleFilter}
