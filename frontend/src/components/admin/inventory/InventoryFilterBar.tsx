@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { SearchOutlined, FilterOutlined } from "@ant-design/icons";
+import DateRangeFilter from "@/components/admin/common/DateRangeFilter";
 
 /**
  * InventoryFilterBar – thanh lọc dữ liệu kho hàng.
@@ -26,6 +26,7 @@ const PILL_FILTERS: PillFilter[] = [
   { key: "tat_ca",      label: "Tất cả" },
   { key: "ao_basic",    label: "Áo thun Basic" },
   { key: "premium",     label: "Premium Cotton" },
+  { key: "ton_thap",    label: "Tồn kho thấp" },
   { key: "sap_het",     label: "Sắp hết hàng" },
 ];
 
@@ -36,6 +37,9 @@ type InventoryFilterBarProps = {
 
   activeFilter: string;                   // Key của pill đang được chọn
   onFilterChange: (key: string) => void;  // Hàm gọi khi người dùng bấm pill
+
+  onDateChange: (startDate: string, endDate: string) => void;
+  onDateClear: () => void;
 };
 
 export default function InventoryFilterBar({
@@ -43,61 +47,78 @@ export default function InventoryFilterBar({
   onSearchChange,
   activeFilter,
   onFilterChange,
+  onDateChange,
+  onDateClear,
 }: InventoryFilterBarProps) {
   return (
     // Khu vực filter: nền xám rất nhạt, viền dưới, padding đều 16px
-    <div className="flex flex-col gap-4 border-b border-border bg-surface-alt px-4 py-4 md:flex-row md:items-center md:justify-between">
+    <div className="space-y-3 border-b border-border bg-surface-alt px-4 py-4">
 
-      {/* ---- Phần trái: Ô tìm kiếm + nút Bộ lọc ---- */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        {/* ---- Phần trái: Ô tìm kiếm + nút Bộ lọc ---- */}
+        <div className="flex items-center gap-3">
 
-        {/* Ô tìm kiếm SKU / tên phôi áo */}
-        <div className="relative w-full md:w-64">
-          {/* Icon kính lúp – nằm bên trái, không thể click */}
-          <SearchOutlined
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
-            style={{ fontSize: 16 }}
-          />
-          <input
-            type="text"
-            value={searchValue}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Tìm SKU, tên phôi..."
-            className="h-10 w-full rounded-lg border border-border bg-surface py-0 pl-9 pr-3 text-sm text-text-main outline-none transition-all focus:border-primary-container focus:ring-1 focus:ring-primary-container"
-          />
+          {/* Ô tìm kiếm SKU / tên phôi áo */}
+          <div className="relative w-full md:w-64">
+            {/* Icon kính lúp – nằm bên trái, không thể click */}
+            <SearchOutlined
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
+              style={{ fontSize: 16 }}
+            />
+            <input
+              type="text"
+              value={searchValue}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Tìm SKU, tên phôi..."
+              className="h-10 w-full rounded-lg border border-border bg-surface py-0 pl-9 pr-3 text-sm text-text-main outline-none transition-all focus:border-primary-container focus:ring-1 focus:ring-primary-container"
+            />
+          </div>
+
+          {/* Nút "Bộ lọc" – dùng để mở filter nâng cao (mở rộng sau) */}
+          <button
+            type="button"
+            className="flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm text-text-secondary transition-colors hover:bg-surface-alt"
+          >
+            <FilterOutlined style={{ fontSize: 16 }} />
+            <span>Bộ lọc</span>
+          </button>
         </div>
 
-        {/* Nút "Bộ lọc" – dùng để mở filter nâng cao (mở rộng sau) */}
-        <button
-          type="button"
-          className="flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm text-text-secondary transition-colors hover:bg-surface-alt"
-        >
-          <FilterOutlined style={{ fontSize: 16 }} />
-          <span>Bộ lọc</span>
-        </button>
+        {/* ---- Phần phải: Dãy pill filter ---- */}
+        <div className="flex flex-wrap gap-2">
+          {PILL_FILTERS.map((pill) => {
+            // Pill đang được chọn: nền xanh nhạt, viền xanh, chữ xanh đậm, chữ đậm
+            // Pill chưa chọn: nền trắng, viền xám, chữ xám
+            const isActive = activeFilter === pill.key;
+            const activeClass = isActive
+              ? "border-primary-container bg-primary-container/10 text-primary-container font-bold"
+              : "border-border bg-surface text-text-secondary hover:bg-surface-alt font-semibold";
+
+            return (
+              <button
+                key={pill.key}
+                type="button"
+                onClick={() => onFilterChange(pill.key)}
+                className={`rounded-full border px-4 py-1.5 text-xs transition-colors ${activeClass}`}
+              >
+                {pill.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* ---- Phần phải: Dãy pill filter ---- */}
-      <div className="flex flex-wrap gap-2">
-        {PILL_FILTERS.map((pill) => {
-          // Pill đang được chọn: nền xanh nhạt, viền xanh, chữ xanh đậm, chữ đậm
-          // Pill chưa chọn: nền trắng, viền xám, chữ xám
-          const isActive = activeFilter === pill.key;
-          const activeClass = isActive
-            ? "border-primary-container bg-primary-container/10 text-primary-container font-bold"
-            : "border-border bg-surface text-text-secondary hover:bg-surface-alt font-semibold";
-
-          return (
-            <button
-              key={pill.key}
-              type="button"
-              onClick={() => onFilterChange(pill.key)}
-              className={`rounded-full border px-4 py-1.5 text-xs transition-colors ${activeClass}`}
-            >
-              {pill.label}
-            </button>
-          );
-        })}
+      <div className="flex flex-col gap-2 border-t border-border pt-3 lg:flex-row lg:items-center">
+        <span className="shrink-0 text-xs font-bold uppercase text-text-secondary">
+          SKU có biến động trong khoảng
+        </span>
+        <DateRangeFilter
+          initialPreset="custom"
+          allowClear
+          onChange={onDateChange}
+          onClear={onDateClear}
+          rangePickerClassName="sm:w-[280px]"
+        />
       </div>
 
     </div>

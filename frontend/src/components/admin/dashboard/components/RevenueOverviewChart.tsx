@@ -1,5 +1,6 @@
 import { BarChartOutlined, LoadingOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
+import Link from "next/link";
 import type {
   DashboardGroupBy,
   DiemBieuDo,
@@ -66,6 +67,29 @@ const groupByDescriptions: Record<DashboardGroupBy, string> = {
   month: "theo từng tháng",
 };
 
+function taoLinkDonHangTheoCot(
+  item: DiemBieuDo,
+  groupBy: DashboardGroupBy
+): string {
+  const params = new URLSearchParams({
+    status: "COMPLETED",
+    dateField: "completed",
+  });
+  const mocThoiGian = dayjs(item.ngay);
+
+  if (groupBy === "month") {
+    params.set("from", mocThoiGian.startOf("month").format("YYYY-MM-DD"));
+    params.set("to", mocThoiGian.endOf("month").format("YYYY-MM-DD"));
+  } else {
+    params.set("date", mocThoiGian.format("YYYY-MM-DD"));
+    if (groupBy === "hour") {
+      params.set("hour", mocThoiGian.format("HH"));
+    }
+  }
+
+  return `/admin/don-hang?${params.toString()}`;
+}
+
 export default function RevenueOverviewChart({
   data = [],
   groupBy = "day",
@@ -94,6 +118,7 @@ export default function RevenueOverviewChart({
           </h3>
           <p className="mt-1 text-xs text-text-secondary">
             Doanh thu từ đơn hàng đã hoàn tất {groupByDescriptions[groupBy]}.
+            {" "}Nhấn vào từng cột để xem các đơn hàng chi tiết.
           </p>
         </div>
         <span className="shrink-0 text-sm font-medium text-text-secondary">
@@ -168,9 +193,11 @@ export default function RevenueOverviewChart({
                         ? Math.max(8, (item.doanhThuVnd / maxValue) * 100)
                         : 1;
                     return (
-                      <div
+                      <Link
                         key={item.ngay || `${item.nhan}-${index}`}
-                        className="group relative flex h-full min-w-[14px] flex-1 items-end justify-center"
+                        href={taoLinkDonHangTheoCot(item, groupBy)}
+                        aria-label={`Xem đơn hàng ${item.nhan}, doanh thu ${formatTienVnd(item.doanhThuVnd)}`}
+                        className="group relative flex h-full min-w-[14px] flex-1 cursor-pointer items-end justify-center rounded-t-[6px] outline-none focus-visible:ring-2 focus-visible:ring-primary-container"
                         title={`${item.nhan}: ${formatTienVnd(item.doanhThuVnd)} | ${item.soDonHoanTat || 0} đơn hoàn tất`}
                       >
                         <span
@@ -189,7 +216,7 @@ export default function RevenueOverviewChart({
                           }`}
                           style={{ height: `${heightPct}%` }}
                         />
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>

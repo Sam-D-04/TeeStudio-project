@@ -21,6 +21,23 @@ export const metadata: Metadata = {
     "Theo dõi tồn kho áo trơn theo màu, size và SKU. Quản lý nhập xuất phôi áo trước khi chuyển sang xưởng in.",
 };
 
-export default function KhoHangPage() {
-  return <InventoryClient />;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function layGiaTriDauTien(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+export default async function KhoHangPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const params = await searchParams;
+  const stock = layGiaTriDauTien(params.stock).toLowerCase();
+
+  return (
+    <InventoryClient
+      initialStockFilter={stock === "low" ? "ton_thap" : "tat_ca"}
+    />
+  );
 }

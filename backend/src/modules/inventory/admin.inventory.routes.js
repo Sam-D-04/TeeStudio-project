@@ -22,6 +22,7 @@ const { verifyToken, requireAdmin } = require("../../common/middlewares/auth.mid
 const validate = require("../../common/middlewares/validate.middleware");
 const {
   createInventoryTransactionSchema,
+  getDanhSachTonKhoSchema,
 } = require("./inventory.validation");
 const {
   getThongKeKho,
@@ -51,7 +52,7 @@ router.get("/suppliers", getDanhSachNhaCungCap);
 router.get("/history", getLichSuKho);
 
 // ─── Danh sách tồn kho ────────────────────────────────────────────────────
-router.get("/", getDanhSachTonKho);
+router.get("/", validate(getDanhSachTonKhoSchema), getDanhSachTonKho);
 
 // ─── Chi tiết biến thể ───────────────────────────────────────────────────
 router.get("/variants/:variantId", getChiTietBienThe);

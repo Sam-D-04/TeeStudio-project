@@ -1,3 +1,4 @@
+import DateRangeFilter from "@/components/admin/common/DateRangeFilter";
 import type { PaymentStatus } from "./PaymentStatusBadge";
 
 /**
@@ -53,8 +54,9 @@ type PaymentFilterBarProps = {
   methodFilter: string;
   onMethodFilterChange: (value: string) => void;
 
-  timeFilter: string;
-  onTimeFilterChange: (value: string) => void;
+  dateFilterKey: number;
+  onDateChange: (startDate: string, endDate: string) => void;
+  onDateClear: () => void;
 
   // Nút lọc và đặt lại
   onFilter: () => void;
@@ -73,8 +75,9 @@ export default function PaymentFilterBar({
   onStatusFilterChange,
   methodFilter,
   onMethodFilterChange,
-  timeFilter,
-  onTimeFilterChange,
+  dateFilterKey,
+  onDateChange,
+  onDateClear,
   onFilter,
   onReset,
   tabCounts,
@@ -158,32 +161,20 @@ export default function PaymentFilterBar({
           </div>
         </div>
 
-        {/* Ô chọn thời gian (dạng input text readonly, mở date picker sau) */}
-        <div className="w-full sm:w-auto">
+        {/* Bộ lọc thời gian dùng chung */}
+        <div className="w-full lg:w-auto">
           <label className="mb-1 block text-xs font-bold uppercase text-text-secondary">
             Thời gian
           </label>
-          <div className="relative">
-            {/* Icon lịch */}
-            <svg
-              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-            >
-              <rect x="3" y="4" width="18" height="18" rx="2" />
-              <path d="M16 2v4M8 2v4M3 10h18" strokeLinecap="round" />
-            </svg>
-            <input
-              type="text"
-              value={timeFilter}
-              onChange={(e) => onTimeFilterChange(e.target.value)}
-              placeholder="Hôm nay"
-              readOnly
-              className="h-control-h w-full cursor-pointer rounded-lg border border-border bg-surface-alt pl-9 pr-3 text-sm text-text-main outline-none focus:border-primary-container sm:w-40"
-            />
-          </div>
+          <DateRangeFilter
+            key={dateFilterKey}
+            initialPreset="today"
+            allowClear
+            onChange={onDateChange}
+            onClear={onDateClear}
+            selectClassName="h-control-h"
+            rangePickerClassName="h-control-h"
+          />
         </div>
 
         {/* Nút Lọc và Đặt lại */}

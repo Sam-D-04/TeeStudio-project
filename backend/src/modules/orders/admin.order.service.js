@@ -354,6 +354,8 @@ async function layDanhSachDonHang({
   thoiGian,
   tuNgay,
   denNgay,
+  kieuNgay,
+  gio,
   loai,
   tuKhoa,
 }) {
@@ -389,19 +391,20 @@ async function layDanhSachDonHang({
   // Lọc theo thời gian. Ưu tiên khoảng ngày cụ thể từ RangePicker.
   const tuNgayHopLe = laNgayLocHopLe(tuNgay) ? tuNgay : null;
   const denNgayHopLe = laNgayLocHopLe(denNgay) ? denNgay : null;
+  const cotNgay = kieuNgay === "ngay_hoan_tat" ? "co.updatedAt" : "co.createdAt";
   if (tuNgayHopLe && denNgayHopLe) {
     const [ngayBatDau, ngayKetThuc] =
       tuNgayHopLe <= denNgayHopLe
         ? [tuNgayHopLe, denNgayHopLe]
         : [denNgayHopLe, tuNgayHopLe];
 
-    dieuKien.push("co.createdAt >= ? AND co.createdAt < DATE_ADD(?, INTERVAL 1 DAY)");
+    dieuKien.push(`${cotNgay} >= ? AND ${cotNgay} < DATE_ADD(?, INTERVAL 1 DAY)`);
     thamSo.push(ngayBatDau, ngayKetThuc);
   } else if (tuNgayHopLe) {
-    dieuKien.push("co.createdAt >= ?");
+    dieuKien.push(`${cotNgay} >= ?`);
     thamSo.push(tuNgayHopLe);
   } else if (denNgayHopLe) {
-    dieuKien.push("co.createdAt < DATE_ADD(?, INTERVAL 1 DAY)");
+    dieuKien.push(`${cotNgay} < DATE_ADD(?, INTERVAL 1 DAY)`);
     thamSo.push(denNgayHopLe);
   } else if (thoiGian === "hom_nay") {
     dieuKien.push("DATE(co.createdAt) = CURDATE()");
@@ -409,6 +412,15 @@ async function layDanhSachDonHang({
     dieuKien.push("YEARWEEK(co.createdAt, 1) = YEARWEEK(CURDATE(), 1)");
   } else if (thoiGian === "thang_nay") {
     dieuKien.push("MONTH(co.createdAt) = MONTH(CURDATE()) AND YEAR(co.createdAt) = YEAR(CURDATE())");
+  }
+
+  if (
+    kieuNgay === "ngay_hoan_tat" &&
+    typeof gio === "string" &&
+    /^(?:[01]\d|2[0-3])$/.test(gio)
+  ) {
+    dieuKien.push(`DATE_FORMAT(${cotNgay}, '%H') = ?`);
+    thamSo.push(gio);
   }
 
   // Lọc theo loại đơn (custom_design hay ao_mau)

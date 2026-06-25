@@ -51,14 +51,24 @@ function tinhTrangThaiTheoKhaDung(khaDung: number): InventoryItem["trangThai"] {
   return "con_hang";
 }
 
-export default function InventoryPage() {
+type InventoryPageProps = {
+  initialStockFilter?: string;
+};
+
+export default function InventoryPage({
+  initialStockFilter = "tat_ca",
+}: InventoryPageProps) {
   // ===== TRẠNG THÁI UI =====
 
   /** Từ khóa tìm kiếm trong ô search */
   const [tuKhoaTimKiem, setTuKhoaTimKiem] = useState("");
 
   /** Pill filter đang được chọn */
-  const [boLocHienTai, setBoLocHienTai] = useState("tat_ca");
+  const [boLocHienTai, setBoLocHienTai] = useState(initialStockFilter);
+
+  /** Khoảng ngày phát sinh biến động kho */
+  const [tuNgay, setTuNgay] = useState("");
+  const [denNgay, setDenNgay] = useState("");
 
   /** Trang hiện tại trong phân trang */
   const [trangHienTai, setTrangHienTai] = useState(1);
@@ -88,13 +98,23 @@ export default function InventoryPage() {
     isLoading: dangTaiDanhSach,
     isError: loiDanhSach,
   } = useQuery({
-    queryKey: ["inventory", "list", trangHienTai, tuKhoaTimKiem, boLocHienTai],
+    queryKey: [
+      "inventory",
+      "list",
+      trangHienTai,
+      tuKhoaTimKiem,
+      boLocHienTai,
+      tuNgay,
+      denNgay,
+    ],
     queryFn: () =>
       inventoryService.layDanhSachTonKho({
         trang: trangHienTai,
         soMoiTrang: SO_MOI_TRANG,
         tuKhoa: tuKhoaTimKiem,
         boLoc: boLocHienTai,
+        tuNgay,
+        denNgay,
       }),
     staleTime: 15_000,
     placeholderData: (prev) => prev, // giữ dữ liệu cũ khi đang tải trang mới
@@ -145,6 +165,20 @@ export default function InventoryPage() {
   /** Reset về trang 1 khi tìm kiếm */
   function xuLyTimKiem(val: string) {
     setTuKhoaTimKiem(val);
+    setTrangHienTai(1);
+    setIdDaChon([]);
+  }
+
+  function xuLyDoiNgay(startDate: string, endDate: string) {
+    setTuNgay(startDate);
+    setDenNgay(endDate);
+    setTrangHienTai(1);
+    setIdDaChon([]);
+  }
+
+  function xuLyXoaNgay() {
+    setTuNgay("");
+    setDenNgay("");
     setTrangHienTai(1);
     setIdDaChon([]);
   }
@@ -235,6 +269,8 @@ export default function InventoryPage() {
           onSearchChange={xuLyTimKiem}
           activeFilter={boLocHienTai}
           onFilterChange={xuLyDoiBoLoc}
+          onDateChange={xuLyDoiNgay}
+          onDateClear={xuLyXoaNgay}
         />
 
         {/* Trạng thái lỗi */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { SearchOutlined } from "@ant-design/icons";
+import DateRangeFilter from "@/components/admin/common/DateRangeFilter";
 import type { PromotionStatus } from "./PromotionStatusBadge";
 
 export type BoDucMaKhuyenMai = {
@@ -92,24 +93,31 @@ export default function PromotionFilterBar({ boDuc, onThayDoi }: Props) {
         <option value="mien_phi_van_chuyen">Miễn phí vận chuyển</option>
       </select>
 
-      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569" }}>
-        Từ ngày
-        <input
-          type="date"
-          value={boDuc.tuNgay}
-          onChange={(event) => capNhat("tuNgay", event.target.value)}
-          style={controlStyle}
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-semibold text-text-secondary">
+          Thời gian hiệu lực
+        </span>
+        <DateRangeFilter
+          initialPreset="custom"
+          allowClear
+          onChange={(startDate, endDate) =>
+            onThayDoi({
+              ...boDuc,
+              tuNgay: startDate,
+              denNgay: endDate,
+            })
+          }
+          onClear={() =>
+            onThayDoi({
+              ...boDuc,
+              tuNgay: "",
+              denNgay: "",
+            })
+          }
+          selectClassName="h-10"
+          rangePickerClassName="h-10 sm:w-[280px]"
         />
-      </label>
-      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569" }}>
-        Đến ngày
-        <input
-          type="date"
-          value={boDuc.denNgay}
-          onChange={(event) => capNhat("denNgay", event.target.value)}
-          style={controlStyle}
-        />
-      </label>
+      </div>
     </div>
   );
 }

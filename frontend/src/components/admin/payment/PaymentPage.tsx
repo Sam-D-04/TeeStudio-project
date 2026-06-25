@@ -43,7 +43,10 @@ export default function PaymentPage() {
   const [activeTab, setActiveTab] = useState("tat_ca");
   const [statusFilter, setStatusFilter] = useState("tat_ca");
   const [methodFilter, setMethodFilter] = useState("tat_ca");
-  const [timeFilter, setTimeFilter] = useState("Hôm nay");
+  const [tuNgay, setTuNgay] = useState("");
+  const [denNgay, setDenNgay] = useState("");
+  const [dateFilterKey, setDateFilterKey] = useState(0);
+  const [dateFilterReady, setDateFilterReady] = useState(false);
 
   // State phân trang
   const [currentPage, setCurrentPage] = useState(1);
@@ -70,13 +73,15 @@ export default function PaymentPage() {
       phuongThuc: methodFilter !== "tat_ca" ? methodFilter : undefined,
       tuKhoa: searchValue || undefined,
       tab: activeTab !== "tat_ca" ? activeTab : undefined,
-      thoiGian: timeFilter === "Hôm nay" ? "hom_nay" : undefined,
+      tuNgay: tuNgay || undefined,
+      denNgay: denNgay || undefined,
     };
-  }, [currentPage, statusFilter, methodFilter, searchValue, activeTab, timeFilter]);
+  }, [currentPage, statusFilter, methodFilter, searchValue, activeTab, tuNgay, denNgay]);
 
   const listQuery = useQuery({
     queryKey: ["admin-payments", buildFilterParams()],
     queryFn: () => layDanhSachGiaoDich(buildFilterParams()),
+    enabled: dateFilterReady,
   });
 
   // ===== QUERY: CHI TIẾT GIAO DỊCH =====
@@ -193,14 +198,29 @@ export default function PaymentPage() {
     setSearchValue("");
     setStatusFilter("tat_ca");
     setMethodFilter("tat_ca");
-    setTimeFilter("Hôm nay");
     setActiveTab("tat_ca");
     setCurrentPage(1);
+    setDateFilterReady(false);
+    setDateFilterKey((current) => current + 1);
   }
 
   // Khi chuyển tab → reset trang về 1
   function handleTabChange(tab: string) {
     setActiveTab(tab);
+    setCurrentPage(1);
+  }
+
+  function handleDateChange(startDate: string, endDate: string) {
+    setTuNgay(startDate);
+    setDenNgay(endDate);
+    setDateFilterReady(true);
+    setCurrentPage(1);
+  }
+
+  function handleDateClear() {
+    setTuNgay("");
+    setDenNgay("");
+    setDateFilterReady(true);
     setCurrentPage(1);
   }
 
@@ -215,7 +235,8 @@ export default function PaymentPage() {
         phuongThuc: currentFilters.phuongThuc,
         tuKhoa: currentFilters.tuKhoa,
         tab: currentFilters.tab,
-        thoiGian: currentFilters.thoiGian,
+        tuNgay: currentFilters.tuNgay,
+        denNgay: currentFilters.denNgay,
       });
       messageApi.success("Đã xuất báo cáo thanh toán thành công.");
     } catch (error) {
@@ -392,8 +413,9 @@ export default function PaymentPage() {
           onStatusFilterChange={setStatusFilter}
           methodFilter={methodFilter}
           onMethodFilterChange={setMethodFilter}
-          timeFilter={timeFilter}
-          onTimeFilterChange={setTimeFilter}
+          dateFilterKey={dateFilterKey}
+          onDateChange={handleDateChange}
+          onDateClear={handleDateClear}
           onFilter={handleFilter}
           onReset={handleReset}
           tabCounts={tabCounts}

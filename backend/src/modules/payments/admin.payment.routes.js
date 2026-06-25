@@ -9,7 +9,11 @@ const express = require("express");
 
 const { verifyToken, requireRoles } = require("../../common/middlewares/auth.middleware");
 const { ROLES } = require("../../common/constants/roles");
+const validate = require("../../common/middlewares/validate.middleware");
 const paymentController = require("./admin.payment.controller");
+const {
+  getDanhSachThanhToanSchema,
+} = require("./payment.validation");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PHẦN 1: ROUTE CÔNG KHAI (VNPAY)
@@ -41,6 +45,7 @@ adminRouter.get(
   "/xuat-bao-cao",
   verifyToken,
   requireAdmin,
+  validate(getDanhSachThanhToanSchema),
   paymentController.exportBaoCaoThanhToan
 );
 
@@ -49,6 +54,7 @@ adminRouter.get(
   "/",
   verifyToken,
   requireAdmin,
+  validate(getDanhSachThanhToanSchema),
   paymentController.getDanhSachThanhToan
 );
 

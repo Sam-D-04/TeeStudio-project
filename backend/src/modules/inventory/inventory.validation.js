@@ -74,6 +74,16 @@ const getDanhSachTonKhoSchema = {
       type: "string",
       maxLength: 100,
     },
+    tuNgay: {
+      label: "Từ ngày",
+      type: "string",
+      pattern: /^\d{4}-\d{2}-\d{2}$/,
+    },
+    denNgay: {
+      label: "Đến ngày",
+      type: "string",
+      pattern: /^\d{4}-\d{2}-\d{2}$/,
+    },
   },
 };
 

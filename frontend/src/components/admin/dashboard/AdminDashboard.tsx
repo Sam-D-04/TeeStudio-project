@@ -9,15 +9,11 @@ import {
   ShoppingOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
-import dayjs from "dayjs";
 import { useState } from "react";
 import * as dashboardService from "@/services/admin/dashboardService";
-import type { DashboardGroupBy } from "@/services/admin/dashboardService";
 import type { DesignOrder } from "./components/DesignReviewTable";
 import BestSellingProductsCard from "./components/BestSellingProductsCard";
-import DashboardFilterToolbar, {
-  type DashboardDateRange,
-} from "./components/DashboardFilterToolbar";
+import DashboardFilterToolbar from "./components/DashboardFilterToolbar";
 import DesignReviewTable from "./components/DesignReviewTable";
 import InventoryWarningCard from "./components/InventoryWarningCard";
 import MetricCard from "./components/MetricCard";
@@ -40,29 +36,19 @@ function formatPhanTram(value: number | undefined): string {
 }
 
 // ---------------------------------------------------------------------------
-// Khoảng ngày mặc định: toàn bộ tháng hiện tại
-// ---------------------------------------------------------------------------
-function getDefaultRange(): DashboardDateRange {
-  const today = dayjs();
-  return [today.startOf("month"), today.endOf("month")];
-}
-
-function getChartGroupBy(dates: DashboardDateRange): DashboardGroupBy {
-  const [startDate, endDate] = dates;
-
-  if (!startDate || !endDate) return "day";
-  if (startDate.isSame(endDate, "day")) return "hour";
-  return endDate.diff(startDate, "day") > 60 ? "month" : "day";
-}
-
-// ---------------------------------------------------------------------------
 // Component chính
 // ---------------------------------------------------------------------------
 export default function AdminDashboard() {
-  const [dates, setDates] = useState<DashboardDateRange>(getDefaultRange);
-  const tuNgay = dates[0]?.format("YYYY-MM-DD") ?? "";
-  const denNgay = dates[1]?.format("YYYY-MM-DD") ?? "";
-  const groupBy = getChartGroupBy(dates);
+  const [dateRange, setDateRange] = useState({
+    startDate: "",
+    endDate: "",
+  });
+  const { startDate: tuNgay, endDate: denNgay } = dateRange;
+  const hasDateRange = Boolean(tuNgay && denNgay);
+
+  function handleDateChange(startDate: string, endDate: string) {
+    setDateRange({ startDate, endDate });
+  }
 
   // ── Truy vấn 1: Thẻ chỉ số tổng quan ──
   const {
@@ -71,6 +57,7 @@ export default function AdminDashboard() {
   } = useQuery({
     queryKey: ["dashboard/tong-quan", tuNgay, denNgay],
     queryFn: () => dashboardService.layTongQuanChiSo(tuNgay, denNgay),
+    enabled: hasDateRange,
     staleTime: 60_000,
   });
 
@@ -80,8 +67,9 @@ export default function AdminDashboard() {
     isLoading: isLoadingBieuDo,
     isError: isErrorBieuDo,
   } = useQuery({
-    queryKey: ["dashboard/bieu-do", tuNgay, denNgay, groupBy],
+    queryKey: ["dashboard/bieu-do", tuNgay, denNgay],
     queryFn: () => dashboardService.layDuLieuBieuDo(tuNgay, denNgay),
+    enabled: hasDateRange,
     staleTime: 60_000,
   });
 
@@ -96,22 +84,17 @@ export default function AdminDashboard() {
   });
 
   // ── Truy vấn 4: Tồn kho cảnh báo ──
-  const {
-    data: tonKhoRaw,
-    isLoading: isLoadingTonKho,
-  } = useQuery({
+  const { data: tonKhoRaw } = useQuery({
     queryKey: ["dashboard/ton-kho-canh-bao"],
     queryFn: () => dashboardService.layTonKhoCanhBao(15, 10),
     staleTime: 120_000,
   });
 
   // ── Truy vấn 5: Sản phẩm bán chạy ──
-  const {
-    data: sanPhamBanChayRaw,
-    isLoading: isLoadingSanPham,
-  } = useQuery({
+  const { data: sanPhamBanChayRaw } = useQuery({
     queryKey: ["dashboard/san-pham-ban-chay", tuNgay, denNgay],
     queryFn: () => dashboardService.laySanPhamBanChay(tuNgay, denNgay, 3),
+    enabled: hasDateRange,
     staleTime: 60_000,
   });
 
@@ -144,29 +127,39 @@ export default function AdminDashboard() {
     thumbnailClassName: sp.thumbnailClassName,
   }));
 
+  const dateQuery = hasDateRange
+    ? `&from=${encodeURIComponent(tuNgay)}&to=${encodeURIComponent(denNgay)}`
+    : "";
+  const completedOrdersHref =
+    `/admin/don-hang?status=COMPLETED&dateField=completed${dateQuery}`;
+
   // ── Cấu hình thẻ chỉ số hàng 1 ──
   const primaryMetrics = [
     {
       label: "Doanh thu tháng này",
       value: isLoadingChiSo ? "..." : formatTienVnd(chiSo?.doanhThuThangVnd),
+      href: completedOrdersHref,
       icon: <RiseOutlined />,
       iconClassName: "text-success",
     },
     {
       label: "Doanh thu từ thiết kế",
       value: isLoadingChiSo ? "..." : formatTienVnd(chiSo?.doanhThuThietKeVnd),
+      href: completedOrdersHref,
       icon: <ScissorOutlined />,
       iconClassName: "text-accent",
     },
     {
       label: "Đơn hàng mới",
       value: isLoadingChiSo ? "..." : String(chiSo?.soDonMoi ?? "—"),
+      href: `/admin/don-hang?status=PENDING${dateQuery}`,
       icon: <ShoppingOutlined />,
       iconClassName: "text-primary-container",
     },
     {
       label: "Tồn kho mức thấp",
       value: isLoadingChiSo ? "..." : String(chiSo?.soVariantTonKhoThap ?? "—"),
+      href: "/admin/kho-hang?stock=low",
       icon: <InboxOutlined />,
       iconClassName: "text-error",
       valueClassName: "text-error",
@@ -178,12 +171,14 @@ export default function AdminDashboard() {
     {
       label: "Giá trị trung bình đơn",
       value: isLoadingChiSo ? "..." : formatTienVnd(chiSo?.giaTriTrungBinhDonVnd),
+      href: completedOrdersHref,
       icon: <PercentageOutlined />,
       iconClassName: "text-primary-container",
     },
     {
       label: "Tỷ lệ đơn hàng thành công",
       value: isLoadingChiSo ? "..." : formatPhanTram(chiSo?.tyLeThanhCongPhanTram),
+      href: `/admin/don-hang?status=COMPLETED%2CDELIVERED${dateQuery}`,
       icon: <RiseOutlined />,
       iconClassName: "text-success",
       valueClassName: "text-success",
@@ -191,6 +186,7 @@ export default function AdminDashboard() {
     {
       label: "Doanh thu khác / Đền bù",
       value: isLoadingChiSo ? "..." : formatTienVnd(chiSo?.doanhThuKhacDenBuVnd),
+      href: `/admin/don-hang?status=CANCELLED${dateQuery}`,
       icon: <AlertOutlined />,
       iconClassName: "text-warning",
       subLabel: "Tỷ lệ hủy",
@@ -214,7 +210,7 @@ export default function AdminDashboard() {
       </section>
 
       {/* Bộ lọc thời gian */}
-      <DashboardFilterToolbar dates={dates} onDatesChange={setDates} />
+      <DashboardFilterToolbar onDateChange={handleDateChange} />
 
       {/* ── Hàng 1: Thẻ chỉ số tài chính & đơn hàng (4 thẻ chính) ── */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -223,6 +219,7 @@ export default function AdminDashboard() {
             key={metric.label}
             label={metric.label}
             value={metric.value}
+            href={metric.href}
             icon={metric.icon}
             iconClassName={metric.iconClassName}
             valueClassName={metric.valueClassName}
@@ -239,6 +236,7 @@ export default function AdminDashboard() {
               key={metric.label}
               label={metric.label}
               value={metric.value}
+              href={metric.href}
               icon={metric.icon}
               iconClassName={metric.iconClassName}
               valueClassName={metric.valueClassName}
@@ -251,7 +249,7 @@ export default function AdminDashboard() {
         {/* Cột phải: Biểu đồ doanh thu tổng quan */}
         <RevenueOverviewChart
           data={bieuDo?.danhSach ?? []}
-          groupBy={bieuDo?.groupBy ?? groupBy}
+          groupBy={bieuDo?.groupBy ?? "day"}
           dateRange={bieuDo?.khoangThoiGian}
           isLoading={isLoadingBieuDo}
           isError={isErrorBieuDo}

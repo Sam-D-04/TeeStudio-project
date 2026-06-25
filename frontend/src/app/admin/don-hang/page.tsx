@@ -18,6 +18,54 @@ export const metadata: Metadata = {
  * Layout admin dùng chung nằm ở app/admin/layout.tsx.
  * Logic tương tác của trang nằm trong OrdersClient/OrdersPage.
  */
-export default function AdminOrdersPage() {
-  return <OrdersClient />;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function layGiaTriDauTien(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+function chuyenTrangThaiSangBoLoc(value: string): string {
+  const statuses = value
+    .split(",")
+    .map((status) => status.trim().toUpperCase())
+    .filter(Boolean);
+
+  if (statuses.includes("PENDING")) return "cho_xac_nhan";
+  if (statuses.includes("CANCELLED")) return "da_huy";
+  if (statuses.includes("COMPLETED") || statuses.includes("DELIVERED")) {
+    return "hoan_tat";
+  }
+
+  return "tat_ca";
+}
+
+function laNgayHopLe(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+export default async function AdminOrdersPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const params = await searchParams;
+  const date = layGiaTriDauTien(params.date);
+  const from = layGiaTriDauTien(params.from);
+  const to = layGiaTriDauTien(params.to);
+  const hour = layGiaTriDauTien(params.hour);
+
+  return (
+    <OrdersClient
+      initialFilters={{
+        status: chuyenTrangThaiSangBoLoc(layGiaTriDauTien(params.status)),
+        startDate: laNgayHopLe(date) ? date : laNgayHopLe(from) ? from : "",
+        endDate: laNgayHopLe(date) ? date : laNgayHopLe(to) ? to : "",
+        dateField:
+          layGiaTriDauTien(params.dateField) === "completed"
+            ? "completed"
+            : "created",
+        hour: /^(?:[01]\d|2[0-3])$/.test(hour) ? hour : "",
+      }}
+    />
+  );
 }

@@ -35,6 +35,8 @@ const getThongKeKho = async (req, res, next) => {
  *   soMoiTrang    – số dòng mỗi trang (mặc định: 10)
  *   tuKhoa        – tìm theo SKU, tên sản phẩm, hoặc màu sắc
  *   boLoc         – "tat_ca" | "sap_het" | "het_hang" | "con_hang" | <tên sản phẩm>
+ *   tuNgay        – lọc SKU có biến động kho từ ngày YYYY-MM-DD
+ *   denNgay       – lọc SKU có biến động kho đến ngày YYYY-MM-DD
  */
 const getDanhSachTonKho = async (req, res, next) => {
   try {

@@ -1,8 +1,10 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 type MetricCardProps = {
   label: string;
   value: string;
+  href: string;
   icon: ReactNode;
   iconClassName: string;
   valueClassName?: string;
@@ -16,6 +18,7 @@ type MetricCardProps = {
 export default function MetricCard({
   label,
   value,
+  href,
   icon,
   iconClassName,
   valueClassName = "text-text-main",
@@ -24,7 +27,11 @@ export default function MetricCard({
   subValueClassName = "text-text-secondary",
 }: MetricCardProps) {
   return (
-    <article className="admin-card admin-card-hover flex flex-col justify-between p-4">
+    <Link
+      href={href}
+      aria-label={`${label}: ${value}. Xem chi tiết`}
+      className="admin-card admin-card-hover flex cursor-pointer flex-col justify-between p-4 outline-none focus-visible:border-primary-container focus-visible:ring-2 focus-visible:ring-primary-container/30"
+    >
       <div className="mb-1.5 flex items-start justify-between gap-2">
         <p className="text-xs leading-[1.4] text-text-secondary">{label}</p>
         <span className={`flex text-[18px] leading-none ${iconClassName}`}>
@@ -38,6 +45,6 @@ export default function MetricCard({
           <span className="font-semibold">{subValue}</span>
         </p>
       )}
-    </article>
+    </Link>
   );
 }

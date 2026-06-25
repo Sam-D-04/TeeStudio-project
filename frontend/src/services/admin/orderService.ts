@@ -128,6 +128,8 @@ export type ThamSoLocDonHang = {
   thoiGian?: string;
   tuNgay?: string;
   denNgay?: string;
+  kieuNgay?: "ngay_tao" | "ngay_hoan_tat";
+  gio?: string;
   loai?: string;
   tuKhoa?: string;
 };
@@ -164,6 +166,8 @@ export async function layDanhSachDonHang(
   if (thamSo.thoiGian && thamSo.thoiGian !== "tat_ca") params.thoiGian = thamSo.thoiGian;
   if (thamSo.tuNgay) params.tuNgay = thamSo.tuNgay;
   if (thamSo.denNgay) params.denNgay = thamSo.denNgay;
+  if (thamSo.kieuNgay) params.kieuNgay = thamSo.kieuNgay;
+  if (thamSo.gio) params.gio = thamSo.gio;
   if (thamSo.loai && thamSo.loai !== "tat_ca") params.loai = thamSo.loai;
   if (thamSo.tuKhoa && thamSo.tuKhoa.trim()) params.tuKhoa = thamSo.tuKhoa.trim();
 

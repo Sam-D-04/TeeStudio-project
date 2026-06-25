@@ -67,6 +67,8 @@ export type ThamSoLocTonKho = {
   soMoiTrang?: number;
   tuKhoa?: string;
   boLoc?: string;
+  tuNgay?: string;
+  denNgay?: string;
 };
 
 /** Một đơn hàng đang chờ xuất phôi áo */
@@ -213,6 +215,8 @@ export async function layDanhSachTonKho(
   if (thamSo.soMoiTrang) params.soMoiTrang = thamSo.soMoiTrang;
   if (thamSo.tuKhoa && thamSo.tuKhoa.trim()) params.tuKhoa = thamSo.tuKhoa.trim();
   if (thamSo.boLoc && thamSo.boLoc !== "tat_ca") params.boLoc = thamSo.boLoc;
+  if (thamSo.tuNgay) params.tuNgay = thamSo.tuNgay;
+  if (thamSo.denNgay) params.denNgay = thamSo.denNgay;
 
   const res = await apiClient.get<{
     success: boolean;

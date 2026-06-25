@@ -20,6 +20,7 @@ const db = require("../../database/mysql");
 
 /** Số lượng ≤ ngưỡng này → trạng thái "sap_het" */
 const NGUONG_SAP_HET = 20;
+const NGUONG_TON_THAP_DASHBOARD = 15;
 
 const RESERVED_STOCK_JOIN = `
   LEFT JOIN (
@@ -42,6 +43,10 @@ function tinhTrangThaiTonKho(availableQty) {
   if (availableQty <= 0) return "het_hang";
   if (availableQty <= NGUONG_SAP_HET) return "sap_het";
   return "con_hang";
+}
+
+function laNgayHopLe(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -108,7 +113,9 @@ async function layThongKeKho() {
  * @param {number}  [params.trang=1]        - Trang hiện tại
  * @param {number}  [params.soMoiTrang=10]  - Số dòng mỗi trang
  * @param {string}  [params.tuKhoa]         - Tìm theo SKU | tên | màu
- * @param {string}  [params.boLoc]          - "tat_ca" | "sap_het" | "het_hang" | "con_hang" | tên sản phẩm
+ * @param {string}  [params.boLoc]          - "tat_ca" | "ton_thap" | "sap_het" | "het_hang" | "con_hang" | tên sản phẩm
+ * @param {string}  [params.tuNgay]          - Chỉ lấy SKU có biến động kho từ ngày này
+ * @param {string}  [params.denNgay]         - Chỉ lấy SKU có biến động kho đến ngày này
  * @returns {Promise<{danhSach: object[], tongSo: number, trang: number, soMoiTrang: number, tongSoTrang: number}>}
  */
 async function layDanhSachTonKho(params = {}) {
@@ -117,6 +124,8 @@ async function layDanhSachTonKho(params = {}) {
   const offset = (trang - 1) * soMoiTrang;
   const tuKhoa = params.tuKhoa ? params.tuKhoa.trim() : "";
   const boLoc = params.boLoc || "tat_ca";
+  const tuNgay = laNgayHopLe(params.tuNgay) ? params.tuNgay : "";
+  const denNgay = laNgayHopLe(params.denNgay) ? params.denNgay : "";
 
   const conditions = [];
   const values = [];
@@ -129,7 +138,11 @@ async function layDanhSachTonKho(params = {}) {
   }
 
   // Lọc theo trạng thái tồn kho
-  if (boLoc === "sap_het") {
+  if (boLoc === "ton_thap") {
+    conditions.push(
+      `${AVAILABLE_STOCK_SQL} <= ${NGUONG_TON_THAP_DASHBOARD}`
+    );
+  } else if (boLoc === "sap_het") {
     conditions.push(
       `${AVAILABLE_STOCK_SQL} > 0 AND ${AVAILABLE_STOCK_SQL} <= ${NGUONG_SAP_HET}`
     );
@@ -141,6 +154,25 @@ async function layDanhSachTonKho(params = {}) {
     // Lọc theo tên sản phẩm (partial match)
     conditions.push(`p.name LIKE ?`);
     values.push(`%${boLoc}%`);
+  }
+
+  if (tuNgay || denNgay) {
+    const transactionConditions = ["it.variantId = pv.id"];
+    if (tuNgay) {
+      transactionConditions.push("DATE(it.createdAt) >= ?");
+      values.push(tuNgay);
+    }
+    if (denNgay) {
+      transactionConditions.push("DATE(it.createdAt) <= ?");
+      values.push(denNgay);
+    }
+    conditions.push(
+      `EXISTS (
+        SELECT 1
+        FROM InventoryTransaction it
+        WHERE ${transactionConditions.join(" AND ")}
+      )`
+    );
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";

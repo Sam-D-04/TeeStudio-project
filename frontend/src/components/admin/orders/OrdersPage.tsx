@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
 import AdminSearchInput from "../common/AdminSearchInput";
-import OrderFilterBar, { type DateRange } from "./OrderFilterBar";
+import OrderFilterBar from "./OrderFilterBar";
 import OrderPagination from "./OrderPagination";
 import OrderStatCard from "./OrderStatCard";
 import OrderTable, { type Order } from "./OrderTable";
@@ -82,13 +82,32 @@ function chuyenDoiSangOrder(don: orderService.DonHang): Order {
 
 const SO_MOI_TRANG = 10;
 
-export default function OrdersPage() {
+export type OrdersInitialFilters = {
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  dateField?: "created" | "completed";
+  hour?: string;
+};
+
+type OrdersPageProps = {
+  initialFilters?: OrdersInitialFilters;
+};
+
+export default function OrdersPage({ initialFilters }: OrdersPageProps) {
   const router = useRouter();
 
   // ---- State bộ lọc ----
-  const [activeTab, setActiveTab] = useState("tat_ca");
+  const [activeTab, setActiveTab] = useState(initialFilters?.status ?? "tat_ca");
   const [paymentFilter, setPaymentFilter] = useState("tat_ca");
-  const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  const [tuNgay, setTuNgay] = useState(initialFilters?.startDate ?? "");
+  const [denNgay, setDenNgay] = useState(initialFilters?.endDate ?? "");
+  const [dateField, setDateField] = useState(
+    initialFilters?.dateField ?? "created"
+  );
+  const [completionHour, setCompletionHour] = useState(
+    initialFilters?.hour ?? ""
+  );
   const [typeFilter, setTypeFilter] = useState("tat_ca");
   const [tuKhoa, setTuKhoa] = useState("");
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -99,9 +118,6 @@ export default function OrdersPage() {
   // ---- State modal cập nhật trạng thái ----
   const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-
-  const tuNgay = dateRange?.[0].format("YYYY-MM-DD") ?? "";
-  const denNgay = dateRange?.[1].format("YYYY-MM-DD") ?? "";
 
   // ======================================================
   // REACT QUERY: Lấy thống kê KPI
@@ -133,6 +149,8 @@ export default function OrdersPage() {
       paymentFilter,
       tuNgay,
       denNgay,
+      dateField,
+      completionHour,
       typeFilter,
       tuKhoa,
     ],
@@ -144,6 +162,8 @@ export default function OrdersPage() {
         thanhToan: paymentFilter,
         tuNgay,
         denNgay,
+        kieuNgay: dateField === "completed" ? "ngay_hoan_tat" : "ngay_tao",
+        gio: completionHour,
         loai: typeFilter,
         tuKhoa,
       }),
@@ -165,10 +185,25 @@ export default function OrdersPage() {
   // Hàm xử lý khi filter thay đổi → reset về trang 1
   function handleTabChange(key: string) {
     setActiveTab(key);
+    if (key !== "hoan_tat") {
+      setDateField("created");
+      setCompletionHour("");
+    }
     setCurrentPage(1);
   }
   function handlePaymentChange(v: string) { setPaymentFilter(v); setCurrentPage(1); }
-  function handleDateRangeChange(v: DateRange | null) { setDateRange(v); setCurrentPage(1); }
+  function handleDateChange(startDate: string, endDate: string) {
+    setTuNgay(startDate);
+    setDenNgay(endDate);
+    setCompletionHour("");
+    setCurrentPage(1);
+  }
+  function handleDateClear() {
+    setTuNgay("");
+    setDenNgay("");
+    setCompletionHour("");
+    setCurrentPage(1);
+  }
   function handleTypeChange(v: string) { setTypeFilter(v); setCurrentPage(1); }
 
   // Chuyển đổi dữ liệu từ API sang kiểu FE
@@ -222,8 +257,10 @@ export default function OrdersPage() {
           onTabChange={handleTabChange}
           paymentFilter={paymentFilter}
           onPaymentFilterChange={handlePaymentChange}
-          dateRange={dateRange}
-          onDateRangeChange={handleDateRangeChange}
+          onDateChange={handleDateChange}
+          onDateClear={handleDateClear}
+          initialStartDate={initialFilters?.startDate}
+          initialEndDate={initialFilters?.endDate}
           typeFilter={typeFilter}
           onTypeFilterChange={handleTypeChange}
           searchSlot={(
