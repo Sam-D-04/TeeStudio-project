@@ -49,7 +49,7 @@ export type Order = {
 
 type OrderTableProps = {
   orders: Order[];
-  onRowClick: (order: Order) => void;
+  onViewDetail: (order: Order) => void;
   onEditStatus?: (order: Order) => void;
 };
 
@@ -58,7 +58,7 @@ function formatCurrency(amountVnd: number): string {
   return amountVnd.toLocaleString("vi-VN") + "đ";
 }
 
-export default function OrderTable({ orders, onRowClick, onEditStatus }: OrderTableProps) {
+export default function OrderTable({ orders, onViewDetail, onEditStatus }: OrderTableProps) {
   return (
     // Wrapper cho phép cuộn ngang trên màn hình nhỏ
     <div className="overflow-x-auto">
@@ -81,9 +81,8 @@ export default function OrderTable({ orders, onRowClick, onEditStatus }: OrderTa
           {orders.map((order) => (
             <tr
               key={order.id}
-              // Khi hover: nền xám rất nhạt, con trỏ dạng bàn tay
-              className="cursor-pointer border-b border-border transition-colors hover:bg-surface-alt"
-              onClick={() => onRowClick(order)}
+              // Khi hover: nền xám rất nhạt
+              className="border-b border-border transition-colors hover:bg-surface-alt"
             >
               {/* Cột 1: Mã đơn + ngày tạo */}
               <td className="p-4 align-top">
@@ -188,7 +187,7 @@ export default function OrderTable({ orders, onRowClick, onEditStatus }: OrderTa
                     title="Xem chi tiết"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onRowClick(order);
+                      onViewDetail(order);
                     }}
                     className="rounded p-1.5 text-text-secondary transition-colors hover:bg-surface-dim hover:text-[#006591]"
                   >

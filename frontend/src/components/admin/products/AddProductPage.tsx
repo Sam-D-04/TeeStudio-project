@@ -114,8 +114,6 @@ function validateBuoc1(form: FormBuoc1): Partial<Record<keyof FormBuoc1, string>
   if (!form.chatLieu.trim()) loi.chatLieu = "Vui lòng nhập chất liệu";
   if (!form.formDang.trim()) loi.formDang = "Vui lòng nhập kiểu dáng";
   if (!form.xuatXu.trim()) loi.xuatXu = "Vui lòng nhập xuất xứ";
-  if (!form.moTa.trim()) loi.moTa = "Vui lòng nhập mô tả";
-  else if (form.moTa.trim().length < 10) loi.moTa = "Mô tả phải có ít nhất 10 ký tự";
   return loi;
 }
 
@@ -576,7 +574,7 @@ export default function AddProductPage() {
               </FormField>
 
               {/* Mô tả */}
-              <FormField label="Mô tả sản phẩm" required error={loiBuoc1.moTa}>
+              <FormField label="Mô tả sản phẩm" error={loiBuoc1.moTa}>
                 <textarea
                   id="add-product-mo-ta"
                   value={formBuoc1.moTa}

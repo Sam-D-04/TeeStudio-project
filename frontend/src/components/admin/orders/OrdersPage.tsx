@@ -148,8 +148,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
       }),
   });
 
-  // Mỗi đơn chỉ có một trang chi tiết chính thức theo ID.
-  function handleRowClick(order: Order) {
+  function handleViewDetail(order: Order) {
     router.push(`/admin/don-hang/${order.id}`);
   }
 
@@ -355,7 +354,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
             )}
             <OrderTable
               orders={danhSachOrder}
-              onRowClick={handleRowClick}
+              onViewDetail={handleViewDetail}
               onEditStatus={handleEditStatus}
             />
           </div>

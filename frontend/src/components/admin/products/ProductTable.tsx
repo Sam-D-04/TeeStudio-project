@@ -7,7 +7,7 @@
  * 1. Hiển thị danh sách phôi áo (tên, danh mục, chất liệu, giá nền, biến thể, tồn kho, trạng thái).
  * 2. Bấm vào hàng hoặc mũi tên ở đầu để mở rộng/thu gọn phần biến thể màu × kích thước.
  * 3. Phần biến thể hiển thị bảng con với SKU, số lượng tồn, trạng thái từng biến thể.
- * 4. Các nút hành động: Xem chi tiết, Chỉnh sửa, Xóa.
+ * 4. Các nút hành động: Xem / Chỉnh sửa, Xóa.
  *
  * Thiết kế: bảng phẳng, nền trắng, header xám nhạt, hover row, border mảnh.
  */
@@ -16,7 +16,6 @@ import {
   DeleteOutlined,
   DownOutlined,
   EditOutlined,
-  EyeOutlined,
   RightOutlined,
   SkinOutlined,
 } from "@ant-design/icons";
@@ -40,9 +39,7 @@ type ProductTableProps = {
   emptyMessage?: string;
   /** Đang có thao tác loading (ví dụ: đang xóa) */
   isLoading?: boolean;
-  /** Hàm gọi khi bấm nút Xem chi tiết */
-  onView: (product: SanPham) => void;
-  /** Hàm gọi khi bấm nút Chỉnh sửa */
+  /** Hàm gọi khi bấm nút Xem / Chỉnh sửa */
   onEdit: (product: SanPham) => void;
   /** Hàm gọi khi bấm nút Xóa */
   onDelete: (product: SanPham) => void;
@@ -171,7 +168,6 @@ export default function ProductTable({
   products,
   emptyMessage = "Chưa có phôi áo nào. Bấm “Thêm phôi áo” để bắt đầu.",
   isLoading = false,
-  onView,
   onEdit,
   onDelete,
 }: ProductTableProps) {
@@ -326,19 +322,10 @@ export default function ProductTable({
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center justify-end gap-1">
-                        {/* Nút Xem chi tiết */}
+                        {/* Nút Xem / Chỉnh sửa */}
                         <button
                           type="button"
-                          title="Xem chi tiết"
-                          onClick={() => onView(product)}
-                          className="rounded p-1.5 text-text-secondary transition-colors hover:bg-surface-alt hover:text-primary"
-                        >
-                          <EyeOutlined className="text-[18px]" />
-                        </button>
-                        {/* Nút Chỉnh sửa */}
-                        <button
-                          type="button"
-                          title="Chỉnh sửa"
+                          title="Xem / Chỉnh sửa"
                           onClick={() => onEdit(product)}
                           className="rounded p-1.5 text-text-secondary transition-colors hover:bg-surface-alt hover:text-primary"
                         >
