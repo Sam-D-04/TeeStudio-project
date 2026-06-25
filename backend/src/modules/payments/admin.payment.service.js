@@ -454,16 +454,6 @@ function buildIpnHistory(paymentRow) {
     }
   }
 
-  // Nếu bị hoàn tiền
-  if (paymentRow.status === PAYMENT_STATUS.REFUNDED) {
-    steps.push({
-      description: "Đã hoàn tiền",
-      time: formatDateVn(paymentRow.paidAt) || "",
-      note: paymentRow.note || "Admin xử lý hoàn tiền",
-      isSuccess: true,
-    });
-  }
-
   // Đảo ngược: bước mới nhất lên trên
   return steps.reverse();
 }
@@ -563,57 +553,6 @@ async function dongBoLaiVnpay(id) {
   };
 }
 
-// ── Hoàn tiền ─────────────────────────────────────────────────────────
-
-async function hoanTienGiaoDich(id) {
-  const conn = await db.pool.getConnection();
-
-  try {
-    await conn.beginTransaction();
-
-    const [rows] = await conn.query(
-      `SELECT p.id, p.status, p.paymentMethod
-       FROM Payment p
-       WHERE p.id = ?
-       LIMIT 1
-       FOR UPDATE`,
-      [id]
-    );
-
-    if (rows.length === 0) {
-      await conn.rollback();
-      const error = new Error("Không tìm thấy giao dịch thanh toán");
-      error.statusCode = 404;
-      throw error;
-    }
-
-    const payment = rows[0];
-
-    if (payment.status !== PAYMENT_STATUS.COMPLETED) {
-      await conn.rollback();
-      const error = new Error("Chỉ có thể hoàn tiền cho giao dịch đã thanh toán thành công");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    await conn.query(
-      `UPDATE Payment
-       SET status = 'REFUNDED'
-       WHERE id = ?`,
-      [id]
-    );
-
-    await conn.commit();
-
-    return { id, trangThai: "hoan_tien" };
-  } catch (error) {
-    await conn.rollback();
-    throw error;
-  } finally {
-    conn.release();
-  }
-}
-
 // ── Lưu ghi chú kế toán ──────────────────────────────────────────────
 
 async function luuGhiChu(id, note) {
@@ -646,6 +585,5 @@ module.exports = {
   layChiTietThanhToan,
   xacNhanThuCod,
   dongBoLaiVnpay,
-  hoanTienGiaoDich,
   luuGhiChu,
 };

@@ -29,7 +29,6 @@ const FILTER_PILLS: FilterPill[] = [
     // Pill màu đỏ nhạt khi không active
     pillClassName: "bg-[#fef2f2] border-[#fca5a5] text-[#b91c1c] hover:bg-[#fee2e2]",
   },
-
 ];
 
 /** Số lượng giao dịch cho mỗi tab */

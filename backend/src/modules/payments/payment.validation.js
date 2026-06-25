@@ -39,7 +39,7 @@ const updatePaymentStatusSchema = {
     status: {
       required: true,
       type: "string",
-      enum: ["PENDING", "COMPLETED", "FAILED", "CANCELLED", "REFUNDED"],
+      enum: ["PENDING", "COMPLETED", "FAILED", "CANCELLED"],
     },
   },
 };
@@ -66,7 +66,6 @@ const getDanhSachThanhToanSchema = {
         "cho_thanh_toan",
         "da_thanh_toan",
         "that_bai",
-        "hoan_tien",
         "can_doi_soat",
       ],
     },

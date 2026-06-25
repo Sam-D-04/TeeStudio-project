@@ -165,18 +165,6 @@ export async function dongBoLaiVnpay(
   return res.data.data;
 }
 
-/**
- * Hoàn tiền giao dịch.
- * POST /api/admin/payments/:id/refund
- */
-export async function hoanTienGiaoDich(id: number): Promise<{ id: number; trangThai: string }> {
-  const res = await apiClient.post<{
-    success: boolean;
-    message: string;
-    data: { id: number; trangThai: string };
-  }>(`/admin/payments/${id}/refund`);
-  return res.data.data;
-}
 
 /**
  * Lưu ghi chú kế toán.

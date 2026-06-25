@@ -22,8 +22,6 @@ function taoBoLocThanhToan(queryParams = {}) {
     conditions.push("p.status = 'COMPLETED'");
   } else if (filterKey === "that_bai") {
     conditions.push("p.status IN ('FAILED', 'CANCELLED')");
-  } else if (filterKey === "hoan_tien") {
-    conditions.push("p.status = 'REFUNDED'");
   }
 
   if (phuongThuc !== "tat_ca") {

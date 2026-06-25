@@ -10,7 +10,6 @@ export type PaymentStatus =
   | "da_thanh_toan"    // Đã thanh toán thành công
   | "cho_thanh_toan"   // Chờ người dùng thanh toán
   | "that_bai"         // Thanh toán thất bại / lỗi cổng
-  | "hoan_tien"        // Đã hoàn tiền cho khách
   | "can_doi_soat";    // Cần đối soát thủ công với VNPAY
 
 type PaymentStatusBadgeProps = {
@@ -33,11 +32,6 @@ const statusConfig: Record<PaymentStatus, { label: string; className: string }> 
     label: "Thất bại",
     // Nền đỏ nhạt, viền đỏ nhạt, chữ đỏ đậm
     className: "bg-[#fee2e2] text-[#b91c1c] border border-[#fca5a5]",
-  },
-  hoan_tien: {
-    label: "Hoàn tiền",
-    // Nền xám nhạt, chữ xám trung tính – trạng thái trung lập
-    className: "bg-[#f1f5f9] text-[#475569] border border-[#e2e8f0]",
   },
   can_doi_soat: {
     label: "Cần đối soát",

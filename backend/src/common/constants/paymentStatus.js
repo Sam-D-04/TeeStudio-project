@@ -10,7 +10,6 @@ const PAYMENT_STATUS = Object.freeze({
   COMPLETED: "COMPLETED",
   FAILED: "FAILED",
   CANCELLED: "CANCELLED",
-  REFUNDED: "REFUNDED",
 });
 
 const PAYMENT_METHOD = Object.freeze({
@@ -39,7 +38,6 @@ function mapStatusToFrontend(dbStatus, paymentMethod) {
     [PAYMENT_STATUS.COMPLETED]: "da_thanh_toan",
     [PAYMENT_STATUS.FAILED]: "that_bai",
     [PAYMENT_STATUS.CANCELLED]: "that_bai",
-    [PAYMENT_STATUS.REFUNDED]: "hoan_tien",
   };
 
   return MAP[dbStatus] || "cho_thanh_toan";
@@ -53,7 +51,6 @@ function mapFrontendToDbStatuses(frontendStatus, paymentMethod) {
     cho_thanh_toan: [PAYMENT_STATUS.PENDING],
     da_thanh_toan: [PAYMENT_STATUS.COMPLETED],
     that_bai: [PAYMENT_STATUS.FAILED, PAYMENT_STATUS.CANCELLED],
-    hoan_tien: [PAYMENT_STATUS.REFUNDED],
     can_doi_soat: [PAYMENT_STATUS.PENDING], // sẽ kèm AND paymentMethod = 'COD'
   };
 

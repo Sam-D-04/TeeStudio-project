@@ -18,7 +18,6 @@ import PaymentStatusBadge from "./PaymentStatusBadge";
  * Props:
  * - payment: null = ẩn ngăn kéo | PaymentDetail = hiển thị ngăn kéo với dữ liệu
  * - onClose: gọi khi bấm nút X
- * - onRefund: gọi khi bấm nút Hoàn tiền
  * - onSyncVnpay: gọi khi bấm nút Đồng bộ VNPAY
  * - onSaveNote: gọi khi bấm nút Lưu ghi chú
  * - isActionLoading: true khi đang xử lý hành động (disable nút)
@@ -50,7 +49,6 @@ type PaymentDetailDrawerProps = {
   payment: PaymentDetail | null;           // null = ẩn ngăn kéo
   onClose: () => void;                     // Đóng ngăn kéo
   isLoading?: boolean;                     // Đang tải chi tiết
-  onRefund?: (id: number) => void;         // Hoàn tiền
   onSyncVnpay?: (id: number) => void;      // Đồng bộ VNPAY
   onSaveNote?: (id: number, note: string) => void; // Lưu ghi chú
   isActionLoading?: boolean;               // Đang xử lý hành động
@@ -60,7 +58,6 @@ export default function PaymentDetailDrawer({
   payment,
   onClose,
   isLoading = false,
-  onRefund,
   onSyncVnpay,
   onSaveNote,
   isActionLoading = false,
@@ -278,19 +275,6 @@ export default function PaymentDetailDrawer({
         {/* ---- Khu vực nút hành động cuối ngăn kéo ---- */}
         {payment && !isLoading && (
           <div className="flex shrink-0 gap-3 border-t border-border bg-surface p-5">
-            {/* Nút Hoàn tiền – màu đỏ nhạt */}
-            <button
-              type="button"
-              disabled={isActionLoading || payment.status !== "da_thanh_toan"}
-              onClick={() => {
-                if (payment && onRefund) {
-                  onRefund(payment.id);
-                }
-              }}
-              className="h-control-h flex-1 rounded-lg border border-[#fca5a5] bg-surface text-sm font-semibold text-[#b91c1c] transition-colors hover:bg-[#fef2f2] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Hoàn tiền
-            </button>
             {/* Nút Đồng bộ VNPAY – màu xanh chính */}
             <button
               type="button"

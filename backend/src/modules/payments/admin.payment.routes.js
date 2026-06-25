@@ -82,14 +82,6 @@ adminRouter.post(
   paymentController.dongBoLaiVnpay
 );
 
-// POST /api/admin/payments/:id/refund – Hoàn tiền giao dịch
-adminRouter.post(
-  "/:id/refund",
-  verifyToken,
-  requireAdmin,
-  paymentController.hoanTienGiaoDich
-);
-
 // PATCH /api/admin/payments/:id/note – Lưu ghi chú kế toán
 adminRouter.patch(
   "/:id/note",

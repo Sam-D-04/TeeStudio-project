@@ -16,7 +16,6 @@ import {
   layChiTietGiaoDich,
   xacNhanThuCod,
   dongBoLaiVnpay,
-  hoanTienGiaoDich,
   luuGhiChu,
   xuatBaoCaoThanhToan,
   type ThamSoLocGiaoDich,
@@ -155,16 +154,6 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
     },
   });
 
-  const refundMutation = useMutation({
-    mutationFn: hoanTienGiaoDich,
-    onSuccess: () => {
-      invalidateAll();
-      setActionLoading(false);
-    },
-    onError: () => {
-      setActionLoading(false);
-    },
-  });
 
   const saveNoteMutation = useMutation({
     mutationFn: ({ id, note }: { id: number; note: string }) => luuGhiChu(id, note),
@@ -202,13 +191,6 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
     }
   }
 
-  // Hoàn tiền từ Drawer
-  function handleRefund(id: number) {
-    setActionLoading(true);
-    refundMutation.mutate(id);
-  }
-
-  // Đồng bộ VNPAY từ Drawer
   function handleSyncVnpay(id: number) {
     setActionLoading(true);
     syncVnpayMutation.mutate(id);
@@ -582,7 +564,6 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
         payment={selectedPayment}
         onClose={() => setSelectedPaymentId(null)}
         isLoading={detailQuery.isLoading && selectedPaymentId !== null}
-        onRefund={handleRefund}
         onSyncVnpay={handleSyncVnpay}
         onSaveNote={handleSaveNote}
         isActionLoading={actionLoading}

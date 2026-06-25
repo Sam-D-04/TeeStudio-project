@@ -428,7 +428,7 @@ VALUES
   (10, 10, 580000,  'VNPAY', 'FULL_PAYMENT', 'PENDING',   'TS20260613E2F3G4',    NULL,                  '{"paymentUrlExpiresAt":"2026-06-13T09:45:00+07:00"}', 'Chờ khách hoàn tất thanh toán.', '2026-06-13 09:30:00'),
   (11, 11, 500000,  'COD',   'COD_FINAL',    'COMPLETED', NULL,                  '2026-06-05 17:10:00', NULL, 'Đã thu tiền và đối soát COD.', '2026-06-01 07:50:00'),
   (12, 12, 395000,  'VNPAY', 'FULL_PAYMENT', 'FAILED',    'TS20260608M8N9P1',    NULL,                  '{"vnp_ResponseCode":"24","message":"Khách hàng hủy giao dịch"}', 'Giao dịch không thành công.', '2026-06-08 20:10:00'),
-  (13, 13, 520000,  'VNPAY', 'FULL_PAYMENT', 'REFUNDED',  'TS20260606Q2R3S4',    '2026-06-06 10:28:00', '{"vnp_ResponseCode":"00","refundStatus":"COMPLETED"}', 'Đã hoàn tiền toàn bộ cho khách ngày 07/06/2026.', '2026-06-06 10:20:00');
+  (13, 13, 520000,  'VNPAY', 'FULL_PAYMENT', 'CANCELLED', 'TS20260606Q2R3S4',    '2026-06-06 10:28:00', '{"vnp_ResponseCode":"00"}', 'Đơn đã hủy, không phát sinh hoàn tiền.', '2026-06-06 10:20:00');
 
 -- =====================================================================
 -- 11. GIAO DỊCH KHO

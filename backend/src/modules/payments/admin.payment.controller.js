@@ -132,26 +132,6 @@ const dongBoLaiVnpay = async (req, res, next) => {
 };
 
 /**
- * POST /api/admin/payments/:id/refund
- * Hoàn tiền giao dịch.
- */
-const hoanTienGiaoDich = async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (!id || id < 1) {
-      return res.status(400).json({ success: false, message: "ID không hợp lệ" });
-    }
-    const data = await paymentService.hoanTienGiaoDich(id);
-    res.json({ success: true, message: "Đã hoàn tiền giao dịch", data });
-  } catch (error) {
-    if (error.statusCode) {
-      return res.status(error.statusCode).json({ success: false, message: error.message });
-    }
-    next(error);
-  }
-};
-
-/**
  * PATCH /api/admin/payments/:id/note
  * Lưu ghi chú kế toán.
  */
@@ -183,6 +163,5 @@ module.exports = {
   getChiTietThanhToan,
   xacNhanThuCod,
   dongBoLaiVnpay,
-  hoanTienGiaoDich,
   luuGhiChu,
 };
