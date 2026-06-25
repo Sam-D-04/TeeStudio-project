@@ -105,19 +105,22 @@ async function layThongKeKhuyenMai() {
         `SELECT COUNT(*) AS tong
          FROM Promotion p
          WHERE p.status = 'ACTIVE'
+           AND p.startDate <= NOW()
            AND p.endDate BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 7 DAY)
            AND (p.usageLimit IS NULL OR p.usedCount < p.usageLimit)`
       ),
       db.pool.query(
         `SELECT COUNT(*) AS tong
          FROM PromotionUsage
-         WHERE usedAt >= DATE_FORMAT(CURDATE(), '%Y-%m-01')`
+         WHERE usedAt >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+           AND usedAt < DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY)`
       ),
       db.pool.query(
         `SELECT COALESCE(SUM(discountAmount), 0) AS tong
          FROM CustomerOrder
          WHERE promotionId IS NOT NULL
-           AND createdAt >= DATE_FORMAT(CURDATE(), '%Y-%m-01')`
+           AND createdAt >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+           AND createdAt < DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY)`
       ),
     ]);
 
@@ -137,6 +140,9 @@ async function layDanhSachKhuyenMai({
   loaiGiam,
   tuNgay,
   denNgay,
+  hetHanTrongNgay,
+  kySuDung,
+  kyGiamGia,
 }) {
   const page = Math.max(1, Number(trang) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(soMoiTrang) || 10));
@@ -163,6 +169,38 @@ async function layDanhSachKhuyenMai({
   if (denNgay) {
     conditions.push("p.startDate <= ?");
     params.push(chuanHoaNgay(denNgay, true));
+  }
+  if (hetHanTrongNgay) {
+    conditions.push(`p.status = 'ACTIVE'`);
+    conditions.push("p.startDate <= NOW()");
+    conditions.push(
+      "p.endDate BETWEEN NOW() AND TIMESTAMPADD(DAY, ?, NOW())"
+    );
+    conditions.push("(p.usageLimit IS NULL OR p.usedCount < p.usageLimit)");
+    params.push(Number(hetHanTrongNgay));
+  }
+  if (kySuDung === "THIS_MONTH") {
+    conditions.push(
+      `EXISTS (
+         SELECT 1
+         FROM PromotionUsage pu
+         WHERE pu.promotionId = p.id
+           AND pu.usedAt >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+           AND pu.usedAt < DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY)
+       )`
+    );
+  }
+  if (kyGiamGia === "THIS_MONTH") {
+    conditions.push(
+      `EXISTS (
+         SELECT 1
+         FROM CustomerOrder co
+         WHERE co.promotionId = p.id
+           AND co.discountAmount > 0
+           AND co.createdAt >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+           AND co.createdAt < DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY)
+       )`
+    );
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";

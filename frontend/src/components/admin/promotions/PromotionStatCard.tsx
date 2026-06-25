@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 /**
@@ -15,6 +16,8 @@ type PromotionStatCardProps = {
   icon: ReactNode;        // Icon SVG hoặc Ant Design icon
   mauNenIcon: string;     // Màu nền ô icon, ví dụ "#dcfce7"
   mauIcon: string;        // Màu icon, ví dụ "#10b981"
+  href: string;           // URL bộ lọc khi Admin bấm vào thẻ
+  isActive?: boolean;     // Đánh dấu bộ lọc của thẻ đang được áp dụng
 };
 
 export default function PromotionStatCard({
@@ -23,29 +26,41 @@ export default function PromotionStatCard({
   icon,
   mauNenIcon,
   mauIcon,
+  href,
+  isActive = false,
 }: PromotionStatCardProps) {
   return (
     // Card nền trắng, bo góc 20px theo DESIGN.md, shadow rất nhẹ
     // Khi hover: viền đổi sang màu xanh nhạt (bae6fd)
-    <div
+    <Link
+      href={href}
+      aria-label={`${nhan}. Bấm để lọc danh sách mã khuyến mãi`}
+      aria-current={isActive ? "page" : undefined}
+      className="outline-none focus-visible:ring-2 focus-visible:ring-primary-container/30"
       style={{
         background: "#ffffff",
         borderRadius: 20,
         padding: 20,
-        border: "1px solid #e2e8f0",
-        boxShadow: "0px 1px 4px rgba(0, 0, 0, 0.05)",
+        border: `1px solid ${isActive ? "#0ea5e9" : "#e2e8f0"}`,
+        boxShadow: isActive
+          ? "0 0 0 1px rgba(14, 165, 233, 0.18)"
+          : "0px 1px 4px rgba(0, 0, 0, 0.05)",
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "space-between",
-        transition: "border-color 0.2s ease",
-        cursor: "default",
+        transition: "border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease",
+        cursor: "pointer",
+        color: "inherit",
+        textDecoration: "none",
       }}
-      // Hiệu ứng hover: đổi màu viền sang xanh nhạt
+      // Hiệu ứng hover: đổi màu viền và nâng nhẹ thẻ
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = "#bae6fd";
+        e.currentTarget.style.borderColor = "#76a1b6";
+        e.currentTarget.style.transform = "translateY(-2px)";
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = "#e2e8f0";
+        e.currentTarget.style.borderColor = isActive ? "#0ea5e9" : "#e2e8f0";
+        e.currentTarget.style.transform = "translateY(0)";
       }}
     >
       {/* Phần bên trái: nhãn + giá trị */}
@@ -92,6 +107,6 @@ export default function PromotionStatCard({
       >
         {icon}
       </div>
-    </div>
+    </Link>
   );
 }

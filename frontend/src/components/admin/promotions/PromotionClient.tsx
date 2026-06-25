@@ -1,6 +1,7 @@
 "use client";
 
 import PromotionPage from "@/components/admin/promotions/PromotionPage";
+import type { PromotionInitialFilters } from "@/components/admin/promotions/PromotionPage";
 
 /**
  * PromotionClient – Client boundary cho trang Khuyến mãi & Báo giá.
@@ -14,6 +15,10 @@ import PromotionPage from "@/components/admin/promotions/PromotionPage";
  * - Tách riêng như vậy để layout.tsx (AdminShell) không bị ảnh hưởng,
  *   giữ đúng kiến trúc của toàn bộ admin module.
  */
-export default function PromotionClient() {
-  return <PromotionPage />;
+type PromotionClientProps = {
+  initialFilters?: PromotionInitialFilters;
+};
+
+export default function PromotionClient({ initialFilters }: PromotionClientProps) {
+  return <PromotionPage initialFilters={initialFilters} />;
 }

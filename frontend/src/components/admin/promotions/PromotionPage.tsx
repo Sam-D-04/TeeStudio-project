@@ -31,6 +31,17 @@ const DANH_SACH_TAB = [
 ] as const;
 type TenTab = (typeof DANH_SACH_TAB)[number]["key"];
 
+export type PromotionInitialFilters = {
+  trangThai?: BoDucMaKhuyenMai["trangThai"];
+  hetHanTrongNgay?: number;
+  kySuDung?: "THIS_MONTH";
+  kyGiamGia?: "THIS_MONTH";
+};
+
+type PromotionPageProps = {
+  initialFilters?: PromotionInitialFilters;
+};
+
 const doiFormSangPayload = (
   form: FormMaKhuyenMai,
 ): promotionService.LuuKhuyenMaiInput => ({
@@ -51,7 +62,7 @@ const doiFormSangPayload = (
   status: form.dangHoatDong ? "ACTIVE" : "INACTIVE",
 });
 
-function PromotionContent() {
+function PromotionContent({ initialFilters }: PromotionPageProps) {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [tabDangChon, setTabDangChon] = useState<TenTab>("ma_khuyen_mai");
@@ -59,10 +70,20 @@ function PromotionContent() {
   const [dsIDDaChon, setDsIDDaChon] = useState<number[]>([]);
   const [boDuc, setBoDuc] = useState<BoDucMaKhuyenMai>({
     tuKhoa: "",
-    trangThai: "",
+    trangThai: initialFilters?.trangThai ?? "",
     loaiGiam: "",
     tuNgay: "",
     denNgay: "",
+  });
+  const [boLocNhanh, setBoLocNhanh] = useState<
+    Pick<
+      promotionService.BoLocKhuyenMai,
+      "hetHanTrongNgay" | "kySuDung" | "kyGiamGia"
+    >
+  >({
+    hetHanTrongNgay: initialFilters?.hetHanTrongNgay,
+    kySuDung: initialFilters?.kySuDung,
+    kyGiamGia: initialFilters?.kyGiamGia,
   });
   const [moDrawer, setMoDrawer] = useState(false);
   const [dangSuaId, setDangSuaId] = useState<number | null>(null);
@@ -73,10 +94,11 @@ function PromotionContent() {
     queryFn: promotionService.layThongKeKhuyenMai,
   });
   const listQuery = useQuery({
-    queryKey: ["admin-promotions", "list", trang, boDuc],
+    queryKey: ["admin-promotions", "list", trang, boDuc, boLocNhanh],
     queryFn: () =>
       promotionService.layDanhSachKhuyenMai({
         ...boDuc,
+        ...boLocNhanh,
         trang,
         soMoiTrang: SO_MOI_TRANG,
       }),
@@ -138,9 +160,16 @@ function PromotionContent() {
 
   function doiBoLoc(value: BoDucMaKhuyenMai) {
     setBoDuc(value);
+    setBoLocNhanh({});
     setTrang(1);
     setDsIDDaChon([]);
   }
+
+  const khongCoBoLocChiTiet =
+    boDuc.tuKhoa.trim() === "" &&
+    boDuc.loaiGiam === "" &&
+    boDuc.tuNgay === "" &&
+    boDuc.denNgay === "";
 
   return (
     <>
@@ -197,6 +226,14 @@ function PromotionContent() {
             icon={<TagOutlined />}
             mauNenIcon="#dcfce7"
             mauIcon="#10b981"
+            href="/admin/khuyen-mai-bao-gia?status=ACTIVE"
+            isActive={
+              boDuc.trangThai === "dang_hoat_dong" &&
+              !boLocNhanh.hetHanTrongNgay &&
+              !boLocNhanh.kySuDung &&
+              !boLocNhanh.kyGiamGia &&
+              khongCoBoLocChiTiet
+            }
           />
           <PromotionStatCard
             nhan="Sắp hết hạn trong 7 ngày"
@@ -204,6 +241,14 @@ function PromotionContent() {
             icon={<ClockCircleOutlined />}
             mauNenIcon="#ffdad6"
             mauIcon="#ea580c"
+            href="/admin/khuyen-mai-bao-gia?status=ACTIVE&expiresWithinDays=7"
+            isActive={
+              boDuc.trangThai === "dang_hoat_dong" &&
+              boLocNhanh.hetHanTrongNgay === 7 &&
+              !boLocNhanh.kySuDung &&
+              !boLocNhanh.kyGiamGia &&
+              khongCoBoLocChiTiet
+            }
           />
           <PromotionStatCard
             nhan="Lượt dùng tháng này"
@@ -211,6 +256,14 @@ function PromotionContent() {
             icon={<CheckCircleOutlined />}
             mauNenIcon="#c9e6ff"
             mauIcon="#006591"
+            href="/admin/khuyen-mai-bao-gia?usagePeriod=THIS_MONTH"
+            isActive={
+              boDuc.trangThai === "" &&
+              boLocNhanh.kySuDung === "THIS_MONTH" &&
+              !boLocNhanh.hetHanTrongNgay &&
+              !boLocNhanh.kyGiamGia &&
+              khongCoBoLocChiTiet
+            }
           />
           <PromotionStatCard
             nhan="Giảm giá tháng này"
@@ -222,6 +275,14 @@ function PromotionContent() {
             icon={<DollarOutlined />}
             mauNenIcon="#cce5ff"
             mauIcon="#006398"
+            href="/admin/khuyen-mai-bao-gia?discountPeriod=THIS_MONTH"
+            isActive={
+              boDuc.trangThai === "" &&
+              boLocNhanh.kyGiamGia === "THIS_MONTH" &&
+              !boLocNhanh.hetHanTrongNgay &&
+              !boLocNhanh.kySuDung &&
+              khongCoBoLocChiTiet
+            }
           />
         </div>
 
@@ -350,10 +411,10 @@ function PromotionContent() {
   );
 }
 
-export default function PromotionPage() {
+export default function PromotionPage({ initialFilters }: PromotionPageProps) {
   return (
     <App>
-      <PromotionContent />
+      <PromotionContent initialFilters={initialFilters} />
     </App>
   );
 }
