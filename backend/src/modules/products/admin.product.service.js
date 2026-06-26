@@ -382,7 +382,9 @@ async function layChiTietSanPham(id) {
        pv.size,
        pv.sku,
        pv.stockQty,
-       COALESCE(reservedStock.reservedQty, 0) AS reservedQty
+       pv.status,
+       COALESCE(reservedStock.reservedQty, 0) AS reservedQty,
+       EXISTS(SELECT 1 FROM InventoryTransaction it WHERE it.variantId = pv.id) as hasTransactions
      FROM ProductVariant pv
      ${RESERVED_STOCK_JOIN}
      WHERE pv.productId = ?
@@ -421,6 +423,8 @@ async function layChiTietSanPham(id) {
         stock,
         reserved,
         available,
+        status: v.status || 'ACTIVE',
+        hasTransactions: v.hasTransactions ? true : false,
         inventoryStatus: tinhTrangThaiTonKho(available),
       };
     }),
@@ -607,9 +611,11 @@ async function themBienThe(productId, { color, size, sku, stockQty }) {
 // =====================================================================
 // SERVICE 11: Cập nhật biến thể
 // =====================================================================
-async function capNhatBienThe(productId, variantId, { color, size, sku, stockQty }) {
+async function capNhatBienThe(productId, variantId, { color, size, sku, stockQty, status }) {
   const [rows] = await db.pool.query(
-    "SELECT id FROM ProductVariant WHERE id = ? AND productId = ?",
+    `SELECT pv.id, pv.color, pv.size, pv.sku,
+       EXISTS(SELECT 1 FROM InventoryTransaction it WHERE it.variantId = pv.id) as hasTransactions
+     FROM ProductVariant pv WHERE pv.id = ? AND pv.productId = ?`,
     [variantId, productId]
   );
   if (!rows || rows.length === 0) {
@@ -617,14 +623,28 @@ async function capNhatBienThe(productId, variantId, { color, size, sku, stockQty
     err.statusCode = 404;
     throw err;
   }
+  
+  const currentVariant = rows[0];
 
   const fields = [];
   const params = [];
+
+  // Khóa cập nhật Màu, Size, SKU nếu đã có giao dịch
+  const isProtectedFieldChanged = (color !== undefined && color !== currentVariant.color) || 
+                                  (size !== undefined && size !== currentVariant.size) || 
+                                  (sku !== undefined && sku !== currentVariant.sku);
+                                  
+  if (currentVariant.hasTransactions && isProtectedFieldChanged) {
+      const err = new Error("Không thể thay đổi Màu sắc, Kích thước hoặc SKU của biến thể đã có lịch sử nhập kho");
+      err.statusCode = 403;
+      throw err;
+  }
 
   if (color !== undefined) { fields.push("color = ?"); params.push(color); }
   if (size !== undefined) { fields.push("size = ?"); params.push(size); }
   if (sku !== undefined) { fields.push("sku = ?"); params.push(sku); }
   if (stockQty !== undefined) { fields.push("stockQty = ?"); params.push(stockQty); }
+  if (status !== undefined) { fields.push("status = ?"); params.push(status); }
 
   if (fields.length === 0) {
     const err = new Error("Không có trường nào để cập nhật");
@@ -642,6 +662,8 @@ async function capNhatBienThe(productId, variantId, { color, size, sku, stockQty
        pv.size,
        pv.sku,
        pv.stockQty,
+       pv.status,
+       EXISTS(SELECT 1 FROM InventoryTransaction it WHERE it.variantId = pv.id) as hasTransactions,
        COALESCE(reservedStock.reservedQty, 0) AS reservedQty
      FROM ProductVariant pv
      ${RESERVED_STOCK_JOIN}
@@ -662,10 +684,11 @@ async function capNhatBienThe(productId, variantId, { color, size, sku, stockQty
     stock,
     reserved,
     available,
+    status: v.status || 'ACTIVE',
+    hasTransactions: v.hasTransactions ? true : false,
     inventoryStatus: tinhTrangThaiTonKho(available),
   };
 }
-
 module.exports = {
   layThongKe,
   layDanhMuc,

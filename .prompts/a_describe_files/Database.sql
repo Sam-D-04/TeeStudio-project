@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS `ProductVariant` (
 	`size` VARCHAR(20) NOT NULL,
 	`sku` VARCHAR(100) NOT NULL,
 	`stockQty` INT NOT NULL DEFAULT 0,
+	`status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
 	`createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	PRIMARY KEY (`id`),
 	UNIQUE KEY `uq_product_variant_sku` (`sku`),

@@ -39,6 +39,10 @@ export type BienTheSanPham = {
   available: number;
   /** Trạng thái tồn kho tự động tính từ available */
   inventoryStatus: TrangThaiTonKho;
+  /** Trạng thái hiển thị (từ DB) */
+  status: string;
+  /** Đã có giao dịch chưa */
+  hasTransactions: boolean;
 };
 
 /** Một phôi áo (blank product) trong danh sách */
@@ -142,7 +146,7 @@ export type ThemBienTheInput = {
 };
 
 /** Payload cập nhật biến thể */
-export type CapNhatBienTheInput = Partial<ThemBienTheInput>;
+export type CapNhatBienTheInput = Partial<ThemBienTheInput> & { status?: string };
 
 // =====================================================================
 // CÁC HÀM GỌI API

@@ -57,6 +57,7 @@ type BienTheEdit = BienTheSanPham & {
   editSize: string;
   editSKU: string;
   editStock: string;
+  editStatus: string;
 };
 
 /** Một hàng biến thể mới sẽ thêm */
@@ -279,6 +280,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
         editSize: v.size,
         editSKU: v.sku,
         editStock: String(v.stock),
+        editStatus: v.status || "ACTIVE",
       }))
     );
     setDsBienTheMoi([]);
@@ -376,6 +378,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
               editSize: data.size,
               editSKU: data.sku,
               editStock: String(data.stock),
+              editStatus: data.status || "ACTIVE",
             }
             : bt
         )
@@ -426,7 +429,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
     setDsBienTheEdit((prev) =>
       prev.map((bt) =>
         bt.id === id
-          ? { ...bt, dangSua: true, editMau: bt.colorName, editSize: bt.size, editSKU: bt.sku, editStock: String(bt.stock) }
+          ? { ...bt, dangSua: true, editMau: bt.colorName, editSize: bt.size, editSKU: bt.sku, editStock: String(bt.stock), editStatus: bt.status || "ACTIVE" }
           : { ...bt, dangSua: false }
       )
     );
@@ -436,13 +439,13 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
     setDsBienTheEdit((prev) =>
       prev.map((bt) =>
         bt.id === id
-          ? { ...bt, dangSua: false, editMau: bt.colorName, editSize: bt.size, editSKU: bt.sku, editStock: String(bt.stock) }
+          ? { ...bt, dangSua: false, editMau: bt.colorName, editSize: bt.size, editSKU: bt.sku, editStock: String(bt.stock), editStatus: bt.status || "ACTIVE" }
           : bt
       )
     );
   }
 
-  function capNhatEditBienThe(id: number, field: "editMau" | "editSize" | "editSKU" | "editStock", value: string) {
+  function capNhatEditBienThe(id: number, field: "editMau" | "editSize" | "editSKU" | "editStock" | "editStatus", value: string) {
     setDsBienTheEdit((prev) =>
       prev.map((bt) => (bt.id === id ? { ...bt, [field]: value } : bt))
     );
@@ -460,6 +463,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
         size: bt.editSize.trim(),
         sku: bt.editSKU.trim(),
         stockQty: bt.stock,
+        status: bt.editStatus,
       },
     });
   }
@@ -828,11 +832,12 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                     <table className="w-full min-w-[900px] table-fixed text-left">
                       <thead>
                         <tr className="border-b border-border bg-surface-alt text-[11px] font-bold uppercase tracking-wide text-text-secondary">
-                          <th className="w-[22%] px-3 py-2">Màu sắc</th>
+                          <th className="w-[20%] px-3 py-2">Màu sắc</th>
                           <th className="w-[12%] px-3 py-2">Kích thước</th>
-                          <th className="w-[26%] px-3 py-2">Mã SKU</th>
-                          <th className="w-[12%] px-3 py-2 text-right">Tồn kho</th>
-                          <th className="w-[13%] px-3 py-2">Trạng thái</th>
+                          <th className="w-[20%] px-3 py-2">Mã SKU</th>
+                          <th className="w-[10%] px-3 py-2 text-right">Tồn kho</th>
+                          <th className="w-[11%] px-3 py-2">Trạng thái tồn</th>
+                          <th className="w-[12%] px-3 py-2">Hiển thị</th>
                           {!isViewMode && <th className="w-[15%] px-3 py-2 text-right">Thao tác</th>}
                         </tr>
                       </thead>
@@ -859,7 +864,8 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                                       capNhatEditBienThe(bt.id, "editMau", e.target.value)
                                     }
                                     maxLength={100}
-                                    className="h-8 min-w-0 flex-1 rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
+                                    disabled={bt.hasTransactions}
+                                    className={`h-8 min-w-0 flex-1 rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none ${bt.hasTransactions ? "cursor-not-allowed bg-surface-container opacity-60 text-text-muted" : "focus:border-primary-container"}`}
                                   />
                                 </div>
                               ) : (
@@ -884,7 +890,8 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                                     capNhatEditBienThe(bt.id, "editSize", e.target.value)
                                   }
                                   maxLength={50}
-                                  className="h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
+                                  disabled={bt.hasTransactions}
+                                  className={`h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none ${bt.hasTransactions ? "cursor-not-allowed bg-surface-container opacity-60 text-text-muted" : "focus:border-primary-container"}`}
                                 />
                               ) : (
                                 <span className="inline-flex rounded bg-surface-container px-2 py-0.5 text-[12px] font-semibold text-text-secondary">
@@ -901,7 +908,8 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                                     capNhatEditBienThe(bt.id, "editSKU", e.target.value)
                                   }
                                   maxLength={100}
-                                  className="h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 font-mono text-[12px] outline-none focus:border-primary-container"
+                                  disabled={bt.hasTransactions}
+                                  className={`h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 font-mono text-[12px] outline-none ${bt.hasTransactions ? "cursor-not-allowed bg-surface-container opacity-60 text-text-muted" : "focus:border-primary-container"}`}
                                 />
                               ) : (
                                 <span className="block truncate font-mono text-[12px] text-text-secondary" title={bt.sku}>
@@ -916,6 +924,22 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                             </td>
                             <td className="px-3 py-2">
                               <BadgeTonKho status={bt.inventoryStatus} />
+                            </td>
+                            <td className="px-3 py-2">
+                              {bt.dangSua ? (
+                                <select
+                                  value={bt.editStatus}
+                                  onChange={(e) => capNhatEditBienThe(bt.id, "editStatus", e.target.value)}
+                                  className="h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
+                                >
+                                  <option value="ACTIVE">Hiện</option>
+                                  <option value="INACTIVE">Ẩn</option>
+                                </select>
+                              ) : (
+                                <span className={`inline-flex rounded px-2 py-0.5 text-[12px] font-semibold ${bt.status === 'ACTIVE' ? 'bg-success/10 text-success' : 'bg-surface-container text-text-muted'}`}>
+                                  {bt.status === 'ACTIVE' ? 'Hiện' : 'Ẩn'}
+                                </span>
+                              )}
                             </td>
                             {!isViewMode && (
                               <td className="px-3 py-2">
