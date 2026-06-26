@@ -16,6 +16,7 @@ import {
   DeleteOutlined,
   DownOutlined,
   EditOutlined,
+  EyeOutlined,
   RightOutlined,
   SkinOutlined,
 } from "@ant-design/icons";
@@ -39,6 +40,8 @@ type ProductTableProps = {
   emptyMessage?: string;
   /** Đang có thao tác loading (ví dụ: đang xóa) */
   isLoading?: boolean;
+  /** Hàm gọi khi bấm nút Xem */
+  onView?: (product: SanPham) => void;
   /** Hàm gọi khi bấm nút Xem / Chỉnh sửa */
   onEdit: (product: SanPham) => void;
   /** Hàm gọi khi bấm nút Xóa */
@@ -168,6 +171,7 @@ export default function ProductTable({
   products,
   emptyMessage = "Chưa có phôi áo nào. Bấm “Thêm phôi áo” để bắt đầu.",
   isLoading = false,
+  onView,
   onEdit,
   onDelete,
 }: ProductTableProps) {
@@ -322,10 +326,21 @@ export default function ProductTable({
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center justify-end gap-1">
+                        {/* Nút Xem */}
+                        {onView && (
+                          <button
+                            type="button"
+                            title="Xem chi tiết"
+                            onClick={() => onView(product)}
+                            className="rounded p-1.5 text-text-secondary transition-colors hover:bg-surface-alt hover:text-primary"
+                          >
+                            <EyeOutlined className="text-[18px]" />
+                          </button>
+                        )}
                         {/* Nút Xem / Chỉnh sửa */}
                         <button
                           type="button"
-                          title="Xem / Chỉnh sửa"
+                          title="Sửa"
                           onClick={() => onEdit(product)}
                           className="rounded p-1.5 text-text-secondary transition-colors hover:bg-surface-alt hover:text-primary"
                         >

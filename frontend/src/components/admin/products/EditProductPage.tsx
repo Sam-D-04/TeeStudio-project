@@ -3,11 +3,9 @@
 /**
  * EditProductPage – Trang xem và chỉnh sửa phôi áo.
  *
- * Cấu trúc 2 mục:
- *   Mục "Thông tin cơ bản" – sửa tên, danh mục, giá, chất liệu, kiểu dáng, xuất xứ, mô tả,
- *                            bật/tắt hiển thị trên cửa hàng.
- *   Mục "Quản lý biến thể" – xem toàn bộ biến thể hiện có, sửa tồn kho / SKU / màu / kích thước
- *                            từng biến thể, thêm biến thể mới.
+ * Giao diện một biểu mẫu:
+ *   - Sửa thông tin chung và trạng thái hiển thị.
+ *   - Xem, sửa và thêm biến thể trong các bảng ngang nhỏ gọn.
  *
  * Luồng API:
  *   - Mở trang → GET /api/admin/products/:id  (layChiTietSanPham)
@@ -22,13 +20,11 @@ import {
   CheckOutlined,
   DeleteOutlined,
   EditOutlined,
-  EyeInvisibleOutlined,
-  EyeOutlined,
   PlusOutlined,
   SaveOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { message } from "antd";
 import * as productService from "@/services/admin/productService";
@@ -40,8 +36,6 @@ import type {
 // =====================================================================
 // KIỂU DỮ LIỆU NỘI BỘ
 // =====================================================================
-
-type TabHienTai = "thong_tin" | "bien_the";
 
 /** Trạng thái biểu mẫu thông tin cơ bản */
 type FormThongTin = {
@@ -198,11 +192,10 @@ function BadgeTonKho({ status }: { status: string }) {
 // =====================================================================
 export default function EditProductPage({ productId }: EditProductPageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isViewMode = searchParams.get("mode") === "view";
   const queryClient = useQueryClient();
   const productIdHopLe = Number.isFinite(productId) && productId > 0;
-
-  // ===== MỤC ĐANG HIỂN THỊ =====
-  const [tabHienTai, setTabHienTai] = useState<TabHienTai>("thong_tin");
 
   // ===== THÔNG BÁO =====
   const [messageApi, contextHolder] = message.useMessage();
@@ -234,8 +227,6 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
   const [dsBienTheEdit, setDsBienTheEdit] = useState<BienTheEdit[]>([]);
   const [dsBienTheMoi, setDsBienTheMoi] = useState<HangBienTheMoi[]>([]);
   const [loiBienThe, setLoiBienThe] = useState<string>("");
-  const [keyDangChonMau, setKeyDangChonMau] = useState<string | null>(null);
-  const [keyMoiDangChonMau, setKeyMoiDangChonMau] = useState<string | null>(null);
 
   // ===== LẤY DANH MỤC =====
   const { data: danhSachDanhMuc = [] } = useQuery({
@@ -439,7 +430,6 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
           : { ...bt, dangSua: false }
       )
     );
-    setKeyDangChonMau(null);
   }
 
   function huyBienThe(id: number) {
@@ -450,7 +440,6 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
           : bt
       )
     );
-    setKeyDangChonMau(null);
   }
 
   function capNhatEditBienThe(id: number, field: "editMau" | "editSize" | "editSKU" | "editStock", value: string) {
@@ -570,7 +559,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
           <div className="flex items-center gap-2">
             <EditOutlined className="text-[20px] text-primary-container" />
             <h2 className="font-extrabold text-headline-lg-mobile text-text-main md:text-headline-lg">
-              Xem và sửa phôi áo
+              {isViewMode ? "Chi tiết phôi áo" : "Xem và sửa phôi áo"}
             </h2>
           </div>
           <p className="mt-1 max-w-2xl text-body-sm text-text-secondary">
@@ -578,7 +567,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
           </p>
         </div>
 
-        {tabHienTai === "thong_tin" && chiTiet && !dangTaiChiTiet && (
+        {chiTiet && !dangTaiChiTiet && !isViewMode && (
           <button
             type="button"
             onClick={xuLyLuuThongTin}
@@ -593,7 +582,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
             ) : (
               <>
                 <SaveOutlined />
-                Lưu thay đổi
+                Lưu thông tin chung
               </>
             )}
           </button>
@@ -601,373 +590,318 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
       </section>
 
       <section className="overflow-hidden rounded-[20px] border border-border bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
-
-        {/* ──────────────────────────────────────
-            THÔNG BÁO (Đã chuyển sang dùng Toast)
-        ────────────────────────────────────── */}
-
-        {/* ──────────────────────────────────────
-            THANH CHUYỂN MỤC
-        ────────────────────────────────────── */}
-        <div className="flex shrink-0 border-b border-border px-6">
-          {(
-            [
-              { key: "thong_tin", label: "Thông tin cơ bản" },
-              { key: "bien_the", label: `Biến thể${chiTiet ? ` (${chiTiet.variants.length})` : ""}` },
-            ] as { key: TabHienTai; label: string }[]
-          ).map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setTabHienTai(tab.key)}
-              className={`relative mr-6 py-3 text-[14px] font-semibold transition-colors ${tabHienTai === tab.key
-                  ? "text-primary-container"
-                  : "text-text-muted hover:text-text-secondary"
+        <div className="flex flex-col gap-2 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div>
+            <h3 className="text-[18px] font-extrabold text-text-main">
+              Thông tin phôi áo
+            </h3>
+            <p className="mt-0.5 text-[13px] text-text-secondary">
+              Chỉnh sửa thông tin chung và quản lý toàn bộ biến thể trong cùng một biểu mẫu.
+            </p>
+          </div>
+          {chiTiet && !dangTaiChiTiet && (
+            <div className="flex items-center gap-2 text-[12px]">
+              <span className="rounded-full bg-surface-alt px-3 py-1 font-semibold text-text-secondary">
+                {dsBienTheEdit.length} biến thể
+              </span>
+              <span
+                className={`rounded-full px-3 py-1 font-semibold ${
+                  trangThaiHienThi === "dang_hien_thi"
+                    ? "bg-success/10 text-success"
+                    : "bg-surface-container text-text-muted"
                 }`}
-            >
-              {tab.label}
-              {tabHienTai === tab.key && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full bg-primary-container" />
-              )}
-            </button>
-          ))}
+              >
+                {trangThaiHienThi === "dang_hien_thi" ? "Đang hiển thị" : "Đang ẩn"}
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* ──────────────────────────────────────
-            NỘI DUNG
-        ────────────────────────────────────── */}
-        <div>
-          {!productIdHopLe && (
-            <div className="flex min-h-48 flex-col items-center justify-center gap-3 p-6 text-center">
-              <p className="text-[14px] font-semibold text-error">
-                Mã phôi áo không hợp lệ.
-              </p>
-              <button
-                type="button"
-                onClick={() => router.push("/admin/san-pham-phoi-ao")}
-                className="rounded-[8px] border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-secondary hover:bg-surface-alt"
-              >
-                Về danh sách phôi áo
-              </button>
-            </div>
-          )}
+        {!productIdHopLe && (
+          <div className="flex min-h-48 flex-col items-center justify-center gap-3 p-6 text-center">
+            <p className="text-[14px] font-semibold text-error">Mã phôi áo không hợp lệ.</p>
+            <button
+              type="button"
+              onClick={() => router.push("/admin/san-pham-phoi-ao")}
+              className="rounded-[8px] border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-text-secondary hover:bg-surface-alt"
+            >
+              Về danh sách phôi áo
+            </button>
+          </div>
+        )}
 
-          {/* --- Trạng thái loading --- */}
-          {productIdHopLe && dangTaiChiTiet && (
-            <div className="flex h-48 items-center justify-center text-text-muted">
-              <span className="animate-pulse text-[14px]">Đang tải dữ liệu...</span>
-            </div>
-          )}
+        {productIdHopLe && dangTaiChiTiet && (
+          <div className="flex h-48 items-center justify-center text-text-muted">
+            <span className="animate-pulse text-[14px]">Đang tải dữ liệu...</span>
+          </div>
+        )}
 
-          {/* --- Trạng thái lỗi --- */}
-          {productIdHopLe && loiTaiChiTiet && !dangTaiChiTiet && (
-            <div className="flex h-48 flex-col items-center justify-center gap-2 text-center text-error">
-              <span className="text-[14px]">Không thể tải dữ liệu phôi áo.</span>
-              <button
-                type="button"
-                onClick={() =>
-                  queryClient.invalidateQueries({
-                    queryKey: ["products", "detail", productId],
-                  })
-                }
-                className="rounded-lg border border-error/30 px-4 py-1.5 text-[13px] hover:bg-error/5"
-              >
-                Thử lại
-              </button>
-            </div>
-          )}
+        {productIdHopLe && loiTaiChiTiet && !dangTaiChiTiet && (
+          <div className="flex h-48 flex-col items-center justify-center gap-2 text-center text-error">
+            <span className="text-[14px]">Không thể tải dữ liệu phôi áo.</span>
+            <button
+              type="button"
+              onClick={() =>
+                queryClient.invalidateQueries({
+                  queryKey: ["products", "detail", productId],
+                })
+              }
+              className="rounded-lg border border-error/30 px-4 py-1.5 text-[13px] hover:bg-error/5"
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
 
-          {/* ===== THÔNG TIN CƠ BẢN ===== */}
-          {!dangTaiChiTiet && !loiTaiChiTiet && tabHienTai === "thong_tin" && chiTiet && (
-            <div className="space-y-5 p-6">
+        {!dangTaiChiTiet && !loiTaiChiTiet && chiTiet && (
+          <>
+            <div className="space-y-6 p-4 sm:p-6">
+              <datalist id="edit-product-colors">
+                {DS_MAU_PHO_BIEN.map((mau) => (
+                  <option key={mau.ten} value={mau.ten} />
+                ))}
+              </datalist>
+              <datalist id="edit-product-sizes">
+                {DS_SIZE_GOI_Y.map((size) => (
+                  <option key={size} value={size} />
+                ))}
+              </datalist>
 
-              {/* ── Trạng thái hiển thị ── */}
-              <FormField label="Trạng thái hiển thị">
-                <select
-                  value={trangThaiHienThi}
-                  onChange={(e) => doiTrangThai(e.target.value as "dang_hien_thi" | "dang_an")}
-                  disabled={dangDoiTrangThai}
-                  className={`${inputClass} cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  <option value="dang_hien_thi">Đang hiển thị</option>
-                  <option value="dang_an">Đang ẩn</option>
-                </select>
-              </FormField>
-
-              {/* ── Tên phôi áo ── */}
-              <FormField label="Tên phôi áo" required error={loiThongTin.tenSanPham}>
-                <input
-                  id="edit-ten"
-                  type="text"
-                  value={formThongTin.tenSanPham}
-                  onChange={(e) => capNhatThongTin("tenSanPham", e.target.value)}
-                  maxLength={300}
-                  className={`${inputClass} ${loiThongTin.tenSanPham ? "border-error" : ""}`}
-                />
-              </FormField>
-
-              {/* ── Danh mục + Giá nền ── */}
-              <div className="grid grid-cols-2 gap-4">
-                <FormField label="Danh mục" required error={loiThongTin.danhMucId}>
-                  <select
-                    id="edit-danh-muc"
-                    value={formThongTin.danhMucId}
-                    onChange={(e) => capNhatThongTin("danhMucId", e.target.value)}
-                    className={`${inputClass} cursor-pointer ${loiThongTin.danhMucId ? "border-error" : ""}`}
-                  >
-                    <option value="">-- Chọn danh mục --</option>
-                    {danhSachDanhMuc.map((dm) => (
-                      <option key={dm.id} value={dm.id}>
-                        {dm.ten}
-                      </option>
-                    ))}
-                  </select>
-                </FormField>
-
-                <FormField label="Giá nền (VNĐ)" required error={loiThongTin.giaNen}>
-                  <input
-                    id="edit-gia"
-                    type="number"
-                    value={formThongTin.giaNen}
-                    onChange={(e) => capNhatThongTin("giaNen", e.target.value)}
-                    min={0}
-                    step={1000}
-                    className={`${inputClass} ${loiThongTin.giaNen ? "border-error" : ""}`}
-                  />
-                </FormField>
-              </div>
-
-              {/* ── Chất liệu + Kiểu dáng ── */}
-              <div className="grid grid-cols-2 gap-4">
-                <FormField label="Chất liệu" required error={loiThongTin.chatLieu}>
-                  <input
-                    id="edit-chat-lieu"
-                    type="text"
-                    value={formThongTin.chatLieu}
-                    onChange={(e) => capNhatThongTin("chatLieu", e.target.value)}
-                    maxLength={200}
-                    className={`${inputClass} ${loiThongTin.chatLieu ? "border-error" : ""}`}
-                  />
-                </FormField>
-
-                <FormField label="Kiểu dáng" required error={loiThongTin.formDang}>
-                  <input
-                    id="edit-form-dang"
-                    type="text"
-                    value={formThongTin.formDang}
-                    onChange={(e) => capNhatThongTin("formDang", e.target.value)}
-                    maxLength={100}
-                    className={`${inputClass} ${loiThongTin.formDang ? "border-error" : ""}`}
-                  />
-                </FormField>
-              </div>
-
-              {/* ── Xuất xứ ── */}
-              <FormField label="Xuất xứ" required error={loiThongTin.xuatXu}>
-                <input
-                  id="edit-xuat-xu"
-                  type="text"
-                  value={formThongTin.xuatXu}
-                  onChange={(e) => capNhatThongTin("xuatXu", e.target.value)}
-                  maxLength={100}
-                  className={`${inputClass} ${loiThongTin.xuatXu ? "border-error" : ""}`}
-                />
-              </FormField>
-
-              {/* ── Mô tả ── */}
-              <FormField label="Mô tả sản phẩm" error={loiThongTin.moTa}>
-                <textarea
-                  id="edit-mo-ta"
-                  value={formThongTin.moTa}
-                  onChange={(e) => capNhatThongTin("moTa", e.target.value)}
-                  rows={5}
-                  className={`${textareaClass} ${loiThongTin.moTa ? "border-error" : ""}`}
-                />
-              </FormField>
-
-              {/* ── Đường dẫn tĩnh (chỉ đọc) ── */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[13px] font-semibold text-text-secondary">
-                  Đường dẫn tĩnh (Slug)
-                </label>
-                <div className="flex h-9 items-center rounded-[7px] border border-border/50 bg-surface-container px-3 font-mono text-[12px] text-text-muted">
-                  {chiTiet.slug}
+              <section aria-labelledby="tieu-de-thong-tin-chung">
+                <div className="mb-4 flex items-end justify-between gap-3">
+                  <div>
+                    <h4 id="tieu-de-thong-tin-chung" className="text-[15px] font-extrabold text-text-main">
+                      Thông tin chung
+                    </h4>
+                    <p className="mt-0.5 text-[12px] text-text-muted">
+                      Các trường được bố trí theo cột để xem và chỉnh sửa nhanh hơn.
+                    </p>
+                  </div>
                 </div>
-                <span className="text-[11px] text-text-muted">
-                  Đường dẫn tĩnh được sinh tự động và không thể thay đổi sau khi tạo.
-                </span>
-              </div>
-            </div>
-          )}
 
-          {/* ===== BIẾN THỂ ===== */}
-          {!dangTaiChiTiet && !loiTaiChiTiet && tabHienTai === "bien_the" && chiTiet && (
-            <div className="space-y-5 p-6">
+                <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2 xl:grid-cols-12">
+                  <div className="xl:col-span-5">
+                    <FormField label="Tên phôi áo" required error={loiThongTin.tenSanPham}>
+                      <input
+                        id="edit-ten"
+                        type="text"
+                        value={formThongTin.tenSanPham}
+                        onChange={(e) => capNhatThongTin("tenSanPham", e.target.value)}
+                        maxLength={300}
+                        disabled={isViewMode}
+                        className={`${inputClass} ${loiThongTin.tenSanPham ? "border-error" : ""}`}
+                      />
+                    </FormField>
+                  </div>
 
-              {/* ── Thông báo lỗi biến thể ── */}
-              {loiBienThe && (
-                <div className="flex items-center gap-2 rounded-[8px] border border-error/30 bg-error/5 px-4 py-2.5 text-[13px] text-error">
-                  <span>⚠️</span>
-                  {loiBienThe}
+                  <div className="xl:col-span-3">
+                    <FormField label="Danh mục" required error={loiThongTin.danhMucId}>
+                      <select
+                        id="edit-danh-muc"
+                        value={formThongTin.danhMucId}
+                        onChange={(e) => capNhatThongTin("danhMucId", e.target.value)}
+                        disabled={isViewMode}
+                        className={`${inputClass} cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed ${loiThongTin.danhMucId ? "border-error" : ""}`}
+                      >
+                        <option value="">-- Chọn danh mục --</option>
+                        {danhSachDanhMuc.map((dm) => (
+                          <option key={dm.id} value={dm.id}>
+                            {dm.ten}
+                          </option>
+                        ))}
+                      </select>
+                    </FormField>
+                  </div>
+
+                  <div className="xl:col-span-2">
+                    <FormField label="Giá nền (VNĐ)" required error={loiThongTin.giaNen}>
+                      <input
+                        id="edit-gia"
+                        type="number"
+                        value={formThongTin.giaNen}
+                        onChange={(e) => capNhatThongTin("giaNen", e.target.value)}
+                        min={0}
+                        step={1000}
+                        disabled={isViewMode}
+                        className={`${inputClass} ${loiThongTin.giaNen ? "border-error" : ""}`}
+                      />
+                    </FormField>
+                  </div>
+
+                  <div className="xl:col-span-2">
+                    <FormField label="Trạng thái hiển thị">
+                      <select
+                        value={trangThaiHienThi}
+                        onChange={(e) =>
+                          doiTrangThai(e.target.value as TrangThaiHienThi)
+                        }
+                        disabled={dangDoiTrangThai || isViewMode}
+                        className={`${inputClass} cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}
+                      >
+                        <option value="dang_hien_thi">Đang hiển thị</option>
+                        <option value="dang_an">Đang ẩn</option>
+                      </select>
+                    </FormField>
+                  </div>
+
+                  <div className="xl:col-span-4">
+                    <FormField label="Chất liệu" required error={loiThongTin.chatLieu}>
+                      <input
+                        id="edit-chat-lieu"
+                        type="text"
+                        value={formThongTin.chatLieu}
+                        onChange={(e) => capNhatThongTin("chatLieu", e.target.value)}
+                        maxLength={200}
+                        disabled={isViewMode}
+                        className={`${inputClass} ${loiThongTin.chatLieu ? "border-error" : ""}`}
+                      />
+                    </FormField>
+                  </div>
+
+                  <div className="xl:col-span-3">
+                    <FormField label="Kiểu dáng" required error={loiThongTin.formDang}>
+                      <input
+                        id="edit-form-dang"
+                        type="text"
+                        value={formThongTin.formDang}
+                        onChange={(e) => capNhatThongTin("formDang", e.target.value)}
+                        maxLength={100}
+                        disabled={isViewMode}
+                        className={`${inputClass} ${loiThongTin.formDang ? "border-error" : ""}`}
+                      />
+                    </FormField>
+                  </div>
+
+                  <div className="xl:col-span-2">
+                    <FormField label="Xuất xứ" required error={loiThongTin.xuatXu}>
+                      <input
+                        id="edit-xuat-xu"
+                        type="text"
+                        value={formThongTin.xuatXu}
+                        onChange={(e) => capNhatThongTin("xuatXu", e.target.value)}
+                        maxLength={100}
+                        disabled={isViewMode}
+                        className={`${inputClass} ${loiThongTin.xuatXu ? "border-error" : ""}`}
+                      />
+                    </FormField>
+                  </div>
+
+                  <div className="xl:col-span-3">
+                    <FormField label="Đường dẫn tĩnh (chỉ đọc)">
+                      <div
+                        title={chiTiet.slug}
+                        className="flex h-9 items-center truncate rounded-[7px] border border-border/50 bg-surface-container px-3 font-mono text-[12px] text-text-muted"
+                      >
+                        {chiTiet.slug}
+                      </div>
+                    </FormField>
+                  </div>
+
+                  <div className="md:col-span-2 xl:col-span-12">
+                    <FormField label="Mô tả sản phẩm" error={loiThongTin.moTa}>
+                      <textarea
+                        id="edit-mo-ta"
+                        value={formThongTin.moTa}
+                        onChange={(e) => capNhatThongTin("moTa", e.target.value)}
+                        rows={3}
+                        disabled={isViewMode}
+                        className={`${textareaClass} ${loiThongTin.moTa ? "border-error" : ""}`}
+                      />
+                    </FormField>
+                  </div>
                 </div>
-              )}
+              </section>
 
-              {/* ──────────────────────────
-                  BIẾN THỂ HIỆN CÓ
-              ────────────────────────── */}
-              <div>
-                <h3 className="mb-3 text-[14px] font-bold text-text-main">
-                  Biến thể hiện có
-                  <span className="ml-2 text-[12px] font-normal text-text-muted">
-                    ({dsBienTheEdit.length} biến thể)
+              <section aria-labelledby="tieu-de-bien-the-hien-co" className="border-t border-border pt-5">
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h4 id="tieu-de-bien-the-hien-co" className="text-[15px] font-extrabold text-text-main">
+                      Biến thể hiện có
+                    </h4>
+                    <p className="mt-0.5 text-[12px] text-text-muted">
+                      Mỗi biến thể nằm trên một dòng; chọn “Sửa” để cập nhật trực tiếp.
+                    </p>
+                  </div>
+                  <span className="text-[12px] font-semibold text-text-secondary">
+                    {dsBienTheEdit.length} biến thể
                   </span>
-                </h3>
+                </div>
 
                 {dsBienTheEdit.length === 0 ? (
-                  <p className="text-[13px] italic text-text-muted">
+                  <div className="rounded-[10px] border border-dashed border-border py-5 text-center text-[13px] italic text-text-muted">
                     Chưa có biến thể nào.
-                  </p>
+                  </div>
                 ) : (
-                  <div className="space-y-2">
-                    {dsBienTheEdit.map((bt) => (
-                      <div
-                        key={bt.id}
-                        className={`rounded-[12px] border transition-all ${bt.dangSua
-                            ? "border-primary-container/40 bg-primary-container/5 shadow-sm"
-                            : "border-border bg-surface-alt/30"
-                          }`}
-                      >
-                        {/* ── Hàng xem / sửa ── */}
-                        {!bt.dangSua ? (
-                          /* CHẾ ĐỘ XEM */
-                          <div className="flex items-center gap-3 px-4 py-3">
-                            {/* Chấm màu */}
-                            <span
-                              className="h-5 w-5 shrink-0 rounded-full border border-border shadow-sm"
-                              style={{ backgroundColor: timMauHex(bt.colorName) }}
-                            />
-                            {/* Thông tin */}
-                            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-                              <span className="font-semibold text-text-main text-[13px]">
-                                {bt.colorName}
-                              </span>
-                              <span className="rounded bg-surface-container px-1.5 py-0.5 text-[12px] font-medium text-text-secondary">
-                                {bt.size}
-                              </span>
-                              <span className="font-mono text-[11px] text-text-muted">
-                                {bt.sku}
-                              </span>
-                              <span className="text-[13px] font-semibold text-text-main">
-                                {bt.stock.toLocaleString("vi-VN")} cái
-                              </span>
-                              <BadgeTonKho status={bt.inventoryStatus} />
-                            </div>
-                            {/* Nút sửa */}
-                            <button
-                              type="button"
-                              onClick={() => batDauSuaBienThe(bt.id)}
-                              className="flex shrink-0 items-center gap-1.5 rounded-[7px] border border-border bg-surface px-3 py-1.5 text-[12px] font-semibold text-text-secondary transition-colors hover:border-primary-container/30 hover:bg-primary-container/5 hover:text-primary-container"
-                            >
-                              <EditOutlined className="text-[13px]" />
-                              Sửa
-                            </button>
-                          </div>
-                        ) : (
-                          /* CHẾ ĐỘ SỬA */
-                          <div className="p-4">
-                            <div className="mb-3 flex items-center gap-2">
-                              <span className="text-[13px] font-bold text-primary-container">
-                                ✏️ Đang chỉnh sửa biến thể
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                              {/* Màu sắc */}
-                              <div className="relative sm:col-span-1">
-                                <label className="mb-1 block text-[11px] font-semibold uppercase text-text-muted">
-                                  Màu sắc
-                                </label>
-                                <div className="flex items-center gap-1.5">
+                  <div className="overflow-x-auto rounded-[12px] border border-border">
+                    <table className="w-full min-w-[900px] table-fixed text-left">
+                      <thead>
+                        <tr className="border-b border-border bg-surface-alt text-[11px] font-bold uppercase tracking-wide text-text-secondary">
+                          <th className="w-[22%] px-3 py-2">Màu sắc</th>
+                          <th className="w-[12%] px-3 py-2">Kích thước</th>
+                          <th className="w-[26%] px-3 py-2">Mã SKU</th>
+                          <th className="w-[12%] px-3 py-2 text-right">Tồn kho</th>
+                          <th className="w-[13%] px-3 py-2">Trạng thái</th>
+                          {!isViewMode && <th className="w-[15%] px-3 py-2 text-right">Thao tác</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dsBienTheEdit.map((bt) => (
+                          <tr
+                            key={bt.id}
+                            className={`border-b border-border/70 last:border-b-0 ${
+                              bt.dangSua ? "bg-primary-container/5" : "bg-surface"
+                            }`}
+                          >
+                            <td className="px-3 py-2">
+                              {bt.dangSua ? (
+                                <div className="flex items-center gap-2">
                                   <span
-                                    className="h-5 w-5 shrink-0 cursor-pointer rounded-full border border-border shadow-sm"
+                                    className="h-5 w-5 shrink-0 rounded-full border border-border shadow-sm"
                                     style={{ backgroundColor: timMauHex(bt.editMau) }}
-                                    onClick={() =>
-                                      setKeyDangChonMau(
-                                        keyDangChonMau === String(bt.id) ? null : String(bt.id)
-                                      )
-                                    }
-                                    title="Chọn màu nhanh"
                                   />
                                   <input
                                     type="text"
+                                    list="edit-product-colors"
                                     value={bt.editMau}
                                     onChange={(e) =>
                                       capNhatEditBienThe(bt.id, "editMau", e.target.value)
                                     }
-                                    className="h-8 w-full rounded-[6px] border border-border bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
+                                    maxLength={100}
+                                    className="h-8 min-w-0 flex-1 rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
                                   />
                                 </div>
-                                {/* Dropdown màu nhanh */}
-                                {keyDangChonMau === String(bt.id) && (
-                                  <div className="absolute left-0 top-full z-20 mt-1 w-[260px] rounded-[10px] border border-border bg-surface p-3 shadow-lg">
-                                    <p className="mb-2 text-[11px] font-semibold uppercase text-text-muted">
-                                      Chọn màu nhanh
-                                    </p>
-                                    <div className="grid grid-cols-5 gap-2">
-                                      {DS_MAU_PHO_BIEN.map((mau) => (
-                                        <button
-                                          key={mau.ten}
-                                          type="button"
-                                          title={mau.ten}
-                                          onClick={() => {
-                                            capNhatEditBienThe(bt.id, "editMau", mau.ten);
-                                            setKeyDangChonMau(null);
-                                          }}
-                                          className="group flex flex-col items-center gap-1"
-                                        >
-                                          <span
-                                            className={`h-6 w-6 rounded-full border-2 shadow-sm transition-transform group-hover:scale-110 ${bt.editMau === mau.ten
-                                                ? "border-primary-container"
-                                                : "border-border"
-                                              }`}
-                                            style={{ backgroundColor: mau.hex }}
-                                          />
-                                          <span className="text-center text-[9px] leading-tight text-text-muted">
-                                            {mau.ten}
-                                          </span>
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Kích thước */}
-                              <div className="sm:col-span-1">
-                                <label className="mb-1 block text-[11px] font-semibold uppercase text-text-muted">
-                                  Kích thước
-                                </label>
-                                <div className="flex flex-wrap gap-1">
-                                  {DS_SIZE_GOI_Y.map((sz) => (
-                                    <button
-                                      key={sz}
-                                      type="button"
-                                      onClick={() => capNhatEditBienThe(bt.id, "editSize", sz)}
-                                      className={`rounded-[4px] px-1.5 py-0.5 text-[11px] font-medium transition-colors ${bt.editSize === sz
-                                          ? "bg-primary-container text-white"
-                                          : "border border-border bg-surface text-text-secondary hover:bg-surface-alt"
-                                        }`}
-                                    >
-                                      {sz}
-                                    </button>
-                                  ))}
+                              ) : (
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span
+                                    className="h-5 w-5 shrink-0 rounded-full border border-border shadow-sm"
+                                    style={{ backgroundColor: timMauHex(bt.colorName) }}
+                                  />
+                                  <span className="truncate text-[13px] font-semibold text-text-main" title={bt.colorName}>
+                                    {bt.colorName}
+                                  </span>
                                 </div>
-                              </div>
-
-                              {/* SKU */}
-                              <div className="sm:col-span-1">
-                                <label className="mb-1 block text-[11px] font-semibold uppercase text-text-muted">
-                                  Mã SKU
-                                </label>
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              {bt.dangSua ? (
+                                <input
+                                  type="text"
+                                  list="edit-product-sizes"
+                                  value={bt.editSize}
+                                  onChange={(e) =>
+                                    capNhatEditBienThe(bt.id, "editSize", e.target.value)
+                                  }
+                                  maxLength={50}
+                                  className="h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
+                                />
+                              ) : (
+                                <span className="inline-flex rounded bg-surface-container px-2 py-0.5 text-[12px] font-semibold text-text-secondary">
+                                  {bt.size}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              {bt.dangSua ? (
                                 <input
                                   type="text"
                                   value={bt.editSKU}
@@ -975,15 +909,16 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                                     capNhatEditBienThe(bt.id, "editSKU", e.target.value)
                                   }
                                   maxLength={100}
-                                  className="h-8 w-full rounded-[6px] border border-border bg-surface px-2 font-mono text-[12px] outline-none focus:border-primary-container"
+                                  className="h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 font-mono text-[12px] outline-none focus:border-primary-container"
                                 />
-                              </div>
-
-                              {/* Tồn kho */}
-                              <div className="sm:col-span-1">
-                                <label className="mb-1 block text-[11px] font-semibold uppercase text-text-muted">
-                                  Tồn kho
-                                </label>
+                              ) : (
+                                <span className="block truncate font-mono text-[12px] text-text-secondary" title={bt.sku}>
+                                  {bt.sku}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              {bt.dangSua ? (
                                 <input
                                   type="number"
                                   value={bt.editStock}
@@ -991,275 +926,242 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                                     capNhatEditBienThe(bt.id, "editStock", e.target.value)
                                   }
                                   min={0}
-                                  className="h-8 w-full rounded-[6px] border border-border bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
+                                  className="h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 text-right text-[12px] outline-none focus:border-primary-container"
                                 />
-                              </div>
-                            </div>
-
-                            {/* Nút lưu / hủy */}
-                            <div className="mt-3 flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => luuBienTheDaChon(bt)}
-                                disabled={dangLuuBienThe}
-                                className="flex items-center gap-1.5 rounded-[7px] bg-primary-container px-4 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-primary-container/80 disabled:opacity-50"
-                              >
-                                {dangLuuBienThe ? (
-                                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                                ) : (
-                                  <SaveOutlined className="text-[13px]" />
-                                )}
-                                Lưu biến thể
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => huyBienThe(bt.id)}
-                                disabled={dangLuuBienThe}
-                                className="rounded-[7px] border border-border px-4 py-1.5 text-[12px] font-semibold text-text-secondary transition-colors hover:bg-surface-alt"
-                              >
-                                Hủy
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                              ) : (
+                                <span className="text-[13px] font-semibold text-text-main">
+                                  {bt.stock.toLocaleString("vi-VN")}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              <BadgeTonKho status={bt.inventoryStatus} />
+                            </td>
+                            {!isViewMode && (
+                              <td className="px-3 py-2">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {bt.dangSua ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => luuBienTheDaChon(bt)}
+                                        disabled={dangLuuBienThe}
+                                        className="flex h-8 items-center gap-1 rounded-[6px] bg-primary-container px-3 text-[12px] font-semibold text-white hover:bg-primary-container/80 disabled:opacity-50"
+                                      >
+                                        {dangLuuBienThe ? (
+                                          <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                                        ) : (
+                                          <SaveOutlined />
+                                        )}
+                                        Lưu
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => huyBienThe(bt.id)}
+                                        disabled={dangLuuBienThe}
+                                        className="h-8 rounded-[6px] border border-border bg-surface px-3 text-[12px] font-semibold text-text-secondary hover:bg-surface-alt disabled:opacity-50"
+                                      >
+                                        Hủy
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => batDauSuaBienThe(bt.id)}
+                                      className="flex h-8 items-center gap-1.5 rounded-[6px] border border-border bg-surface px-3 text-[12px] font-semibold text-text-secondary transition-colors hover:border-primary-container/30 hover:bg-primary-container/5 hover:text-primary-container"
+                                    >
+                                      <EditOutlined />
+                                      Sửa
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
-              </div>
+              </section>
 
-              {/* Đường kẻ phân cách */}
-              <div className="border-t border-border" />
-
-              {/* ──────────────────────────
-                  THÊM BIẾN THỂ MỚI
-              ────────────────────────── */}
-              <div>
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-[14px] font-bold text-text-main">
-                    Thêm biến thể mới
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={themHangMoi}
-                    className="flex items-center gap-1.5 rounded-[8px] border border-dashed border-border px-3 py-1.5 text-[12px] font-semibold text-text-secondary transition-colors hover:border-primary-container/50 hover:bg-primary-container/5 hover:text-primary-container"
-                  >
-                    <PlusOutlined className="text-[12px]" />
-                    Thêm hàng
-                  </button>
-                </div>
-
-                {dsBienTheMoi.length === 0 ? (
-                  <button
-                    type="button"
-                    onClick={themHangMoi}
-                    className="flex w-full items-center justify-center gap-2 rounded-[10px] border-2 border-dashed border-border py-4 text-[13px] font-semibold text-text-muted transition-colors hover:border-primary-container/40 hover:bg-primary-container/5 hover:text-primary-container"
-                  >
-                    <PlusOutlined />
-                    Nhấn để thêm biến thể màu × kích thước mới
-                  </button>
-                ) : (
-                  <div className="space-y-2">
-                    {dsBienTheMoi.map((h) => (
-                      <div
-                        key={h.key}
-                        className="rounded-[10px] border border-dashed border-primary-container/30 bg-primary-container/5 p-3"
+              <section aria-labelledby="tieu-de-them-bien-the" className="border-t border-border pt-5">
+                {!isViewMode && (
+                  <>
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <h4 id="tieu-de-them-bien-the" className="text-[15px] font-extrabold text-text-main">
+                          Thêm biến thể mới
+                        </h4>
+                        <p className="mt-0.5 text-[12px] text-text-muted">
+                          Thêm nhiều dòng rồi lưu cùng lúc.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={themHangMoi}
+                        className="flex h-8 shrink-0 items-center gap-1.5 rounded-[7px] border border-dashed border-border px-3 text-[12px] font-semibold text-text-secondary transition-colors hover:border-primary-container/50 hover:bg-primary-container/5 hover:text-primary-container"
                       >
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                          {/* Màu sắc mới */}
-                          <div className="relative sm:col-span-1">
-                            <label className="mb-1 block text-[11px] font-semibold uppercase text-text-muted">
-                              Màu sắc <span className="text-error">*</span>
-                            </label>
-                            <div className="flex items-center gap-1">
-                              <span
-                                className="h-5 w-5 shrink-0 cursor-pointer rounded-full border border-border shadow-sm"
-                                style={{ backgroundColor: timMauHex(h.mauSac) }}
-                                onClick={() =>
-                                  setKeyMoiDangChonMau(
-                                    keyMoiDangChonMau === h.key ? null : h.key
-                                  )
-                                }
-                                title="Chọn màu nhanh"
-                              />
-                              <input
-                                type="text"
-                                value={h.mauSac}
-                                onChange={(e) => capNhatHangMoi(h.key, "mauSac", e.target.value)}
-                                placeholder="Tên màu..."
-                                maxLength={100}
-                                className="h-8 w-full rounded-[6px] border border-primary-container/30 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
-                              />
-                            </div>
-                            {keyMoiDangChonMau === h.key && (
-                              <div className="absolute left-0 top-full z-20 mt-1 w-[260px] rounded-[10px] border border-border bg-surface p-3 shadow-lg">
-                                <p className="mb-2 text-[11px] font-semibold uppercase text-text-muted">
-                                  Chọn màu nhanh
-                                </p>
-                                <div className="grid grid-cols-5 gap-2">
-                                  {DS_MAU_PHO_BIEN.map((mau) => (
-                                    <button
-                                      key={mau.ten}
-                                      type="button"
-                                      title={mau.ten}
-                                      onClick={() => {
-                                        capNhatHangMoi(h.key, "mauSac", mau.ten);
-                                        setKeyMoiDangChonMau(null);
-                                      }}
-                                      className="group flex flex-col items-center gap-1"
-                                    >
+                        <PlusOutlined />
+                        Thêm dòng
+                      </button>
+                    </div>
+
+                    {loiBienThe && (
+                      <div className="mb-3 flex items-center gap-2 rounded-[8px] border border-error/30 bg-error/5 px-4 py-2.5 text-[13px] text-error">
+                        <span>⚠️</span>
+                        {loiBienThe}
+                      </div>
+                    )}
+
+                    {dsBienTheMoi.length === 0 ? (
+                      <button
+                        type="button"
+                        onClick={themHangMoi}
+                        className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-dashed border-border py-3 text-[13px] font-semibold text-text-muted transition-colors hover:border-primary-container/40 hover:bg-primary-container/5 hover:text-primary-container"
+                      >
+                        <PlusOutlined />
+                        Thêm biến thể màu × kích thước
+                      </button>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="overflow-x-auto rounded-[12px] border border-primary-container/30">
+                          <table className="w-full min-w-[760px] table-fixed text-left">
+                            <thead>
+                              <tr className="border-b border-primary-container/20 bg-primary-container/5 text-[11px] font-bold uppercase tracking-wide text-text-secondary">
+                                <th className="w-[25%] px-3 py-2">Màu sắc <span className="text-error">*</span></th>
+                                <th className="w-[16%] px-3 py-2">Kích thước <span className="text-error">*</span></th>
+                                <th className="w-[32%] px-3 py-2">Mã SKU <span className="text-error">*</span></th>
+                                <th className="w-[17%] px-3 py-2">Tồn kho</th>
+                                <th className="w-[10%] px-3 py-2 text-center">Xóa</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dsBienTheMoi.map((h) => (
+                                <tr key={h.key} className="border-b border-border/70 bg-primary-container/[0.02] last:border-b-0">
+                                  <td className="px-3 py-2">
+                                    <div className="flex items-center gap-2">
                                       <span
-                                        className={`h-6 w-6 rounded-full border-2 shadow-sm transition-transform group-hover:scale-110 ${h.mauSac === mau.ten
-                                            ? "border-primary-container"
-                                            : "border-border"
-                                          }`}
-                                        style={{ backgroundColor: mau.hex }}
+                                        className="h-5 w-5 shrink-0 rounded-full border border-border shadow-sm"
+                                        style={{ backgroundColor: timMauHex(h.mauSac) }}
                                       />
-                                      <span className="text-center text-[9px] leading-tight text-text-muted">
-                                        {mau.ten}
-                                      </span>
+                                      <input
+                                        type="text"
+                                        list="edit-product-colors"
+                                        value={h.mauSac}
+                                        onChange={(e) => capNhatHangMoi(h.key, "mauSac", e.target.value)}
+                                        placeholder="Tên màu"
+                                        maxLength={100}
+                                        className="h-8 min-w-0 flex-1 rounded-[6px] border border-primary-container/30 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="text"
+                                      list="edit-product-sizes"
+                                      value={h.kichThuoc}
+                                      onChange={(e) => capNhatHangMoi(h.key, "kichThuoc", e.target.value)}
+                                      placeholder="VD: M"
+                                      maxLength={50}
+                                      className="h-8 w-full rounded-[6px] border border-primary-container/30 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="text"
+                                      value={h.maSKU}
+                                      onChange={(e) => capNhatHangMoi(h.key, "maSKU", e.target.value)}
+                                      placeholder="Mã SKU"
+                                      maxLength={100}
+                                      className="h-8 w-full rounded-[6px] border border-primary-container/30 bg-surface px-2 font-mono text-[12px] outline-none focus:border-primary-container"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      value={h.tonKho}
+                                      onChange={(e) => capNhatHangMoi(h.key, "tonKho", e.target.value)}
+                                      min={0}
+                                      placeholder="0"
+                                      className="h-8 w-full rounded-[6px] border border-primary-container/30 bg-surface px-2 text-right text-[12px] outline-none focus:border-primary-container"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => xoaHangMoi(h.key)}
+                                      title="Xóa dòng này"
+                                      aria-label="Xóa biến thể mới"
+                                      className="mx-auto flex h-8 w-8 items-center justify-center rounded-[6px] text-text-muted transition-colors hover:bg-error-container hover:text-error"
+                                    >
+                                      <DeleteOutlined />
                                     </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Kích thước mới */}
-                          <div className="sm:col-span-1">
-                            <label className="mb-1 block text-[11px] font-semibold uppercase text-text-muted">
-                              Kích thước <span className="text-error">*</span>
-                            </label>
-                            <div className="flex flex-wrap gap-1">
-                              {DS_SIZE_GOI_Y.map((sz) => (
-                                <button
-                                  key={sz}
-                                  type="button"
-                                  onClick={() => capNhatHangMoi(h.key, "kichThuoc", sz)}
-                                  className={`rounded-[4px] px-1.5 py-0.5 text-[11px] font-medium transition-colors ${h.kichThuoc === sz
-                                      ? "bg-primary-container text-white"
-                                      : "border border-border bg-surface text-text-secondary hover:bg-surface-alt"
-                                    }`}
-                                >
-                                  {sz}
-                                </button>
+                                  </td>
+                                </tr>
                               ))}
-                            </div>
-                          </div>
+                            </tbody>
+                          </table>
+                        </div>
 
-                          {/* SKU mới */}
-                          <div className="sm:col-span-1">
-                            <label className="mb-1 block text-[11px] font-semibold uppercase text-text-muted">
-                              Mã SKU <span className="text-error">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              value={h.maSKU}
-                              onChange={(e) => capNhatHangMoi(h.key, "maSKU", e.target.value)}
-                              placeholder="SKU..."
-                              maxLength={100}
-                              className="h-8 w-full rounded-[6px] border border-primary-container/30 bg-surface px-2 font-mono text-[12px] outline-none focus:border-primary-container"
-                            />
-                          </div>
-
-                          {/* Tồn kho mới */}
-                          <div className="sm:col-span-1">
-                            <label className="mb-1 block text-[11px] font-semibold uppercase text-text-muted">
-                              Tồn kho
-                            </label>
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="number"
-                                value={h.tonKho}
-                                onChange={(e) => capNhatHangMoi(h.key, "tonKho", e.target.value)}
-                                min={0}
-                                placeholder="0"
-                                className="h-8 w-full rounded-[6px] border border-primary-container/30 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
-                              />
-                              {/* Nút xóa hàng */}
-                              <button
-                                type="button"
-                                onClick={() => xoaHangMoi(h.key)}
-                                title="Xóa hàng này"
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] text-text-muted transition-colors hover:bg-error-container hover:text-error"
-                              >
-                                <DeleteOutlined className="text-[14px]" />
-                              </button>
-                            </div>
-                          </div>
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={xuLyThemBienTheMoi}
+                            disabled={dangThemBienThe}
+                            className="flex h-9 items-center justify-center gap-2 rounded-[8px] bg-[#0ea5e9] px-5 text-[13px] font-semibold text-white transition-colors hover:bg-[#0284c7] disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {dangThemBienThe ? (
+                              <>
+                                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                                Đang lưu...
+                              </>
+                            ) : (
+                              <>
+                                <CheckOutlined />
+                                Lưu {dsBienTheMoi.length} biến thể mới
+                              </>
+                            )}
+                          </button>
                         </div>
                       </div>
-                    ))}
-
-                    {/* Nút lưu các biến thể mới */}
-                    <button
-                      type="button"
-                      onClick={xuLyThemBienTheMoi}
-                      disabled={dangThemBienThe}
-                      className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-[#0ea5e9] py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#0284c7] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {dangThemBienThe ? (
-                        <>
-                          <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                          Đang lưu...
-                        </>
-                      ) : (
-                        <>
-                          <CheckOutlined />
-                          Lưu {dsBienTheMoi.length} biến thể mới
-                        </>
-                      )}
-                    </button>
-                  </div>
+                    )}
+                  </>
                 )}
-              </div>
+              </section>
             </div>
-          )}
-        </div>
 
-        {/* Thanh hành động phần thông tin cơ bản */}
-        {tabHienTai === "thong_tin" && chiTiet && !dangTaiChiTiet && (
-          <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-border bg-surface/95 px-6 py-4 backdrop-blur-sm">
-            <button
-              type="button"
-              onClick={() => router.push("/admin/san-pham-phoi-ao")}
-              disabled={dangLuuThongTin}
-              className="flex h-10 items-center gap-2 rounded-[10px] border border-border bg-surface px-5 text-[14px] font-semibold text-text-secondary transition-colors hover:bg-surface-alt disabled:opacity-40"
-            >
-              Về danh sách
-            </button>
-            <button
-              type="button"
-              onClick={xuLyLuuThongTin}
-              disabled={dangLuuThongTin}
-              className="flex h-10 items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-6 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {dangLuuThongTin ? (
-                <>
-                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Đang lưu...
-                </>
-              ) : (
-                <>
-                  <SaveOutlined />
-                  Lưu thay đổi
-                </>
+            <div className="sticky bottom-0 flex flex-col-reverse gap-3 border-t border-border bg-surface/95 px-5 py-4 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-end sm:px-6">
+              <button
+                type="button"
+                onClick={() => router.push("/admin/san-pham-phoi-ao")}
+                disabled={dangLuuThongTin}
+                className="flex h-10 items-center justify-center rounded-[10px] border border-border bg-surface px-5 text-[14px] font-semibold text-text-secondary transition-colors hover:bg-surface-alt disabled:opacity-40"
+              >
+                Về danh sách
+              </button>
+              {!isViewMode && (
+                <button
+                  type="button"
+                  onClick={xuLyLuuThongTin}
+                  disabled={dangLuuThongTin}
+                  className="flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#0ea5e9] px-6 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {dangLuuThongTin ? (
+                    <>
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      Đang lưu...
+                    </>
+                  ) : (
+                    <>
+                      <SaveOutlined />
+                      Lưu thông tin chung
+                    </>
+                  )}
+                </button>
               )}
-            </button>
-          </div>
-        )}
-
-        {/* Thanh hành động phần biến thể khi không có biến thể mới */}
-        {tabHienTai === "bien_the" && chiTiet && !dangTaiChiTiet && dsBienTheMoi.length === 0 && (
-          <div className="sticky bottom-0 flex items-center justify-end border-t border-border bg-surface/95 px-6 py-4 backdrop-blur-sm">
-            <button
-              type="button"
-              onClick={() => router.push("/admin/san-pham-phoi-ao")}
-              className="flex h-10 items-center gap-2 rounded-[10px] border border-border bg-surface px-5 text-[14px] font-semibold text-text-secondary transition-colors hover:bg-surface-alt"
-            >
-              Về danh sách
-            </button>
-          </div>
+            </div>
+          </>
         )}
       </section>
     </div>

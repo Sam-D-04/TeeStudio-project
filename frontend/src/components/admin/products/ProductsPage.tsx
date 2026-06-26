@@ -170,6 +170,11 @@ export default function ProductsPage({ initialFilters }: ProductsPageProps) {
     router.push(`/admin/san-pham-phoi-ao/${product.id}`);
   }
 
+  /** Xem chi tiết: chuyển hướng với mode=view */
+  function handleView(product: SanPham) {
+    router.push(`/admin/san-pham-phoi-ao/${product.id}?mode=view`);
+  }
+
   /** Xóa: hiển thị hộp thoại xác nhận rồi gọi API */
   function handleDelete(product: SanPham) {
     if (
@@ -353,6 +358,7 @@ export default function ProductsPage({ initialFilters }: ProductsPageProps) {
                     products={danhSachSanPham}
                     emptyMessage={emptyMessage}
                     isLoading={dangXoa}
+                    onView={handleView}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                   />
