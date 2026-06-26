@@ -501,6 +501,7 @@ async function layDanhSachSanPhamVaBienThe() {
     `SELECT id, productId, color AS mau, size, sku, stockQty AS tonHienTai
      FROM ProductVariant
      WHERE productId IN (${placeholders})
+       AND (status IS NULL OR status = 'ACTIVE')
      ORDER BY productId ASC, color ASC, FIELD(size,'XS','S','M','L','XL','XXL','2XL','3XL')`,
     productIds
   );

@@ -1265,6 +1265,7 @@ async function timKiemSanPham(keyword) {
     `SELECT id, productId, color, size, sku, stockQty
      FROM ProductVariant
      WHERE productId IN (${placeholders})
+       AND (status IS NULL OR status = 'ACTIVE')
      ORDER BY productId, color, size`,
     productIds
   );
@@ -1336,6 +1337,8 @@ async function timKiemThietKe(userId, keyword) {
      LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
      WHERE cd.userId = ?
        AND cd.status = 'APPROVED'
+       AND p.status = 'ACTIVE'
+       AND (cd.variantId IS NULL OR pv.status IS NULL OR pv.status = 'ACTIVE')
        ${extraCondition}
      ORDER BY cd.createdAt DESC
      LIMIT 30`,
@@ -1351,6 +1354,7 @@ async function timKiemThietKe(userId, keyword) {
     `SELECT id, productId, color, size, sku, stockQty
      FROM ProductVariant
      WHERE productId IN (${placeholders})
+       AND (status IS NULL OR status = 'ACTIVE')
      ORDER BY productId, color, size`,
     productIds
   );
@@ -1499,7 +1503,9 @@ async function taoMoiDonHang(data, actor, ipAddress) {
               p.name AS tenSanPham, p.basePrice
        FROM ProductVariant pv
        JOIN Product p ON p.id = pv.productId
-       WHERE pv.id = ? AND p.status = 'ACTIVE'
+       WHERE pv.id = ?
+         AND p.status = 'ACTIVE'
+         AND (pv.status IS NULL OR pv.status = 'ACTIVE')
        LIMIT 1`,
       [item.variantId]
     );

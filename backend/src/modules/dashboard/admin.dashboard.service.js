@@ -469,6 +469,7 @@ async function layTonKhoCanhBao(nguong = 15, limit = 10) {
      ${RESERVED_STOCK_JOIN}
      WHERE ${AVAILABLE_STOCK_SQL} <= ?
        AND p.status = 'ACTIVE'
+       AND (pv.status IS NULL OR pv.status = 'ACTIVE')
      ORDER BY availableQty ASC
      LIMIT ?`,
     [nguong, limit]

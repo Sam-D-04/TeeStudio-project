@@ -201,7 +201,7 @@ const xoaSanPham = async (req, res, next) => {
     const data = await productService.xoaSanPham(id);
     res.json({
       success: true,
-      message: "Xóa phôi áo thành công",
+      message: data.message || "Xóa/ẩn phôi áo thành công",
       data,
     });
   } catch (error) {

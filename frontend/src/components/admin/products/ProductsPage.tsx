@@ -17,9 +17,11 @@ import {
   WarningOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { message, Modal } from "antd";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import * as productService from "@/services/admin/productService";
 import type { SanPham } from "@/services/admin/productService";
 import ProductFilterBar from "./ProductFilterBar";
@@ -49,6 +51,8 @@ type ProductsPageProps = {
 export default function ProductsPage({ initialFilters }: ProductsPageProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [messageApi, messageContextHolder] = message.useMessage();
+  const [modalApi, modalContextHolder] = Modal.useModal();
 
   // ===== STATE QUẢN LÝ FILTER =====
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -104,17 +108,20 @@ export default function ProductsPage({ initialFilters }: ProductsPageProps) {
   // ===== MUTATION XÓA =====
   const { mutate: thucHienXoa, isPending: dangXoa } = useMutation({
     mutationFn: (id: number) => productService.xoaSanPham(id),
-    onSuccess: () => {
+    onSuccess: (ketQua) => {
+      messageApi.success(
+        ketQua.message ||
+          (ketQua.action === "deleted"
+            ? "Đã xóa phôi áo sạch khỏi database."
+            : "Đã ẩn phôi áo.")
+      );
       // Làm mới danh sách và thống kê sau khi xóa
       queryClient.invalidateQueries({ queryKey: ["products"] });
     },
-    onError: (error: unknown) => {
-      const msg =
-        error instanceof Error
-          ? error.message
-          : "Đã xảy ra lỗi khi xóa phôi áo";
-      alert(`Lỗi: ${msg}`);
-    },
+    onError: (error: unknown) =>
+      messageApi.error(
+        getApiErrorMessage(error, "Đã xảy ra lỗi khi xóa/ẩn phôi áo")
+      ),
   });
 
   // ===== XỬ LÝ FILTER (reset về trang 1 khi filter thay đổi) =====
@@ -177,13 +184,26 @@ export default function ProductsPage({ initialFilters }: ProductsPageProps) {
 
   /** Xóa: hiển thị hộp thoại xác nhận rồi gọi API */
   function handleDelete(product: SanPham) {
-    if (
-      window.confirm(
-        `Bạn có chắc muốn xóa "${product.name}"?\n\nLưu ý: Không thể xóa nếu phôi áo đang có trong đơn hàng.`
-      )
-    ) {
-      thucHienXoa(product.id);
-    }
+    modalApi.confirm({
+      title: `Xóa/ẩn phôi áo "${product.name}"?`,
+      content: (
+        <div className="space-y-2 text-[14px] leading-6 text-text-secondary">
+          <p>
+            Hệ thống sẽ kiểm tra tồn kho, đơn hàng đang xử lý và lịch sử phát
+            sinh trước khi thực hiện.
+          </p>
+          <p>
+            Nếu phôi áo đã có dữ liệu liên quan, hệ thống chỉ ẩn khỏi kênh bán
+            hàng và giữ nguyên dữ liệu phục vụ báo cáo.
+          </p>
+        </div>
+      ),
+      okText: "Tiếp tục",
+      cancelText: "Hủy",
+      okButtonProps: { danger: true },
+      centered: true,
+      onOk: () => thucHienXoa(product.id),
+    });
   }
 
   // ===== DỮ LIỆU HIỂN THỊ =====
@@ -223,7 +243,10 @@ export default function ProductsPage({ initialFilters }: ProductsPageProps) {
         : "Chưa có phôi áo nào. Bấm “Thêm phôi áo” để bắt đầu.";
 
   return (
-    <div>
+    <>
+      {messageContextHolder}
+      {modalContextHolder}
+      <div>
       {/* ===================================================
           TIÊU ĐỀ TRANG + CÁC NÚT HÀNH ĐỘNG
           =================================================== */}
@@ -382,6 +405,7 @@ export default function ProductsPage({ initialFilters }: ProductsPageProps) {
       {/* Khoảng trống phía dưới để trang không bị sát */}
       <div className="h-12" />
 
-    </div>
+      </div>
+    </>
   );
 }

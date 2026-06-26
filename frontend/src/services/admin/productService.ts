@@ -151,6 +151,14 @@ export type ThemBienTheInput = {
 /** Payload cập nhật biến thể */
 export type CapNhatBienTheInput = Partial<ThemBienTheInput> & { status?: string };
 
+/** Kết quả thao tác xóa/ẩn phôi áo. */
+export type KetQuaXoaSanPham = {
+  id: number;
+  action: "deleted" | "archived";
+  affectedVariants: number;
+  message: string;
+};
+
 // =====================================================================
 // CÁC HÀM GỌI API
 // =====================================================================
@@ -269,16 +277,19 @@ export async function capNhatTrangThaiSanPham(
 }
 
 /**
- * Xóa phôi áo (sẽ lỗi nếu còn đơn hàng).
+ * Xóa/ẩn phôi áo theo ràng buộc nghiệp vụ.
  * DELETE /api/admin/products/:id
  */
-export async function xoaSanPham(id: number): Promise<{ id: number }> {
+export async function xoaSanPham(id: number): Promise<KetQuaXoaSanPham> {
   const res = await apiClient.delete<{
     success: boolean;
     message: string;
-    data: { id: number };
+    data: Omit<KetQuaXoaSanPham, "message"> & { message?: string };
   }>(`/admin/products/${id}`);
-  return res.data.data;
+  return {
+    ...res.data.data,
+    message: res.data.data.message ?? res.data.message,
+  };
 }
 
 /**

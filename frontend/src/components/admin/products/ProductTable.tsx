@@ -349,7 +349,7 @@ export default function ProductTable({
                         {/* Nút Xóa */}
                         <button
                           type="button"
-                          title="Xóa"
+                          title="Xóa/ẩn"
                           onClick={() => onDelete(product)}
                           disabled={isLoading}
                           className="rounded p-1.5 text-text-secondary transition-colors hover:bg-error-container hover:text-error disabled:cursor-not-allowed disabled:opacity-40"

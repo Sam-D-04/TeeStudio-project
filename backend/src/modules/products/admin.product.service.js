@@ -12,6 +12,8 @@ const db = require("../../database/mysql");
 const NGUONG_SAP_HET = 10;
 const TRANG_THAI_DON_GIU_HANG =
   "'PENDING','CONFIRMED','PROCESSING','PRINTING','READY_TO_SHIP'";
+const TRANG_THAI_DON_CHAN_XOA_AN =
+  "'PENDING','CONFIRMED','PROCESSING','PRINTING','READY_TO_SHIP','SHIPPING'";
 
 const RESERVED_STOCK_JOIN = `
   LEFT JOIN (
@@ -25,6 +27,56 @@ const RESERVED_STOCK_JOIN = `
 
 // stockQty đã được giảm khi tạo đơn; reservedQty chỉ dùng để tham khảo.
 const AVAILABLE_STOCK_SQL = "pv.stockQty";
+
+function taoLoi(message, statusCode = 400) {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
+}
+
+async function kiemTraDieuKienAnSanPham(
+  queryRunner,
+  productId,
+  { lockVariants = false } = {}
+) {
+  const [variantRows] = await queryRunner.query(
+    `SELECT id, stockQty FROM ProductVariant WHERE productId = ?${
+      lockVariants ? " FOR UPDATE" : ""
+    }`,
+    [productId]
+  );
+
+  const tongTonKho = variantRows.reduce(
+    (sum, variant) => sum + Number(variant.stockQty || 0),
+    0
+  );
+
+  const [activeOrderRows] = await queryRunner.query(
+    `SELECT COUNT(DISTINCT oi.orderId) AS so_luong
+     FROM OrderItem oi
+     INNER JOIN CustomerOrder co ON co.id = oi.orderId
+     INNER JOIN ProductVariant pv ON pv.id = oi.variantId
+     WHERE pv.productId = ?
+       AND co.status IN (${TRANG_THAI_DON_CHAN_XOA_AN})`,
+    [productId]
+  );
+
+  if (Number(activeOrderRows[0]?.so_luong || 0) > 0) {
+    throw taoLoi(
+      "Không thể ẩn/xóa phôi áo vì đang có đơn hàng chờ xử lý",
+      409
+    );
+  }
+
+  if (tongTonKho > 0) {
+    throw taoLoi(
+      "Phôi áo vẫn còn hàng trong kho. Vui lòng xuất hết hàng trước khi ẩn",
+      409
+    );
+  }
+
+  return { variantRows, tongTonKho };
+}
 
 // =====================================================================
 // MAP TRẠNG THÁI: DB (tiếng Anh) ↔ Frontend (tiếng Việt snake_case)
@@ -226,6 +278,7 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
        pv.size,
        pv.sku,
        pv.stockQty,
+       pv.status,
        COALESCE(reservedStock.reservedQty, 0) AS reservedQty
      FROM ProductVariant pv
      ${RESERVED_STOCK_JOIN}
@@ -260,6 +313,7 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
         stock,
         reserved,
         available,
+        status: v.status || "ACTIVE",
         inventoryStatus: tinhTrangThaiTonKho(available),
       };
     });
@@ -329,6 +383,8 @@ async function layCanhBaoTonKho() {
      JOIN Product p ON p.id = pv.productId
      ${RESERVED_STOCK_JOIN}
      WHERE ${AVAILABLE_STOCK_SQL} <= ?
+       AND p.status = 'ACTIVE'
+       AND (pv.status IS NULL OR pv.status = 'ACTIVE')
      ORDER BY availableQty ASC, p.name ASC
      LIMIT 20`,
     [NGUONG_SAP_HET]
@@ -483,6 +539,10 @@ async function capNhatSanPham(id, { categoryId, name, basePrice, material, form,
 
   const fields = [];
   const params = [];
+  const displayStatusDB =
+    displayStatus !== undefined
+      ? MAP_TRANG_THAI_FE_SANG_DB[displayStatus]
+      : undefined;
 
   if (categoryId !== undefined) { fields.push("categoryId = ?"); params.push(categoryId); }
   if (name !== undefined) { fields.push("name = ?"); params.push(name); }
@@ -491,13 +551,6 @@ async function capNhatSanPham(id, { categoryId, name, basePrice, material, form,
   if (form !== undefined) { fields.push("form = ?"); params.push(form); }
   if (madeIn !== undefined) { fields.push("madeIn = ?"); params.push(madeIn); }
   if (description !== undefined) { fields.push("description = ?"); params.push(description); }
-
-  if (displayStatus !== undefined) {
-    const statusDB = MAP_TRANG_THAI_FE_SANG_DB[displayStatus];
-    if (statusDB) {
-      fields.push("status = ?"); params.push(statusDB);
-    }
-  }
 
   if (fields.length > 0) {
     params.push(id);
@@ -511,6 +564,24 @@ async function capNhatSanPham(id, { categoryId, name, basePrice, material, form,
       } else {
         await themBienThe(id, v);
       }
+    }
+  }
+
+  if (displayStatusDB) {
+    if (displayStatusDB === "INACTIVE") {
+      await kiemTraDieuKienAnSanPham(db.pool, id);
+    }
+
+    await db.execute("UPDATE Product SET status = ? WHERE id = ?", [
+      displayStatusDB,
+      id,
+    ]);
+
+    if (displayStatusDB === "INACTIVE") {
+      await db.execute(
+        "UPDATE ProductVariant SET status = 'INACTIVE' WHERE productId = ?",
+        [id]
+      );
     }
   }
 
@@ -535,6 +606,28 @@ async function capNhatTrangThai(id, trangThaiFE) {
     throw err;
   }
 
+  if (statusDB === "INACTIVE") {
+    await db.transaction(async (connection) => {
+      const [lockedRows] = await connection.query(
+        "SELECT id FROM Product WHERE id = ? FOR UPDATE",
+        [id]
+      );
+      if (!lockedRows || lockedRows.length === 0) {
+        throw taoLoi("Không tìm thấy phôi áo", 404);
+      }
+      await kiemTraDieuKienAnSanPham(connection, id, { lockVariants: true });
+      await connection.query("UPDATE Product SET status = ? WHERE id = ?", [
+        statusDB,
+        id,
+      ]);
+      await connection.query(
+        "UPDATE ProductVariant SET status = 'INACTIVE' WHERE productId = ?",
+        [id]
+      );
+    });
+    return { id: Number(id), trangThai: trangThaiFE };
+  }
+
   await db.execute("UPDATE Product SET status = ? WHERE id = ?", [statusDB, id]);
   return { id: Number(id), trangThai: trangThaiFE };
 }
@@ -543,31 +636,86 @@ async function capNhatTrangThai(id, trangThaiFE) {
 // SERVICE 9: Xóa phôi áo
 // =====================================================================
 async function xoaSanPham(id) {
-  const [rows] = await db.pool.query("SELECT id, name FROM Product WHERE id = ?", [id]);
-  if (!rows || rows.length === 0) {
-    const err = new Error("Không tìm thấy phôi áo");
-    err.statusCode = 404;
-    throw err;
-  }
-
-  // Kiểm tra xem có đơn hàng đang dùng biến thể này không
-  const [orderRows] = await db.pool.query(
-    `SELECT COUNT(*) AS so_luong
-     FROM OrderItem oi
-     JOIN ProductVariant pv ON pv.id = oi.variantId
-     WHERE pv.productId = ?`,
-    [id]
-  );
-  if (orderRows[0].so_luong > 0) {
-    const err = new Error(
-      "Không thể xóa phôi áo đang có trong đơn hàng. Vui lòng ẩn sản phẩm thay vì xóa."
+  return db.transaction(async (connection) => {
+    const [rows] = await connection.query(
+      "SELECT id, name, status FROM Product WHERE id = ? FOR UPDATE",
+      [id]
     );
-    err.statusCode = 409;
-    throw err;
-  }
+    if (!rows || rows.length === 0) {
+      throw taoLoi("Không tìm thấy phôi áo", 404);
+    }
 
-  await db.execute("DELETE FROM Product WHERE id = ?", [id]);
-  return { id: Number(id) };
+    const { variantRows } = await kiemTraDieuKienAnSanPham(connection, id, {
+      lockVariants: true,
+    });
+
+    const [historyRows] = await connection.query(
+      `SELECT
+         (SELECT COUNT(*)
+          FROM OrderItem oi
+          INNER JOIN ProductVariant pv ON pv.id = oi.variantId
+          WHERE pv.productId = ?) AS soDonHang,
+         (SELECT COUNT(*)
+          FROM InventoryTransaction it
+          INNER JOIN ProductVariant pv ON pv.id = it.variantId
+          WHERE pv.productId = ?) AS soGiaoDichKho,
+         (SELECT COUNT(*)
+          FROM CustomDesign cd
+          WHERE cd.productId = ?
+             OR EXISTS (
+               SELECT 1
+               FROM ProductVariant pv
+               WHERE pv.id = cd.variantId
+                 AND pv.productId = ?
+             )) AS soThietKe`,
+      [id, id, id, id]
+    );
+
+    const lichSu = historyRows[0] || {};
+    const daPhatSinhDuLieu =
+      Number(lichSu.soDonHang || 0) > 0 ||
+      Number(lichSu.soGiaoDichKho || 0) > 0 ||
+      Number(lichSu.soThietKe || 0) > 0;
+
+    if (daPhatSinhDuLieu) {
+      await connection.query("UPDATE Product SET status = 'INACTIVE' WHERE id = ?", [
+        id,
+      ]);
+      await connection.query(
+        "UPDATE ProductVariant SET status = 'INACTIVE' WHERE productId = ?",
+        [id]
+      );
+
+      return {
+        id: Number(id),
+        action: "archived",
+        affectedVariants: variantRows.length,
+        message:
+          "Đã ẩn phôi áo. Dữ liệu lịch sử vẫn được giữ để phục vụ báo cáo và kho.",
+      };
+    }
+
+    await connection.query(
+      `DELETE ci
+       FROM CartItem ci
+       INNER JOIN ProductVariant pv ON pv.id = ci.variantId
+       WHERE pv.productId = ?`,
+      [id]
+    );
+    await connection.query("DELETE FROM ProductImage WHERE productId = ?", [id]);
+    await connection.query("DELETE FROM BulkPricing WHERE productId = ?", [id]);
+    await connection.query("DELETE FROM ProductVariant WHERE productId = ?", [
+      id,
+    ]);
+    await connection.query("DELETE FROM Product WHERE id = ?", [id]);
+
+    return {
+      id: Number(id),
+      action: "deleted",
+      affectedVariants: variantRows.length,
+      message: "Đã xóa phôi áo sạch khỏi database.",
+    };
+  });
 }
 
 // =====================================================================
