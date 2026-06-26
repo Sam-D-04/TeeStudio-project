@@ -400,7 +400,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
           color: bt.mauSac.trim(),
           size: bt.kichThuoc.trim(),
           sku: bt.maSKU.trim(),
-          stockQty: Number(bt.tonKho) || 0,
+          stockQty: 0,
         });
       }
     },
@@ -453,17 +453,13 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
       hienThiThongBao("loi", "Vui lòng điền đầy đủ màu sắc, kích thước và mã SKU");
       return;
     }
-    if (isNaN(Number(bt.editStock)) || Number(bt.editStock) < 0) {
-      hienThiThongBao("loi", "Tồn kho phải là số không âm");
-      return;
-    }
     luuBienTheHienCo({
       variantId: bt.id,
       payload: {
         color: bt.editMau.trim(),
         size: bt.editSize.trim(),
         sku: bt.editSKU.trim(),
-        stockQty: Number(bt.editStock),
+        stockQty: bt.stock,
       },
     });
   }
@@ -512,10 +508,6 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
     for (const h of dsBienTheMoi) {
       if (!h.mauSac.trim() || !h.kichThuoc.trim() || !h.maSKU.trim()) {
         setLoiBienThe("Vui lòng điền đầy đủ Màu sắc, Kích thước và Mã SKU cho tất cả biến thể mới");
-        return;
-      }
-      if (isNaN(Number(h.tonKho)) || Number(h.tonKho) < 0) {
-        setLoiBienThe("Tồn kho phải là số không âm");
         return;
       }
     }
@@ -918,21 +910,9 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                               )}
                             </td>
                             <td className="px-3 py-2 text-right">
-                              {bt.dangSua ? (
-                                <input
-                                  type="number"
-                                  value={bt.editStock}
-                                  onChange={(e) =>
-                                    capNhatEditBienThe(bt.id, "editStock", e.target.value)
-                                  }
-                                  min={0}
-                                  className="h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 text-right text-[12px] outline-none focus:border-primary-container"
-                                />
-                              ) : (
-                                <span className="text-[13px] font-semibold text-text-main">
-                                  {bt.stock.toLocaleString("vi-VN")}
-                                </span>
-                              )}
+                              <span className="text-[13px] font-semibold text-text-main">
+                                {bt.stock.toLocaleString("vi-VN")}
+                              </span>
                             </td>
                             <td className="px-3 py-2">
                               <BadgeTonKho status={bt.inventoryStatus} />
@@ -1029,10 +1009,9 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                           <table className="w-full min-w-[760px] table-fixed text-left">
                             <thead>
                               <tr className="border-b border-primary-container/20 bg-primary-container/5 text-[11px] font-bold uppercase tracking-wide text-text-secondary">
-                                <th className="w-[25%] px-3 py-2">Màu sắc <span className="text-error">*</span></th>
-                                <th className="w-[16%] px-3 py-2">Kích thước <span className="text-error">*</span></th>
-                                <th className="w-[32%] px-3 py-2">Mã SKU <span className="text-error">*</span></th>
-                                <th className="w-[17%] px-3 py-2">Tồn kho</th>
+                                <th className="w-[30%] px-3 py-2">Màu sắc <span className="text-error">*</span></th>
+                                <th className="w-[20%] px-3 py-2">Kích thước <span className="text-error">*</span></th>
+                                <th className="w-[40%] px-3 py-2">Mã SKU <span className="text-error">*</span></th>
                                 <th className="w-[10%] px-3 py-2 text-center">Xóa</th>
                               </tr>
                             </thead>
@@ -1075,16 +1054,6 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                                       placeholder="Mã SKU"
                                       maxLength={100}
                                       className="h-8 w-full rounded-[6px] border border-primary-container/30 bg-surface px-2 font-mono text-[12px] outline-none focus:border-primary-container"
-                                    />
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    <input
-                                      type="number"
-                                      value={h.tonKho}
-                                      onChange={(e) => capNhatHangMoi(h.key, "tonKho", e.target.value)}
-                                      min={0}
-                                      placeholder="0"
-                                      className="h-8 w-full rounded-[6px] border border-primary-container/30 bg-surface px-2 text-right text-[12px] outline-none focus:border-primary-container"
                                     />
                                   </td>
                                   <td className="px-3 py-2">

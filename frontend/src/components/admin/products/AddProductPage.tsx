@@ -48,7 +48,6 @@ type HangBienThe = {
   mauSac: string;
   kichThuoc: string;
   maSKU: string;
-  tonKhoBanDau: string;
 };
 
 // ===== HẰNG SỐ =====
@@ -123,9 +122,6 @@ function validateHangBienThe(hang: HangBienThe): string[] {
   if (!hang.mauSac.trim()) loi.push("Chưa nhập màu sắc");
   if (!hang.kichThuoc.trim()) loi.push("Chưa chọn kích thước");
   if (!hang.maSKU.trim()) loi.push("Chưa nhập mã SKU");
-  if (hang.tonKhoBanDau.trim() && (isNaN(Number(hang.tonKhoBanDau)) || Number(hang.tonKhoBanDau) < 0)) {
-    loi.push("Tồn kho phải là số không âm");
-  }
   return loi;
 }
 
@@ -180,7 +176,7 @@ export default function AddProductPage() {
 
   // Danh sách biến thể
   const [danhSachBienThe, setDanhSachBienThe] = useState<HangBienThe[]>([
-    { key: taoKey(), mauSac: "", kichThuoc: "", maSKU: "", tonKhoBanDau: "0" },
+    { key: taoKey(), mauSac: "", kichThuoc: "", maSKU: "" },
   ]);
   const [loiBuoc2Chung, setLoiBuoc2Chung] = useState<string>("");
 
@@ -292,7 +288,7 @@ export default function AddProductPage() {
   function themHangBienThe() {
     setDanhSachBienThe((prev) => [
       ...prev,
-      { key: taoKey(), mauSac: "", kichThuoc: "", maSKU: "", tonKhoBanDau: "0" },
+      { key: taoKey(), mauSac: "", kichThuoc: "", maSKU: "" },
     ]);
   }
 
@@ -311,7 +307,7 @@ export default function AddProductPage() {
       color: hang.mauSac.trim(),
       size: hang.kichThuoc.trim(),
       sku: hang.maSKU.trim(),
-      stockQty: Number(hang.tonKhoBanDau) || 0,
+      stockQty: 0,
     }));
   }
 
@@ -400,9 +396,7 @@ export default function AddProductPage() {
       (hang) =>
         !hang.mauSac.trim() ||
         !hang.kichThuoc.trim() ||
-        !hang.maSKU.trim() ||
-        (hang.tonKhoBanDau.trim() &&
-          (isNaN(Number(hang.tonKhoBanDau)) || Number(hang.tonKhoBanDau) < 0))
+        !hang.maSKU.trim()
     );
 
   return (
@@ -421,8 +415,8 @@ export default function AddProductPage() {
             Thêm phôi áo mới
           </h2>
           <p className="mt-1 max-w-2xl text-body-sm text-text-secondary">
-            Khai báo thông tin cơ bản, biến thể màu sắc, kích thước và tồn kho
-            ban đầu của phôi áo.
+            Khai báo thông tin cơ bản, biến thể màu sắc, kích thước và mã SKU
+            của phôi áo.
           </p>
         </div>
       </section>
@@ -601,7 +595,7 @@ export default function AddProductPage() {
                 Biến thể phôi áo
               </h3>
               <p className="mt-1 text-[13px] text-text-secondary">
-                Thêm các tổ hợp màu sắc, kích thước, mã SKU và tồn kho ban đầu.
+                Thêm các tổ hợp màu sắc, kích thước và mã SKU.
               </p>
             </div>
 
@@ -633,10 +627,9 @@ export default function AddProductPage() {
                 <table className="w-full min-w-[640px] text-left">
                   <thead>
                     <tr className="border-b border-border bg-surface-alt text-[12px] font-bold uppercase text-text-secondary">
-                      <th className="px-4 py-2.5 w-[190px]">Màu sắc <span className="text-error">*</span></th>
-                      <th className="px-4 py-2.5 w-[140px]">Kích thước <span className="text-error">*</span></th>
+                      <th className="px-4 py-2.5 w-[220px]">Màu sắc <span className="text-error">*</span></th>
+                      <th className="px-4 py-2.5 w-[160px]">Kích thước <span className="text-error">*</span></th>
                       <th className="px-4 py-2.5">Mã SKU <span className="text-error">*</span></th>
-                      <th className="px-4 py-2.5 w-[110px]">Tồn kho</th>
                       <th className="px-4 py-2.5 w-[44px]" />
                     </tr>
                   </thead>
@@ -756,28 +749,6 @@ export default function AddProductPage() {
                             placeholder="SKU..."
                             maxLength={100}
                             className="h-8 w-full rounded-[6px] border border-border bg-surface-alt px-2 font-mono text-[13px] text-text-main outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container"
-                          />
-                        </td>
-
-                        {/* Tồn kho */}
-                        <td className="px-3 py-2">
-                          <input
-                            data-error-anchor={
-                              loiBuoc2Chung &&
-                              hang.tonKhoBanDau.trim() &&
-                              (isNaN(Number(hang.tonKhoBanDau)) ||
-                                Number(hang.tonKhoBanDau) < 0)
-                                ? "true"
-                                : undefined
-                            }
-                            type="number"
-                            value={hang.tonKhoBanDau}
-                            onChange={(e) =>
-                              capNhatBienThe(hang.key, "tonKhoBanDau", e.target.value)
-                            }
-                            min={0}
-                            placeholder="0"
-                            className="h-8 w-full rounded-[6px] border border-border bg-surface-alt px-2 text-[13px] text-text-main outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container"
                           />
                         </td>
 
