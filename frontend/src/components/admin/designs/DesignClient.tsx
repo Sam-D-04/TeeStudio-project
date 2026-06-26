@@ -11,7 +11,7 @@
  *
  * Pattern này nhất quán với các module khác:
  *  - PromotionClient.tsx (Khuyến mãi & Báo giá)
- *  - SettingsClient.tsx (Cài đặt)
+ *  - AccountsClient.tsx (Tài khoản)
  *  - OrdersClient.tsx (Đơn hàng)
  */
 

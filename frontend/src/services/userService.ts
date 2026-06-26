@@ -21,18 +21,21 @@ export interface UpdateStaffPayload {
 
 export const userService = {
   listStaff: async () => {
-    const response = await apiClient.get<ApiResponse<StaffList>>("/users/staff");
+    const response = await apiClient.get<ApiResponse<StaffList>>("/users/admin/staff");
     return response.data.data;
   },
 
   createStaff: async (data: CreateStaffPayload) => {
-    const response = await apiClient.post<ApiResponse<AuthUser>>("/users/staff", data);
+    const response = await apiClient.post<ApiResponse<AuthUser>>(
+      "/users/admin/staff",
+      data,
+    );
     return response.data.data;
   },
 
   updateStaff: async (id: number, data: UpdateStaffPayload) => {
     const response = await apiClient.patch<ApiResponse<AuthUser>>(
-      `/users/staff/${id}`,
+      `/users/admin/staff/${id}`,
       data,
     );
     return response.data.data;

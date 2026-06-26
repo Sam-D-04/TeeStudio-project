@@ -1,8 +1,9 @@
 "use client";
 
 import { EditOutlined, PlusOutlined } from "@ant-design/icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Form, Input, Modal, Select, message } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import {
   userService,
@@ -10,8 +11,8 @@ import {
   type UpdateStaffPayload,
 } from "@/services/userService";
 import type { AuthUser } from "@/types/auth";
-import SettingRoleBadge, { type StaffRole } from "./SettingRoleBadge";
-import SettingStatusBadge from "./SettingStatusBadge";
+import AccountRoleBadge, { type StaffRole } from "./AccountRoleBadge";
+import AccountStaffStatusBadge from "./AccountStaffStatusBadge";
 
 const roleOptions = [
   { value: "ADMIN", label: "Quản trị viên" },
@@ -19,37 +20,47 @@ const roleOptions = [
   { value: "PRODUCTION", label: "Thiết kế & in ấn" },
 ];
 
+const staffQueryKey = ["admin", "accounts", "staff"];
+
 const initials = (name: string) => {
   const words = name.trim().split(/\s+/);
   return `${words[0]?.[0] || ""}${words.at(-1)?.[0] || ""}`.toUpperCase();
 };
 
-export default function SettingStaffTable() {
+export default function AccountStaffTable() {
+  const queryClient = useQueryClient();
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
-  const [staff, setStaff] = useState<AuthUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [editing, setEditing] = useState<AuthUser | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
 
-  const loadStaff = async () => {
-    setLoading(true);
-    setErrorMessage("");
-    try {
-      const data = await userService.listStaff();
-      setStaff(data.items);
-    } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, "Không thể tải danh sách nhân sự."));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data, error, isFetching } = useQuery({
+    queryKey: staffQueryKey,
+    queryFn: userService.listStaff,
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    void loadStaff();
-  }, []);
+  const staff = useMemo(() => data?.items ?? [], [data?.items]);
+
+  const saveStaffMutation = useMutation({
+    mutationFn: async (values: CreateStaffPayload | UpdateStaffPayload) => {
+      if (editing) {
+        return userService.updateStaff(editing.id, values as UpdateStaffPayload);
+      }
+
+      return userService.createStaff(values as CreateStaffPayload);
+    },
+    onSuccess: async () => {
+      messageApi.success(
+        editing ? "Đã cập nhật quyền nhân sự." : "Đã tạo tài khoản nhân sự.",
+      );
+      setModalOpen(false);
+      await queryClient.invalidateQueries({ queryKey: staffQueryKey });
+    },
+    onError: (error) => {
+      messageApi.error(getApiErrorMessage(error, "Không thể lưu tài khoản nhân sự."));
+    },
+  });
 
   const openCreateModal = () => {
     setEditing(null);
@@ -67,22 +78,10 @@ export default function SettingStaffTable() {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      setSubmitting(true);
-
-      if (editing) {
-        await userService.updateStaff(editing.id, values as UpdateStaffPayload);
-        messageApi.success("Đã cập nhật quyền nhân sự.");
-      } else {
-        await userService.createStaff(values as CreateStaffPayload);
-        messageApi.success("Đã tạo tài khoản nhân sự.");
-      }
-      setModalOpen(false);
-      await loadStaff();
+      saveStaffMutation.mutate(values as CreateStaffPayload | UpdateStaffPayload);
     } catch (error) {
       if (error && typeof error === "object" && "errorFields" in error) return;
       messageApi.error(getApiErrorMessage(error, "Không thể lưu tài khoản nhân sự."));
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -90,6 +89,9 @@ export default function SettingStaffTable() {
     () => staff.filter((member) => member.status === "ACTIVE").length,
     [staff],
   );
+  const errorMessage = error
+    ? getApiErrorMessage(error, "Không thể tải danh sách nhân sự.")
+    : "";
 
   return (
     <div className="flex flex-col overflow-hidden rounded-[20px] border border-border bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
@@ -130,7 +132,7 @@ export default function SettingStaffTable() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-surface text-sm">
-            {loading ? (
+            {isFetching ? (
               <tr>
                 <td colSpan={6} className="px-6 py-10 text-center text-text-secondary">
                   Đang tải danh sách...
@@ -155,10 +157,10 @@ export default function SettingStaffTable() {
                   </td>
                   <td className="px-6 py-4 text-text-secondary">{member.email}</td>
                   <td className="px-6 py-4">
-                    <SettingRoleBadge role={member.role as StaffRole} />
+                    <AccountRoleBadge role={member.role as StaffRole} />
                   </td>
                   <td className="px-6 py-4">
-                    <SettingStatusBadge status={member.status} />
+                    <AccountStaffStatusBadge status={member.status} />
                   </td>
                   <td className="px-6 py-4 text-text-secondary">
                     {member.createdAt
@@ -168,6 +170,7 @@ export default function SettingStaffTable() {
                   <td className="px-6 py-4 text-center">
                     <button
                       type="button"
+                      aria-label={`Cập nhật quyền ${member.fullName}`}
                       onClick={() => openEditModal(member)}
                       className="p-1 text-text-muted hover:text-[#0ea5e9]"
                     >
@@ -186,7 +189,7 @@ export default function SettingStaffTable() {
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         onOk={() => void handleSubmit()}
-        confirmLoading={submitting}
+        confirmLoading={saveStaffMutation.isPending}
         okText={editing ? "Lưu thay đổi" : "Tạo tài khoản"}
         cancelText="Hủy"
       >

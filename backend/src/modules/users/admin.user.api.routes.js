@@ -34,6 +34,21 @@ router.patch(
   validate(updateStaffSchema),
   userController.updateStaff
 );
+router.get("/admin/staff", verifyToken, requireAdmin, userController.listStaff);
+router.post(
+  "/admin/staff",
+  verifyToken,
+  requireAdmin,
+  validate(createStaffSchema),
+  userController.createStaff
+);
+router.patch(
+  "/admin/staff/:id",
+  verifyToken,
+  requireAdmin,
+  validate(updateStaffSchema),
+  userController.updateStaff
+);
 
 // ── Customer management (Admin only) ──────────────────────────────────────────
 router.get("/admin/customers", verifyToken, requireAdmin, userController.listCustomers);

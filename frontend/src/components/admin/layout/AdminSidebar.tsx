@@ -8,7 +8,6 @@ import {
   DashboardOutlined,
   InboxOutlined,
   MenuOutlined,
-  SettingOutlined,
   SkinOutlined,
   ShoppingCartOutlined,
   TagsOutlined,
@@ -36,7 +35,6 @@ const navItems: NavItem[] = [
   { label: "Thanh toán", icon: <CreditCardOutlined />, href: "/admin/thanh-toan", allowedRoles: ["ADMIN"] },
   { label: "Khuyến mãi & Báo giá", icon: <TagsOutlined />, href: "/admin/khuyen-mai-bao-gia", allowedRoles: ["ADMIN"] },
   { label: "Tài khoản", icon: <TeamOutlined />, href: "/admin/tai-khoan", allowedRoles: ["ADMIN"] },
-  { label: "Cài đặt", icon: <SettingOutlined />, href: "/admin/cai-dat", allowedRoles: ["ADMIN"] },
 ];
 
 function SidebarContent({

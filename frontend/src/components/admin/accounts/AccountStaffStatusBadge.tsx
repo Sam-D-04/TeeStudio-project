@@ -2,7 +2,11 @@ import type { AccountStatus } from "@/types/auth";
 
 export type StaffStatus = AccountStatus;
 
-export default function SettingStatusBadge({ status }: { status: StaffStatus }) {
+export default function AccountStaffStatusBadge({
+  status,
+}: {
+  status: StaffStatus;
+}) {
   const isActive = status === "ACTIVE";
 
   return (

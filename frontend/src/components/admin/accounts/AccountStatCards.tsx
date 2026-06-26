@@ -5,7 +5,6 @@
  * Hiển thị: Tổng tài khoản | Đang hoạt động | Đã vô hiệu hóa
  */
 
-import type { KetQuaDanhSachTaiKhoan } from "@/services/admin/accountService";
 import { TeamOutlined, CheckCircleOutlined, StopOutlined } from "@ant-design/icons";
 
 type Props = {
