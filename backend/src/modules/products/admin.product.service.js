@@ -472,7 +472,7 @@ async function taoSanPham({ categoryId, name, basePrice, material, form, madeIn,
 // =====================================================================
 // SERVICE 7: Cập nhật phôi áo
 // =====================================================================
-async function capNhatSanPham(id, { categoryId, name, basePrice, material, form, madeIn, description }) {
+async function capNhatSanPham(id, { categoryId, name, basePrice, material, form, madeIn, description, displayStatus, variants }) {
   // Kiểm tra tồn tại
   const [rows] = await db.pool.query("SELECT id FROM Product WHERE id = ?", [id]);
   if (!rows || rows.length === 0) {
@@ -492,14 +492,27 @@ async function capNhatSanPham(id, { categoryId, name, basePrice, material, form,
   if (madeIn !== undefined) { fields.push("madeIn = ?"); params.push(madeIn); }
   if (description !== undefined) { fields.push("description = ?"); params.push(description); }
 
-  if (fields.length === 0) {
-    const err = new Error("Không có trường nào để cập nhật");
-    err.statusCode = 400;
-    throw err;
+  if (displayStatus !== undefined) {
+    const statusDB = MAP_TRANG_THAI_FE_SANG_DB[displayStatus];
+    if (statusDB) {
+      fields.push("status = ?"); params.push(statusDB);
+    }
   }
 
-  params.push(id);
-  await db.execute(`UPDATE Product SET ${fields.join(", ")} WHERE id = ?`, params);
+  if (fields.length > 0) {
+    params.push(id);
+    await db.execute(`UPDATE Product SET ${fields.join(", ")} WHERE id = ?`, params);
+  }
+
+  if (variants && Array.isArray(variants)) {
+    for (const v of variants) {
+      if (v.id) {
+        await capNhatBienThe(id, v.id, v);
+      } else {
+        await themBienThe(id, v);
+      }
+    }
+  }
 
   return layChiTietSanPham(id);
 }

@@ -135,7 +135,10 @@ export type TaoSanPhamInput = {
 };
 
 /** Payload cập nhật phôi áo */
-export type CapNhatSanPhamInput = Partial<TaoSanPhamInput>;
+export type CapNhatSanPhamInput = Partial<TaoSanPhamInput> & {
+  displayStatus?: TrangThaiHienThi;
+  variants?: Array<Partial<ThemBienTheInput> & { id?: number; status?: string }>;
+};
 
 /** Payload thêm biến thể */
 export type ThemBienTheInput = {

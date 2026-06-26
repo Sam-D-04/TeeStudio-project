@@ -110,6 +110,7 @@ function validateBuoc1(form: FormBuoc1): Partial<Record<keyof FormBuoc1, string>
   if (!form.danhMucId) loi.danhMucId = "Vui lòng chọn danh mục";
   if (!form.giaNen.trim()) loi.giaNen = "Vui lòng nhập giá nền";
   else if (isNaN(Number(form.giaNen)) || Number(form.giaNen) < 0) loi.giaNen = "Giá nền phải là số không âm";
+  else if (Number(form.giaNen) % 1000 !== 0) loi.giaNen = "Giá nền phải là bội số của 1.000";
   if (!form.chatLieu.trim()) loi.chatLieu = "Vui lòng nhập chất liệu";
   if (!form.formDang.trim()) loi.formDang = "Vui lòng nhập kiểu dáng";
   if (!form.xuatXu.trim()) loi.xuatXu = "Vui lòng nhập xuất xứ";

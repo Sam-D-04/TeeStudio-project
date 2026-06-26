@@ -3,16 +3,10 @@
 /**
  * EditProductPage – Trang xem và chỉnh sửa phôi áo.
  *
- * Giao diện một biểu mẫu:
- *   - Sửa thông tin chung và trạng thái hiển thị.
- *   - Xem, sửa và thêm biến thể trong các bảng ngang nhỏ gọn.
- *
- * Luồng API:
- *   - Mở trang → GET /api/admin/products/:id  (layChiTietSanPham)
- *   - Lưu thông tin → PUT /api/admin/products/:id  (capNhatSanPham)
- *   - Bật/tắt   → PATCH /api/admin/products/:id/status
- *   - Sửa biến thể → PUT /api/admin/products/:id/variants/:variantId
- *   - Thêm biến thể mới → POST /api/admin/products/:id/variants
+ * Giao diện một biểu mẫu duy nhất:
+ *   - Quản lý toàn bộ state bằng react-hook-form.
+ *   - Không gọi API khi sửa/đổi trạng thái biến thể, chỉ lưu cục bộ.
+ *   - Bấm "Lưu thay đổi" sẽ đóng gói toàn bộ và gọi 1 API duy nhất.
  */
 
 import {
@@ -25,8 +19,9 @@ import {
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { message } from "antd";
+import { useForm, useFieldArray } from "react-hook-form";
 import * as productService from "@/services/admin/productService";
 import type {
   BienTheSanPham,
@@ -34,34 +29,14 @@ import type {
 } from "@/services/admin/productService";
 
 // =====================================================================
-// KIỂU DỮ LIỆU NỘI BỘ
+// KIỂU DỮ LIỆU NỘI BỘ (REACT-HOOK-FORM)
 // =====================================================================
 
-/** Trạng thái biểu mẫu thông tin cơ bản */
-type FormThongTin = {
-  tenSanPham: string;
-  danhMucId: string;
-  giaNen: string;
-  chatLieu: string;
-  formDang: string;
-  xuatXu: string;
-  moTa: string;
+type ExistingVariantForm = BienTheSanPham & {
+  isEditing: boolean;
 };
 
-/** Trạng thái chỉnh sửa của một biến thể hiện có */
-type BienTheEdit = BienTheSanPham & {
-  /** Có đang trong chế độ chỉnh sửa không */
-  dangSua: boolean;
-  /** Giá trị đang nhập (dạng string để bind với input) */
-  editMau: string;
-  editSize: string;
-  editSKU: string;
-  editStock: string;
-  editStatus: string;
-};
-
-/** Một hàng biến thể mới sẽ thêm */
-type HangBienTheMoi = {
+type NewVariantForm = {
   key: string;
   mauSac: string;
   kichThuoc: string;
@@ -69,8 +44,20 @@ type HangBienTheMoi = {
   tonKho: string;
 };
 
+type FormValues = {
+  tenSanPham: string;
+  danhMucId: string;
+  giaNen: string;
+  chatLieu: string;
+  formDang: string;
+  xuatXu: string;
+  moTa: string;
+  displayStatus: TrangThaiHienThi;
+  existingVariants: ExistingVariantForm[];
+  newVariants: NewVariantForm[];
+};
+
 type EditProductPageProps = {
-  /** Mã phôi áo lấy từ URL */
   productId: number;
 };
 
@@ -123,20 +110,6 @@ function goiYSKU(ten: string, mau: string, size: string): string {
   const sz = size.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 4);
   if (!t && !m && !sz) return "";
   return `${t}-${m}-${sz}`;
-}
-
-function validateThongTin(f: FormThongTin): Partial<Record<keyof FormThongTin, string>> {
-  const e: Partial<Record<keyof FormThongTin, string>> = {};
-  if (!f.tenSanPham.trim()) e.tenSanPham = "Vui lòng nhập tên phôi áo";
-  else if (f.tenSanPham.trim().length < 2) e.tenSanPham = "Tên phải có ít nhất 2 ký tự";
-  if (!f.danhMucId) e.danhMucId = "Vui lòng chọn danh mục";
-  if (!f.giaNen.trim()) e.giaNen = "Vui lòng nhập giá nền";
-  else if (isNaN(Number(f.giaNen)) || Number(f.giaNen) < 0)
-    e.giaNen = "Giá nền phải là số không âm";
-  if (!f.chatLieu.trim()) e.chatLieu = "Vui lòng nhập chất liệu";
-  if (!f.formDang.trim()) e.formDang = "Vui lòng nhập kiểu dáng";
-  if (!f.xuatXu.trim()) e.xuatXu = "Vui lòng nhập xuất xứ";
-  return e;
 }
 
 // =====================================================================
@@ -198,36 +171,12 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
   const queryClient = useQueryClient();
   const productIdHopLe = Number.isFinite(productId) && productId > 0;
 
-  // ===== THÔNG BÁO =====
   const [messageApi, contextHolder] = message.useMessage();
 
   function hienThiThongBao(loai: "thanh_cong" | "loi", noi_dung: string) {
-    if (loai === "thanh_cong") {
-      messageApi.success(noi_dung);
-    } else {
-      messageApi.error(noi_dung);
-    }
+    if (loai === "thanh_cong") messageApi.success(noi_dung);
+    else messageApi.error(noi_dung);
   }
-
-  // ===== BIỂU MẪU THÔNG TIN CƠ BẢN =====
-  const [formThongTin, setFormThongTin] = useState<FormThongTin>({
-    tenSanPham: "",
-    danhMucId: "",
-    giaNen: "",
-    chatLieu: "",
-    formDang: "",
-    xuatXu: "",
-    moTa: "",
-  });
-  const [loiThongTin, setLoiThongTin] = useState<
-    Partial<Record<keyof FormThongTin, string>>
-  >({});
-  const [trangThaiHienThi, setTrangThaiHienThi] = useState<TrangThaiHienThi>("dang_hien_thi");
-
-  // ===== BIẾN THỂ HIỆN CÓ + BIẾN THỂ MỚI =====
-  const [dsBienTheEdit, setDsBienTheEdit] = useState<BienTheEdit[]>([]);
-  const [dsBienTheMoi, setDsBienTheMoi] = useState<HangBienTheMoi[]>([]);
-  const [loiBienThe, setLoiBienThe] = useState<string>("");
 
   // ===== LẤY DANH MỤC =====
   const { data: danhSachDanhMuc = [] } = useQuery({
@@ -248,18 +197,47 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
     staleTime: 0,
   });
 
-  // ===== ĐIỀN FORM KHI CÓ DỮ LIỆU =====
+  // ===== REACT HOOK FORM =====
+  const { register, handleSubmit, control, watch, setValue, reset, formState: { errors } } = useForm<FormValues>({
+    defaultValues: {
+      tenSanPham: "",
+      danhMucId: "",
+      giaNen: "",
+      chatLieu: "",
+      formDang: "",
+      xuatXu: "",
+      moTa: "",
+      displayStatus: "dang_hien_thi",
+      existingVariants: [],
+      newVariants: [],
+    },
+  });
+
+  const { fields: existingFields, update: updateExisting } = useFieldArray({
+    control,
+    name: "existingVariants",
+  });
+
+  const { fields: newFields, append: appendNew, remove: removeNew } = useFieldArray({
+    control,
+    name: "newVariants",
+  });
+
+  // Theo dõi giá trị form để sử dụng hiển thị
+  const dsBienTheMoi = watch("newVariants");
+  const dsBienTheEdit = watch("existingVariants");
+  const trangThaiHienThi = watch("displayStatus");
+  const tenSanPham = watch("tenSanPham");
+
+  // ĐIỀN FORM KHI CÓ DỮ LIỆU
   useEffect(() => {
     if (!chiTiet) return;
 
-    // Tìm categoryId từ tên danh mục (dùng categoryId từ API nếu có)
     const catId = chiTiet.categoryId
       ? String(chiTiet.categoryId)
       : String(danhSachDanhMuc.find((dm) => dm.ten === chiTiet.category)?.id ?? "");
 
-    // Dữ liệu truy vấn là nguồn khởi tạo cho toàn bộ biểu mẫu chỉnh sửa.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFormThongTin({
+    reset({
       tenSanPham: chiTiet.name,
       danhMucId: catId,
       giaNen: String(chiTiet.basePrice),
@@ -267,280 +245,127 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
       formDang: chiTiet.fit,
       xuatXu: chiTiet.madeIn ?? "",
       moTa: chiTiet.description ?? "",
+      displayStatus: chiTiet.displayStatus,
+      existingVariants: chiTiet.variants.map((v) => ({ ...v, isEditing: false })),
+      newVariants: [],
     });
-    setTrangThaiHienThi(chiTiet.displayStatus);
-    setLoiThongTin({});
+  }, [chiTiet, danhSachDanhMuc, reset]);
 
-    // Khởi tạo danh sách biến thể có thể chỉnh sửa
-    setDsBienTheEdit(
-      chiTiet.variants.map((v) => ({
-        ...v,
-        dangSua: false,
-        editMau: v.colorName,
-        editSize: v.size,
-        editSKU: v.sku,
-        editStock: String(v.stock),
-        editStatus: v.status || "ACTIVE",
-      }))
-    );
-    setDsBienTheMoi([]);
-    setLoiBienThe("");
-  }, [chiTiet, danhSachDanhMuc]);
-
-  // =====================================================================
-  // THAO TÁC CẬP NHẬT THÔNG TIN
-  // =====================================================================
-
-  /** Cập nhật thông tin cơ bản */
-  const { mutate: luuThongTin, isPending: dangLuuThongTin } = useMutation({
-    mutationFn: () =>
-      productService.capNhatSanPham(productId, {
-        categoryId: Number(formThongTin.danhMucId),
-        name: formThongTin.tenSanPham.trim(),
-        basePrice: Number(formThongTin.giaNen),
-        material: formThongTin.chatLieu.trim(),
-        form: formThongTin.formDang.trim(),
-        madeIn: formThongTin.xuatXu.trim(),
-        description: formThongTin.moTa.trim(),
-      }),
+  // ===== GỌI API LƯU TOÀN BỘ =====
+  const { mutate: luuTatCa, isPending: dangLuuTatCa } = useMutation({
+    mutationFn: (payload: productService.CapNhatSanPhamInput) =>
+      productService.capNhatSanPham(productId, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      hienThiThongBao("thanh_cong", "Đã cập nhật thông tin phôi áo thành công!");
-    },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Đã xảy ra lỗi";
-      hienThiThongBao("loi", `Lỗi: ${msg}`);
-    },
-  });
-
-  /** Bật / tắt hiển thị */
-  const { mutate: doiTrangThai, isPending: dangDoiTrangThai } = useMutation({
-    mutationFn: (trangThai: TrangThaiHienThi) =>
-      productService.capNhatTrangThaiSanPham(productId, trangThai),
-    onSuccess: (data) => {
-      setTrangThaiHienThi(data.trangThai);
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      hienThiThongBao(
-        "thanh_cong",
-        data.trangThai === "dang_hien_thi"
-          ? "Phôi áo đã được bật hiển thị trên cửa hàng."
-          : "Phôi áo đã được ẩn khỏi cửa hàng."
-      );
-    },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Lỗi thay đổi trạng thái";
-      hienThiThongBao("loi", `Lỗi: ${msg}`);
-    },
-  });
-
-  function xuLyLuuThongTin() {
-    const loi = validateThongTin(formThongTin);
-    if (Object.keys(loi).length > 0) {
-      setLoiThongTin(loi);
-      return;
-    }
-    luuThongTin();
-  }
-
-  function capNhatThongTin(field: keyof FormThongTin, value: string) {
-    setFormThongTin((prev) => ({ ...prev, [field]: value }));
-    if (loiThongTin[field]) {
-      setLoiThongTin((prev) => {
-        const next = { ...prev };
-        delete next[field];
-        return next;
-      });
-    }
-  }
-
-  // =====================================================================
-  // THAO TÁC CẬP NHẬT BIẾN THỂ HIỆN CÓ
-  // =====================================================================
-
-  const { mutate: luuBienTheHienCo, isPending: dangLuuBienThe } = useMutation({
-    mutationFn: ({
-      variantId,
-      payload,
-    }: {
-      variantId: number;
-      payload: productService.CapNhatBienTheInput;
-    }) => productService.capNhatBienThe(productId, variantId, payload),
-    onSuccess: (data, { variantId }) => {
-      // Cập nhật lại state local ngay lập tức
-      setDsBienTheEdit((prev) =>
-        prev.map((bt) =>
-          bt.id === variantId
-            ? {
-              ...bt,
-              ...data,
-              dangSua: false,
-              editMau: data.colorName,
-              editSize: data.size,
-              editSKU: data.sku,
-              editStock: String(data.stock),
-              editStatus: data.status || "ACTIVE",
-            }
-            : bt
-        )
-      );
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      hienThiThongBao("thanh_cong", "Đã cập nhật biến thể thành công!");
-    },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Đã xảy ra lỗi";
-      hienThiThongBao("loi", `Lỗi: ${msg}`);
-    },
-  });
-
-  // =====================================================================
-  // THAO TÁC THÊM BIẾN THỂ MỚI
-  // =====================================================================
-
-  const { mutate: themBienTheMoi, isPending: dangThemBienThe } = useMutation({
-    mutationFn: async (danhSach: HangBienTheMoi[]) => {
-      for (const bt of danhSach) {
-        await productService.themBienThe(productId, {
-          color: bt.mauSac.trim(),
-          size: bt.kichThuoc.trim(),
-          sku: bt.maSKU.trim(),
-          stockQty: 0,
-        });
-      }
-    },
-    onSuccess: () => {
-      setDsBienTheMoi([]);
-      // Reload chi tiết để lấy danh sách biến thể mới nhất
       queryClient.invalidateQueries({ queryKey: ["products", "detail", productId] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      hienThiThongBao("thanh_cong", "Đã thêm biến thể mới thành công!");
+      hienThiThongBao("thanh_cong", "Đã lưu toàn bộ thay đổi thành công!");
     },
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : "Đã xảy ra lỗi";
-      setLoiBienThe(`Lỗi: ${msg}`);
-      hienThiThongBao("loi", `Lỗi thêm biến thể: ${msg}`);
+      hienThiThongBao("loi", `Lỗi: ${msg}`);
     },
   });
 
-  // =====================================================================
-  // XỬ LÝ BIẾN THỂ HIỆN CÓ
-  // =====================================================================
-
-  function batDauSuaBienThe(id: number) {
-    setDsBienTheEdit((prev) =>
-      prev.map((bt) =>
-        bt.id === id
-          ? { ...bt, dangSua: true, editMau: bt.colorName, editSize: bt.size, editSKU: bt.sku, editStock: String(bt.stock), editStatus: bt.status || "ACTIVE" }
-          : { ...bt, dangSua: false }
-      )
-    );
-  }
-
-  function huyBienThe(id: number) {
-    setDsBienTheEdit((prev) =>
-      prev.map((bt) =>
-        bt.id === id
-          ? { ...bt, dangSua: false, editMau: bt.colorName, editSize: bt.size, editSKU: bt.sku, editStock: String(bt.stock), editStatus: bt.status || "ACTIVE" }
-          : bt
-      )
-    );
-  }
-
-  function capNhatEditBienThe(id: number, field: "editMau" | "editSize" | "editSKU" | "editStock" | "editStatus", value: string) {
-    setDsBienTheEdit((prev) =>
-      prev.map((bt) => (bt.id === id ? { ...bt, [field]: value } : bt))
-    );
-  }
-
-  function luuBienTheDaChon(bt: BienTheEdit) {
-    if (!bt.editMau.trim() || !bt.editSize.trim() || !bt.editSKU.trim()) {
-      hienThiThongBao("loi", "Vui lòng điền đầy đủ màu sắc, kích thước và mã SKU");
-      return;
-    }
-    luuBienTheHienCo({
-      variantId: bt.id,
-      payload: {
-        color: bt.editMau.trim(),
-        size: bt.editSize.trim(),
-        sku: bt.editSKU.trim(),
-        stockQty: bt.stock,
-        status: bt.editStatus,
-      },
-    });
-  }
-
-  // =====================================================================
-  // XỬ LÝ BIẾN THỂ MỚI
-  // =====================================================================
-
-  function themHangMoi() {
-    setDsBienTheMoi((prev) => [
-      ...prev,
-      { key: taoKey(), mauSac: "", kichThuoc: "", maSKU: "", tonKho: "0" },
-    ]);
-  }
-
-  function xoaHangMoi(key: string) {
-    setDsBienTheMoi((prev) => prev.filter((h) => h.key !== key));
-  }
-
-  function capNhatHangMoi(key: string, field: keyof HangBienTheMoi, value: string) {
-    setDsBienTheMoi((prev) =>
-      prev.map((h) => {
-        if (h.key !== key) return h;
-        const next = { ...h, [field]: value };
-        if (field === "mauSac" || field === "kichThuoc") {
-          const tenSP = chiTiet?.name ?? "";
-          const skuGoiY = goiYSKU(
-            tenSP,
-            field === "mauSac" ? value : h.mauSac,
-            field === "kichThuoc" ? value : h.kichThuoc
-          );
-          if (!h.maSKU || h.maSKU === goiYSKU(tenSP, h.mauSac, h.kichThuoc)) {
-            next.maSKU = skuGoiY;
-          }
+  const onSubmit = (data: FormValues) => {
+    // Validate new variants
+    if (data.newVariants.length > 0) {
+      for (const h of data.newVariants) {
+        if (!h.mauSac.trim() || !h.kichThuoc.trim() || !h.maSKU.trim()) {
+          hienThiThongBao("loi", "Vui lòng điền đầy đủ Màu sắc, Kích thước và Mã SKU cho tất cả biến thể mới");
+          return;
         }
-        return next;
-      })
-    );
-    setLoiBienThe("");
-  }
-
-  function xuLyThemBienTheMoi() {
-    if (dsBienTheMoi.length === 0) return;
-
-    // Validate
-    for (const h of dsBienTheMoi) {
-      if (!h.mauSac.trim() || !h.kichThuoc.trim() || !h.maSKU.trim()) {
-        setLoiBienThe("Vui lòng điền đầy đủ Màu sắc, Kích thước và Mã SKU cho tất cả biến thể mới");
+      }
+      const dsSKU = data.newVariants.map((h) => h.maSKU.trim());
+      const trung = dsSKU.filter((s, i) => dsSKU.indexOf(s) !== i);
+      if (trung.length > 0) {
+        hienThiThongBao("loi", `Mã SKU "${trung[0]}" bị trùng lặp trong danh sách mới`);
         return;
       }
     }
 
-    // Kiểm tra SKU trùng trong danh sách mới
-    const dsSKU = dsBienTheMoi.map((h) => h.maSKU.trim());
-    const trung = dsSKU.filter((s, i) => dsSKU.indexOf(s) !== i);
-    if (trung.length > 0) {
-      setLoiBienThe(`Mã SKU "${trung[0]}" bị trùng lặp trong danh sách mới`);
-      return;
-    }
+    const payload: productService.CapNhatSanPhamInput = {
+      categoryId: Number(data.danhMucId),
+      name: data.tenSanPham.trim(),
+      basePrice: Number(data.giaNen),
+      material: data.chatLieu.trim(),
+      form: data.formDang.trim(),
+      madeIn: data.xuatXu.trim(),
+      description: data.moTa.trim(),
+      displayStatus: data.displayStatus,
+      variants: [
+        ...data.existingVariants.map((v) => ({
+          id: v.id,
+          color: v.colorName.trim(),
+          size: v.size.trim(),
+          sku: v.sku.trim(),
+          status: v.status,
+          stockQty: v.stock,
+        })),
+        ...data.newVariants.map((v) => ({
+          color: v.mauSac.trim(),
+          size: v.kichThuoc.trim(),
+          sku: v.maSKU.trim(),
+          stockQty: 0,
+        })),
+      ],
+    };
 
-    themBienTheMoi(dsBienTheMoi);
+    luuTatCa(payload);
+  };
+
+  // ===== XỬ LÝ BIẾN THỂ HIỆN CÓ =====
+  function batDauSuaBienThe(index: number) {
+    const current = watch(`existingVariants.${index}`);
+    updateExisting(index, { ...current, isEditing: true });
   }
 
-  // =====================================================================
-  // HỖ TRỢ HIỂN THỊ
-  // =====================================================================
+  function luuBienTheDaChon(index: number) {
+    const current = watch(`existingVariants.${index}`);
+    if (!current.colorName.trim() || !current.size.trim() || !current.sku.trim()) {
+      hienThiThongBao("loi", "Vui lòng điền đầy đủ màu sắc, kích thước và mã SKU");
+      return;
+    }
+    updateExisting(index, { ...current, isEditing: false });
+  }
+
+  function huyBienThe(index: number) {
+    const current = watch(`existingVariants.${index}`);
+    const original = chiTiet?.variants.find((v) => v.id === current.id);
+    if (original) {
+      updateExisting(index, { ...original, isEditing: false });
+    }
+  }
+
+  // ===== XỬ LÝ BIẾN THỂ MỚI =====
+  function themHangMoi() {
+    appendNew({ key: taoKey(), mauSac: "", kichThuoc: "", maSKU: "", tonKho: "0" });
+  }
+
+  function capNhatHangMoi(index: number, field: keyof NewVariantForm, value: string) {
+    setValue(`newVariants.${index}.${field}`, value);
+    const h = watch(`newVariants.${index}`);
+
+    if (field === "mauSac" || field === "kichThuoc") {
+      const tenSP = tenSanPham ?? "";
+      const skuGoiY = goiYSKU(
+        tenSP,
+        field === "mauSac" ? value : h.mauSac,
+        field === "kichThuoc" ? value : h.kichThuoc
+      );
+      if (!h.maSKU || h.maSKU === goiYSKU(tenSP, h.mauSac, h.kichThuoc)) {
+        setValue(`newVariants.${index}.maSKU`, skuGoiY);
+      }
+    }
+  }
+
   const inputClass =
     "h-9 w-full rounded-[7px] border border-border bg-surface-alt px-3 text-body-md text-text-main outline-none transition-all placeholder:text-text-muted focus:border-primary-container focus:ring-1 focus:ring-primary-container";
 
   const textareaClass =
     "w-full resize-none rounded-[7px] border border-border bg-surface-alt px-3 py-2 text-body-md text-text-main outline-none transition-all placeholder:text-text-muted focus:border-primary-container focus:ring-1 focus:ring-primary-container";
 
-  // =====================================================================
-  // HIỂN THỊ
-  // =====================================================================
   return (
-    <div className="pb-12">
+    <form onSubmit={handleSubmit(onSubmit)} className="pb-12" noValidate>
       {contextHolder}
       <section className="mb-6 flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-end">
         <div>
@@ -565,12 +390,11 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
 
         {chiTiet && !dangTaiChiTiet && !isViewMode && (
           <button
-            type="button"
-            onClick={xuLyLuuThongTin}
-            disabled={dangLuuThongTin}
+            type="submit"
+            disabled={dangLuuTatCa}
             className="flex h-10 items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-6 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {dangLuuThongTin ? (
+            {dangLuuTatCa ? (
               <>
                 <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                 Đang lưu...
@@ -578,7 +402,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
             ) : (
               <>
                 <SaveOutlined />
-                Lưu thông tin chung
+                Lưu thay đổi
               </>
             )}
           </button>
@@ -588,9 +412,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
       <section className="overflow-hidden rounded-[20px] border border-border bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
         <div className="flex flex-col gap-2 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div>
-            <h3 className="text-[18px] font-extrabold text-text-main">
-              Thông tin phôi áo
-            </h3>
+            <h3 className="text-[18px] font-extrabold text-text-main">Thông tin phôi áo</h3>
             <p className="mt-0.5 text-[13px] text-text-secondary">
               Chỉnh sửa thông tin chung và quản lý toàn bộ biến thể trong cùng một biểu mẫu.
             </p>
@@ -598,7 +420,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
           {chiTiet && !dangTaiChiTiet && (
             <div className="flex items-center gap-2 text-[12px]">
               <span className="rounded-full bg-surface-alt px-3 py-1 font-semibold text-text-secondary">
-                {dsBienTheEdit.length} biến thể
+                {dsBienTheEdit?.length || 0} biến thể
               </span>
               <span
                 className={`rounded-full px-3 py-1 font-semibold ${
@@ -637,11 +459,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
             <span className="text-[14px]">Không thể tải dữ liệu phôi áo.</span>
             <button
               type="button"
-              onClick={() =>
-                queryClient.invalidateQueries({
-                  queryKey: ["products", "detail", productId],
-                })
-              }
+              onClick={() => queryClient.invalidateQueries({ queryKey: ["products", "detail", productId] })}
               className="rounded-lg border border-error/30 px-4 py-1.5 text-[13px] hover:bg-error/5"
             >
               Thử lại
@@ -677,27 +495,28 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
 
                 <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2 xl:grid-cols-12">
                   <div className="xl:col-span-5">
-                    <FormField label="Tên phôi áo" required error={loiThongTin.tenSanPham}>
+                    <FormField label="Tên phôi áo" required error={errors.tenSanPham?.message}>
                       <input
-                        id="edit-ten"
                         type="text"
-                        value={formThongTin.tenSanPham}
-                        onChange={(e) => capNhatThongTin("tenSanPham", e.target.value)}
+                        {...register("tenSanPham", {
+                          required: "Vui lòng nhập tên phôi áo",
+                          minLength: { value: 2, message: "Tên phải có ít nhất 2 ký tự" },
+                        })}
                         maxLength={300}
                         disabled={isViewMode}
-                        className={`${inputClass} ${loiThongTin.tenSanPham ? "border-error" : ""}`}
+                        className={`${inputClass} ${errors.tenSanPham ? "border-error" : ""}`}
                       />
                     </FormField>
                   </div>
 
                   <div className="xl:col-span-3">
-                    <FormField label="Danh mục" required error={loiThongTin.danhMucId}>
+                    <FormField label="Danh mục" required error={errors.danhMucId?.message}>
                       <select
-                        id="edit-danh-muc"
-                        value={formThongTin.danhMucId}
-                        onChange={(e) => capNhatThongTin("danhMucId", e.target.value)}
+                        {...register("danhMucId", { required: "Vui lòng chọn danh mục" })}
                         disabled={isViewMode}
-                        className={`${inputClass} cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed ${loiThongTin.danhMucId ? "border-error" : ""}`}
+                        className={`${inputClass} cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed ${
+                          errors.danhMucId ? "border-error" : ""
+                        }`}
                       >
                         <option value="">-- Chọn danh mục --</option>
                         {danhSachDanhMuc.map((dm) => (
@@ -710,16 +529,18 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                   </div>
 
                   <div className="xl:col-span-2">
-                    <FormField label="Giá nền (VNĐ)" required error={loiThongTin.giaNen}>
+                    <FormField label="Giá nền (VNĐ)" required error={errors.giaNen?.message}>
                       <input
-                        id="edit-gia"
                         type="number"
-                        value={formThongTin.giaNen}
-                        onChange={(e) => capNhatThongTin("giaNen", e.target.value)}
+                        {...register("giaNen", {
+                          required: "Vui lòng nhập giá nền",
+                          min: { value: 0, message: "Giá nền phải là số không âm" },
+                          validate: (val) => Number(val) % 1000 === 0 || "Giá nền phải là bội số của 1.000",
+                        })}
                         min={0}
                         step={1000}
                         disabled={isViewMode}
-                        className={`${inputClass} ${loiThongTin.giaNen ? "border-error" : ""}`}
+                        className={`${inputClass} ${errors.giaNen ? "border-error" : ""}`}
                       />
                     </FormField>
                   </div>
@@ -727,11 +548,8 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                   <div className="xl:col-span-2">
                     <FormField label="Trạng thái hiển thị">
                       <select
-                        value={trangThaiHienThi}
-                        onChange={(e) =>
-                          doiTrangThai(e.target.value as TrangThaiHienThi)
-                        }
-                        disabled={dangDoiTrangThai || isViewMode}
+                        {...register("displayStatus")}
+                        disabled={isViewMode}
                         className={`${inputClass} cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}
                       >
                         <option value="dang_hien_thi">Đang hiển thị</option>
@@ -741,43 +559,37 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                   </div>
 
                   <div className="xl:col-span-4">
-                    <FormField label="Chất liệu" required error={loiThongTin.chatLieu}>
+                    <FormField label="Chất liệu" required error={errors.chatLieu?.message}>
                       <input
-                        id="edit-chat-lieu"
                         type="text"
-                        value={formThongTin.chatLieu}
-                        onChange={(e) => capNhatThongTin("chatLieu", e.target.value)}
+                        {...register("chatLieu", { required: "Vui lòng nhập chất liệu" })}
                         maxLength={200}
                         disabled={isViewMode}
-                        className={`${inputClass} ${loiThongTin.chatLieu ? "border-error" : ""}`}
+                        className={`${inputClass} ${errors.chatLieu ? "border-error" : ""}`}
                       />
                     </FormField>
                   </div>
 
                   <div className="xl:col-span-3">
-                    <FormField label="Kiểu dáng" required error={loiThongTin.formDang}>
+                    <FormField label="Kiểu dáng" required error={errors.formDang?.message}>
                       <input
-                        id="edit-form-dang"
                         type="text"
-                        value={formThongTin.formDang}
-                        onChange={(e) => capNhatThongTin("formDang", e.target.value)}
+                        {...register("formDang", { required: "Vui lòng nhập kiểu dáng" })}
                         maxLength={100}
                         disabled={isViewMode}
-                        className={`${inputClass} ${loiThongTin.formDang ? "border-error" : ""}`}
+                        className={`${inputClass} ${errors.formDang ? "border-error" : ""}`}
                       />
                     </FormField>
                   </div>
 
                   <div className="xl:col-span-2">
-                    <FormField label="Xuất xứ" required error={loiThongTin.xuatXu}>
+                    <FormField label="Xuất xứ" required error={errors.xuatXu?.message}>
                       <input
-                        id="edit-xuat-xu"
                         type="text"
-                        value={formThongTin.xuatXu}
-                        onChange={(e) => capNhatThongTin("xuatXu", e.target.value)}
+                        {...register("xuatXu", { required: "Vui lòng nhập xuất xứ" })}
                         maxLength={100}
                         disabled={isViewMode}
-                        className={`${inputClass} ${loiThongTin.xuatXu ? "border-error" : ""}`}
+                        className={`${inputClass} ${errors.xuatXu ? "border-error" : ""}`}
                       />
                     </FormField>
                   </div>
@@ -794,14 +606,12 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                   </div>
 
                   <div className="md:col-span-2 xl:col-span-12">
-                    <FormField label="Mô tả sản phẩm" error={loiThongTin.moTa}>
+                    <FormField label="Mô tả sản phẩm">
                       <textarea
-                        id="edit-mo-ta"
-                        value={formThongTin.moTa}
-                        onChange={(e) => capNhatThongTin("moTa", e.target.value)}
+                        {...register("moTa")}
                         rows={3}
                         disabled={isViewMode}
-                        className={`${textareaClass} ${loiThongTin.moTa ? "border-error" : ""}`}
+                        className={textareaClass}
                       />
                     </FormField>
                   </div>
@@ -819,11 +629,11 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                     </p>
                   </div>
                   <span className="text-[12px] font-semibold text-text-secondary">
-                    {dsBienTheEdit.length} biến thể
+                    {dsBienTheEdit?.length || 0} biến thể
                   </span>
                 </div>
 
-                {dsBienTheEdit.length === 0 ? (
+                {existingFields.length === 0 ? (
                   <div className="rounded-[10px] border border-dashed border-border py-5 text-center text-[13px] italic text-text-muted">
                     Chưa có biến thể nào.
                   </div>
@@ -842,147 +652,151 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                         </tr>
                       </thead>
                       <tbody>
-                        {dsBienTheEdit.map((bt) => (
-                          <tr
-                            key={bt.id}
-                            className={`border-b border-border/70 last:border-b-0 ${
-                              bt.dangSua ? "bg-primary-container/5" : "bg-surface"
-                            }`}
-                          >
-                            <td className="px-3 py-2">
-                              {bt.dangSua ? (
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className="h-5 w-5 shrink-0 rounded-full border border-border shadow-sm"
-                                    style={{ backgroundColor: timMauHex(bt.editMau) }}
-                                  />
+                        {existingFields.map((field, index) => {
+                          const bt = watch(`existingVariants.${index}`);
+                          return (
+                            <tr
+                              key={field.id}
+                              className={`border-b border-border/70 last:border-b-0 ${
+                                bt.isEditing ? "bg-primary-container/5" : "bg-surface"
+                              }`}
+                            >
+                              <td className="px-3 py-2">
+                                {bt.isEditing ? (
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="h-5 w-5 shrink-0 rounded-full border border-border shadow-sm"
+                                      style={{ backgroundColor: timMauHex(bt.colorName) }}
+                                    />
+                                    <input
+                                      type="text"
+                                      list="edit-product-colors"
+                                      {...register(`existingVariants.${index}.colorName`)}
+                                      maxLength={100}
+                                      disabled={bt.hasTransactions}
+                                      className={`h-8 min-w-0 flex-1 rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none ${
+                                        bt.hasTransactions
+                                          ? "cursor-not-allowed bg-surface-container opacity-60 text-text-muted"
+                                          : "focus:border-primary-container"
+                                      }`}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <span
+                                      className="h-5 w-5 shrink-0 rounded-full border border-border shadow-sm"
+                                      style={{ backgroundColor: timMauHex(bt.colorName) }}
+                                    />
+                                    <span className="truncate text-[13px] font-semibold text-text-main" title={bt.colorName}>
+                                      {bt.colorName}
+                                    </span>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-3 py-2">
+                                {bt.isEditing ? (
                                   <input
                                     type="text"
-                                    list="edit-product-colors"
-                                    value={bt.editMau}
-                                    onChange={(e) =>
-                                      capNhatEditBienThe(bt.id, "editMau", e.target.value)
-                                    }
+                                    list="edit-product-sizes"
+                                    {...register(`existingVariants.${index}.size`)}
+                                    maxLength={50}
+                                    disabled={bt.hasTransactions}
+                                    className={`h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none ${
+                                      bt.hasTransactions
+                                        ? "cursor-not-allowed bg-surface-container opacity-60 text-text-muted"
+                                        : "focus:border-primary-container"
+                                    }`}
+                                  />
+                                ) : (
+                                  <span className="inline-flex rounded bg-surface-container px-2 py-0.5 text-[12px] font-semibold text-text-secondary">
+                                    {bt.size}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2">
+                                {bt.isEditing ? (
+                                  <input
+                                    type="text"
+                                    {...register(`existingVariants.${index}.sku`)}
                                     maxLength={100}
                                     disabled={bt.hasTransactions}
-                                    className={`h-8 min-w-0 flex-1 rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none ${bt.hasTransactions ? "cursor-not-allowed bg-surface-container opacity-60 text-text-muted" : "focus:border-primary-container"}`}
+                                    className={`h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 font-mono text-[12px] outline-none ${
+                                      bt.hasTransactions
+                                        ? "cursor-not-allowed bg-surface-container opacity-60 text-text-muted"
+                                        : "focus:border-primary-container"
+                                    }`}
                                   />
-                                </div>
-                              ) : (
-                                <div className="flex min-w-0 items-center gap-2">
-                                  <span
-                                    className="h-5 w-5 shrink-0 rounded-full border border-border shadow-sm"
-                                    style={{ backgroundColor: timMauHex(bt.colorName) }}
-                                  />
-                                  <span className="truncate text-[13px] font-semibold text-text-main" title={bt.colorName}>
-                                    {bt.colorName}
+                                ) : (
+                                  <span className="block truncate font-mono text-[12px] text-text-secondary" title={bt.sku}>
+                                    {bt.sku}
                                   </span>
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-3 py-2">
-                              {bt.dangSua ? (
-                                <input
-                                  type="text"
-                                  list="edit-product-sizes"
-                                  value={bt.editSize}
-                                  onChange={(e) =>
-                                    capNhatEditBienThe(bt.id, "editSize", e.target.value)
-                                  }
-                                  maxLength={50}
-                                  disabled={bt.hasTransactions}
-                                  className={`h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none ${bt.hasTransactions ? "cursor-not-allowed bg-surface-container opacity-60 text-text-muted" : "focus:border-primary-container"}`}
-                                />
-                              ) : (
-                                <span className="inline-flex rounded bg-surface-container px-2 py-0.5 text-[12px] font-semibold text-text-secondary">
-                                  {bt.size}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2">
-                              {bt.dangSua ? (
-                                <input
-                                  type="text"
-                                  value={bt.editSKU}
-                                  onChange={(e) =>
-                                    capNhatEditBienThe(bt.id, "editSKU", e.target.value)
-                                  }
-                                  maxLength={100}
-                                  disabled={bt.hasTransactions}
-                                  className={`h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 font-mono text-[12px] outline-none ${bt.hasTransactions ? "cursor-not-allowed bg-surface-container opacity-60 text-text-muted" : "focus:border-primary-container"}`}
-                                />
-                              ) : (
-                                <span className="block truncate font-mono text-[12px] text-text-secondary" title={bt.sku}>
-                                  {bt.sku}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              <span className="text-[13px] font-semibold text-text-main">
-                                {bt.stock.toLocaleString("vi-VN")}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2">
-                              <BadgeTonKho status={bt.inventoryStatus} />
-                            </td>
-                            <td className="px-3 py-2">
-                              {bt.dangSua ? (
-                                <select
-                                  value={bt.editStatus}
-                                  onChange={(e) => capNhatEditBienThe(bt.id, "editStatus", e.target.value)}
-                                  className="h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
-                                >
-                                  <option value="ACTIVE">Hiện</option>
-                                  <option value="INACTIVE">Ẩn</option>
-                                </select>
-                              ) : (
-                                <span className={`inline-flex rounded px-2 py-0.5 text-[12px] font-semibold ${bt.status === 'ACTIVE' ? 'bg-success/10 text-success' : 'bg-surface-container text-text-muted'}`}>
-                                  {bt.status === 'ACTIVE' ? 'Hiện' : 'Ẩn'}
-                                </span>
-                              )}
-                            </td>
-                            {!isViewMode && (
-                              <td className="px-3 py-2">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  {bt.dangSua ? (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() => luuBienTheDaChon(bt)}
-                                        disabled={dangLuuBienThe}
-                                        className="flex h-8 items-center gap-1 rounded-[6px] bg-primary-container px-3 text-[12px] font-semibold text-white hover:bg-primary-container/80 disabled:opacity-50"
-                                      >
-                                        {dangLuuBienThe ? (
-                                          <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                                        ) : (
-                                          <SaveOutlined />
-                                        )}
-                                        Lưu
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => huyBienThe(bt.id)}
-                                        disabled={dangLuuBienThe}
-                                        className="h-8 rounded-[6px] border border-border bg-surface px-3 text-[12px] font-semibold text-text-secondary hover:bg-surface-alt disabled:opacity-50"
-                                      >
-                                        Hủy
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => batDauSuaBienThe(bt.id)}
-                                      className="flex h-8 items-center gap-1.5 rounded-[6px] border border-border bg-surface px-3 text-[12px] font-semibold text-text-secondary transition-colors hover:border-primary-container/30 hover:bg-primary-container/5 hover:text-primary-container"
-                                    >
-                                      <EditOutlined />
-                                      Sửa
-                                    </button>
-                                  )}
-                                </div>
+                                )}
                               </td>
-                            )}
-                          </tr>
-                        ))}
+                              <td className="px-3 py-2 text-right">
+                                <span className="text-[13px] font-semibold text-text-main">
+                                  {bt.stock.toLocaleString("vi-VN")}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2">
+                                <BadgeTonKho status={bt.inventoryStatus} />
+                              </td>
+                              <td className="px-3 py-2">
+                                {bt.isEditing ? (
+                                  <select
+                                    {...register(`existingVariants.${index}.status`)}
+                                    className="h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
+                                  >
+                                    <option value="ACTIVE">Hiện</option>
+                                    <option value="INACTIVE">Ẩn</option>
+                                  </select>
+                                ) : (
+                                  <span
+                                    className={`inline-flex rounded px-2 py-0.5 text-[12px] font-semibold ${
+                                      bt.status === "ACTIVE"
+                                        ? "bg-success/10 text-success"
+                                        : "bg-surface-container text-text-muted"
+                                    }`}
+                                  >
+                                    {bt.status === "ACTIVE" ? "Hiện" : "Ẩn"}
+                                  </span>
+                                )}
+                              </td>
+                              {!isViewMode && (
+                                <td className="px-3 py-2">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    {bt.isEditing ? (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => luuBienTheDaChon(index)}
+                                          className="flex h-8 items-center gap-1 rounded-[6px] bg-primary-container px-3 text-[12px] font-semibold text-white hover:bg-primary-container/80 disabled:opacity-50"
+                                        >
+                                          Lưu tạm
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => huyBienThe(index)}
+                                          className="h-8 rounded-[6px] border border-border bg-surface px-3 text-[12px] font-semibold text-text-secondary hover:bg-surface-alt disabled:opacity-50"
+                                        >
+                                          Hủy
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => batDauSuaBienThe(index)}
+                                        className="flex h-8 items-center gap-1.5 rounded-[6px] border border-border bg-surface px-3 text-[12px] font-semibold text-text-secondary transition-colors hover:border-primary-container/30 hover:bg-primary-container/5 hover:text-primary-container"
+                                      >
+                                        <EditOutlined />
+                                        Sửa
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -998,7 +812,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                           Thêm biến thể mới
                         </h4>
                         <p className="mt-0.5 text-[12px] text-text-muted">
-                          Thêm nhiều dòng rồi lưu cùng lúc.
+                          Thêm nhiều dòng rồi lưu cùng lúc với thông tin chung.
                         </p>
                       </div>
                       <button
@@ -1011,14 +825,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                       </button>
                     </div>
 
-                    {loiBienThe && (
-                      <div className="mb-3 flex items-center gap-2 rounded-[8px] border border-error/30 bg-error/5 px-4 py-2.5 text-[13px] text-error">
-                        <span>⚠️</span>
-                        {loiBienThe}
-                      </div>
-                    )}
-
-                    {dsBienTheMoi.length === 0 ? (
+                    {newFields.length === 0 ? (
                       <button
                         type="button"
                         onClick={themHangMoi}
@@ -1040,82 +847,64 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                               </tr>
                             </thead>
                             <tbody>
-                              {dsBienTheMoi.map((h) => (
-                                <tr key={h.key} className="border-b border-border/70 bg-primary-container/[0.02] last:border-b-0">
-                                  <td className="px-3 py-2">
-                                    <div className="flex items-center gap-2">
-                                      <span
-                                        className="h-5 w-5 shrink-0 rounded-full border border-border shadow-sm"
-                                        style={{ backgroundColor: timMauHex(h.mauSac) }}
-                                      />
+                              {newFields.map((field, index) => {
+                                const h = dsBienTheMoi[index];
+                                return (
+                                  <tr key={field.id} className="border-b border-border/70 bg-primary-container/[0.02] last:border-b-0">
+                                    <td className="px-3 py-2">
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className="h-5 w-5 shrink-0 rounded-full border border-border shadow-sm"
+                                          style={{ backgroundColor: timMauHex(h?.mauSac || "") }}
+                                        />
+                                        <input
+                                          type="text"
+                                          list="edit-product-colors"
+                                          value={h?.mauSac || ""}
+                                          onChange={(e) => capNhatHangMoi(index, "mauSac", e.target.value)}
+                                          placeholder="Tên màu"
+                                          maxLength={100}
+                                          className="h-8 min-w-0 flex-1 rounded-[6px] border border-primary-container/30 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
+                                        />
+                                      </div>
+                                    </td>
+                                    <td className="px-3 py-2">
                                       <input
                                         type="text"
-                                        list="edit-product-colors"
-                                        value={h.mauSac}
-                                        onChange={(e) => capNhatHangMoi(h.key, "mauSac", e.target.value)}
-                                        placeholder="Tên màu"
-                                        maxLength={100}
-                                        className="h-8 min-w-0 flex-1 rounded-[6px] border border-primary-container/30 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
+                                        list="edit-product-sizes"
+                                        value={h?.kichThuoc || ""}
+                                        onChange={(e) => capNhatHangMoi(index, "kichThuoc", e.target.value)}
+                                        placeholder="VD: M"
+                                        maxLength={50}
+                                        className="h-8 w-full rounded-[6px] border border-primary-container/30 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
                                       />
-                                    </div>
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    <input
-                                      type="text"
-                                      list="edit-product-sizes"
-                                      value={h.kichThuoc}
-                                      onChange={(e) => capNhatHangMoi(h.key, "kichThuoc", e.target.value)}
-                                      placeholder="VD: M"
-                                      maxLength={50}
-                                      className="h-8 w-full rounded-[6px] border border-primary-container/30 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
-                                    />
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    <input
-                                      type="text"
-                                      value={h.maSKU}
-                                      onChange={(e) => capNhatHangMoi(h.key, "maSKU", e.target.value)}
-                                      placeholder="Mã SKU"
-                                      maxLength={100}
-                                      className="h-8 w-full rounded-[6px] border border-primary-container/30 bg-surface px-2 font-mono text-[12px] outline-none focus:border-primary-container"
-                                    />
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => xoaHangMoi(h.key)}
-                                      title="Xóa dòng này"
-                                      aria-label="Xóa biến thể mới"
-                                      className="mx-auto flex h-8 w-8 items-center justify-center rounded-[6px] text-text-muted transition-colors hover:bg-error-container hover:text-error"
-                                    >
-                                      <DeleteOutlined />
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <input
+                                        type="text"
+                                        value={h?.maSKU || ""}
+                                        onChange={(e) => capNhatHangMoi(index, "maSKU", e.target.value)}
+                                        placeholder="Mã SKU"
+                                        maxLength={100}
+                                        className="h-8 w-full rounded-[6px] border border-primary-container/30 bg-surface px-2 font-mono text-[12px] outline-none focus:border-primary-container"
+                                      />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => removeNew(index)}
+                                        title="Xóa dòng này"
+                                        aria-label="Xóa biến thể mới"
+                                        className="mx-auto flex h-8 w-8 items-center justify-center rounded-[6px] text-text-muted transition-colors hover:bg-error-container hover:text-error"
+                                      >
+                                        <DeleteOutlined />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
-                        </div>
-
-                        <div className="flex justify-end">
-                          <button
-                            type="button"
-                            onClick={xuLyThemBienTheMoi}
-                            disabled={dangThemBienThe}
-                            className="flex h-9 items-center justify-center gap-2 rounded-[8px] bg-[#0ea5e9] px-5 text-[13px] font-semibold text-white transition-colors hover:bg-[#0284c7] disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {dangThemBienThe ? (
-                              <>
-                                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                                Đang lưu...
-                              </>
-                            ) : (
-                              <>
-                                <CheckOutlined />
-                                Lưu {dsBienTheMoi.length} biến thể mới
-                              </>
-                            )}
-                          </button>
                         </div>
                       </div>
                     )}
@@ -1128,19 +917,18 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
               <button
                 type="button"
                 onClick={() => router.push("/admin/san-pham-phoi-ao")}
-                disabled={dangLuuThongTin}
+                disabled={dangLuuTatCa}
                 className="flex h-10 items-center justify-center rounded-[10px] border border-border bg-surface px-5 text-[14px] font-semibold text-text-secondary transition-colors hover:bg-surface-alt disabled:opacity-40"
               >
                 Về danh sách
               </button>
               {!isViewMode && (
                 <button
-                  type="button"
-                  onClick={xuLyLuuThongTin}
-                  disabled={dangLuuThongTin}
+                  type="submit"
+                  disabled={dangLuuTatCa}
                   className="flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#0ea5e9] px-6 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {dangLuuThongTin ? (
+                  {dangLuuTatCa ? (
                     <>
                       <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                       Đang lưu...
@@ -1148,7 +936,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                   ) : (
                     <>
                       <SaveOutlined />
-                      Lưu thông tin chung
+                      Lưu thay đổi
                     </>
                   )}
                 </button>
@@ -1157,6 +945,6 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
           </>
         )}
       </section>
-    </div>
+    </form>
   );
 }
