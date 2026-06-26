@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Tabs } from "antd";
 import { UserAddOutlined } from "@ant-design/icons";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 import AccountFormDrawer from "./AccountFormDrawer";
 import AccountStaffTable from "./AccountStaffTable";
@@ -25,12 +26,16 @@ type AccountsTabKey = "customers" | "staff";
 export default function AccountsPage() {
   const queryClient = useQueryClient();
   const { notification: api } = App.useApp();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [activeTab, setActiveTab] = useState<AccountsTabKey>("customers");
   const [thamSoLoc, setThamSoLoc] = useState<ThamSoLocTaiKhoan>({
     page: 1,
-    limit: 20,
+    limit: 10,
     search: "",
-    status: "",
+    status: searchParams?.get("status") || "",
   });
   const [drawer, setDrawer] = useState<{
     open: boolean;
@@ -47,16 +52,13 @@ export default function AccountsPage() {
   });
 
   const danhSach = useMemo(() => data?.items ?? [], [data?.items]);
-  const tongSo = data?.total ?? 0;
+  const tongSoList = data?.total ?? 0; // Dùng cho phân trang
   const trang = data?.page ?? 1;
-  const soMoiTrang = data?.limit ?? 20;
+  const soMoiTrang = data?.limit ?? 10;
 
-  const { soHoatDong, soVoHieuHoa } = useMemo(() => {
-    return {
-      soHoatDong: danhSach.filter((taiKhoan) => taiKhoan.status === "ACTIVE").length,
-      soVoHieuHoa: danhSach.filter((taiKhoan) => taiKhoan.status !== "ACTIVE").length,
-    };
-  }, [danhSach]);
+  const tongSo = data?.statTotal ?? tongSoList;
+  const soHoatDong = data?.statActive ?? 0;
+  const soVoHieuHoa = data?.statInactive ?? 0;
 
   const mutationThem = useMutation({
     mutationFn: (payload: TaoTaiKhoanInput) => taoTaiKhoan(payload),
@@ -170,13 +172,26 @@ export default function AccountsPage() {
   };
 
   const handleDoiLoc = (thamSoMoi: Partial<ThamSoLocTaiKhoan>) => {
+    const newStatus = thamSoMoi.status !== undefined
+      ? (thamSoMoi.status === "tat_ca" ? "" : thamSoMoi.status)
+      : thamSoLoc.status;
+
     setThamSoLoc((prev) => ({
       ...prev,
       ...thamSoMoi,
-      ...(thamSoMoi.status !== undefined
-        ? { status: thamSoMoi.status === "tat_ca" ? "" : thamSoMoi.status }
-        : {}),
+      status: newStatus,
     }));
+
+    // Cập nhật URL query param
+    const currentParams = new URLSearchParams(Array.from(searchParams?.entries() || []));
+    if (newStatus) {
+      currentParams.set("status", newStatus);
+    } else {
+      currentParams.delete("status");
+    }
+    
+    const newUrl = currentParams.toString() ? `${pathname}?${currentParams.toString()}` : pathname;
+    router.replace(newUrl, { scroll: false });
   };
 
   const dangLuuForm = mutationThem.isPending || mutationSua.isPending;
@@ -243,11 +258,13 @@ export default function AccountsPage() {
             tongSo={tongSo}
             soHoatDong={soHoatDong}
             soVoHieuHoa={soVoHieuHoa}
+            currentStatus={thamSoLoc.status}
+            onFilterChange={(status) => handleDoiLoc({ status, page: 1 })}
           />
 
           <AccountsTable
             danhSach={danhSach}
-            tongSo={tongSo}
+            tongSo={tongSoList}
             trang={trang}
             soMoiTrang={soMoiTrang}
             dangTai={isFetching}

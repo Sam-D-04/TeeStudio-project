@@ -288,13 +288,12 @@ export default function AccountsTable({
 
         {/* Lọc theo trạng thái */}
         <Select
-          value={thamSoLoc.status ?? "tat_ca"}
+          value={thamSoLoc.status || "tat_ca"}
           onChange={(value) => onDoiLoc({ status: value, page: 1 })}
           options={[
             { value: "tat_ca", label: "Tất cả trạng thái" },
             { value: "ACTIVE", label: "Đang hoạt động" },
             { value: "INACTIVE", label: "Đã vô hiệu hóa" },
-            { value: "SUSPENDED", label: "Đình chỉ" },
           ]}
           style={{ width: 190, height: 40 }}
         />
@@ -315,7 +314,7 @@ export default function AccountsTable({
             fontWeight: 500,
           }}
         >
-          Làm mới
+          Đặt lại
         </Button>
       </div>
 
@@ -330,8 +329,7 @@ export default function AccountsTable({
           current: trang,
           pageSize: soMoiTrang,
           total: tongSo,
-          showSizeChanger: true,
-          pageSizeOptions: ["10", "20", "50"],
+          showSizeChanger: false,
           showTotal: (total, range) =>
             `${range[0]}–${range[1]} trong ${total} tài khoản`,
           onChange: onDoiTrang,

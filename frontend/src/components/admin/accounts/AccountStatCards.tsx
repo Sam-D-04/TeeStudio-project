@@ -11,6 +11,8 @@ type Props = {
   tongSo: number;
   soHoatDong: number;
   soVoHieuHoa: number;
+  currentStatus?: string;
+  onFilterChange?: (status: string) => void;
 };
 
 function StatCard({
@@ -20,6 +22,8 @@ function StatCard({
   iconBg,
   iconColor,
   valueColor,
+  isActive,
+  onClick,
 }: {
   label: string;
   value: number;
@@ -27,18 +31,24 @@ function StatCard({
   iconBg: string;
   iconColor: string;
   valueColor?: string;
+  isActive?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <div
+      onClick={onClick}
       style={{
-        background: "#ffffff",
-        border: "1px solid #e2e8f0",
+        background: isActive ? "#f8fafc" : "#ffffff",
+        border: isActive ? `2px solid ${iconColor}` : "1px solid #e2e8f0",
         borderRadius: 16,
-        boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
-        padding: "20px 22px",
+        boxShadow: isActive ? `0 4px 12px ${iconColor}33` : "0 1px 4px rgba(0,0,0,0.05)",
+        padding: isActive ? "19px 21px" : "20px 22px",
         display: "flex",
         alignItems: "center",
         gap: 16,
+        cursor: "pointer",
+        transition: "all 0.2s ease-in-out",
+        transform: isActive ? "translateY(-2px)" : "none",
       }}
     >
       <div
@@ -77,7 +87,19 @@ function StatCard({
   );
 }
 
-export default function AccountStatCards({ tongSo, soHoatDong, soVoHieuHoa }: Props) {
+export default function AccountStatCards({ 
+  tongSo, 
+  soHoatDong, 
+  soVoHieuHoa,
+  currentStatus,
+  onFilterChange 
+}: Props) {
+  const handleCardClick = (status: string) => {
+    if (onFilterChange) {
+      onFilterChange(status);
+    }
+  };
+
   return (
     <div
       style={{
@@ -92,6 +114,8 @@ export default function AccountStatCards({ tongSo, soHoatDong, soVoHieuHoa }: Pr
         icon={<TeamOutlined />}
         iconBg="#e0f2fe"
         iconColor="#0ea5e9"
+        isActive={currentStatus === "" || currentStatus === undefined}
+        onClick={() => handleCardClick("")}
       />
       <StatCard
         label="Đang hoạt động"
@@ -100,6 +124,8 @@ export default function AccountStatCards({ tongSo, soHoatDong, soVoHieuHoa }: Pr
         iconBg="#dcfce7"
         iconColor="#16a34a"
         valueColor="#16a34a"
+        isActive={currentStatus === "ACTIVE"}
+        onClick={() => handleCardClick("ACTIVE")}
       />
       <StatCard
         label="Đã vô hiệu hóa"
@@ -108,6 +134,8 @@ export default function AccountStatCards({ tongSo, soHoatDong, soVoHieuHoa }: Pr
         iconBg="#f1f5f9"
         iconColor="#64748b"
         valueColor="#64748b"
+        isActive={currentStatus === "INACTIVE"}
+        onClick={() => handleCardClick("INACTIVE")}
       />
     </div>
   );

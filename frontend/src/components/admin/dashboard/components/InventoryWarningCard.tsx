@@ -45,7 +45,7 @@ export default function InventoryWarningCard({
         </p>
       ) : (
         <ul className="space-y-3">
-          {items.map((item) => {
+          {items.slice(0, 3).map((item) => {
             const available = item.stockQty;
             const status = getInventoryStatus(available);
 

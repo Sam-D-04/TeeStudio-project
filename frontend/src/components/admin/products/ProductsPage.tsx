@@ -308,6 +308,8 @@ export default function ProductsPage({ initialFilters }: ProductsPageProps) {
           <ProductStatCard
             label="Tổng biến thể"
             value={dangTaiThongKe ? "..." : (thongKe?.tongBienThe ?? 0)}
+            href="/admin/san-pham-phoi-ao?stock=ALL"
+            onClick={() => handleKpiFilter({ stock: "tat_ca" })}
           />
 
           {/* Biến thể sắp hết hàng – có accent cam vàng + badge cảnh báo */}

@@ -20,7 +20,8 @@ const updateProfile = async (req, res, next) => {
 
 const listStaff = async (req, res, next) => {
   try {
-    const data = await userService.listStaff();
+    const { page, limit, search, status } = req.query;
+    const data = await userService.listStaff({ page, limit, search, status });
     res.json({ success: true, data });
   } catch (error) {
     next(error);

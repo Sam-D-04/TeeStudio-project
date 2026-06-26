@@ -53,16 +53,45 @@ const updateProfile = async (userId, data) => {
   return getProfile(userId);
 };
 
-const listStaff = async () => {
+const listStaff = async ({ page = 1, limit = 20, search = "", status = "" } = {}) => {
+  const offset = (page - 1) * limit;
+  const conditions = ["role IN (?, ?, ?)"];
+  const params = [...INTERNAL_ROLES];
+
+  if (search) {
+    conditions.push("(fullName LIKE ? OR email LIKE ? OR phone LIKE ?)");
+    const keyword = `%${search}%`;
+    params.push(keyword, keyword, keyword);
+  }
+
+  if (status) {
+    conditions.push("status = ?");
+    params.push(status);
+  }
+
+  const where = conditions.join(" AND ");
+
+  const [[{ total }]] = await db.pool.query(
+    `SELECT COUNT(*) AS total FROM Account WHERE ${where}`,
+    params
+  );
+
   const [items] = await db.pool.query(
     `SELECT id, email, fullName, phone, role, status, createdAt, updatedAt
      FROM Account
-     WHERE role IN (?, ?, ?)
-     ORDER BY createdAt DESC`,
-    INTERNAL_ROLES
+     WHERE ${where}
+     ORDER BY createdAt DESC
+     LIMIT ? OFFSET ?`,
+    [...params, Number(limit), Number(offset)]
   );
 
-  return { items, total: items.length };
+  return {
+    items,
+    total,
+    page: Number(page),
+    limit: Number(limit),
+    totalPages: Math.ceil(total / limit),
+  };
 };
 
 const createStaff = async (data) => {
@@ -172,12 +201,36 @@ const listCustomers = async ({ page = 1, limit = 20, search = "", status = "" } 
     [...params, Number(limit), Number(offset)]
   );
 
+  // Tính thống kê tổng quát (bỏ qua lọc status, chỉ giữ lọc search)
+  const statsConditions = ["role = ?"];
+  const statsParams = [CUSTOMER_ROLE];
+
+  if (search) {
+    statsConditions.push("(fullName LIKE ? OR email LIKE ? OR phone LIKE ?)");
+    const keyword = `%${search}%`;
+    statsParams.push(keyword, keyword, keyword);
+  }
+
+  const statsWhere = statsConditions.join(" AND ");
+
+  const [stats] = await db.pool.query(
+    `SELECT 
+      COUNT(*) as totalCount,
+      SUM(CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END) as activeCount,
+      SUM(CASE WHEN status != 'ACTIVE' THEN 1 ELSE 0 END) as inactiveCount
+     FROM Account WHERE ${statsWhere}`,
+    statsParams
+  );
+
   return {
     items,
     total,
     page: Number(page),
     limit: Number(limit),
     totalPages: Math.ceil(total / limit),
+    statTotal: Number(stats[0].totalCount || 0),
+    statActive: Number(stats[0].activeCount || 0),
+    statInactive: Number(stats[0].inactiveCount || 0),
   };
 };
 

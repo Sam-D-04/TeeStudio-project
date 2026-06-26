@@ -4,6 +4,16 @@ import type { AccountStatus, ApiResponse, AuthUser, UserRole } from "@/types/aut
 export interface StaffList {
   items: AuthUser[];
   total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface StaffListParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
 }
 
 export interface CreateStaffPayload {
@@ -20,8 +30,10 @@ export interface UpdateStaffPayload {
 }
 
 export const userService = {
-  listStaff: async () => {
-    const response = await apiClient.get<ApiResponse<StaffList>>("/users/admin/staff");
+  listStaff: async (params?: StaffListParams) => {
+    const response = await apiClient.get<ApiResponse<StaffList>>("/users/admin/staff", {
+      params,
+    });
     return response.data.data;
   },
 
