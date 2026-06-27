@@ -1,6 +1,10 @@
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const db = require("../../database/mysql");
 const { INTERNAL_ROLES } = require("../../common/constants/roles");
+const {
+  sendAccountCredentialsEmail,
+} = require("../../common/services/emailService");
 
 const CUSTOMER_ROLE = "CUSTOMER";
 
@@ -14,6 +18,75 @@ const createError = (message, statusCode) => {
 
 const normalizeEmail = (email) => email.trim().toLowerCase();
 const normalizeText = (value) => value.trim().replace(/\s+/g, " ");
+
+const generateTemporaryPassword = (length = 12) => {
+  const lowercase = "abcdefghijkmnopqrstuvwxyz";
+  const uppercase = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const digits = "23456789";
+  const allCharacters = lowercase + uppercase + digits;
+  const characters = [
+    lowercase[crypto.randomInt(lowercase.length)],
+    uppercase[crypto.randomInt(uppercase.length)],
+    digits[crypto.randomInt(digits.length)],
+  ];
+
+  while (characters.length < length) {
+    characters.push(allCharacters[crypto.randomInt(allCharacters.length)]);
+  }
+
+  for (let index = characters.length - 1; index > 0; index -= 1) {
+    const randomIndex = crypto.randomInt(index + 1);
+    [characters[index], characters[randomIndex]] = [
+      characters[randomIndex],
+      characters[index],
+    ];
+  }
+
+  return characters.join("");
+};
+
+const ensureEmailAvailable = async (email) => {
+  const [accounts] = await db.pool.query(
+    "SELECT id FROM Account WHERE email = ? LIMIT 1",
+    [email]
+  );
+
+  if (accounts[0]) {
+    throw createError("Email đã được sử dụng", 409);
+  }
+};
+
+const createManagedAccount = async (data, role) => {
+  const email = normalizeEmail(data.email);
+  const fullName = normalizeText(data.fullName);
+  const phone = normalizeText(data.phone);
+
+  await ensureEmailAvailable(email);
+
+  const temporaryPassword = generateTemporaryPassword();
+  await sendAccountCredentialsEmail({
+    to: email,
+    fullName,
+    temporaryPassword,
+  });
+
+  const passwordHash = await bcrypt.hash(temporaryPassword, BCRYPT_ROUNDS);
+
+  try {
+    const result = await db.execute(
+      `INSERT INTO Account (email, passwordHash, fullName, phone, role, status)
+       VALUES (?, ?, ?, ?, ?, 'ACTIVE')`,
+      [email, passwordHash, fullName, phone, role]
+    );
+
+    return getProfile(result.insertId);
+  } catch (error) {
+    if (error.code === "ER_DUP_ENTRY") {
+      throw createError("Email đã được sử dụng", 409);
+    }
+    throw error;
+  }
+};
 
 const getProfile = async (userId) => {
   const [rows] = await db.pool.query(
@@ -95,29 +168,7 @@ const listStaff = async ({ page = 1, limit = 20, search = "", status = "" } = {}
 };
 
 const createStaff = async (data) => {
-  const email = normalizeEmail(data.email);
-  const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
-
-  try {
-    const result = await db.execute(
-      `INSERT INTO Account (email, passwordHash, fullName, phone, role, status)
-       VALUES (?, ?, ?, ?, ?, 'ACTIVE')`,
-      [
-        email,
-        passwordHash,
-        normalizeText(data.fullName),
-        normalizeText(data.phone),
-        data.role,
-      ]
-    );
-
-    return getProfile(result.insertId);
-  } catch (error) {
-    if (error.code === "ER_DUP_ENTRY") {
-      throw createError("Email đã được sử dụng", 409);
-    }
-    throw error;
-  }
+  return createManagedAccount(data, data.role);
 };
 
 const updateStaff = async (staffId, data, actorId) => {
@@ -238,28 +289,7 @@ const listCustomers = async ({ page = 1, limit = 20, search = "", status = "" } 
  * Tạo tài khoản khách hàng mới.
  */
 const createCustomer = async (data) => {
-  const email = normalizeEmail(data.email);
-  const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
-
-  try {
-    const result = await db.execute(
-      `INSERT INTO Account (email, passwordHash, fullName, phone, role, status)
-       VALUES (?, ?, ?, ?, 'CUSTOMER', 'ACTIVE')`,
-      [
-        email,
-        passwordHash,
-        normalizeText(data.fullName),
-        normalizeText(data.phone),
-      ]
-    );
-
-    return getProfile(result.insertId);
-  } catch (error) {
-    if (error.code === "ER_DUP_ENTRY") {
-      throw createError("Email đã được sử dụng", 409);
-    }
-    throw error;
-  }
+  return createManagedAccount(data, CUSTOMER_ROLE);
 };
 
 /**

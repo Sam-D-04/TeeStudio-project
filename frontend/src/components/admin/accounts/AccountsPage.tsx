@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Tabs } from "antd";
 import { UserAddOutlined } from "@ant-design/icons";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
-import AccountFormDrawer from "./AccountFormDrawer";
+import AccountFormModal from "./AccountFormDrawer";
 import AccountStaffTable from "./AccountStaffTable";
 import AccountStatCards from "./AccountStatCards";
 import AccountsTable from "./AccountsTable";
@@ -37,7 +37,7 @@ export default function AccountsPage() {
     search: "",
     status: searchParams?.get("status") || "",
   });
-  const [drawer, setDrawer] = useState<{
+  const [accountModal, setAccountModal] = useState<{
     open: boolean;
     mode: "them" | "sua";
     taiKhoan: TaiKhoanKhachHang | null;
@@ -65,11 +65,11 @@ export default function AccountsPage() {
     onSuccess: (data) => {
       api.success({
         title: "Tạo tài khoản thành công",
-        description: `Tài khoản cho ${data.fullName} đã được tạo.`,
+        description: `Tài khoản cho ${data.fullName} đã được tạo và mật khẩu đã được gửi đến ${data.email}.`,
         placement: "topRight",
       });
       queryClient.invalidateQueries({ queryKey: ["admin", "accounts"] });
-      setDrawer({ open: false, mode: "them", taiKhoan: null });
+      setAccountModal({ open: false, mode: "them", taiKhoan: null });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
       api.error({
@@ -96,7 +96,7 @@ export default function AccountsPage() {
         placement: "topRight",
       });
       queryClient.invalidateQueries({ queryKey: ["admin", "accounts"] });
-      setDrawer({ open: false, mode: "them", taiKhoan: null });
+      setAccountModal({ open: false, mode: "them", taiKhoan: null });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
       api.error({
@@ -148,24 +148,24 @@ export default function AccountsPage() {
     },
   });
 
-  const handleMoDrawerThem = () => {
-    setDrawer({ open: true, mode: "them", taiKhoan: null });
+  const handleMoModalThem = () => {
+    setAccountModal({ open: true, mode: "them", taiKhoan: null });
   };
 
-  const handleMoDrawerSua = (taiKhoan: TaiKhoanKhachHang) => {
-    setDrawer({ open: true, mode: "sua", taiKhoan });
+  const handleMoModalSua = (taiKhoan: TaiKhoanKhachHang) => {
+    setAccountModal({ open: true, mode: "sua", taiKhoan });
   };
 
-  const handleDongDrawer = () => {
-    setDrawer({ open: false, mode: "them", taiKhoan: null });
+  const handleDongModal = () => {
+    setAccountModal({ open: false, mode: "them", taiKhoan: null });
   };
 
   const handleSubmitForm = (values: TaoTaiKhoanInput | CapNhatTaiKhoanInput) => {
-    if (drawer.mode === "them") {
+    if (accountModal.mode === "them") {
       mutationThem.mutate(values as TaoTaiKhoanInput);
-    } else if (drawer.taiKhoan) {
+    } else if (accountModal.taiKhoan) {
       mutationSua.mutate({
-        id: drawer.taiKhoan.id,
+        id: accountModal.taiKhoan.id,
         payload: values as CapNhatTaiKhoanInput,
       });
     }
@@ -226,7 +226,7 @@ export default function AccountsPage() {
           <Button
             type="primary"
             icon={<UserAddOutlined />}
-            onClick={handleMoDrawerThem}
+            onClick={handleMoModalThem}
             style={{
               height: 40,
               borderRadius: 8,
@@ -273,7 +273,7 @@ export default function AccountsPage() {
               setThamSoLoc((prev) => ({ ...prev, page, limit }))
             }
             onDoiLoc={handleDoiLoc}
-            onSua={handleMoDrawerSua}
+            onSua={handleMoModalSua}
             onVoHieuHoa={(taiKhoan) => mutationVoHieu.mutate(taiKhoan.id)}
             onKhoiPhuc={(taiKhoan) => mutationKhoiPhuc.mutate(taiKhoan.id)}
           />
@@ -282,12 +282,12 @@ export default function AccountsPage() {
         <AccountStaffTable />
       )}
 
-      <AccountFormDrawer
-        open={drawer.open}
-        mode={drawer.mode}
-        taiKhoan={drawer.taiKhoan}
+      <AccountFormModal
+        open={accountModal.open}
+        mode={accountModal.mode}
+        taiKhoan={accountModal.taiKhoan}
         dangTai={dangLuuForm}
-        onClose={handleDongDrawer}
+        onClose={handleDongModal}
         onSubmit={handleSubmitForm}
       />
     </div>

@@ -31,7 +31,11 @@ const listStaff = async (req, res, next) => {
 const createStaff = async (req, res, next) => {
   try {
     const data = await userService.createStaff(req.body);
-    res.status(201).json({ success: true, message: "Tạo nhân sự thành công", data });
+    res.status(201).json({
+      success: true,
+      message: "Tạo nhân sự và gửi email thông tin đăng nhập thành công",
+      data,
+    });
   } catch (error) {
     next(error);
   }
@@ -63,7 +67,11 @@ const listCustomers = async (req, res, next) => {
 const createCustomer = async (req, res, next) => {
   try {
     const data = await userService.createCustomer(req.body);
-    res.status(201).json({ success: true, message: "Tạo tài khoản khách hàng thành công", data });
+    res.status(201).json({
+      success: true,
+      message: "Tạo tài khoản khách hàng và gửi email thông tin đăng nhập thành công",
+      data,
+    });
   } catch (error) {
     next(error);
   }

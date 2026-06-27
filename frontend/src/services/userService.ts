@@ -18,7 +18,6 @@ export interface StaffListParams {
 
 export interface CreateStaffPayload {
   email: string;
-  password: string;
   fullName: string;
   phone: string;
   role: Exclude<UserRole, "CUSTOMER">;

@@ -52,7 +52,6 @@ export type ThamSoLocTaiKhoan = {
 /** Payload tạo tài khoản khách hàng mới */
 export type TaoTaiKhoanInput = {
   email: string;
-  password: string;
   fullName: string;
   phone: string;
 };

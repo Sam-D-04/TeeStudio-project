@@ -2,7 +2,7 @@
 
 import { EditOutlined, PlusOutlined, SearchOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Form, Input, Modal, Select, message, Table, Button, Tooltip } from "antd";
+import { Alert, Form, Input, Modal, Select, message, Table, Button, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useMemo, useState } from "react";
 import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
@@ -66,7 +66,9 @@ export default function AccountStaffTable() {
     },
     onSuccess: async () => {
       messageApi.success(
-        editing ? "Đã cập nhật quyền nhân sự." : "Đã tạo tài khoản nhân sự."
+        editing
+          ? "Đã cập nhật quyền nhân sự."
+          : "Đã tạo tài khoản và gửi mật khẩu đến email nhân sự."
       );
       setModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["admin", "accounts", "staff"] });
@@ -112,7 +114,7 @@ export default function AccountStaffTable() {
       title: <span style={{ fontSize: 13, fontWeight: 700, color: "#64748b" }}>Họ tên</span>,
       dataIndex: "fullName",
       key: "fullName",
-      render: (name: string, record: AuthUser) => (
+      render: (name: string) => (
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#c9e6ff] text-xs font-semibold text-[#0284c7]">
             {initials(name)}
@@ -341,6 +343,14 @@ export default function AccountStaffTable() {
       >
         <Form form={form} layout="vertical" className="pt-4">
           {!editing ? (
+            <Alert
+              title="Hệ thống sẽ tự sinh mật khẩu và gửi đến email nhân sự."
+              type="info"
+              showIcon
+              className="mb-4"
+            />
+          ) : null}
+          {!editing ? (
             <>
               <Form.Item name="fullName" label="Họ và tên" rules={[{ required: true }]}>
                 <Input />
@@ -350,19 +360,6 @@ export default function AccountStaffTable() {
               </Form.Item>
               <Form.Item name="phone" label="Số điện thoại" rules={[{ required: true }]}>
                 <Input />
-              </Form.Item>
-              <Form.Item
-                name="password"
-                label="Mật khẩu tạm thời"
-                rules={[
-                  { required: true, min: 8 },
-                  {
-                    pattern: /^(?=.*[A-Za-z])(?=.*\d).+$/,
-                    message: "Mật khẩu phải gồm chữ và số.",
-                  },
-                ]}
-              >
-                <Input.Password />
               </Form.Item>
             </>
           ) : null}
