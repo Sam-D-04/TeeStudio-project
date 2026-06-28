@@ -1,53 +1,17 @@
 import DateRangeFilter, {
   type DateFilterPreset,
 } from "@/components/admin/common/DateRangeFilter";
-import type { PaymentStatus } from "./PaymentStatusBadge";
 
 /**
  * PaymentFilterBar – thanh lọc giao dịch thanh toán.
  *
- * Gồm hai phần:
- * 1. Hàng input tìm kiếm + các select box (Trạng thái, Phương thức, Thời gian).
- * 2. Hàng pill nhanh để chuyển tab theo trạng thái (giống filter tab của đơn hàng).
+ * Gồm input tìm kiếm và các select box (Trạng thái, Phương thức, Thời gian).
  */
-
-// Các tab trạng thái hiển thị dưới dạng pill (nút bo tròn)
-type FilterPill = {
-  key: PaymentStatus | "tat_ca"; // "tat_ca" = không lọc trạng thái
-  label: string;
-  pillClassName?: string; // Lớp CSS tùy chỉnh khi không active
-};
-
-const FILTER_PILLS: FilterPill[] = [
-  { key: "tat_ca",        label: "Tất cả" },
-  { key: "cho_thanh_toan", label: "Chờ thanh toán" },
-  { key: "da_thanh_toan",  label: "Đã thanh toán" },
-  { key: "can_doi_soat",   label: "Cần đối soát" },
-  {
-    key: "that_bai",
-    label: "Thất bại",
-    // Pill màu đỏ nhạt khi không active
-    pillClassName: "bg-[#fef2f2] border-[#fca5a5] text-[#b91c1c] hover:bg-[#fee2e2]",
-  },
-];
-
-/** Số lượng giao dịch cho mỗi tab */
-export type TabCounts = {
-  tat_ca?: number;
-  cho_thanh_toan?: number;
-  da_thanh_toan?: number;
-  that_bai?: number;
-  can_doi_soat?: number;
-};
 
 type PaymentFilterBarProps = {
   // Tìm kiếm theo mã đơn / mã giao dịch
   searchValue: string;
   onSearchChange: (value: string) => void;
-
-  // Tab pill đang được chọn
-  activeTab: string;
-  onTabChange: (key: string) => void;
 
   // Các select box
   statusFilter: string;
@@ -65,16 +29,11 @@ type PaymentFilterBarProps = {
 
   // Nút đặt lại
   onReset: () => void;
-
-  // Số lượng cho mỗi tab pill (từ API)
-  tabCounts?: TabCounts;
 };
 
 export default function PaymentFilterBar({
   searchValue,
   onSearchChange,
-  activeTab,
-  onTabChange,
   statusFilter,
   onStatusFilterChange,
   methodFilter,
@@ -86,13 +45,12 @@ export default function PaymentFilterBar({
   onDateChange,
   onDateClear,
   onReset,
-  tabCounts,
 }: PaymentFilterBarProps) {
   return (
     // Khung filter: nền trắng, bo góc 12px, viền 1px, shadow nhẹ
     <div className="rounded-xl border border-border bg-surface p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
 
-      {/* ---- Hàng 1: Input tìm kiếm + Select boxes + Nút lọc ---- */}
+      {/* Input tìm kiếm + Select boxes + Nút đặt lại */}
       <div className="flex flex-wrap items-end gap-3">
 
         {/* Ô tìm kiếm: tìm theo mã đơn hoặc mã giao dịch */}
@@ -195,41 +153,6 @@ export default function PaymentFilterBar({
           >
             Đặt lại
           </button>
-        </div>
-      </div>
-
-      {/* Đường kẻ ngăn cách giữa 2 hàng */}
-      <div className="mt-4 border-t border-border pt-4">
-
-        {/* ---- Hàng 2: Các pill tab lọc nhanh theo trạng thái ---- */}
-        <div className="flex flex-wrap gap-2">
-          {FILTER_PILLS.map((pill) => {
-            const isActive = activeTab === pill.key;
-            const count = tabCounts?.[pill.key as keyof TabCounts];
-
-            // Xác định lớp CSS cho pill đang active
-            const activeClass = "bg-text-main text-surface";
-
-            // Lớp CSS mặc định (không active): dùng pillClassName tùy chỉnh hoặc mặc định xám
-            const defaultClass =
-              pill.pillClassName ??
-              "bg-surface-alt border border-border text-text-secondary hover:bg-surface-container";
-
-            return (
-              <button
-                key={pill.key}
-                type="button"
-                onClick={() => onTabChange(pill.key)}
-                className={`rounded-full px-4 py-1 text-sm font-medium transition-colors ${
-                  isActive ? activeClass : defaultClass
-                }`}
-              >
-                {/* Hiển thị số lượng trong ngoặc nếu có */}
-                {pill.label}
-                {count !== undefined ? ` (${count})` : ""}
-              </button>
-            );
-          })}
         </div>
       </div>
     </div>

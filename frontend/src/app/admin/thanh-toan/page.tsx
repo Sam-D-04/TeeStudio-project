@@ -37,7 +37,7 @@ export default async function ThanhToanPage({
   const isExplicit = Boolean(status || method || date);
   const initialFilters = isExplicit
     ? {
-        activeTab:
+        status:
           statuses.includes("PENDING") && method === "COD"
             ? "can_doi_soat"
             : statuses.includes("COMPLETED")
@@ -55,7 +55,6 @@ export default async function ThanhToanPage({
           layGiaTriDauTien(params.dateField) === "paid"
             ? ("paid" as const)
             : ("created" as const),
-        isExplicit: true,
       }
     : undefined;
 

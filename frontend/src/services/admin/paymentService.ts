@@ -26,15 +26,6 @@ export type ThongKeThanhToan = {
   thatBai: number;
 };
 
-/** Số lượng giao dịch cho các tab pill */
-export type TabCounts = {
-  tat_ca: number;
-  cho_thanh_toan: number;
-  da_thanh_toan: number;
-  that_bai: number;
-  can_doi_soat: number;
-};
-
 /** Một giao dịch trong danh sách */
 export type GiaoDich = {
   id: number;
@@ -69,7 +60,6 @@ export type KetQuaDanhSachGiaoDich = {
   trang: number;
   soMoiTrang: number;
   tongSoTrang: number;
-  tabCounts: TabCounts;
 };
 
 /** Tham số lọc khi lấy danh sách */
@@ -79,7 +69,6 @@ export type ThamSoLocGiaoDich = {
   trangThai?: string;
   phuongThuc?: string;
   tuKhoa?: string;
-  tab?: string;
   tuNgay?: string;
   denNgay?: string;
   kieuNgay?: "ngay_tao" | "ngay_thanh_toan";
@@ -114,7 +103,6 @@ export async function layDanhSachGiaoDich(
   if (thamSo.trangThai && thamSo.trangThai !== "tat_ca") params.trangThai = thamSo.trangThai;
   if (thamSo.phuongThuc && thamSo.phuongThuc !== "tat_ca") params.phuongThuc = thamSo.phuongThuc;
   if (thamSo.tuKhoa && thamSo.tuKhoa.trim()) params.tuKhoa = thamSo.tuKhoa.trim();
-  if (thamSo.tab && thamSo.tab !== "tat_ca") params.tab = thamSo.tab;
   if (thamSo.tuNgay) params.tuNgay = thamSo.tuNgay;
   if (thamSo.denNgay) params.denNgay = thamSo.denNgay;
   if (thamSo.kieuNgay) params.kieuNgay = thamSo.kieuNgay;

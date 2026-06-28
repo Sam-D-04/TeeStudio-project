@@ -256,14 +256,6 @@ async function layDanhSachThanhToan(queryParams) {
   const offset = (trang - 1) * soMoiTrang;
 
   const { whereClause, params } = taoBoLocThanhToan(queryParams);
-  const {
-    whereClause: tabCountWhereClause,
-    params: tabCountParams,
-  } = taoBoLocThanhToan({
-    ...queryParams,
-    tab: "tat_ca",
-    trangThai: "tat_ca",
-  });
 
   // Đếm tổng
   const [countRows] = await db.pool.query(
@@ -301,29 +293,6 @@ async function layDanhSachThanhToan(queryParams) {
     [...params, soMoiTrang, offset]
   );
 
-  // Đếm theo cùng bộ lọc chung của danh sách, chỉ bỏ điều kiện trạng thái pill.
-  const [tabCountRows] = await db.pool.query(
-    `SELECT
-       COUNT(*) AS tatCa,
-       SUM(CASE WHEN p.status = 'PENDING' AND p.paymentMethod = 'VNPAY' THEN 1 ELSE 0 END) AS choThanhToan,
-       SUM(CASE WHEN p.status = 'COMPLETED' THEN 1 ELSE 0 END) AS daThanhToan,
-       SUM(CASE WHEN p.status IN ('FAILED', 'CANCELLED') THEN 1 ELSE 0 END) AS thatBai,
-       SUM(CASE WHEN p.status = 'PENDING' AND p.paymentMethod = 'COD' THEN 1 ELSE 0 END) AS canDoiSoat
-     FROM Payment p
-     JOIN CustomerOrder co ON co.id = p.orderId
-     JOIN Account a ON a.id = co.userId
-     ${tabCountWhereClause}`,
-    tabCountParams
-  );
-
-  const tabCounts = {
-    tat_ca: Number(tabCountRows[0].tatCa),
-    cho_thanh_toan: Number(tabCountRows[0].choThanhToan),
-    da_thanh_toan: Number(tabCountRows[0].daThanhToan),
-    that_bai: Number(tabCountRows[0].thatBai),
-    can_doi_soat: Number(tabCountRows[0].canDoiSoat),
-  };
-
   // Map sang format frontend
   const danhSach = rows.map((row) => ({
     id: row.id,
@@ -345,7 +314,6 @@ async function layDanhSachThanhToan(queryParams) {
     trang,
     soMoiTrang,
     tongSoTrang: Math.ceil(tongSo / soMoiTrang),
-    tabCounts,
   };
 }
 

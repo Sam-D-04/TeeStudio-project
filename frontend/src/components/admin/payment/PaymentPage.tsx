@@ -36,12 +36,11 @@ import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
  */
 
 export type PaymentInitialFilters = {
-  activeTab?: string;
+  status?: string;
   method?: string;
   startDate?: string;
   endDate?: string;
   dateField?: "created" | "paid";
-  isExplicit?: boolean;
 };
 
 type PaymentPageProps = {
@@ -55,10 +54,9 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
 
   // ===== STATE BỘ LỌC =====
   const [searchValue, setSearchValue] = useState("");
-  const [activeTab, setActiveTab] = useState(
-    initialFilters?.activeTab ?? "tat_ca"
+  const [statusFilter, setStatusFilter] = useState(
+    initialFilters?.status ?? "tat_ca"
   );
-  const [statusFilter, setStatusFilter] = useState("tat_ca");
   const [methodFilter, setMethodFilter] = useState(
     initialFilters?.method ?? "tat_ca"
   );
@@ -68,10 +66,6 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
     initialFilters?.dateField ?? "created"
   );
   const [dateFilterKey, setDateFilterKey] = useState(0);
-  const [dateFilterReady, setDateFilterReady] = useState(
-    initialFilters?.isExplicit ?? false
-  );
-  const [hasReset, setHasReset] = useState(false);
 
   // State phân trang
   const [currentPage, setCurrentPage] = useState(1);
@@ -97,7 +91,6 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
       trangThai: statusFilter !== "tat_ca" ? statusFilter : undefined,
       phuongThuc: methodFilter !== "tat_ca" ? methodFilter : undefined,
       tuKhoa: searchValue || undefined,
-      tab: activeTab !== "tat_ca" ? activeTab : undefined,
       tuNgay: tuNgay || undefined,
       denNgay: denNgay || undefined,
       kieuNgay: dateField === "paid" ? "ngay_thanh_toan" : "ngay_tao",
@@ -107,7 +100,6 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
     statusFilter,
     methodFilter,
     searchValue,
-    activeTab,
     tuNgay,
     denNgay,
     dateField,
@@ -116,7 +108,6 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
   const listQuery = useQuery({
     queryKey: ["admin-payments", buildFilterParams()],
     queryFn: () => layDanhSachGiaoDich(buildFilterParams()),
-    enabled: dateFilterReady,
   });
 
   // ===== QUERY: CHI TIẾT GIAO DỊCH =====
@@ -225,37 +216,23 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
     setSearchValue("");
     setStatusFilter("tat_ca");
     setMethodFilter("tat_ca");
-    setActiveTab("tat_ca");
     setDateField("created");
     setTuNgay("");
     setDenNgay("");
     setCurrentPage(1);
-    setDateFilterReady(true);
     setDateFilterKey((current) => current + 1);
-    setHasReset(true);
     router.push("/admin/thanh-toan");
-  }
-
-  // Khi chuyển tab → reset trang về 1
-  function handleTabChange(tab: string) {
-    setActiveTab(tab);
-    setCurrentPage(1);
-    if (tab === "tat_ca") {
-      router.push("/admin/thanh-toan");
-    }
   }
 
   function handleDateChange(startDate: string, endDate: string) {
     setTuNgay(startDate);
     setDenNgay(endDate);
-    setDateFilterReady(true);
     setCurrentPage(1);
   }
 
   function handleDateClear() {
     setTuNgay("");
     setDenNgay("");
-    setDateFilterReady(true);
     setCurrentPage(1);
   }
 
@@ -269,7 +246,6 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
         trangThai: currentFilters.trangThai,
         phuongThuc: currentFilters.phuongThuc,
         tuKhoa: currentFilters.tuKhoa,
-        tab: currentFilters.tab,
         tuNgay: currentFilters.tuNgay,
         denNgay: currentFilters.denNgay,
         kieuNgay: currentFilters.kieuNgay,
@@ -289,7 +265,6 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
   const payments = listQuery.data?.danhSach ?? [];
   const totalItems = listQuery.data?.tongSo ?? 0;
   const totalPages = listQuery.data?.tongSoTrang ?? 1;
-  const tabCounts = listQuery.data?.tabCounts;
 
   // Xây dựng PaymentDetail từ detailQuery
   const selectedPayment: PaymentDetail | null = detailQuery.data
@@ -378,7 +353,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
           }
           href={`/admin/thanh-toan?status=COMPLETED&date=${today}&dateField=paid`}
           isActive={
-            activeTab === "da_thanh_toan" &&
+            statusFilter === "da_thanh_toan" &&
             methodFilter === "tat_ca" &&
             tuNgay === today &&
             denNgay === today &&
@@ -426,7 +401,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
           }
           href="/admin/thanh-toan?status=PENDING&method=VNPAY"
           isActive={
-            activeTab === "cho_thanh_toan" &&
+            statusFilter === "cho_thanh_toan" &&
             methodFilter === "vnpay" &&
             tuNgay === "" &&
             denNgay === "" &&
@@ -452,7 +427,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
           }
           href="/admin/thanh-toan?status=PENDING&method=COD"
           isActive={
-            activeTab === "can_doi_soat" &&
+            statusFilter === "can_doi_soat" &&
             methodFilter === "cod" &&
             tuNgay === "" &&
             denNgay === "" &&
@@ -481,7 +456,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
           isAlert={true}
           href="/admin/thanh-toan?status=FAILED%2CCANCELLED"
           isActive={
-            activeTab === "that_bai" &&
+            statusFilter === "that_bai" &&
             methodFilter === "tat_ca" &&
             tuNgay === "" &&
             denNgay === "" &&
@@ -498,8 +473,6 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
         <PaymentFilterBar
           searchValue={searchValue}
           onSearchChange={handleSearchChange}
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
           statusFilter={statusFilter}
           onStatusFilterChange={handleStatusChange}
           methodFilter={methodFilter}
@@ -511,7 +484,6 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
           onDateChange={handleDateChange}
           onDateClear={handleDateClear}
           onReset={handleReset}
-          tabCounts={tabCounts}
         />
 
         {/* Bảng giao dịch + Phân trang */}
