@@ -478,7 +478,7 @@ CREATE TABLE IF NOT EXISTS `InventoryTransaction` (
 	`reason` VARCHAR(300) NOT NULL,
 	`createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	PRIMARY KEY (`id`),
-	KEY `idx_inventory_transaction_variant_id` (`variantId`),
+	KEY `idx_inventory_transaction_variant_created_at` (`variantId`, `createdAt`),
 	KEY `idx_inventory_transaction_order_id` (`orderId`),
 	KEY `idx_inventory_transaction_supplier_id` (`supplierId`),
 	CONSTRAINT `fk_inventory_transaction_variant`

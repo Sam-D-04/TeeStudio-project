@@ -175,11 +175,11 @@ async function layDanhSachTonKho(params = {}) {
   if (tuNgay || denNgay) {
     const transactionConditions = ["it.variantId = pv.id"];
     if (tuNgay) {
-      transactionConditions.push("DATE(it.createdAt) >= ?");
+      transactionConditions.push("it.createdAt >= ?");
       values.push(tuNgay);
     }
     if (denNgay) {
-      transactionConditions.push("DATE(it.createdAt) <= ?");
+      transactionConditions.push("it.createdAt < DATE_ADD(?, INTERVAL 1 DAY)");
       values.push(denNgay);
     }
     conditions.push(

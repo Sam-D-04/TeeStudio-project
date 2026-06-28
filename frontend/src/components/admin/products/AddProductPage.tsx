@@ -308,7 +308,6 @@ export default function AddProductPage() {
       color: hang.mauSac.trim(),
       size: hang.kichThuoc.trim(),
       sku: hang.maSKU.trim(),
-      stockQty: 0,
     }));
   }
 

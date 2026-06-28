@@ -145,7 +145,6 @@ export type ThemBienTheInput = {
   color: string;
   size: string;
   sku: string;
-  stockQty?: number;
 };
 
 /** Payload cập nhật biến thể */

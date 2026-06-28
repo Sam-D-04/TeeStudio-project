@@ -66,10 +66,6 @@ const createVariantSchema = {
       type: "string",
       maxLength: 100,
     },
-    stockQty: {
-      type: "integer",
-      min: 0,
-    },
   },
 };
 

@@ -34,6 +34,14 @@ function taoLoi(message, statusCode = 400) {
   return err;
 }
 
+function damBaoKhongSuaTonKhoTuModuleSanPham(payload) {
+  if (Object.prototype.hasOwnProperty.call(payload, "stockQty")) {
+    throw taoLoi(
+      "Không thể cập nhật tồn kho từ module sản phẩm. Vui lòng thực hiện giao dịch kho."
+    );
+  }
+}
+
 async function kiemTraDieuKienAnSanPham(
   queryRunner,
   productId,
@@ -721,7 +729,10 @@ async function xoaSanPham(id) {
 // =====================================================================
 // SERVICE 10: Thêm biến thể
 // =====================================================================
-async function themBienThe(productId, { color, size, sku, stockQty }) {
+async function themBienThe(productId, payload = {}) {
+  damBaoKhongSuaTonKhoTuModuleSanPham(payload);
+  const { color, size, sku } = payload;
+
   // Kiểm tra sản phẩm tồn tại
   const [rows] = await db.pool.query("SELECT id FROM Product WHERE id = ?", [productId]);
   if (!rows || rows.length === 0) {
@@ -750,11 +761,11 @@ async function themBienThe(productId, { color, size, sku, stockQty }) {
   }
 
   const result = await db.execute(
-    "INSERT INTO ProductVariant (productId, color, size, sku, stockQty) VALUES (?, ?, ?, ?, ?)",
-    [productId, color, size, sku, stockQty || 0]
+    "INSERT INTO ProductVariant (productId, color, size, sku) VALUES (?, ?, ?, ?)",
+    [productId, color, size, sku]
   );
 
-  const stock = Number(stockQty) || 0;
+  const stock = 0;
 
   return {
     id: result.insertId,
@@ -772,7 +783,10 @@ async function themBienThe(productId, { color, size, sku, stockQty }) {
 // =====================================================================
 // SERVICE 11: Cập nhật biến thể
 // =====================================================================
-async function capNhatBienThe(productId, variantId, { color, size, sku, stockQty, status }) {
+async function capNhatBienThe(productId, variantId, payload = {}) {
+  damBaoKhongSuaTonKhoTuModuleSanPham(payload);
+  const { color, size, sku, status } = payload;
+
   const [rows] = await db.pool.query(
     `SELECT pv.id, pv.color, pv.size, pv.sku,
        EXISTS(SELECT 1 FROM InventoryTransaction it WHERE it.variantId = pv.id) as hasTransactions
@@ -804,7 +818,6 @@ async function capNhatBienThe(productId, variantId, { color, size, sku, stockQty
   if (color !== undefined) { fields.push("color = ?"); params.push(color); }
   if (size !== undefined) { fields.push("size = ?"); params.push(size); }
   if (sku !== undefined) { fields.push("sku = ?"); params.push(sku); }
-  if (stockQty !== undefined) { fields.push("stockQty = ?"); params.push(stockQty); }
   if (status !== undefined) { fields.push("status = ?"); params.push(status); }
 
   if (fields.length === 0) {

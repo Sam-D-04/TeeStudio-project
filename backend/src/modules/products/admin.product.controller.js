@@ -216,7 +216,7 @@ const xoaSanPham = async (req, res, next) => {
 /**
  * POST /api/admin/products/:id/variants
  * Thêm biến thể (màu + size) mới vào phôi áo.
- * Body: { color, size, sku, stockQty }
+ * Body: { color, size, sku }
  */
 const themBienThe = async (req, res, next) => {
   try {
@@ -239,8 +239,8 @@ const themBienThe = async (req, res, next) => {
 
 /**
  * PUT /api/admin/products/:id/variants/:variantId
- * Cập nhật biến thể (màu, size, SKU, tồn kho).
- * Body: { color?, size?, sku?, stockQty? }
+ * Cập nhật thông tin biến thể (không cập nhật tồn kho).
+ * Body: { color?, size?, sku?, status? }
  */
 const capNhatBienThe = async (req, res, next) => {
   try {

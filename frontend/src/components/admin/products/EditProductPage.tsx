@@ -299,13 +299,11 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
           size: v.size.trim(),
           sku: v.sku.trim(),
           status: v.status,
-          stockQty: v.stock,
         })),
         ...data.newVariants.map((v) => ({
           color: v.mauSac.trim(),
           size: v.kichThuoc.trim(),
           sku: v.maSKU.trim(),
-          stockQty: 0,
         })),
       ],
     };
