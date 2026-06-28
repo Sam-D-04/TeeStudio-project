@@ -98,7 +98,7 @@ export default function AccountFormModal({
       cancelText="Hủy"
       cancelButtonProps={{ disabled: dangTai }}
       closable={!dangTai}
-      maskClosable={!dangTai}
+      mask={{ closable: !dangTai }}
     >
       <div style={{ paddingTop: 16 }}>
         {mode === "them" && (

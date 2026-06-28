@@ -31,6 +31,21 @@ function isVnpayTransactionSuccessful(query) {
   );
 }
 
+function shouldReconcileVnpayLater(query) {
+  return ["07", "99"].includes(String(query.vnp_ResponseCode || ""));
+}
+
+function mergeGatewayResponse(currentResponse, query) {
+  try {
+    const current = typeof currentResponse === "string"
+      ? JSON.parse(currentResponse)
+      : currentResponse;
+    return JSON.stringify({ ...(current || {}), ...query });
+  } catch {
+    return JSON.stringify(query);
+  }
+}
+
 async function findVnpayPayment(executor, transactionRef, lockForUpdate = false) {
   const [rows] = await executor.query(
     `SELECT
@@ -41,6 +56,7 @@ async function findVnpayPayment(executor, transactionRef, lockForUpdate = false)
        p.paymentMethod,
        p.paymentType,
        p.paidAt,
+       p.gatewayResponse,
        co.orderCode,
        co.status AS orderStatus
      FROM Payment p
@@ -124,6 +140,11 @@ async function dongBoTrangThaiVnpay(query) {
     }
 
     const isSuccessful = isVnpayTransactionSuccessful(query);
+    const nextStatus = isSuccessful
+      ? "COMPLETED"
+      : shouldReconcileVnpayLater(query)
+        ? "PENDING"
+        : "FAILED";
     const [updateResult] = await conn.query(
       `UPDATE Payment
        SET status = ?,
@@ -132,9 +153,9 @@ async function dongBoTrangThaiVnpay(query) {
        WHERE id = ?
          AND status = 'PENDING'`,
       [
-        isSuccessful ? "COMPLETED" : "FAILED",
+        nextStatus,
         isSuccessful ? new Date() : null,
-        JSON.stringify(query),
+        mergeGatewayResponse(payment.gatewayResponse, query),
         payment.id,
       ]
     );
@@ -400,11 +421,20 @@ function buildIpnHistory(paymentRow) {
     }
 
     if (gwData) {
-      const isSuccess = gwData.vnp_ResponseCode === "00";
+      const isQueryDr = gwData.vnp_Command === "querydr";
+      const isSuccess =
+        gwData.vnp_ResponseCode === "00" &&
+        (!gwData.vnp_TransactionStatus || gwData.vnp_TransactionStatus === "00");
       steps.push({
-        description: isSuccess ? "Nhận IPN thành công" : `Nhận IPN – Mã lỗi: ${gwData.vnp_ResponseCode || "N/A"}`,
+        description: isSuccess
+          ? isQueryDr
+            ? "Đối soát VNPAY tự động thành công"
+            : "Nhận IPN thành công"
+          : `Nhận phản hồi VNPAY – Mã lỗi: ${gwData.vnp_ResponseCode || "N/A"}`,
         time: formatDateVn(paymentRow.paidAt) || formatDateVn(paymentRow.createdAt) || "",
-        note: isSuccess ? "Payload matched" : `ResponseCode: ${gwData.vnp_ResponseCode || "N/A"}`,
+        note: isSuccess
+          ? isQueryDr ? "QueryDR matched" : "Payload matched"
+          : `ResponseCode: ${gwData.vnp_ResponseCode || "N/A"}`,
         isSuccess,
       });
     }
@@ -485,42 +515,6 @@ async function xacNhanThuCod(id) {
   }
 }
 
-// ── Đồng bộ lại VNPAY ────────────────────────────────────────────────
-
-async function dongBoLaiVnpay(id) {
-  const [rows] = await db.pool.query(
-    `SELECT p.id, p.status, p.paymentMethod, p.transactionId
-     FROM Payment p
-     WHERE p.id = ?
-     LIMIT 1`,
-    [id]
-  );
-
-  if (rows.length === 0) {
-    const error = new Error("Không tìm thấy giao dịch thanh toán");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  const payment = rows[0];
-
-  if (payment.paymentMethod !== PAYMENT_METHOD.VNPAY) {
-    const error = new Error("Giao dịch này không phải VNPAY");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  // Trả về trạng thái hiện tại – trong thực tế sẽ gọi VNPAY QueryDR API
-  // Hiện tại chỉ trả lại trạng thái trong DB (Sandbox không hỗ trợ QueryDR)
-  return {
-    id: payment.id,
-    trangThai: mapStatusToFrontend(payment.status, payment.paymentMethod),
-    dbStatus: payment.status,
-    transactionId: payment.transactionId,
-    thongBao: "Đã kiểm tra trạng thái giao dịch",
-  };
-}
-
 // ── Lưu ghi chú kế toán ──────────────────────────────────────────────
 
 async function luuGhiChu(id, note) {
@@ -552,6 +546,5 @@ module.exports = {
   layDanhSachThanhToan,
   layChiTietThanhToan,
   xacNhanThuCod,
-  dongBoLaiVnpay,
   luuGhiChu,
 };

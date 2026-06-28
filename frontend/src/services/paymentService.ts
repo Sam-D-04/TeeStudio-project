@@ -1,3 +1,6 @@
+import axios from "axios";
+import apiClient from "@/lib/apiClient";
+
 export type VnpayReturnResult = {
   isValidChecksum: boolean;
   isSuccessful: boolean;
@@ -13,25 +16,22 @@ export type VnpayReturnResult = {
   paidAt: string | null;
 };
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-
 export async function xacThucKetQuaVnpay(
   queryString: string
 ): Promise<VnpayReturnResult> {
-  const response = await fetch(
-    `${API_BASE_URL}/payments/vnpay/return?${queryString}`,
-    { cache: "no-store" }
-  );
-
-  if (!response.ok) {
-    throw new Error("Không thể xác minh kết quả thanh toán");
-  }
-
-  const payload = (await response.json()) as {
+  const response = await apiClient.get<{
     success: boolean;
     data: VnpayReturnResult;
-  };
+  }>(`/payments/vnpay/return?${queryString}`);
 
-  return payload.data;
+  return response.data.data;
+}
+
+export function isVnpayVerificationConnectionError(error: unknown) {
+  if (!axios.isAxiosError(error)) return false;
+
+  return (
+    !error.response ||
+    ["ECONNABORTED", "ETIMEDOUT", "ERR_NETWORK"].includes(error.code || "")
+  );
 }

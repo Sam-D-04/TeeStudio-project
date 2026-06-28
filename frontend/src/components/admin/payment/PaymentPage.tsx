@@ -16,7 +16,6 @@ import {
   layDanhSachGiaoDich,
   layChiTietGiaoDich,
   xacNhanThuCod,
-  dongBoLaiVnpay,
   luuGhiChu,
   xuatBaoCaoThanhToan,
   type ThamSoLocGiaoDich,
@@ -137,18 +136,6 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
     },
   });
 
-  const syncVnpayMutation = useMutation({
-    mutationFn: dongBoLaiVnpay,
-    onSuccess: () => {
-      invalidateAll();
-      setActionLoading(false);
-    },
-    onError: () => {
-      setActionLoading(false);
-    },
-  });
-
-
   const saveNoteMutation = useMutation({
     mutationFn: ({ id, note }: { id: number; note: string }) => luuGhiChu(id, note),
     onSuccess: () => {
@@ -175,19 +162,10 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
     setSelectedPaymentId(payment.id);
   }
 
-  // Icon ✅ Xác nhận thu COD / Đồng bộ lại VNPAY
-  function handleConfirmAction(payment: Payment, e: MouseEvent) {
+  // Icon ✅ Xác nhận thu COD
+  function handleConfirmCod(payment: Payment, e: MouseEvent) {
     e.stopPropagation();
-    if (payment.method === "COD") {
-      confirmCodMutation.mutate(payment.id);
-    } else {
-      syncVnpayMutation.mutate(payment.id);
-    }
-  }
-
-  function handleSyncVnpay(id: number) {
-    setActionLoading(true);
-    syncVnpayMutation.mutate(id);
+    confirmCodMutation.mutate(payment.id);
   }
 
   // Lưu ghi chú từ Drawer
@@ -299,15 +277,12 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
             Thanh toán
           </h2>
           <p className="mt-1 text-sm text-text-secondary">
-            Theo dõi giao dịch, kiểm tra VNPAY, xử lý lỗi thanh toán và đối soát doanh thu đơn hàng.
+            Theo dõi giao dịch, xử lý lỗi thanh toán và đối soát doanh thu đơn hàng.
           </p>
         </div>
 
         {/* Các nút hành động đầu trang */}
         <div className="flex flex-wrap items-center gap-3">
-
-
-
           {/* Nút phụ: Xuất báo cáo */}
           <button
             type="button"
@@ -322,18 +297,6 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
             {isExporting ? "Đang xuất..." : "Xuất báo cáo"}
           </button>
 
-          {/* Nút chính: Kiểm tra VNPAY */}
-          <button
-            type="button"
-            className="flex h-control-h items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7]"
-          >
-            {/* Icon sync */}
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path d="M4 12v.01M4 12a8 8 0 018-8 8 8 0 015.657 2.343M20 12a8 8 0 01-8 8 8 8 0 01-5.657-2.343" strokeLinecap="round" />
-              <path d="M20 4v4h-4M4 20v-4h4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Kiểm tra VNPAY
-          </button>
         </div>
       </section>
 
@@ -533,7 +496,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
                 payments={payments}
                 onRowClick={handleRowClick}
                 onViewDetail={handleViewDetail}
-                onConfirmAction={handleConfirmAction}
+                onConfirmCod={handleConfirmCod}
               />
               <PaymentPagination
                 currentPage={currentPage}
@@ -552,7 +515,6 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
         payment={selectedPayment}
         onClose={() => setSelectedPaymentId(null)}
         isLoading={detailQuery.isLoading && selectedPaymentId !== null}
-        onSyncVnpay={handleSyncVnpay}
         onSaveNote={handleSaveNote}
         isActionLoading={actionLoading}
       />

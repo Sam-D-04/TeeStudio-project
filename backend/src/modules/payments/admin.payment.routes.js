@@ -74,14 +74,6 @@ adminRouter.post(
   paymentController.xacNhanThuCod
 );
 
-// POST /api/admin/payments/:id/sync-vnpay – Đồng bộ lại trạng thái VNPAY
-adminRouter.post(
-  "/:id/sync-vnpay",
-  verifyToken,
-  requireAdmin,
-  paymentController.dongBoLaiVnpay
-);
-
 // PATCH /api/admin/payments/:id/note – Lưu ghi chú kế toán
 adminRouter.patch(
   "/:id/note",

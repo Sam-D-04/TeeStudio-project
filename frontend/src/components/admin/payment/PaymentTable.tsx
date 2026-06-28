@@ -15,7 +15,7 @@ import PaymentStatusBadge from "./PaymentStatusBadge";
  * - Trạng thái (badge màu)
  * - Mã cổng TT (mã từ cổng thanh toán VNPAY)
  * - Thời gian giao dịch (paidAt — khớp với cột paidAt trong DB)
- * - Thao tác (xem chi tiết, xác nhận)
+ * - Thao tác (xem chi tiết, xác nhận thu COD)
  *
  * Khi bấm vào một hàng → gọi onRowClick để mở ngăn kéo chi tiết.
  * Khi bấm icon thao tác → gọi onActionClick thay vì mở ngăn kéo.
@@ -56,7 +56,7 @@ type PaymentTableProps = {
   payments: Payment[];                   // Danh sách giao dịch
   onRowClick: (payment: Payment) => void; // Khi bấm vào hàng
   onViewDetail?: (payment: Payment, e: MouseEvent) => void; // Xem chi tiết (icon 👁️)
-  onConfirmAction?: (payment: Payment, e: MouseEvent) => void; // Xác nhận (icon ✅)
+  onConfirmCod?: (payment: Payment, e: MouseEvent) => void;
 };
 
 // Hàm định dạng số tiền sang dạng "850.000đ"
@@ -68,7 +68,7 @@ export default function PaymentTable({
   payments,
   onRowClick,
   onViewDetail,
-  onConfirmAction,
+  onConfirmCod,
 }: PaymentTableProps) {
   return (
     // Bảng có thể cuộn ngang trên màn hình nhỏ
@@ -105,12 +105,6 @@ export default function PaymentTable({
               payment.status === "that_bai"
                 ? "text-[#b91c1c]"
                 : "text-text-main group-hover:text-[#0ea5e9]";
-
-            // Tooltip và icon cho nút xác nhận theo phương thức
-            const confirmLabel =
-              payment.method === "COD"
-                ? "Xác nhận thu COD"
-                : "Đồng bộ lại VNPAY";
 
             return (
               // Mỗi hàng có thể bấm vào để mở chi tiết (ngăn kéo)
@@ -222,22 +216,16 @@ export default function PaymentTable({
                       </svg>
                     </button>
 
-                    {/* Nút ✅ Xác nhận thu COD / Đồng bộ lại VNPAY */}
-                    <button
-                      type="button"
-                      title={confirmLabel}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onConfirmAction?.(payment, e);
-                      }}
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
-                        payment.method === "COD"
-                          ? "border-[#bbf7d0] bg-surface text-[#15803d] hover:bg-[#f0fdf4] hover:border-[#15803d]"
-                          : "border-border bg-surface text-text-secondary hover:border-[#0ea5e9] hover:bg-[#f0f9ff] hover:text-[#0ea5e9]"
-                      }`}
-                    >
-                      {payment.method === "COD" ? (
-                        // Icon dấu tích – Xác nhận thu COD
+                    {payment.method === "COD" && (
+                      <button
+                        type="button"
+                        title="Xác nhận thu COD"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onConfirmCod?.(payment, e);
+                        }}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#bbf7d0] bg-surface text-[#15803d] transition-colors hover:border-[#15803d] hover:bg-[#f0fdf4]"
+                      >
                         <svg
                           className="h-4 w-4"
                           fill="none"
@@ -251,27 +239,8 @@ export default function PaymentTable({
                             strokeLinejoin="round"
                           />
                         </svg>
-                      ) : (
-                        // Icon đồng bộ – Đồng bộ lại VNPAY
-                        <svg
-                          className="h-4 w-4"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            d="M4 12v.01M4 12a8 8 0 018-8 8 8 0 015.657 2.343M20 12a8 8 0 01-8 8 8 8 0 01-5.657-2.343"
-                            strokeLinecap="round"
-                          />
-                          <path
-                            d="M20 4v4h-4M4 20v-4h4"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      )}
-                    </button>
+                      </button>
+                    )}
 
                   </div>
                 </td>

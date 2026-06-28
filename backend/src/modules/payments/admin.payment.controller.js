@@ -112,26 +112,6 @@ const xacNhanThuCod = async (req, res, next) => {
 };
 
 /**
- * POST /api/admin/payments/:id/sync-vnpay
- * Đồng bộ lại trạng thái từ VNPAY.
- */
-const dongBoLaiVnpay = async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (!id || id < 1) {
-      return res.status(400).json({ success: false, message: "ID không hợp lệ" });
-    }
-    const data = await paymentService.dongBoLaiVnpay(id);
-    res.json({ success: true, message: "Đã đồng bộ trạng thái VNPAY", data });
-  } catch (error) {
-    if (error.statusCode) {
-      return res.status(error.statusCode).json({ success: false, message: error.message });
-    }
-    next(error);
-  }
-};
-
-/**
  * PATCH /api/admin/payments/:id/note
  * Lưu ghi chú kế toán.
  */
@@ -162,6 +142,5 @@ module.exports = {
   exportBaoCaoThanhToan,
   getChiTietThanhToan,
   xacNhanThuCod,
-  dongBoLaiVnpay,
   luuGhiChu,
 };

@@ -139,22 +139,6 @@ export async function xacNhanThuCod(id: number): Promise<{ id: number; trangThai
 }
 
 /**
- * Đồng bộ lại trạng thái từ VNPAY.
- * POST /api/admin/payments/:id/sync-vnpay
- */
-export async function dongBoLaiVnpay(
-  id: number
-): Promise<{ id: number; trangThai: string; dbStatus: string; transactionId: string; thongBao: string }> {
-  const res = await apiClient.post<{
-    success: boolean;
-    message: string;
-    data: { id: number; trangThai: string; dbStatus: string; transactionId: string; thongBao: string };
-  }>(`/admin/payments/${id}/sync-vnpay`);
-  return res.data.data;
-}
-
-
-/**
  * Lưu ghi chú kế toán.
  * PATCH /api/admin/payments/:id/note
  */

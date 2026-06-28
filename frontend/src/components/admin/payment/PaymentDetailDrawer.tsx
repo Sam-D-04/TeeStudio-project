@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { Payment, PaymentType } from "./PaymentTable";
 import PaymentStatusBadge from "./PaymentStatusBadge";
 
@@ -13,12 +13,11 @@ import PaymentStatusBadge from "./PaymentStatusBadge";
  * 2. Thông tin thanh toán (số tiền, phương thức, mã cổng, thời gian)
  * 3. Đơn hàng liên quan (mã đơn + thông tin khách)
  * 4. Lịch sử xử lý IPN (timeline)
- * 5. Ghi chú kế toán + nút hành động (Hoàn tiền, Đồng bộ VNPAY)
+ * 5. Ghi chú kế toán
  *
  * Props:
  * - payment: null = ẩn ngăn kéo | PaymentDetail = hiển thị ngăn kéo với dữ liệu
  * - onClose: gọi khi bấm nút X
- * - onSyncVnpay: gọi khi bấm nút Đồng bộ VNPAY
  * - onSaveNote: gọi khi bấm nút Lưu ghi chú
  * - isActionLoading: true khi đang xử lý hành động (disable nút)
  */
@@ -49,7 +48,6 @@ type PaymentDetailDrawerProps = {
   payment: PaymentDetail | null;           // null = ẩn ngăn kéo
   onClose: () => void;                     // Đóng ngăn kéo
   isLoading?: boolean;                     // Đang tải chi tiết
-  onSyncVnpay?: (id: number) => void;      // Đồng bộ VNPAY
   onSaveNote?: (id: number, note: string) => void; // Lưu ghi chú
   isActionLoading?: boolean;               // Đang xử lý hành động
 };
@@ -58,21 +56,12 @@ export default function PaymentDetailDrawer({
   payment,
   onClose,
   isLoading = false,
-  onSyncVnpay,
   onSaveNote,
   isActionLoading = false,
 }: PaymentDetailDrawerProps) {
-  // State lưu nội dung ghi chú kế toán
-  const [accountingNote, setAccountingNote] = useState("");
-
-  // Khi payment thay đổi, cập nhật ghi chú
-  useEffect(() => {
-    if (payment?.note !== undefined) {
-      setAccountingNote(payment.note);
-    } else {
-      setAccountingNote("");
-    }
-  }, [payment?.id, payment?.note]);
+  const [noteDraft, setNoteDraft] = useState({ paymentId: 0, value: "" });
+  const accountingNote =
+    noteDraft.paymentId === payment?.id ? noteDraft.value : payment?.note ?? "";
 
   // Hàm định dạng số tiền VNĐ
   function formatVnd(amount: number): string {
@@ -251,7 +240,9 @@ export default function PaymentDetailDrawer({
               {/* Ô nhập ghi chú tự do */}
               <textarea
                 value={accountingNote}
-                onChange={(e) => setAccountingNote(e.target.value)}
+                onChange={(e) =>
+                  setNoteDraft({ paymentId: payment.id, value: e.target.value })
+                }
                 placeholder="Thêm ghi chú đối soát tại đây..."
                 className="min-h-[100px] w-full rounded-lg border border-border bg-surface-alt p-3 text-sm text-text-main outline-none focus:border-[#0ea5e9] focus:ring-1 focus:ring-[#0ea5e9]"
               />
@@ -271,25 +262,6 @@ export default function PaymentDetailDrawer({
             </div>
           )}
         </div>
-
-        {/* ---- Khu vực nút hành động cuối ngăn kéo ---- */}
-        {payment && !isLoading && (
-          <div className="flex shrink-0 gap-3 border-t border-border bg-surface p-5">
-            {/* Nút Đồng bộ VNPAY – màu xanh chính */}
-            <button
-              type="button"
-              disabled={isActionLoading || payment.method !== "VNPAY"}
-              onClick={() => {
-                if (payment && onSyncVnpay) {
-                  onSyncVnpay(payment.id);
-                }
-              }}
-              className="h-control-h flex-1 rounded-lg bg-[#0ea5e9] text-sm font-semibold text-white transition-colors hover:bg-[#0284c7] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Đồng bộ VNPAY
-            </button>
-          </div>
-        )}
       </div>
     </>
   );
