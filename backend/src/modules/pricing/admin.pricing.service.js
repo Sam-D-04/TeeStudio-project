@@ -7,20 +7,20 @@ const {
 const db = require("../../database/mysql");
 
 const DEFAULT_CONFIGURATION = {
-  roundingUnit: 1000,
   defaultShippingFee: 30000,
   freeShippingThreshold: 500000,
   vatPercent: 0,
 };
 
+const ROUNDING_UNIT = 1000;
+
 const getPricingConfiguration = async () => {
   const [rows] = await db.pool.query(
-    `SELECT roundingUnit, defaultShippingFee, freeShippingThreshold, vatPercent
+    `SELECT defaultShippingFee, freeShippingThreshold, vatPercent
      FROM PricingConfiguration WHERE id = 1 LIMIT 1`
   );
   if (!rows.length) return DEFAULT_CONFIGURATION;
   return {
-    roundingUnit: Number(rows[0].roundingUnit),
     defaultShippingFee: Number(rows[0].defaultShippingFee),
     freeShippingThreshold: Number(rows[0].freeShippingThreshold),
     vatPercent: Number(rows[0].vatPercent),
@@ -111,8 +111,7 @@ const calculateDesignQuote = async ({
     amountAfterPromotion + shippingFee + vatAmount
   );
   const totalAmount = toMoney(
-    Math.ceil(amountBeforeRounding / Math.max(configuration.roundingUnit, 1)) *
-      Math.max(configuration.roundingUnit, 1)
+    Math.round(amountBeforeRounding / ROUNDING_UNIT) * ROUNDING_UNIT
   );
 
   return {

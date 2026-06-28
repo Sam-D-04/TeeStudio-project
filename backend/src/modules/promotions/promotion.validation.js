@@ -174,13 +174,6 @@ const updateSurchargeSchema = {
 
 const updatePricingFormulaSchema = {
   body: {
-    roundingUnit: {
-      label: "Đơn vị làm tròn",
-      required: true,
-      type: "integer",
-      min: 1,
-      max: 1000000,
-    },
     defaultShippingFee: {
       label: "Phí vận chuyển mặc định",
       required: true,

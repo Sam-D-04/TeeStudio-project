@@ -1,11 +1,12 @@
 const db = require("../../database/mysql");
 
 const DEFAULT_FORMULA = {
-  roundingUnit: 1000,
   defaultShippingFee: 30000,
   freeShippingThreshold: 500000,
   vatPercent: 0,
 };
+
+const ROUNDING_UNIT = 1000;
 
 const taoLoi = (message, statusCode = 400) => {
   const error = new Error(message);
@@ -476,7 +477,6 @@ async function capNhatPhuPhi(id, { loai, extraCost, isActive }) {
 }
 
 const mapFormula = (row) => ({
-  roundingUnit: Number(row.roundingUnit),
   defaultShippingFee: Number(row.defaultShippingFee),
   freeShippingThreshold: Number(row.freeShippingThreshold),
   vatPercent: Number(row.vatPercent),
@@ -492,14 +492,13 @@ const taoXemTruocCongThuc = (formula) => {
       ? 0
       : formula.defaultShippingFee;
   const truocLamTron = tamTinh + thueVat + phiVanChuyen;
-  const tongCong =
-    Math.ceil(truocLamTron / formula.roundingUnit) * formula.roundingUnit;
+  const tongCong = Math.round(truocLamTron / ROUNDING_UNIT) * ROUNDING_UNIT;
   return { giaPhoiMau, phuPhiInMau, tamTinh, thueVat, phiVanChuyen, truocLamTron, tongCong };
 };
 
 async function layCongThucBaoGia() {
   const [rows] = await db.pool.query(
-    `SELECT roundingUnit, defaultShippingFee, freeShippingThreshold, vatPercent
+    `SELECT defaultShippingFee, freeShippingThreshold, vatPercent
      FROM PricingConfiguration WHERE id = 1 LIMIT 1`
   );
   const formula = rows.length ? mapFormula(rows[0]) : DEFAULT_FORMULA;
@@ -508,22 +507,19 @@ async function layCongThucBaoGia() {
 
 async function capNhatCongThucBaoGia(data) {
   const formula = {
-    roundingUnit: Number(data.roundingUnit),
     defaultShippingFee: Number(data.defaultShippingFee),
     freeShippingThreshold: Number(data.freeShippingThreshold),
     vatPercent: Number(data.vatPercent),
   };
   await db.pool.query(
     `INSERT INTO PricingConfiguration
-       (id, roundingUnit, defaultShippingFee, freeShippingThreshold, vatPercent)
-     VALUES (1, ?, ?, ?, ?)
+       (id, defaultShippingFee, freeShippingThreshold, vatPercent)
+     VALUES (1, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
-       roundingUnit = VALUES(roundingUnit),
        defaultShippingFee = VALUES(defaultShippingFee),
        freeShippingThreshold = VALUES(freeShippingThreshold),
        vatPercent = VALUES(vatPercent)`,
     [
-      formula.roundingUnit,
       formula.defaultShippingFee,
       formula.freeShippingThreshold,
       formula.vatPercent,

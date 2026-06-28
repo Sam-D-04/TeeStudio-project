@@ -111,7 +111,6 @@ export type DanhSachPhuPhi = {
 };
 
 export type CauHinhBaoGia = {
-  roundingUnit: number;
   defaultShippingFee: number;
   freeShippingThreshold: number;
   vatPercent: number;
