@@ -70,8 +70,10 @@ async function doiSoatThanhToanVnpay() {
           completed += update.affectedRows;
 
           console.log(`==> Đã cập nhật thành công giao dịch ${payment.transactionId} vào cơ sở dữ liệu.`);
+        } else if (result.vnp_ResponseCode === "91") {
+          console.log(`-- VNPAY chưa ghi nhận giao dịch ${payment.transactionId} (mã 91).`);
         } else {
-          console.log(`-- Giao dịch ${payment.transactionId} chưa thanh toán hoặc bị lỗi.`);
+          console.log(`-- Giao dịch ${payment.transactionId} chưa thành công (${result.vnp_ResponseCode}: ${result.vnp_Message || "Không có mô tả"}).`);
         }
       } catch (error) {
         console.error(`[VNPAY] Không thể đối soát ${payment.transactionId}:`, error.message);
@@ -92,6 +94,7 @@ function startVnpayReconciliationJob() {
   void doiSoatThanhToanVnpay();
   const timer = setInterval(doiSoatThanhToanVnpay, INTERVAL_MS);
   timer.unref();
+  console.log("[VNPAY] Đã bắt đầu đối soát và lên lịch chạy lại mỗi 15 phút.");
 }
 
 module.exports = { doiSoatThanhToanVnpay, startVnpayReconciliationJob };

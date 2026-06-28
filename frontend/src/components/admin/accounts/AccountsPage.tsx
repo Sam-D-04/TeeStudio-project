@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { App, Button, Tabs } from "antd";
-import { UserAddOutlined } from "@ant-design/icons";
+import { App, Tabs } from "antd";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 import AccountFormModal from "./AccountFormDrawer";
@@ -189,7 +188,7 @@ export default function AccountsPage() {
     } else {
       currentParams.delete("status");
     }
-    
+
     const newUrl = currentParams.toString() ? `${pathname}?${currentParams.toString()}` : pathname;
     router.replace(newUrl, { scroll: false });
   };
@@ -199,7 +198,7 @@ export default function AccountsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div>
+        <div className="flex items-baseline gap-3">
           <h2
             style={{
               fontSize: 28,
@@ -215,32 +214,13 @@ export default function AccountsPage() {
             style={{
               fontSize: 14,
               color: "#94a3b8",
-              margin: "6px 0 0",
+              margin: 0,
             }}
           >
-            Quản lý tài khoản khách hàng và nhân sự nội bộ.
+            (Quản lý tài khoản khách hàng và nhân sự nội bộ.)
           </p>
         </div>
 
-        {activeTab === "customers" ? (
-          <Button
-            type="primary"
-            icon={<UserAddOutlined />}
-            onClick={handleMoModalThem}
-            style={{
-              height: 40,
-              borderRadius: 8,
-              background: "#0ea5e9",
-              border: "none",
-              fontWeight: 600,
-              fontSize: 14,
-              paddingInline: 20,
-              boxShadow: "0 2px 8px rgba(14,165,233,0.25)",
-            }}
-          >
-            Thêm tài khoản
-          </Button>
-        ) : null}
       </div>
 
       <Tabs
@@ -273,6 +253,7 @@ export default function AccountsPage() {
               setThamSoLoc((prev) => ({ ...prev, page, limit }))
             }
             onDoiLoc={handleDoiLoc}
+            onThem={handleMoModalThem}
             onSua={handleMoModalSua}
             onVoHieuHoa={(taiKhoan) => mutationVoHieu.mutate(taiKhoan.id)}
             onKhoiPhuc={(taiKhoan) => mutationKhoiPhuc.mutate(taiKhoan.id)}

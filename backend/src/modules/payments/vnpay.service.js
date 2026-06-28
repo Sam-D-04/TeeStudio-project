@@ -171,6 +171,16 @@ async function truyVanGiaoDichVnpay({ transactionRef, transactionDate }) {
   }
 
   const data = await response.json();
+  if (!data.vnp_SecureHash) {
+    const responseCode = String(data.vnp_ResponseCode || "N/A");
+    const message = responseCode === "94"
+      ? "Yêu cầu QueryDR bị trùng trong vòng 5 phút; sẽ thử lại ở chu kỳ sau"
+      : String(data.vnp_Message || "Phản hồi không có checksum");
+    throw new Error(`VNPAY QueryDR trả về mã ${responseCode}: ${message}`);
+  }
+  if (data.vnp_TmnCode !== config.tmnCode) {
+    throw new Error("Mã website trong phản hồi QueryDR không khớp cấu hình");
+  }
   if (!verifyQueryDrResponse(data, config)) {
     throw new Error("Checksum QueryDR từ VNPAY không hợp lệ");
   }
