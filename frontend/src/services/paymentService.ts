@@ -1,7 +1,10 @@
 import axios from "axios";
 import apiClient from "@/lib/apiClient";
 
-export type VnpayReturnResult = {
+export type OnlinePaymentGateway = "VNPAY" | "MOMO";
+
+export type OnlinePaymentReturnResult = {
+  gateway: OnlinePaymentGateway;
   isValidChecksum: boolean;
   isSuccessful: boolean;
   responseCode: string;
@@ -16,18 +19,19 @@ export type VnpayReturnResult = {
   paidAt: string | null;
 };
 
-export async function xacThucKetQuaVnpay(
+export async function xacThucKetQuaThanhToan(
+  gateway: OnlinePaymentGateway,
   queryString: string
-): Promise<VnpayReturnResult> {
+): Promise<OnlinePaymentReturnResult> {
   const response = await apiClient.get<{
     success: boolean;
-    data: VnpayReturnResult;
-  }>(`/payments/vnpay/return?${queryString}`);
+    data: OnlinePaymentReturnResult;
+  }>(`/payments/${gateway.toLowerCase()}/return?${queryString}`);
 
   return response.data.data;
 }
 
-export function isVnpayVerificationConnectionError(error: unknown) {
+export function isPaymentVerificationConnectionError(error: unknown) {
   if (!axios.isAxiosError(error)) return false;
 
   return (

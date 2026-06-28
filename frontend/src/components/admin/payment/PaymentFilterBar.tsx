@@ -118,6 +118,7 @@ export default function PaymentFilterBar({
             >
               <option value="tat_ca">Tất cả</option>
               <option value="vnpay">VNPAY</option>
+              <option value="momo">MoMo</option>
               <option value="cod">COD</option>
             </select>
             <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-text-secondary">

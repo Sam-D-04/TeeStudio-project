@@ -35,7 +35,7 @@ router.get("/vi-tri-in", designController.getDanhSachViTriInCongKhai);
 // GET /api/stickers → chỉ trả sticker đang bật
 router.get("/stickers", designController.getDanhSachSticker);
 
-// Xác thực Return URL và nhận IPN từ VNPAY.
+// Xác thực Return URL và nhận IPN từ các cổng thanh toán online.
 router.use("/payments", paymentRoutes);
 
 // ─────────────────────────────────────────────────────────────────────────────

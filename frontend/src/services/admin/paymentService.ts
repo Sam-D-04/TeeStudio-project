@@ -34,7 +34,7 @@ export type GiaoDich = {
   customerName: string;
   amountVnd: number;
   paymentType: PaymentType;
-  method: "VNPAY" | "COD";
+  method: "VNPAY" | "MOMO" | "COD";
   status: PaymentStatus;
   gatewayCode: string;
   paidAt?: string;

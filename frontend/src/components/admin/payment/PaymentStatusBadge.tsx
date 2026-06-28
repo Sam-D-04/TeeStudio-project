@@ -10,7 +10,7 @@ export type PaymentStatus =
   | "da_thanh_toan"    // Đã thanh toán thành công
   | "cho_thanh_toan"   // Chờ người dùng thanh toán
   | "that_bai"         // Thanh toán thất bại / lỗi cổng
-  | "can_doi_soat";    // Cần đối soát thủ công với VNPAY
+  | "can_doi_soat";    // Cần đối soát thủ công với COD
 
 type PaymentStatusBadgeProps = {
   status: PaymentStatus;

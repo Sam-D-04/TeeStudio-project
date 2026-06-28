@@ -25,6 +25,7 @@ import PaymentStatusBadge from "./PaymentStatusBadge";
 // Nhãn tiếng Việt cho từng loại thanh toán (ánh xạ từ DB.paymentType)
 const PAYMENT_TYPE_LABEL: Record<PaymentType, string> = {
   DEPOSIT: "Thanh toán cọc",
+  FULL: "Thanh toán toàn bộ",
   FULL_PAYMENT: "Thanh toán toàn bộ",
   COD_FINAL: "Thanh toán COD",
 };

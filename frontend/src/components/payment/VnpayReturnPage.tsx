@@ -11,9 +11,10 @@ import { Alert, Button, Spin, Tag } from "antd";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  isVnpayVerificationConnectionError,
-  xacThucKetQuaVnpay,
-  type VnpayReturnResult,
+  isPaymentVerificationConnectionError,
+  xacThucKetQuaThanhToan,
+  type OnlinePaymentGateway,
+  type OnlinePaymentReturnResult,
 } from "@/services/paymentService";
 
 const BANK_REJECT_CODES = new Set([
@@ -28,6 +29,8 @@ const BANK_REJECT_CODES = new Set([
   "79",
 ]);
 const UNCERTAIN_CODES = new Set(["07", "99"]);
+const MOMO_UNCERTAIN_CODES = new Set(["10", "43", "1000", "7000", "7002"]);
+const MOMO_CANCELLED_CODES = new Set(["1006", "1017"]);
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("vi-VN", {
@@ -52,7 +55,7 @@ function PaymentInfoRow({
   );
 }
 
-export function VnpayReturnLoading() {
+export function PaymentReturnLoading() {
   return (
     <div className="flex min-h-[360px] flex-col items-center justify-center gap-4 text-center">
       <Spin indicator={<LoadingOutlined spin />} size="large" />
@@ -61,19 +64,25 @@ export function VnpayReturnLoading() {
           Đang xác minh thanh toán
         </h1>
         <p className="mt-2 text-sm text-text-secondary">
-          TeeStudio đang kiểm tra kết quả với VNPAY, vui lòng chờ trong giây lát.
+          TeeStudio đang kiểm tra kết quả với cổng thanh toán, vui lòng chờ trong giây lát.
         </p>
       </div>
     </div>
   );
 }
 
-export default function VnpayReturnPage() {
+export default function OnlinePaymentReturnPage() {
   const searchParams = useSearchParams();
   const queryString = searchParams.toString();
-  const missingRequiredParams =
-    !queryString || !searchParams.get("vnp_SecureHash");
-  const [result, setResult] = useState<VnpayReturnResult | null>(null);
+  const detectedGateway: OnlinePaymentGateway = searchParams.get("partnerCode")
+    ? "MOMO"
+    : "VNPAY";
+  const gatewayName = detectedGateway === "MOMO" ? "MoMo" : "VNPAY";
+  const missingRequiredParams = !queryString ||
+    (detectedGateway === "MOMO"
+      ? !searchParams.get("signature") || !searchParams.get("orderId")
+      : !searchParams.get("vnp_SecureHash"));
+  const [result, setResult] = useState<OnlinePaymentReturnResult | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [hasConnectionError, setHasConnectionError] = useState(false);
 
@@ -82,13 +91,13 @@ export default function VnpayReturnPage() {
 
     if (missingRequiredParams) return;
 
-    xacThucKetQuaVnpay(queryString)
+    xacThucKetQuaThanhToan(detectedGateway, queryString)
       .then((data) => {
         if (active) setResult(data);
       })
       .catch((error: unknown) => {
         if (!active) return;
-        if (isVnpayVerificationConnectionError(error)) {
+        if (isPaymentVerificationConnectionError(error)) {
           setHasConnectionError(true);
           return;
         }
@@ -102,29 +111,46 @@ export default function VnpayReturnPage() {
     return () => {
       active = false;
     };
-  }, [missingRequiredParams, queryString]);
+  }, [detectedGateway, missingRequiredParams, queryString]);
 
   const displayedErrorMessage = missingRequiredParams
-    ? "Đường dẫn thanh toán không có đủ dữ liệu xác minh từ VNPAY."
+    ? `Đường dẫn thanh toán không có đủ dữ liệu xác minh từ ${gatewayName}.`
     : errorMessage;
 
   if (!result && !displayedErrorMessage && !hasConnectionError) {
-    return <VnpayReturnLoading />;
+    return <PaymentReturnLoading />;
   }
 
-  const responseCode = result?.responseCode || searchParams.get("vnp_ResponseCode") || "";
+  const responseCode = result?.responseCode ||
+    searchParams.get(
+      detectedGateway === "MOMO" ? "resultCode" : "vnp_ResponseCode"
+    ) || "";
   const isSuccessful = Boolean(
     result?.isSuccessful || result?.databaseStatus === "COMPLETED"
   );
   const isInvalidChecksum = Boolean(result && !result.isValidChecksum);
   const isUncertain =
     !isSuccessful &&
-    (hasConnectionError || UNCERTAIN_CODES.has(responseCode));
+    (hasConnectionError ||
+      (detectedGateway === "MOMO"
+        ? MOMO_UNCERTAIN_CODES.has(responseCode)
+        : UNCERTAIN_CODES.has(responseCode)));
   const isCancelled = Boolean(
-    !isUncertain && result?.isValidChecksum && responseCode === "24"
+    !isUncertain &&
+    result?.isValidChecksum &&
+    (detectedGateway === "MOMO"
+      ? MOMO_CANCELLED_CODES.has(responseCode)
+      : responseCode === "24")
   );
   const isBankRejected = Boolean(
-    !isUncertain && result?.isValidChecksum && BANK_REJECT_CODES.has(responseCode)
+    !isUncertain &&
+    result?.isValidChecksum &&
+    (detectedGateway === "MOMO"
+      ? Boolean(responseCode) &&
+        !["0", "9000"].includes(responseCode) &&
+        !isCancelled &&
+        !isSuccessful
+      : BANK_REJECT_CODES.has(responseCode))
   );
   const canRetry = isCancelled || isBankRejected;
   const title = isSuccessful
@@ -210,7 +236,7 @@ export default function VnpayReturnPage() {
           showIcon
           type="error"
           title="Chữ ký thanh toán không hợp lệ"
-          description="Dữ liệu trên đường dẫn không khớp với chữ ký VNPAY. Không nên sử dụng thông tin này để xác nhận đã thanh toán."
+          description={`Dữ liệu trên đường dẫn không khớp với chữ ký ${gatewayName}. Không nên sử dụng thông tin này để xác nhận đã thanh toán.`}
         />
       ) : null}
 
@@ -248,10 +274,16 @@ export default function VnpayReturnPage() {
             }
           />
           {result.transactionNo ? (
-            <PaymentInfoRow label="Mã giao dịch VNPAY" value={result.transactionNo} />
+            <PaymentInfoRow
+              label={`Mã giao dịch ${gatewayName}`}
+              value={result.transactionNo}
+            />
           ) : null}
           {result.bankCode ? (
-            <PaymentInfoRow label="Ngân hàng" value={result.bankCode} />
+            <PaymentInfoRow
+              label={detectedGateway === "MOMO" ? "Hình thức" : "Ngân hàng"}
+              value={result.bankCode}
+            />
           ) : null}
           <PaymentInfoRow
             label="Mã phản hồi"
@@ -264,7 +296,7 @@ export default function VnpayReturnPage() {
         <SafetyCertificateOutlined className="mt-0.5 text-xl text-primary-container" />
         <p className="text-xs leading-5 text-text-secondary">
           Kết quả trên được xác minh qua backend TeeStudio. Trạng thái thanh toán
-          chính thức được cập nhật tự động qua IPN và tiến trình đối soát VNPAY.
+          chính thức được cập nhật tự động qua IPN và tiến trình đối soát {gatewayName}.
         </p>
       </div>
 

@@ -11,9 +11,9 @@ import PaymentStatusBadge from "./PaymentStatusBadge";
  * - Khách hàng (tên người mua)
  * - Số tiền (căn phải)
  * - Loại thanh toán (cọc / toàn bộ — ánh xạ từ paymentType trong DB)
- * - Phương thức (VNPAY / COD)
+ * - Phương thức (VNPAY / MOMO / COD)
  * - Trạng thái (badge màu)
- * - Mã cổng TT (mã từ cổng thanh toán VNPAY)
+ * - Mã cổng TT (mã tham chiếu từ VNPAY hoặc MoMo)
  * - Thời gian giao dịch (paidAt — khớp với cột paidAt trong DB)
  * - Thao tác (xem chi tiết, xác nhận thu COD)
  *
@@ -22,11 +22,12 @@ import PaymentStatusBadge from "./PaymentStatusBadge";
  */
 
 // Loại thanh toán ánh xạ từ cột paymentType trong bảng Payment (DB)
-export type PaymentType = "DEPOSIT" | "FULL_PAYMENT" | "COD_FINAL";
+export type PaymentType = "DEPOSIT" | "FULL" | "FULL_PAYMENT" | "COD_FINAL";
 
 // Nhãn tiếng Việt cho từng loại thanh toán
 const PAYMENT_TYPE_LABEL: Record<PaymentType, string> = {
   DEPOSIT: "Thanh toán cọc",
+  FULL: "Thanh toán toàn bộ",
   FULL_PAYMENT: "Thanh toán toàn bộ",
   COD_FINAL: "Thanh toán COD",
 };
@@ -34,6 +35,7 @@ const PAYMENT_TYPE_LABEL: Record<PaymentType, string> = {
 // Màu sắc badge loại thanh toán
 const PAYMENT_TYPE_CLASS: Record<PaymentType, string> = {
   DEPOSIT: "bg-[#fef3c7] text-[#b45309]",       // Vàng nhạt – thanh toán cọc
+  FULL: "bg-[#dbeafe] text-[#1d4ed8]",
   FULL_PAYMENT: "bg-[#dbeafe] text-[#1d4ed8]",  // Xanh dương nhạt – toàn bộ
   COD_FINAL: "bg-[#f0fdf4] text-[#15803d]",     // Xanh lá nhạt – COD
 };
@@ -46,9 +48,9 @@ export type Payment = {
   customerName: string;      // Tên khách hàng
   amountVnd: number;         // Số tiền (đơn vị VNĐ)
   paymentType: PaymentType;  // Loại thanh toán: cọc / toàn bộ / COD (ánh xạ từ DB.paymentType)
-  method: "VNPAY" | "COD";  // Phương thức thanh toán
+  method: "VNPAY" | "MOMO" | "COD";  // Phương thức thanh toán
   status: PaymentStatus;     // Trạng thái giao dịch
-  gatewayCode: string;       // Mã cổng thanh toán từ VNPAY (ví dụ: "VNPAY-842193")
+  gatewayCode: string;       // Mã tham chiếu từ cổng thanh toán
   paidAt?: string;           // Thời gian giao dịch thành công (ánh xạ từ DB.paidAt)
 };
 
@@ -150,6 +152,13 @@ export default function PaymentTable({
                           VN
                         </span>
                         <span>VNPAY</span>
+                      </>
+                    ) : payment.method === "MOMO" ? (
+                      <>
+                        <span className="flex h-4 w-6 items-center justify-center rounded bg-[#a50064] text-[8px] font-bold text-white">
+                          MO
+                        </span>
+                        <span>MoMo</span>
                       </>
                     ) : (
                       <>

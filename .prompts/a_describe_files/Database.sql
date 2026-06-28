@@ -451,7 +451,7 @@ CREATE TABLE IF NOT EXISTS `Payment` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`orderId` INT NOT NULL,
 	`amount` DECIMAL(15,2) NOT NULL,
-	`paymentMethod` VARCHAR(30) NOT NULL,
+	`paymentMethod` VARCHAR(30) NOT NULL COMMENT 'Phương thức thanh toán dùng chung: COD, VNPAY, MOMO',
 	`paymentType` VARCHAR(20) NOT NULL,
 	`status` VARCHAR(20) NOT NULL DEFAULT 'PENDING',
 	`transactionId` VARCHAR(255) NULL,
@@ -462,6 +462,7 @@ CREATE TABLE IF NOT EXISTS `Payment` (
 	PRIMARY KEY (`id`),
 	UNIQUE KEY `uq_payment_transaction_id` (`transactionId`),
 	KEY `idx_payment_order_id` (`orderId`),
+	KEY `idx_payment_method_status_created_at` (`paymentMethod`, `status`, `createdAt`),
 	CONSTRAINT `fk_payment_order`
 		FOREIGN KEY (`orderId`) REFERENCES `CustomerOrder` (`id`)
 		ON UPDATE NO ACTION ON DELETE RESTRICT

@@ -8,8 +8,13 @@ const {
   taoLinkThanhToanVnpay,
   taoMaGiaoDichVnpayMoi,
 } = require("../payments/vnpay.service");
+const {
+  taoLinkThanhToanMomo,
+  taoMaGiaoDichMomoMoi,
+} = require("../payments/momo.service");
 
 const DEPOSIT_PERCENT = 50;
+const ONLINE_PAYMENT_METHODS = new Set(["VNPAY", "MOMO"]);
 const ACTION_CUSTOMER_CREATED = "Khách hàng đặt đơn";
 const ACTION_ADMIN_CREATED = "Tạo đơn cho khách";
 const CREATION_ACTIONS = new Set([
@@ -17,6 +22,40 @@ const CREATION_ACTIONS = new Set([
   ACTION_CUSTOMER_CREATED,
   ACTION_ADMIN_CREATED,
 ]);
+
+function taoMaDonHangMoi() {
+  const now = new Date();
+  const dateStr = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("");
+  const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `TS-${dateStr}-${randomPart}`;
+}
+
+async function taoThongTinThanhToanOnline({
+  paymentMethod,
+  orderCode,
+  amount,
+  ipAddress,
+  transactionRef,
+}) {
+  if (paymentMethod === "VNPAY") {
+    return taoLinkThanhToanVnpay({
+      orderCode,
+      amount,
+      ipAddress,
+      transactionRef,
+    });
+  }
+
+  if (paymentMethod === "MOMO") {
+    return taoLinkThanhToanMomo({ orderCode, amount, transactionRef });
+  }
+
+  return null;
+}
 
 function tinhThongTinThanhToan(totalAmount, paymentMethod, paymentType) {
   const depositAmount =
@@ -671,7 +710,8 @@ async function layChiTietDonHang(id) {
     phuongPhapIn: item.phuongPhapIn || null,
   }));
 
-  const vnpayGatewayResponse = parseGatewayResponse(donHang.gatewayResponse);
+  const gatewayResponse = parseGatewayResponse(donHang.gatewayResponse);
+  const isOnlinePayment = ONLINE_PAYMENT_METHODS.has(donHang.paymentMethod);
   const thanhToan = {
     phuongThuc: donHang.paymentMethod || "COD",
     loai: donHang.paymentType || "FULL",
@@ -680,14 +720,14 @@ async function layChiTietDonHang(id) {
     paidAt: donHang.paidAt,
     status: donHang.trangThaiThanhToan,
     transactionId: donHang.transactionId || null,
-    paymentUrl:
-      donHang.paymentMethod === "VNPAY"
-        ? vnpayGatewayResponse.paymentUrl || null
-        : null,
-    expiresAt:
-      donHang.paymentMethod === "VNPAY"
-        ? vnpayGatewayResponse.expiresAt || null
-        : null,
+    paymentUrl: isOnlinePayment ? gatewayResponse.paymentUrl || null : null,
+    qrCodeValue: isOnlinePayment
+      ? donHang.paymentMethod === "MOMO"
+        ? gatewayResponse.paymentUrl || null
+        : gatewayResponse.qrCodeValue || gatewayResponse.paymentUrl || null
+      : null,
+    requestType: isOnlinePayment ? gatewayResponse.requestType || null : null,
+    expiresAt: isOnlinePayment ? gatewayResponse.expiresAt || null : null,
   };
 
   const [rowsHistory] = await db.pool.query(
@@ -1044,7 +1084,7 @@ async function capNhatDiaChiGiaoHang(id, addressData, actor) {
   }
 }
 
-async function taoLaiMaThanhToanVnpay(id, actor, ipAddress) {
+async function taoLaiMaThanhToanOnline(id, actor, ipAddress) {
   const conn = await db.pool.getConnection();
 
   try {
@@ -1075,8 +1115,8 @@ async function taoLaiMaThanhToanVnpay(id, actor, ipAddress) {
     }
 
     const payment = rows[0];
-    if (payment.paymentMethod !== "VNPAY") {
-      const err = new Error("Đơn hàng không sử dụng phương thức thanh toán VNPAY");
+    if (!ONLINE_PAYMENT_METHODS.has(payment.paymentMethod)) {
+      const err = new Error("Đơn hàng không sử dụng phương thức thanh toán online");
       err.statusCode = 400;
       throw err;
     }
@@ -1093,7 +1133,7 @@ async function taoLaiMaThanhToanVnpay(id, actor, ipAddress) {
       throw err;
     }
 
-    if (payment.paymentStatus !== "PENDING") {
+    if (!["PENDING", "FAILED"].includes(payment.paymentStatus)) {
       const err = new Error("Mã thanh toán hiện tại không thể tạo lại");
       err.statusCode = 400;
       throw err;
@@ -1101,17 +1141,31 @@ async function taoLaiMaThanhToanVnpay(id, actor, ipAddress) {
 
     const currentGatewayResponse = parseGatewayResponse(payment.gatewayResponse);
     const currentExpiresAt = Date.parse(currentGatewayResponse.expiresAt || "");
-    if (Number.isFinite(currentExpiresAt) && currentExpiresAt > Date.now()) {
-      const err = new Error("Mã thanh toán VNPAY hiện tại vẫn còn hiệu lực");
+    const isLegacyMomoPayment =
+      payment.paymentMethod === "MOMO" &&
+      currentGatewayResponse.requestType !== "payWithMethod";
+    if (
+      payment.paymentStatus === "PENDING" &&
+      !isLegacyMomoPayment &&
+      Number.isFinite(currentExpiresAt) &&
+      currentExpiresAt > Date.now()
+    ) {
+      const err = new Error(
+        `Mã thanh toán ${payment.paymentMethod} hiện tại vẫn còn hiệu lực`
+      );
       err.statusCode = 400;
       throw err;
     }
 
-    const vnpayPayment = taoLinkThanhToanVnpay({
+    const transactionRef = payment.paymentMethod === "VNPAY"
+      ? taoMaGiaoDichVnpayMoi(payment.orderCode)
+      : taoMaGiaoDichMomoMoi(payment.orderCode);
+    const onlinePayment = await taoThongTinThanhToanOnline({
+      paymentMethod: payment.paymentMethod,
       orderCode: payment.orderCode,
       amount: Number(payment.amount),
       ipAddress,
-      transactionRef: taoMaGiaoDichVnpayMoi(payment.orderCode),
+      transactionRef,
     });
 
     await conn.query(
@@ -1121,10 +1175,10 @@ async function taoLaiMaThanhToanVnpay(id, actor, ipAddress) {
            status = 'PENDING',
            paidAt = NULL
        WHERE id = ?
-         AND status = 'PENDING'`,
+         AND status IN ('PENDING', 'FAILED')`,
       [
-        vnpayPayment.transactionRef,
-        JSON.stringify(vnpayPayment),
+        onlinePayment.transactionRef,
+        JSON.stringify(onlinePayment),
         payment.paymentId,
       ]
     );
@@ -1133,17 +1187,19 @@ async function taoLaiMaThanhToanVnpay(id, actor, ipAddress) {
       orderId: Number(id),
       fromStatus: payment.orderStatus,
       toStatus: payment.orderStatus,
-      action: "VNPAY_PAYMENT_RECREATED",
+      action: `${payment.paymentMethod}_PAYMENT_RECREATED`,
       actor,
-      note: "Admin đã khởi tạo lại mã thanh toán VNPAY",
+      note: `Admin đã khởi tạo lại mã thanh toán ${payment.paymentMethod}`,
     });
 
     await conn.commit();
 
     return {
-      paymentUrl: vnpayPayment.paymentUrl,
-      paymentUrlExpiresAt: vnpayPayment.expiresAt,
-      transactionId: vnpayPayment.transactionRef,
+      paymentMethod: payment.paymentMethod,
+      paymentUrl: onlinePayment.paymentUrl,
+      qrCodeValue: onlinePayment.qrCodeValue || onlinePayment.paymentUrl,
+      paymentUrlExpiresAt: onlinePayment.expiresAt,
+      transactionId: onlinePayment.transactionRef,
     };
   } catch (error) {
     await conn.rollback();
@@ -1160,7 +1216,7 @@ module.exports = {
   capNhatTrangThai,
   huyDonHang,
   capNhatDiaChiGiaoHang,
-  taoLaiMaThanhToanVnpay,
+  taoLaiMaThanhToanOnline,
   // ── Service hỗ trợ form Tạo đơn mới ──
   timKiemKhachHang,
   layDiaChiKhachHang,
@@ -1625,6 +1681,21 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     enriched.designFee = Number(design.designFee);
   }
 
+  const hasCustomDesign = itemsEnriched.some((item) => Boolean(item.designId));
+  if (hasCustomDesign && paymentMethod === "COD") {
+    const err = new Error(
+      "Đơn có sản phẩm Áo in POD / Thiết kế POD chỉ được thanh toán online bằng VNPAY hoặc MoMo"
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (!hasCustomDesign && paymentType === "DEPOSIT") {
+    const err = new Error("Chỉ đơn hàng POD mới được chọn hình thức đặt cọc");
+    err.statusCode = 400;
+    throw err;
+  }
+
   // ─────────────────────────────────────────────
   // BƯỚC 2: Tính giá tổng đơn hàng
   // ─────────────────────────────────────────────
@@ -1751,11 +1822,19 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     paymentAmount,
   } = tinhThongTinThanhToan(totalAmount, paymentMethod, paymentType);
 
-  if (paymentMethod === "VNPAY" && paymentAmount <= 0) {
-    const err = new Error("Số tiền thanh toán VNPAY phải lớn hơn 0");
+  if (ONLINE_PAYMENT_METHODS.has(paymentMethod) && paymentAmount <= 0) {
+    const err = new Error(`Số tiền thanh toán ${paymentMethod} phải lớn hơn 0`);
     err.statusCode = 400;
     throw err;
   }
+
+  const orderCode = taoMaDonHangMoi();
+  const onlinePayment = await taoThongTinThanhToanOnline({
+    paymentMethod,
+    orderCode,
+    amount: paymentAmount,
+    ipAddress,
+  });
 
   // ─────────────────────────────────────────────
   // BƯỚC 3-9: Thực hiện trong MySQL Transaction
@@ -1766,25 +1845,6 @@ async function taoMoiDonHang(data, actor, ipAddress) {
 
   try {
     await conn.beginTransaction();
-
-    // ── Bước 3.1: Sinh orderCode duy nhất ──
-    // Format: TS-YYYYMMDD-XXXXXX (X = random hex)
-    const now = new Date();
-    const dateStr = [
-      now.getFullYear(),
-      String(now.getMonth() + 1).padStart(2, "0"),
-      String(now.getDate()).padStart(2, "0"),
-    ].join("");
-    const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const orderCode = `TS-${dateStr}-${randomPart}`;
-    const vnpayPayment =
-      paymentMethod === "VNPAY"
-        ? taoLinkThanhToanVnpay({
-            orderCode,
-            amount: paymentAmount,
-            ipAddress,
-          })
-        : null;
 
     // ── Bước 3.1.5: INSERT UserAddress để lấy addressId mới ──
     const [resultAddress] = await conn.query(
@@ -1899,8 +1959,8 @@ async function taoMoiDonHang(data, actor, ipAddress) {
         paymentAmount,
         paymentMethod,
         paymentType,
-        vnpayPayment?.transactionRef || null,
-        vnpayPayment ? JSON.stringify(vnpayPayment) : null,
+        onlinePayment?.transactionRef || null,
+        onlinePayment ? JSON.stringify(onlinePayment) : null,
       ]
     );
 
@@ -1931,8 +1991,10 @@ async function taoMoiDonHang(data, actor, ipAddress) {
       depositAmount,
       codAmount,
       paymentAmount,
-      paymentUrl: vnpayPayment?.paymentUrl || null,
-      paymentUrlExpiresAt: vnpayPayment?.expiresAt || null,
+      paymentMethod,
+      paymentUrl: onlinePayment?.paymentUrl || null,
+      qrCodeValue: onlinePayment?.qrCodeValue || onlinePayment?.paymentUrl || null,
+      paymentUrlExpiresAt: onlinePayment?.expiresAt || null,
     };
   } catch (error) {
     // ── ROLLBACK nếu có lỗi ──

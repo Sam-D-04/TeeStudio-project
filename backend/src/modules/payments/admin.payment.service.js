@@ -2,12 +2,17 @@
  * payment.service.js – Nghiệp vụ thanh toán.
  *
  * Bao gồm:
- * - Phần 1: Logic VNPAY Return / IPN (giữ nguyên từ trước)
- * - Phần 2: Logic Admin quản lý thanh toán (mới)
+ * - Phần 1: Logic Return / IPN của VNPAY và MoMo
+ * - Phần 2: Logic Admin quản lý thanh toán
  */
 
 const db = require("../../database/mysql");
 const { xacThucPhanHoiVnpay } = require("./vnpay.service");
+const {
+  xacThucPhanHoiMomo,
+  laGiaoDichMomoThanhCong,
+  laGiaoDichMomoDangXuLy,
+} = require("./momo.service");
 const {
   PAYMENT_STATUS,
   PAYMENT_METHOD,
@@ -16,7 +21,7 @@ const {
 const { taoBoLocThanhToan } = require("./payment-filter.util");
 
 // =====================================================================
-// PHẦN 1: LOGIC VNPAY RETURN / IPN (GIỮ NGUYÊN)
+// PHẦN 1: LOGIC RETURN / IPN CỦA CÁC CỔNG ONLINE
 // =====================================================================
 
 function parseVnpayAmount(query) {
@@ -46,7 +51,12 @@ function mergeGatewayResponse(currentResponse, query) {
   }
 }
 
-async function findVnpayPayment(executor, transactionRef, lockForUpdate = false) {
+async function findOnlinePayment(
+  executor,
+  transactionRef,
+  paymentMethod,
+  lockForUpdate = false
+) {
   const [rows] = await executor.query(
     `SELECT
        p.id,
@@ -62,9 +72,9 @@ async function findVnpayPayment(executor, transactionRef, lockForUpdate = false)
      FROM Payment p
      JOIN CustomerOrder co ON co.id = p.orderId
      WHERE p.transactionId = ?
-       AND p.paymentMethod = 'VNPAY'
+       AND p.paymentMethod = ?
      LIMIT 1${lockForUpdate ? " FOR UPDATE" : ""}`,
-    [transactionRef]
+    [transactionRef, paymentMethod]
   );
 
   return rows[0] || null;
@@ -77,6 +87,7 @@ function buildPublicResult(query, payment, isValidChecksum) {
     isValidChecksum && amountMatches && isVnpayTransactionSuccessful(query);
 
   return {
+    gateway: PAYMENT_METHOD.VNPAY,
     isValidChecksum,
     isSuccessful,
     responseCode: isValidChecksum ? String(query.vnp_ResponseCode || "") : "",
@@ -105,7 +116,7 @@ async function xacThucKetQuaTraVeVnpay(query) {
   }
 
   const payment = isValidChecksum && transactionRef
-    ? await findVnpayPayment(db.pool, transactionRef)
+    ? await findOnlinePayment(db.pool, transactionRef, PAYMENT_METHOD.VNPAY)
     : null;
 
   return buildPublicResult(query, payment, isValidChecksum);
@@ -117,7 +128,12 @@ async function dongBoTrangThaiVnpay(query) {
 
   try {
     await conn.beginTransaction();
-    const payment = await findVnpayPayment(conn, transactionRef, true);
+    const payment = await findOnlinePayment(
+      conn,
+      transactionRef,
+      PAYMENT_METHOD.VNPAY,
+      true
+    );
 
     if (!payment) {
       await conn.rollback();
@@ -184,6 +200,152 @@ async function xuLyIpnVnpay(query) {
   return dongBoTrangThaiVnpay(query);
 }
 
+function parseMomoAmount(payload) {
+  const amount = Number(payload.amount);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function parseMomoPaidAt(payload) {
+  const responseTime = Number(payload.responseTime);
+  const paidAt = Number.isFinite(responseTime) ? new Date(responseTime) : new Date();
+  return Number.isNaN(paidAt.getTime()) ? new Date() : paidAt;
+}
+
+function buildMomoPublicResult(payload, payment, isValidChecksum) {
+  const amount = isValidChecksum ? parseMomoAmount(payload) : 0;
+  const amountMatches = Boolean(payment) && Number(payment.amount) === amount;
+  const isSuccessful =
+    isValidChecksum &&
+    amountMatches &&
+    laGiaoDichMomoThanhCong(payload.resultCode);
+
+  return {
+    gateway: PAYMENT_METHOD.MOMO,
+    isValidChecksum,
+    isSuccessful,
+    responseCode: isValidChecksum ? String(payload.resultCode ?? "") : "",
+    transactionStatus: isValidChecksum ? String(payload.resultCode ?? "") : "",
+    transactionRef: isValidChecksum ? String(payload.orderId || "") : "",
+    transactionNo: isValidChecksum ? String(payload.transId || "") : "",
+    bankCode: isValidChecksum ? String(payload.payType || "") : "",
+    orderCode: payment?.orderCode || null,
+    amount,
+    paymentType: payment?.paymentType || null,
+    databaseStatus: payment?.status || null,
+    paidAt: payment?.paidAt || null,
+  };
+}
+
+async function dongBoTrangThaiMomo(payload, source = "ipn") {
+  const transactionRef = String(payload.orderId || "");
+  const conn = await db.pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+    const payment = await findOnlinePayment(
+      conn,
+      transactionRef,
+      PAYMENT_METHOD.MOMO,
+      true
+    );
+
+    if (!payment) {
+      await conn.rollback();
+      return { accepted: false, reason: "Không tìm thấy giao dịch MoMo" };
+    }
+
+    if (Number(payment.amount) !== parseMomoAmount(payload)) {
+      await conn.rollback();
+      return { accepted: false, reason: "Số tiền giao dịch MoMo không khớp" };
+    }
+
+    if (payment.status === PAYMENT_STATUS.COMPLETED) {
+      await conn.rollback();
+      return { accepted: true, payment };
+    }
+
+    if (
+      payment.status !== PAYMENT_STATUS.PENDING ||
+      payment.orderStatus === "CANCELLED"
+    ) {
+      await conn.rollback();
+      return { accepted: false, reason: "Giao dịch MoMo không còn khả dụng" };
+    }
+
+    const isSuccessful = laGiaoDichMomoThanhCong(payload.resultCode);
+    const nextStatus = isSuccessful
+      ? PAYMENT_STATUS.COMPLETED
+      : laGiaoDichMomoDangXuLy(payload.resultCode)
+        ? PAYMENT_STATUS.PENDING
+        : PAYMENT_STATUS.FAILED;
+    const paidAt = isSuccessful ? parseMomoPaidAt(payload) : null;
+
+    const [updateResult] = await conn.query(
+      `UPDATE Payment
+       SET status = ?,
+           paidAt = ?,
+           gatewayResponse = ?
+       WHERE id = ?
+         AND status = 'PENDING'`,
+      [
+        nextStatus,
+        paidAt,
+        mergeGatewayResponse(payment.gatewayResponse, {
+          ...payload,
+          source,
+        }),
+        payment.id,
+      ]
+    );
+
+    if (updateResult.affectedRows === 0) {
+      await conn.rollback();
+      return { accepted: true, payment };
+    }
+
+    await conn.commit();
+    return {
+      accepted: true,
+      payment: { ...payment, status: nextStatus, paidAt },
+    };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+async function xacThucKetQuaTraVeMomo(payload) {
+  const isValidChecksum = xacThucPhanHoiMomo(payload);
+  const transactionRef = String(payload.orderId || "");
+
+  if (isValidChecksum && transactionRef) {
+    await dongBoTrangThaiMomo(payload, "return");
+  }
+
+  const payment = isValidChecksum && transactionRef
+    ? await findOnlinePayment(db.pool, transactionRef, PAYMENT_METHOD.MOMO)
+    : null;
+
+  return buildMomoPublicResult(payload, payment, isValidChecksum);
+}
+
+async function xuLyIpnMomo(payload) {
+  if (!xacThucPhanHoiMomo(payload)) {
+    const error = new Error("Chữ ký IPN MoMo không hợp lệ");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const result = await dongBoTrangThaiMomo(payload, "ipn");
+  if (!result.accepted) {
+    const error = new Error(result.reason);
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
 // =====================================================================
 // PHẦN 2: LOGIC ADMIN QUẢN LÝ THANH TOÁN (MỚI)
 // =====================================================================
@@ -226,12 +388,12 @@ async function layThongKeThanhToan() {
        AND DATE(paidAt) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`
   );
 
-  // Giao dịch chờ thanh toán (VNPAY PENDING)
+  // Giao dịch online đang chờ thanh toán (VNPAY/MOMO PENDING)
   const [choThanhToanRows] = await db.pool.query(
     `SELECT COUNT(*) AS soLuong
      FROM Payment
      WHERE status = 'PENDING'
-       AND paymentMethod = 'VNPAY'`
+       AND paymentMethod IN ('VNPAY', 'MOMO')`
   );
 
   // Giao dịch COD cần đối soát (COD PENDING)
@@ -420,21 +582,43 @@ function buildIpnHistory(paymentRow) {
       // Bỏ qua nếu parse lỗi
     }
 
-    if (gwData) {
-      const isQueryDr = gwData.vnp_Command === "querydr";
-      const isSuccess =
-        gwData.vnp_ResponseCode === "00" &&
-        (!gwData.vnp_TransactionStatus || gwData.vnp_TransactionStatus === "00");
+    const hasVnpayResult =
+      paymentRow.paymentMethod === PAYMENT_METHOD.VNPAY &&
+      gwData?.vnp_ResponseCode !== undefined;
+    const hasMomoResult =
+      paymentRow.paymentMethod === PAYMENT_METHOD.MOMO &&
+      gwData?.resultCode !== undefined;
+
+    if (gwData && (hasVnpayResult || hasMomoResult)) {
+      const isVnpay = paymentRow.paymentMethod === PAYMENT_METHOD.VNPAY;
+      const isQuery = isVnpay
+        ? gwData.vnp_Command === "querydr"
+        : gwData.source === "query";
+      const isReturn = !isVnpay && gwData.source === "return";
+      const responseCode = isVnpay
+        ? String(gwData.vnp_ResponseCode || "N/A")
+        : String(gwData.resultCode ?? "N/A");
+      const isSuccess = isVnpay
+        ? gwData.vnp_ResponseCode === "00" &&
+          (!gwData.vnp_TransactionStatus || gwData.vnp_TransactionStatus === "00")
+        : laGiaoDichMomoThanhCong(gwData.resultCode);
+      const gatewayName = isVnpay ? "VNPAY" : "MoMo";
       steps.push({
         description: isSuccess
-          ? isQueryDr
-            ? "Đối soát VNPAY tự động thành công"
-            : "Nhận IPN thành công"
-          : `Nhận phản hồi VNPAY – Mã lỗi: ${gwData.vnp_ResponseCode || "N/A"}`,
+          ? isQuery
+            ? `Đối soát ${gatewayName} tự động thành công`
+            : isReturn
+              ? `Xác minh redirect ${gatewayName} thành công`
+              : "Nhận IPN thành công"
+          : `Nhận phản hồi ${gatewayName} – Mã: ${responseCode}`,
         time: formatDateVn(paymentRow.paidAt) || formatDateVn(paymentRow.createdAt) || "",
         note: isSuccess
-          ? isQueryDr ? "QueryDR matched" : "Payload matched"
-          : `ResponseCode: ${gwData.vnp_ResponseCode || "N/A"}`,
+          ? isQuery
+            ? "Query transaction matched"
+            : isReturn
+              ? "Return payload matched"
+              : "IPN payload matched"
+          : `ResponseCode: ${responseCode}`,
         isSuccess,
       });
     }
@@ -538,9 +722,11 @@ async function luuGhiChu(id, note) {
 }
 
 module.exports = {
-  // VNPAY Return / IPN (giữ nguyên)
+  // Return / IPN của các cổng thanh toán online
   xacThucKetQuaTraVeVnpay,
   xuLyIpnVnpay,
+  xacThucKetQuaTraVeMomo,
+  xuLyIpnMomo,
   // Admin quản lý thanh toán (mới)
   layThongKeThanhToan,
   layDanhSachThanhToan,

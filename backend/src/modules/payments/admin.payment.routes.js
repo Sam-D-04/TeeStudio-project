@@ -1,7 +1,7 @@
 /**
  * payment.routes.js – Đăng ký các route API cho module Thanh toán.
  *
- * Phần 1: Route công khai (VNPAY Return / IPN) – không cần auth
+ * Phần 1: Route công khai (VNPAY/MoMo Return / IPN) – không cần auth
  * Phần 2: Route Admin – yêu cầu verifyToken + requireAdmin
  */
 
@@ -16,14 +16,15 @@ const {
 } = require("./payment.validation");
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PHẦN 1: ROUTE CÔNG KHAI (VNPAY)
+// PHẦN 1: ROUTE CÔNG KHAI DÙNG CHUNG (VNPAY / MOMO)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const publicRouter = express.Router();
 
-// Public endpoints được VNPAY và trang kết quả thanh toán gọi trực tiếp.
-publicRouter.get("/vnpay/return", paymentController.xacThucKetQuaTraVeVnpay);
-publicRouter.get("/vnpay/ipn", paymentController.xuLyIpnVnpay);
+// VNPAY gọi IPN bằng GET; MoMo gọi IPN bằng POST JSON.
+publicRouter.get("/:gateway/return", paymentController.xacThucKetQuaTraVe);
+publicRouter.get("/:gateway/ipn", paymentController.xuLyIpn);
+publicRouter.post("/:gateway/ipn", paymentController.xuLyIpn);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PHẦN 2: ROUTE ADMIN

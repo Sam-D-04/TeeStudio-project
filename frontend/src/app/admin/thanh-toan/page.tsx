@@ -5,7 +5,7 @@ import PaymentClient from "@/components/admin/payment/PaymentClient";
 export const metadata: Metadata = {
   title: "Quản lý thanh toán - TeeStudio Quản trị",
   description:
-    "Theo dõi giao dịch VNPAY, COD, đối soát doanh thu, xử lý lỗi thanh toán và hoàn tiền.",
+    "Theo dõi giao dịch VNPAY, MOMO, COD, đối soát doanh thu và xử lý lỗi thanh toán.",
 };
 
 /**
@@ -48,7 +48,13 @@ export default async function ThanhToanPage({
               ? "that_bai"
               : "tat_ca",
         method:
-          method === "VNPAY" ? "vnpay" : method === "COD" ? "cod" : "tat_ca",
+          method === "VNPAY"
+            ? "vnpay"
+            : method === "MOMO"
+              ? "momo"
+              : method === "COD"
+                ? "cod"
+                : "tat_ca",
         startDate: laNgayHopLe(date) ? date : "",
         endDate: laNgayHopLe(date) ? date : "",
         dateField:

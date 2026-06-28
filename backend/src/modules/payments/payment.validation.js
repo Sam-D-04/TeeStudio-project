@@ -17,7 +17,7 @@ const createPaymentSchema = {
     paymentMethod: {
       required: true,
       type: "string",
-      enum: ["COD", "VNPAY"],
+      enum: ["COD", "VNPAY", "MOMO"],
     },
     paymentType: {
       required: true,
@@ -72,7 +72,7 @@ const getDanhSachThanhToanSchema = {
     phuongThuc: {
       required: false,
       type: "string",
-      enum: ["tat_ca", "vnpay", "cod"],
+      enum: ["tat_ca", "vnpay", "momo", "cod"],
     },
     tuKhoa: {
       required: false,

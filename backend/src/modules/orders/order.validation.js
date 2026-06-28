@@ -120,7 +120,7 @@ const checkoutSchema = {
     paymentMethod: {
       required: true,
       type: "string",
-      enum: ["COD", "VNPAY"],
+      enum: ["COD", "VNPAY", "MOMO"],
     },
     promotionCode: {
       type: "string",
@@ -208,7 +208,7 @@ const createOrderSchema = {
     paymentMethod: {
       required: true,
       type: "string",
-      enum: ["COD", "VNPAY"],
+      enum: ["COD", "VNPAY", "MOMO"],
     },
     paymentType: {
       type: "string",

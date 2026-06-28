@@ -956,10 +956,17 @@ function PaymentShippingSection({
         >
           <Radio.Group>
             <Space wrap>
-              <Tooltip title={hasCustomDesign ? "Áo POD bắt buộc VNPAY" : ""}>
+              <Tooltip
+                title={
+                  hasCustomDesign
+                    ? "Áo POD chỉ được thanh toán online bằng VNPAY hoặc MoMo"
+                    : ""
+                }
+              >
                 <Radio.Button value="COD" disabled={hasCustomDesign}>COD</Radio.Button>
               </Tooltip>
               <Radio.Button value="VNPAY">VNPAY</Radio.Button>
+              <Radio.Button value="MOMO">MoMo / ATM / Thẻ</Radio.Button>
             </Space>
           </Radio.Group>
         </Form.Item>
@@ -1041,7 +1048,9 @@ function PaymentShippingSection({
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-text-secondary">Tiền cọc (VNPAY)</span>
+              <span className="text-xs text-text-secondary">
+                Tiền cọc ({paymentMethod || "Thanh toán online"})
+              </span>
               <strong className="text-primary-container">{formatCurrency(depositAmount)}</strong>
             </div>
             <div className="flex items-center justify-between gap-2">
@@ -1049,12 +1058,12 @@ function PaymentShippingSection({
               <strong className="text-text-main">{formatCurrency(codAmount)}</strong>
             </div>
           </div>
-          {paymentMethod === "VNPAY" ? (
+          {paymentMethod === "VNPAY" || paymentMethod === "MOMO" ? (
             <Alert
               className="mt-2"
               showIcon
               type="info"
-              title={`VNPAY yêu cầu khách cọc ${formatCurrency(depositAmount)}. Phần còn lại thu COD khi giao.`}
+              title={`${paymentMethod} yêu cầu khách cọc ${formatCurrency(depositAmount)}. Phần còn lại thu COD khi giao.`}
             />
           ) : null}
         </div>
@@ -1317,7 +1326,7 @@ export default function CreateOrderPage() {
     const newValues: Partial<CreateOrderFormValues> = {};
 
     if (hasCustomDesign) {
-      if (values.paymentMethod !== "VNPAY") {
+      if (values.paymentMethod === "COD") {
         newValues.paymentMethod = "VNPAY";
       }
     } else {
@@ -1470,7 +1479,7 @@ export default function CreateOrderPage() {
     form.setFieldsValue({ items });
   }
 
-  function handleVariantChange(rowIndex: number) {
+  function handleVariantChange() {
     // Form Item tự xử lý value update
   }
 
@@ -1530,7 +1539,7 @@ export default function CreateOrderPage() {
     });
   }
 
-  function handleFinishFailed({ errorFields }: any) {
+  function handleFinishFailed({ errorFields }: { errorFields: unknown[] }) {
     if (errorFields.length > 0) {
       messageApi.error("Vui lòng kiểm tra lại thông tin biểu mẫu");
     }

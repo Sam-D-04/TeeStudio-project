@@ -18,7 +18,7 @@ import OrderStatusBadge from "./OrderStatusBadge";
 
 // Kiểu dữ liệu cho một mục thanh toán
 export type PaymentInfo = {
-  method: string;   // Phương thức: "VNPAY", "COD", "Chuyển khoản"
+  method: string;   // Phương thức: "VNPAY", "MOMO", "COD"
   type?: string;
   amountVnd?: number;
   isPaid: boolean;  // Đã thanh toán hay chưa

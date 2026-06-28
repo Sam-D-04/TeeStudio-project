@@ -93,17 +93,17 @@ const capNhatDiaChiGiaoHang = async (req, res, next) => {
   }
 };
 
-const taoLaiMaThanhToanVnpay = async (req, res, next) => {
+const taoLaiMaThanhToanOnline = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
-    const data = await orderService.taoLaiMaThanhToanVnpay(
+    const data = await orderService.taoLaiMaThanhToanOnline(
       id,
       req.user,
       req.ip
     );
     res.json({
       success: true,
-      message: "Đã tạo lại mã thanh toán VNPAY",
+      message: `Đã tạo lại mã thanh toán ${data.paymentMethod}`,
       data,
     });
   } catch (error) {
@@ -216,7 +216,7 @@ module.exports = {
   capNhatTrangThai,
   huyDonHang,
   capNhatDiaChiGiaoHang,
-  taoLaiMaThanhToanVnpay,
+  taoLaiMaThanhToanOnline,
   // Hỗ trợ form Tạo đơn mới
   timKhachHang,
   layDiaChi,

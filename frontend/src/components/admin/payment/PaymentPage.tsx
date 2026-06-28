@@ -362,10 +362,10 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
               <path d="M12 6v6l4 2" strokeLinecap="round" />
             </svg>
           }
-          href="/admin/thanh-toan?status=PENDING&method=VNPAY"
+          href="/admin/thanh-toan?status=PENDING"
           isActive={
             statusFilter === "cho_thanh_toan" &&
-            methodFilter === "vnpay" &&
+            methodFilter === "tat_ca" &&
             tuNgay === "" &&
             denNgay === "" &&
             hasNoSecondaryFilters

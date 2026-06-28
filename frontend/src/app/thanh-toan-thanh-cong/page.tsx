@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import VnpayReturnPage, {
-  VnpayReturnLoading,
+import OnlinePaymentReturnPage, {
+  PaymentReturnLoading,
 } from "@/components/payment/VnpayReturnPage";
 
 export const metadata: Metadata = {
   title: "Kết quả thanh toán | TeeStudio",
-  description: "Xác minh và hiển thị kết quả thanh toán VNPAY của TeeStudio.",
+  description: "Xác minh và hiển thị kết quả thanh toán online của TeeStudio.",
 };
 
 export default function PaymentSuccessPage() {
@@ -23,8 +23,8 @@ export default function PaymentSuccessPage() {
         TeeStudio
       </Link>
 
-      <Suspense fallback={<VnpayReturnLoading />}>
-        <VnpayReturnPage />
+      <Suspense fallback={<PaymentReturnLoading />}>
+        <OnlinePaymentReturnPage />
       </Suspense>
     </main>
   );

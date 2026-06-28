@@ -14,6 +14,7 @@ const PAYMENT_STATUS = Object.freeze({
 
 const PAYMENT_METHOD = Object.freeze({
   VNPAY: "VNPAY",
+  MOMO: "MOMO",
   COD: "COD",
 });
 
