@@ -11,7 +11,6 @@
 
 import {
   ArrowLeftOutlined,
-  CheckOutlined,
   DeleteOutlined,
   EditOutlined,
   PlusOutlined,
@@ -21,7 +20,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { message } from "antd";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import CreatableColorSelect from "@/components/admin/products/CreatableColorSelect";
+import {
+  DEFAULT_PRODUCT_COLORS,
+  mergeProductColors,
+  type ProductColor,
+} from "@/lib/productColors";
 import * as productService from "@/services/admin/productService";
 import type {
   BienTheSanPham,
@@ -39,6 +44,7 @@ type ExistingVariantForm = BienTheSanPham & {
 type NewVariantForm = {
   key: string;
   mauSac: string;
+  maMau: string;
   kichThuoc: string;
   maSKU: string;
   tonKho: string;
@@ -67,34 +73,12 @@ type EditProductPageProps = {
 
 const DS_SIZE_GOI_Y = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 
-const DS_MAU_PHO_BIEN: { ten: string; hex: string }[] = [
-  { ten: "Đen", hex: "#1a1a1a" },
-  { ten: "Trắng", hex: "#ffffff" },
-  { ten: "Trắng sữa", hex: "#f8f5f0" },
-  { ten: "Xám", hex: "#6b7280" },
-  { ten: "Xám nhạt", hex: "#d1d5db" },
-  { ten: "Xanh hải quân", hex: "#1e3a8a" },
-  { ten: "Xanh dương", hex: "#2563eb" },
-  { ten: "Xanh lá", hex: "#16a34a" },
-  { ten: "Đỏ", hex: "#dc2626" },
-  { ten: "Cam", hex: "#ea580c" },
-  { ten: "Vàng", hex: "#ca8a04" },
-  { ten: "Hồng", hex: "#ec4899" },
-  { ten: "Tím", hex: "#7c3aed" },
-  { ten: "Nâu", hex: "#92400e" },
-  { ten: "Be", hex: "#d4b896" },
-];
-
 // =====================================================================
 // HÀM TIỆN ÍCH
 // =====================================================================
 
 function taoKey() {
   return Math.random().toString(36).slice(2, 9);
-}
-
-function timMauHex(tenMau: string): string {
-  return DS_MAU_PHO_BIEN.find((m) => m.ten === tenMau)?.hex ?? "#94a3b8";
 }
 
 function goiYSKU(ten: string, mau: string, size: string): string {
@@ -185,6 +169,12 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
     staleTime: 5 * 60_000,
   });
 
+  const { data: bangMauDaDung = [] } = useQuery({
+    queryKey: ["products", "colors"],
+    queryFn: productService.layBangMauSanPham,
+    staleTime: 5 * 60_000,
+  });
+
   // ===== LẤY CHI TIẾT SẢN PHẨM =====
   const {
     data: chiTiet,
@@ -198,7 +188,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
   });
 
   // ===== REACT HOOK FORM =====
-  const { register, handleSubmit, control, watch, setValue, reset, formState: { errors } } = useForm<FormValues>({
+  const { register, handleSubmit, control, getValues, setValue, reset, formState: { errors } } = useForm<FormValues>({
     defaultValues: {
       tenSanPham: "",
       danhMucId: "",
@@ -224,10 +214,23 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
   });
 
   // Theo dõi giá trị form để sử dụng hiển thị
-  const dsBienTheMoi = watch("newVariants");
-  const dsBienTheEdit = watch("existingVariants");
-  const trangThaiHienThi = watch("displayStatus");
-  const tenSanPham = watch("tenSanPham");
+  const dsBienTheMoi = useWatch({ control, name: "newVariants" });
+  const dsBienTheEdit = useWatch({ control, name: "existingVariants" });
+  const trangThaiHienThi = useWatch({ control, name: "displayStatus" });
+  const tenSanPham = useWatch({ control, name: "tenSanPham" });
+
+  const bangMau = mergeProductColors(
+    dsBienTheEdit?.map((variant) => ({
+      name: variant.colorName,
+      hex: variant.colorHex,
+    })),
+    dsBienTheMoi?.map((variant) => ({
+      name: variant.mauSac,
+      hex: variant.maMau,
+    })),
+    bangMauDaDung,
+    DEFAULT_PRODUCT_COLORS
+  );
 
   // ĐIỀN FORM KHI CÓ DỮ LIỆU
   useEffect(() => {
@@ -270,7 +273,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
     // Validate new variants
     if (data.newVariants.length > 0) {
       for (const h of data.newVariants) {
-        if (!h.mauSac.trim() || !h.kichThuoc.trim() || !h.maSKU.trim()) {
+        if (!h.mauSac.trim() || !h.maMau || !h.kichThuoc.trim() || !h.maSKU.trim()) {
           hienThiThongBao("loi", "Vui lòng điền đầy đủ Màu sắc, Kích thước và Mã SKU cho tất cả biến thể mới");
           return;
         }
@@ -296,12 +299,14 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
         ...data.existingVariants.map((v) => ({
           id: v.id,
           color: v.colorName.trim(),
+          colorHex: v.colorHex,
           size: v.size.trim(),
           sku: v.sku.trim(),
           status: v.status,
         })),
         ...data.newVariants.map((v) => ({
           color: v.mauSac.trim(),
+          colorHex: v.maMau,
           size: v.kichThuoc.trim(),
           sku: v.maSKU.trim(),
         })),
@@ -313,12 +318,12 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
 
   // ===== XỬ LÝ BIẾN THỂ HIỆN CÓ =====
   function batDauSuaBienThe(index: number) {
-    const current = watch(`existingVariants.${index}`);
+    const current = getValues(`existingVariants.${index}`);
     updateExisting(index, { ...current, isEditing: true });
   }
 
   function luuBienTheDaChon(index: number) {
-    const current = watch(`existingVariants.${index}`);
+    const current = getValues(`existingVariants.${index}`);
     if (!current.colorName.trim() || !current.size.trim() || !current.sku.trim()) {
       hienThiThongBao("loi", "Vui lòng điền đầy đủ màu sắc, kích thước và mã SKU");
       return;
@@ -327,7 +332,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
   }
 
   function huyBienThe(index: number) {
-    const current = watch(`existingVariants.${index}`);
+    const current = getValues(`existingVariants.${index}`);
     const original = chiTiet?.variants.find((v) => v.id === current.id);
     if (original) {
       updateExisting(index, { ...original, isEditing: false });
@@ -336,12 +341,35 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
 
   // ===== XỬ LÝ BIẾN THỂ MỚI =====
   function themHangMoi() {
-    appendNew({ key: taoKey(), mauSac: "", kichThuoc: "", maSKU: "", tonKho: "0" });
+    appendNew({
+      key: taoKey(),
+      mauSac: "",
+      maMau: "",
+      kichThuoc: "",
+      maSKU: "",
+      tonKho: "0",
+    });
+  }
+
+  function capNhatMauMoi(index: number, color: ProductColor | null) {
+    const current = getValues(`newVariants.${index}`);
+    const mauSac = color?.name ?? "";
+    const tenSP = tenSanPham ?? "";
+    const skuGoiY = goiYSKU(tenSP, mauSac, current.kichThuoc);
+
+    setValue(`newVariants.${index}.mauSac`, mauSac);
+    setValue(`newVariants.${index}.maMau`, color?.hex ?? "");
+    if (
+      !current.maSKU ||
+      current.maSKU === goiYSKU(tenSP, current.mauSac, current.kichThuoc)
+    ) {
+      setValue(`newVariants.${index}.maSKU`, skuGoiY);
+    }
   }
 
   function capNhatHangMoi(index: number, field: keyof NewVariantForm, value: string) {
     setValue(`newVariants.${index}.${field}`, value);
-    const h = watch(`newVariants.${index}`);
+    const h = getValues(`newVariants.${index}`);
 
     if (field === "mauSac" || field === "kichThuoc") {
       const tenSP = tenSanPham ?? "";
@@ -468,11 +496,6 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
         {!dangTaiChiTiet && !loiTaiChiTiet && chiTiet && (
           <>
             <div className="space-y-6 p-4 sm:p-6">
-              <datalist id="edit-product-colors">
-                {DS_MAU_PHO_BIEN.map((mau) => (
-                  <option key={mau.ten} value={mau.ten} />
-                ))}
-              </datalist>
               <datalist id="edit-product-sizes">
                 {DS_SIZE_GOI_Y.map((size) => (
                   <option key={size} value={size} />
@@ -651,7 +674,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                       </thead>
                       <tbody>
                         {existingFields.map((field, index) => {
-                          const bt = watch(`existingVariants.${index}`);
+                          const bt = dsBienTheEdit[index] ?? field;
                           return (
                             <tr
                               key={field.id}
@@ -661,29 +684,30 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                             >
                               <td className="px-3 py-2">
                                 {bt.isEditing ? (
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      className="h-5 w-5 shrink-0 rounded-full border border-border shadow-sm"
-                                      style={{ backgroundColor: timMauHex(bt.colorName) }}
-                                    />
-                                    <input
-                                      type="text"
-                                      list="edit-product-colors"
-                                      {...register(`existingVariants.${index}.colorName`)}
-                                      maxLength={100}
-                                      disabled={bt.hasTransactions}
-                                      className={`h-8 min-w-0 flex-1 rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none ${
-                                        bt.hasTransactions
-                                          ? "cursor-not-allowed bg-surface-container opacity-60 text-text-muted"
-                                          : "focus:border-primary-container"
-                                      }`}
-                                    />
-                                  </div>
+                                  <CreatableColorSelect
+                                    value={{
+                                      name: bt.colorName,
+                                      hex: bt.colorHex,
+                                    }}
+                                    options={bangMau}
+                                    onChange={(color) => {
+                                      setValue(
+                                        `existingVariants.${index}.colorName`,
+                                        color?.name ?? ""
+                                      );
+                                      setValue(
+                                        `existingVariants.${index}.colorHex`,
+                                        color?.hex ?? ""
+                                      );
+                                    }}
+                                    disabled={bt.hasTransactions}
+                                    compact
+                                  />
                                 ) : (
                                   <div className="flex min-w-0 items-center gap-2">
                                     <span
                                       className="h-5 w-5 shrink-0 rounded-full border border-border shadow-sm"
-                                      style={{ backgroundColor: timMauHex(bt.colorName) }}
+                                      style={{ backgroundColor: bt.colorHex }}
                                     />
                                     <span className="truncate text-[13px] font-semibold text-text-main" title={bt.colorName}>
                                       {bt.colorName}
@@ -850,21 +874,21 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                                 return (
                                   <tr key={field.id} className="border-b border-border/70 bg-primary-container/[0.02] last:border-b-0">
                                     <td className="px-3 py-2">
-                                      <div className="flex items-center gap-2">
-                                        <span
-                                          className="h-5 w-5 shrink-0 rounded-full border border-border shadow-sm"
-                                          style={{ backgroundColor: timMauHex(h?.mauSac || "") }}
-                                        />
-                                        <input
-                                          type="text"
-                                          list="edit-product-colors"
-                                          value={h?.mauSac || ""}
-                                          onChange={(e) => capNhatHangMoi(index, "mauSac", e.target.value)}
-                                          placeholder="Tên màu"
-                                          maxLength={100}
-                                          className="h-8 min-w-0 flex-1 rounded-[6px] border border-primary-container/30 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
-                                        />
-                                      </div>
+                                      <CreatableColorSelect
+                                        value={
+                                          h?.mauSac
+                                            ? {
+                                                name: h.mauSac,
+                                                hex: h.maMau,
+                                              }
+                                            : null
+                                        }
+                                        options={bangMau}
+                                        onChange={(color) =>
+                                          capNhatMauMoi(index, color)
+                                        }
+                                        compact
+                                      />
                                     </td>
                                     <td className="px-3 py-2">
                                       <input

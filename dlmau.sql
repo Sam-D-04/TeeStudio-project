@@ -138,6 +138,18 @@ VALUES
   (31, 8, 'Xanh rêu',  'L',  'ASOS-REU-L',     58, '2026-01-08 09:12:00'),
   (32, 8, 'Xanh rêu',  'XL', 'ASOS-REU-XL',    58, '2026-01-08 09:13:00');
 
+-- ProductVariant.colorHex được thêm bởi migration 20260629_add_product_variant_color_hex.sql.
+UPDATE `ProductVariant`
+SET `colorHex` = CASE LOWER(TRIM(`color`))
+  WHEN 'trắng' THEN '#ffffff'
+  WHEN 'đen' THEN '#1a1a1a'
+  WHEN 'xanh navy' THEN '#1e3a8a'
+  WHEN 'xám tiêu' THEN '#737373'
+  WHEN 'be' THEN '#d4b896'
+  WHEN 'xanh rêu' THEN '#4d7c0f'
+  ELSE '#94a3b8'
+END;
+
 INSERT INTO `ProductImage`
   (`id`, `productId`, `variantId`, `imageUrl`, `altText`, `sortOrder`, `isPrimary`, `createdAt`)
 VALUES

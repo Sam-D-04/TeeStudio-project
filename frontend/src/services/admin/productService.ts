@@ -9,6 +9,7 @@
  */
 
 import apiClient from "@/lib/apiClient";
+import type { ProductColor } from "@/lib/productColors";
 
 // =====================================================================
 // KIỂU DỮ LIỆU (Types) – khớp với response từ Backend
@@ -143,6 +144,7 @@ export type CapNhatSanPhamInput = Partial<TaoSanPhamInput> & {
 /** Payload thêm biến thể */
 export type ThemBienTheInput = {
   color: string;
+  colorHex: string;
   size: string;
   sku: string;
 };
@@ -289,6 +291,17 @@ export async function xoaSanPham(id: number): Promise<KetQuaXoaSanPham> {
     ...res.data.data,
     message: res.data.data.message ?? res.data.message,
   };
+}
+
+/**
+ * Lấy bảng màu đã được sử dụng trong các biến thể sản phẩm.
+ * GET /api/admin/products/colors
+ */
+export async function layBangMauSanPham(): Promise<ProductColor[]> {
+  const res = await apiClient.get<{ success: boolean; data: ProductColor[] }>(
+    "/admin/products/colors"
+  );
+  return res.data.data;
 }
 
 /**

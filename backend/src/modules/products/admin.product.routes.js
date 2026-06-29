@@ -6,6 +6,7 @@
  * Danh sách endpoints:
  *  GET    /stats                          – KPI thống kê
  *  GET    /categories                     – Danh sách danh mục (cho dropdown)
+ *  GET    /colors                         – Bảng màu biến thể đã sử dụng
  *  GET    /inventory-alerts               – Cảnh báo tồn kho thấp
  *  GET    /                               – Danh sách phôi áo (phân trang + lọc)
  *  POST   /                               – Tạo phôi áo mới
@@ -31,6 +32,9 @@ router.get("/stats", productController.getThongKe);
 // ─── Danh mục (dành cho dropdown filter) ──────────────────────────────────────
 // GET /api/admin/products/categories
 router.get("/categories", productController.getDanhMuc);
+
+// GET /api/admin/products/colors
+router.get("/colors", productController.getBangMau);
 
 // ─── Cảnh báo tồn kho thấp ────────────────────────────────────────────────────
 // GET /api/admin/products/inventory-alerts

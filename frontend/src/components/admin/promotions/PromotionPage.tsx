@@ -63,7 +63,6 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
   const [resetKey, setResetKey] = useState(0);
   const [tabDangChon, setTabDangChon] = useState<TenTab>("ma_khuyen_mai");
   const [trang, setTrang] = useState(1);
-  const [dsIDDaChon, setDsIDDaChon] = useState<number[]>([]);
   const [boDuc, setBoDuc] = useState<BoDucMaKhuyenMai>({
     tuKhoa: "",
     trangThai: initialFilters?.trangThai ?? "",
@@ -132,7 +131,6 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
     mutationFn: promotionService.xoaKhuyenMai,
     onSuccess: () => {
       message.success("Đã xóa mã khuyến mãi");
-      setDsIDDaChon([]);
       lamMoiDuLieu();
     },
     onError: (error) => message.error(getApiErrorMessage(error)),
@@ -158,7 +156,6 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
     setBoDuc(value);
     setBoLocNhanh({});
     setTrang(1);
-    setDsIDDaChon([]);
   }
 
   const handleResetFilter = () => {
@@ -172,7 +169,6 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
     });
     setBoLocNhanh({});
     setTrang(1);
-    setDsIDDaChon([]);
     setResetKey(prev => prev + 1);
   };
 
@@ -341,17 +337,6 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
             ) : (
               <PromotionTable
                 danhSach={danhSach}
-                dsIDDaChon={dsIDDaChon}
-                onChonTatCa={(checked) =>
-                  setDsIDDaChon(checked ? danhSach.map((item) => item.id) : [])
-                }
-                onChonMot={(id) =>
-                  setDsIDDaChon((current) =>
-                    current.includes(id)
-                      ? current.filter((item) => item !== id)
-                      : [...current, id],
-                  )
-                }
                 onXem={moChinhSua}
                 onSua={moChinhSua}
                 onXoa={(id) => {

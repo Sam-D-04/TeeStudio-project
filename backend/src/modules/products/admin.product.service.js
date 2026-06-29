@@ -27,6 +27,20 @@ const RESERVED_STOCK_JOIN = `
 
 // stockQty đã được giảm khi tạo đơn; reservedQty chỉ dùng để tham khảo.
 const AVAILABLE_STOCK_SQL = "pv.stockQty";
+const DEFAULT_COLOR_HEX = "#94a3b8";
+
+function chuanHoaMaMau(colorHex) {
+  const value = String(colorHex || "").trim().toLowerCase();
+  return /^#[0-9a-f]{6}$/.test(value) ? value : DEFAULT_COLOR_HEX;
+}
+
+function chuanHoaMaMauNhap(colorHex) {
+  const value = String(colorHex || "").trim().toLowerCase();
+  if (!/^#[0-9a-f]{6}$/.test(value)) {
+    throw taoLoi("Mã màu phải có định dạng #RRGGBB");
+  }
+  return value;
+}
 
 function taoLoi(message, statusCode = 400) {
   const err = new Error(message);
@@ -163,6 +177,23 @@ async function layDanhMuc() {
   return rows.map((r) => ({ id: r.id, ten: r.name }));
 }
 
+async function layBangMau() {
+  const [rows] = await db.pool.query(
+    `SELECT
+       color AS name,
+       MAX(colorHex) AS hex
+     FROM ProductVariant
+     WHERE color IS NOT NULL AND TRIM(color) <> ''
+     GROUP BY color
+     ORDER BY color ASC`
+  );
+
+  return rows.map((row) => ({
+    name: row.name,
+    hex: chuanHoaMaMau(row.hex),
+  }));
+}
+
 // =====================================================================
 // SERVICE 3: Danh sách phôi áo (phân trang + lọc)
 // =====================================================================
@@ -283,6 +314,7 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
        pv.id,
        pv.productId,
        pv.color,
+       pv.colorHex,
        pv.size,
        pv.sku,
        pv.stockQty,
@@ -306,7 +338,6 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
   const danhSach = rowsProduct.map((p) => {
     const variants = variantMap[p.id] || [];
 
-    // Xác định màu hex từ tên màu (frontend dùng colorHex để vẽ chấm màu)
     const mappedVariants = variants.map((v) => {
       const stock = Number(v.stockQty);
       const reserved = Number(v.reservedQty);
@@ -315,7 +346,7 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
       return {
         id: v.id,
         colorName: v.color,
-        colorHex: mapMauSangHex(v.color),
+        colorHex: chuanHoaMaMau(v.colorHex),
         size: v.size,
         sku: v.sku,
         stock,
@@ -348,31 +379,6 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
   };
 }
 
-/**
- * Map tên màu phổ biến sang mã hex (fallback cho dữ liệu DB không có hex)
- */
-function mapMauSangHex(colorName) {
-  const map = {
-    "Đen": "#1a1a1a",
-    "Trắng": "#ffffff",
-    "Trắng sữa": "#f8f5f0",
-    "Xám": "#6b7280",
-    "Xám nhạt": "#d1d5db",
-    "Navy": "#1e3a8a",
-    "Xanh navy": "#1e3a8a",
-    "Xanh dương": "#2563eb",
-    "Xanh lá": "#16a34a",
-    "Đỏ": "#dc2626",
-    "Cam": "#ea580c",
-    "Vàng": "#ca8a04",
-    "Hồng": "#ec4899",
-    "Tím": "#7c3aed",
-    "Nâu": "#92400e",
-    "Be": "#d4b896",
-  };
-  return map[colorName] || "#94a3b8";
-}
-
 // =====================================================================
 // SERVICE 4: Cảnh báo tồn kho (panel bên phải)
 // =====================================================================
@@ -381,6 +387,7 @@ async function layCanhBaoTonKho() {
     `SELECT
        pv.id,
        pv.color,
+       pv.colorHex,
        pv.size,
        pv.sku,
        pv.stockQty,
@@ -407,7 +414,7 @@ async function layCanhBaoTonKho() {
       id: r.id,
       productName: r.tenSanPham,
       colorName: r.color,
-      colorHex: mapMauSangHex(r.color),
+      colorHex: chuanHoaMaMau(r.colorHex),
       size: r.size,
       sku: r.sku,
       stock,
@@ -443,6 +450,7 @@ async function layChiTietSanPham(id) {
     `SELECT
        pv.id,
        pv.color,
+       pv.colorHex,
        pv.size,
        pv.sku,
        pv.stockQty,
@@ -481,7 +489,7 @@ async function layChiTietSanPham(id) {
       return {
         id: v.id,
         colorName: v.color,
-        colorHex: mapMauSangHex(v.color),
+        colorHex: chuanHoaMaMau(v.colorHex),
         size: v.size,
         sku: v.sku,
         stock,
@@ -731,7 +739,8 @@ async function xoaSanPham(id) {
 // =====================================================================
 async function themBienThe(productId, payload = {}) {
   damBaoKhongSuaTonKhoTuModuleSanPham(payload);
-  const { color, size, sku } = payload;
+  const { color, colorHex, size, sku } = payload;
+  const normalizedColorHex = chuanHoaMaMauNhap(colorHex);
 
   // Kiểm tra sản phẩm tồn tại
   const [rows] = await db.pool.query("SELECT id FROM Product WHERE id = ?", [productId]);
@@ -761,8 +770,8 @@ async function themBienThe(productId, payload = {}) {
   }
 
   const result = await db.execute(
-    "INSERT INTO ProductVariant (productId, color, size, sku) VALUES (?, ?, ?, ?)",
-    [productId, color, size, sku]
+    "INSERT INTO ProductVariant (productId, color, colorHex, size, sku) VALUES (?, ?, ?, ?, ?)",
+    [productId, color, normalizedColorHex, size, sku]
   );
 
   const stock = 0;
@@ -770,7 +779,7 @@ async function themBienThe(productId, payload = {}) {
   return {
     id: result.insertId,
     colorName: color,
-    colorHex: mapMauSangHex(color),
+    colorHex: normalizedColorHex,
     size,
     sku,
     stock,
@@ -785,10 +794,10 @@ async function themBienThe(productId, payload = {}) {
 // =====================================================================
 async function capNhatBienThe(productId, variantId, payload = {}) {
   damBaoKhongSuaTonKhoTuModuleSanPham(payload);
-  const { color, size, sku, status } = payload;
+  const { color, colorHex, size, sku, status } = payload;
 
   const [rows] = await db.pool.query(
-    `SELECT pv.id, pv.color, pv.size, pv.sku,
+    `SELECT pv.id, pv.color, pv.colorHex, pv.size, pv.sku,
        EXISTS(SELECT 1 FROM InventoryTransaction it WHERE it.variantId = pv.id) as hasTransactions
      FROM ProductVariant pv WHERE pv.id = ? AND pv.productId = ?`,
     [variantId, productId]
@@ -805,7 +814,8 @@ async function capNhatBienThe(productId, variantId, payload = {}) {
   const params = [];
 
   // Khóa cập nhật Màu, Size, SKU nếu đã có giao dịch
-  const isProtectedFieldChanged = (color !== undefined && color !== currentVariant.color) || 
+  const isProtectedFieldChanged = (color !== undefined && color !== currentVariant.color) ||
+                                  (colorHex !== undefined && chuanHoaMaMau(colorHex) !== chuanHoaMaMau(currentVariant.colorHex)) ||
                                   (size !== undefined && size !== currentVariant.size) || 
                                   (sku !== undefined && sku !== currentVariant.sku);
                                   
@@ -816,6 +826,7 @@ async function capNhatBienThe(productId, variantId, payload = {}) {
   }
 
   if (color !== undefined) { fields.push("color = ?"); params.push(color); }
+  if (colorHex !== undefined) { fields.push("colorHex = ?"); params.push(chuanHoaMaMauNhap(colorHex)); }
   if (size !== undefined) { fields.push("size = ?"); params.push(size); }
   if (sku !== undefined) { fields.push("sku = ?"); params.push(sku); }
   if (status !== undefined) { fields.push("status = ?"); params.push(status); }
@@ -833,6 +844,7 @@ async function capNhatBienThe(productId, variantId, payload = {}) {
     `SELECT
        pv.id,
        pv.color,
+       pv.colorHex,
        pv.size,
        pv.sku,
        pv.stockQty,
@@ -852,7 +864,7 @@ async function capNhatBienThe(productId, variantId, payload = {}) {
   return {
     id: v.id,
     colorName: v.color,
-    colorHex: mapMauSangHex(v.color),
+    colorHex: chuanHoaMaMau(v.colorHex),
     size: v.size,
     sku: v.sku,
     stock,
@@ -866,6 +878,7 @@ async function capNhatBienThe(productId, variantId, payload = {}) {
 module.exports = {
   layThongKe,
   layDanhMuc,
+  layBangMau,
   layDanhSachSanPham,
   layCanhBaoTonKho,
   layChiTietSanPham,

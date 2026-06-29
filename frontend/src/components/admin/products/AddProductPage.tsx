@@ -25,6 +25,12 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import CreatableColorSelect from "@/components/admin/products/CreatableColorSelect";
+import {
+  DEFAULT_PRODUCT_COLORS,
+  mergeProductColors,
+  type ProductColor,
+} from "@/lib/productColors";
 import * as productService from "@/services/admin/productService";
 import type { ThemBienTheInput } from "@/services/admin/productService";
 
@@ -46,6 +52,7 @@ type HangBienThe = {
   /** ID tạm thời (dùng để xác định hàng trong UI) */
   key: string;
   mauSac: string;
+  maMau: string;
   kichThuoc: string;
   maSKU: string;
 };
@@ -54,25 +61,6 @@ type HangBienThe = {
 
 /** Danh sách kích thước phổ biến để gợi ý nhanh */
 const DS_SIZE_GOI_Y = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
-
-/** Danh sách màu phổ biến để chọn nhanh */
-const DS_MAU_PHO_BIEN: { ten: string; hex: string }[] = [
-  { ten: "Đen", hex: "#1a1a1a" },
-  { ten: "Trắng", hex: "#ffffff" },
-  { ten: "Trắng sữa", hex: "#f8f5f0" },
-  { ten: "Xám", hex: "#6b7280" },
-  { ten: "Xám nhạt", hex: "#d1d5db" },
-  { ten: "Xanh hải quân", hex: "#1e3a8a" },
-  { ten: "Xanh dương", hex: "#2563eb" },
-  { ten: "Xanh lá", hex: "#16a34a" },
-  { ten: "Đỏ", hex: "#dc2626" },
-  { ten: "Cam", hex: "#ea580c" },
-  { ten: "Vàng", hex: "#ca8a04" },
-  { ten: "Hồng", hex: "#ec4899" },
-  { ten: "Tím", hex: "#7c3aed" },
-  { ten: "Nâu", hex: "#92400e" },
-  { ten: "Be", hex: "#d4b896" },
-];
 
 // ===== COMPONENT HÀM TIỆN ÍCH =====
 
@@ -120,7 +108,7 @@ function validateBuoc1(form: FormBuoc1): Partial<Record<keyof FormBuoc1, string>
 /** Validate một hàng biến thể */
 function validateHangBienThe(hang: HangBienThe): string[] {
   const loi: string[] = [];
-  if (!hang.mauSac.trim()) loi.push("Chưa nhập màu sắc");
+  if (!hang.mauSac.trim() || !hang.maMau) loi.push("Chưa chọn màu sắc");
   if (!hang.kichThuoc.trim()) loi.push("Chưa chọn kích thước");
   if (!hang.maSKU.trim()) loi.push("Chưa nhập mã SKU");
   return loi;
@@ -177,12 +165,9 @@ export default function AddProductPage() {
 
   // Danh sách biến thể
   const [danhSachBienThe, setDanhSachBienThe] = useState<HangBienThe[]>([
-    { key: taoKey(), mauSac: "", kichThuoc: "", maSKU: "" },
+    { key: taoKey(), mauSac: "", maMau: "", kichThuoc: "", maSKU: "" },
   ]);
   const [loiBuoc2Chung, setLoiBuoc2Chung] = useState<string>("");
-
-  // Hàng đang chọn màu nhanh
-  const [keyDangChonMau, setKeyDangChonMau] = useState<string | null>(null);
 
   // ===== LẤY DANH MỤC =====
   const { data: danhSachDanhMuc = [] } = useQuery({
@@ -190,6 +175,21 @@ export default function AddProductPage() {
     queryFn: productService.layDanhMucSanPham,
     staleTime: 5 * 60_000,
   });
+
+  const { data: bangMauDaDung = [] } = useQuery({
+    queryKey: ["products", "colors"],
+    queryFn: productService.layBangMauSanPham,
+    staleTime: 5 * 60_000,
+  });
+
+  const bangMau = mergeProductColors(
+    danhSachBienThe.map((variant) => ({
+      name: variant.mauSac,
+      hex: variant.maMau,
+    })),
+    bangMauDaDung,
+    DEFAULT_PRODUCT_COLORS
+  );
 
   // ===== MUTATION THÊM BIẾN THỂ =====
   const { mutate: luuBienThe, isPending: dangLuuBienThe } = useMutation({
@@ -289,7 +289,7 @@ export default function AddProductPage() {
   function themHangBienThe() {
     setDanhSachBienThe((prev) => [
       ...prev,
-      { key: taoKey(), mauSac: "", kichThuoc: "", maSKU: "" },
+      { key: taoKey(), mauSac: "", maMau: "", kichThuoc: "", maSKU: "" },
     ]);
   }
 
@@ -298,14 +298,35 @@ export default function AddProductPage() {
     setDanhSachBienThe((prev) => prev.filter((h) => h.key !== key));
   }
 
-  function chonMauNhanh(key: string, tenMau: string) {
-    capNhatBienThe(key, "mauSac", tenMau);
-    setKeyDangChonMau(null);
+  function capNhatMau(key: string, color: ProductColor | null) {
+    setDanhSachBienThe((prev) =>
+      prev.map((hang) => {
+        if (hang.key !== key) return hang;
+
+        const mauSac = color?.name ?? "";
+        const tenSanPham = formBuoc1.tenSanPham.trim();
+        const skuGoiY = goiYSKU(tenSanPham, mauSac, hang.kichThuoc);
+        const maSKU =
+          !hang.maSKU ||
+          hang.maSKU === goiYSKU(tenSanPham, hang.mauSac, hang.kichThuoc)
+            ? skuGoiY
+            : hang.maSKU;
+
+        return {
+          ...hang,
+          mauSac,
+          maMau: color?.hex ?? "",
+          maSKU,
+        };
+      })
+    );
+    setLoiBuoc2Chung("");
   }
 
   function taoDanhSachBienTheInput(): ThemBienTheInput[] {
     return danhSachBienThe.map((hang) => ({
       color: hang.mauSac.trim(),
+      colorHex: hang.maMau,
       size: hang.kichThuoc.trim(),
       sku: hang.maSKU.trim(),
     }));
@@ -341,14 +362,21 @@ export default function AddProductPage() {
     }
 
     // Kiểm tra SKU trùng nhau trong danh sách
-    const dsSKU = danhSachBienThe.map((h) => h.maSKU.trim()).filter(Boolean);
+    const dsSKU = danhSachBienThe
+      .map((h) => h.maSKU.trim().toLocaleUpperCase("vi-VN"))
+      .filter(Boolean);
     const skuTrung = dsSKU.filter((sku, i) => dsSKU.indexOf(sku) !== i);
     if (skuTrung.length > 0) {
       tatCaLoi.push(`Mã SKU "${skuTrung[0]}" bị trùng lặp trong danh sách`);
     }
 
     // Kiểm tra tổ hợp màu và kích thước trùng nhau
-    const dsMauSize = danhSachBienThe.map((h) => `${h.mauSac.trim()}|${h.kichThuoc.trim()}`);
+    const dsMauSize = danhSachBienThe.map(
+      (h) =>
+        `${h.mauSac.trim().toLocaleLowerCase("vi-VN")}|${h.kichThuoc
+          .trim()
+          .toLocaleUpperCase("vi-VN")}`
+    );
     const mauSizeTrung = dsMauSize.filter((ms, i) => dsMauSize.indexOf(ms) !== i && ms !== "|");
     if (mauSizeTrung.length > 0) {
       const [mau, kichThuoc] = mauSizeTrung[0].split("|");
@@ -395,6 +423,7 @@ export default function AddProductPage() {
     danhSachBienThe.some(
       (hang) =>
         !hang.mauSac.trim() ||
+        !hang.maMau ||
         !hang.kichThuoc.trim() ||
         !hang.maSKU.trim()
     );
@@ -422,21 +451,11 @@ export default function AddProductPage() {
       </section>
 
       <section className="overflow-hidden rounded-[20px] border border-border bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
-        <div className="border-b border-border px-6 py-4">
-          <h3 className="text-[18px] font-extrabold text-text-main">
-            Thông tin phôi áo
-          </h3>
-          <p className="mt-0.5 text-[13px] text-text-secondary">
-            Hoàn thiện thông tin cơ bản và biến thể, sau đó lưu phôi áo trong một lần.
-          </p>
-        </div>
-
         {/* ===== NỘI DUNG ===== */}
         <div className="space-y-8 p-6 lg:p-8">
           {/* Thông tin cơ bản */}
           <section
             aria-labelledby="tieu-de-thong-tin-co-ban"
-            className="rounded-[14px] border border-border p-5"
           >
             <div className="mb-5">
               <h3
@@ -585,7 +604,7 @@ export default function AddProductPage() {
           {/* Biến thể */}
           <section
             aria-labelledby="tieu-de-bien-the"
-            className="rounded-[14px] border border-border p-5"
+            className="border-t border-border pt-8"
           >
             <div className="mb-5">
               <h3
@@ -607,7 +626,7 @@ export default function AddProductPage() {
                     <span className="font-semibold text-text-main">Thêm biến thể màu × kích thước</span>
                     <br />
                     Mỗi biến thể là một tổ hợp <strong>Màu sắc + Kích thước</strong> duy nhất.
-                    SKU được gợi ý tự động, bạn có thể chỉnh sửa trực tiếp.
+                    Chọn màu đã có hoặc tạo màu mới kèm mã màu; SKU sẽ được gợi ý tự động.
                   </div>
                 </div>
 
@@ -639,72 +658,29 @@ export default function AddProductPage() {
                         key={hang.key}
                         className="border-b border-border/50 last:border-b-0"
                       >
-                        {/* Ô màu sắc và bảng chọn nhanh */}
+                        {/* Creatable Select: chọn màu có sẵn hoặc tạo màu mới */}
                         <td className="px-3 py-2">
-                          <div className="relative">
-                            <div className="flex items-center gap-1.5">
-                              {/* Chấm màu xem trước */}
-                              <span
-                                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border shadow-sm cursor-pointer"
-                                style={{
-                                  backgroundColor:
-                                    DS_MAU_PHO_BIEN.find(
-                                      (m) => m.ten === hang.mauSac
-                                    )?.hex || "#94a3b8",
-                                }}
-                                onClick={() =>
-                                  setKeyDangChonMau(
-                                    keyDangChonMau === hang.key ? null : hang.key
-                                  )
-                                }
-                                title="Chọn màu nhanh"
-                              />
-                              <input
-                                data-error-anchor={
-                                  loiBuoc2Chung && !hang.mauSac.trim() ? "true" : undefined
-                                }
-                                type="text"
-                                value={hang.mauSac}
-                                onChange={(e) =>
-                                  capNhatBienThe(hang.key, "mauSac", e.target.value)
-                                }
-                                placeholder="Tên màu..."
-                                maxLength={100}
-                                className="h-8 w-full rounded-[6px] border border-border bg-surface-alt px-2 text-[13px] text-text-main outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container"
-                              />
-                            </div>
-
-                            {/* Bảng chọn màu nhanh */}
-                            {keyDangChonMau === hang.key && (
-                              <div className="absolute left-0 top-full z-20 mt-1 w-[280px] rounded-[10px] border border-border bg-surface p-3 shadow-lg">
-                                <p className="mb-2 text-[11px] font-semibold uppercase text-text-muted">
-                                  Chọn màu nhanh
-                                </p>
-                                <div className="grid grid-cols-5 gap-2">
-                                  {DS_MAU_PHO_BIEN.map((mau) => (
-                                    <button
-                                      key={mau.ten}
-                                      type="button"
-                                      title={mau.ten}
-                                      onClick={() => chonMauNhanh(hang.key, mau.ten)}
-                                      className="group flex flex-col items-center gap-1"
-                                    >
-                                      <span
-                                        className={`h-7 w-7 rounded-full border-2 shadow-sm transition-transform group-hover:scale-110 ${
-                                          hang.mauSac === mau.ten
-                                            ? "border-primary-container"
-                                            : "border-border"
-                                        }`}
-                                        style={{ backgroundColor: mau.hex }}
-                                      />
-                                      <span className="text-[10px] text-text-muted leading-tight text-center">
-                                        {mau.ten}
-                                      </span>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
+                          <div
+                            data-error-anchor={
+                              loiBuoc2Chung && (!hang.mauSac.trim() || !hang.maMau)
+                                ? "true"
+                                : undefined
+                            }
+                          >
+                            <CreatableColorSelect
+                              value={
+                                hang.mauSac
+                                  ? { name: hang.mauSac, hex: hang.maMau }
+                                  : null
+                              }
+                              options={bangMau}
+                              onChange={(color) => capNhatMau(hang.key, color)}
+                              hasError={Boolean(
+                                loiBuoc2Chung &&
+                                  (!hang.mauSac.trim() || !hang.maMau)
+                              )}
+                              compact
+                            />
                           </div>
                         </td>
 
