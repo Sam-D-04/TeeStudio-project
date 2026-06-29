@@ -37,10 +37,6 @@ import type {
 // KIỂU DỮ LIỆU NỘI BỘ (REACT-HOOK-FORM)
 // =====================================================================
 
-type ExistingVariantForm = BienTheSanPham & {
-  isEditing: boolean;
-};
-
 type NewVariantForm = {
   key: string;
   mauSac: string;
@@ -59,7 +55,7 @@ type FormValues = {
   xuatXu: string;
   moTa: string;
   displayStatus: TrangThaiHienThi;
-  existingVariants: ExistingVariantForm[];
+  existingVariants: BienTheSanPham[];
   newVariants: NewVariantForm[];
 };
 
@@ -203,7 +199,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
     },
   });
 
-  const { fields: existingFields, update: updateExisting } = useFieldArray({
+  const { fields: existingFields } = useFieldArray({
     control,
     name: "existingVariants",
   });
@@ -249,7 +245,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
       xuatXu: chiTiet.madeIn ?? "",
       moTa: chiTiet.description ?? "",
       displayStatus: chiTiet.displayStatus,
-      existingVariants: chiTiet.variants.map((v) => ({ ...v, isEditing: false })),
+      existingVariants: chiTiet.variants,
       newVariants: [],
     });
   }, [chiTiet, danhSachDanhMuc, reset]);
@@ -270,6 +266,13 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
   });
 
   const onSubmit = (data: FormValues) => {
+    for (const variant of data.existingVariants) {
+      if (!variant.colorName.trim() || !variant.size.trim() || !variant.sku.trim()) {
+        hienThiThongBao("loi", "Vui lòng điền đầy đủ màu sắc, kích thước và mã SKU cho tất cả biến thể hiện có");
+        return;
+      }
+    }
+
     // Validate new variants
     if (data.newVariants.length > 0) {
       for (const h of data.newVariants) {
@@ -315,29 +318,6 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
 
     luuTatCa(payload);
   };
-
-  // ===== XỬ LÝ BIẾN THỂ HIỆN CÓ =====
-  function batDauSuaBienThe(index: number) {
-    const current = getValues(`existingVariants.${index}`);
-    updateExisting(index, { ...current, isEditing: true });
-  }
-
-  function luuBienTheDaChon(index: number) {
-    const current = getValues(`existingVariants.${index}`);
-    if (!current.colorName.trim() || !current.size.trim() || !current.sku.trim()) {
-      hienThiThongBao("loi", "Vui lòng điền đầy đủ màu sắc, kích thước và mã SKU");
-      return;
-    }
-    updateExisting(index, { ...current, isEditing: false });
-  }
-
-  function huyBienThe(index: number) {
-    const current = getValues(`existingVariants.${index}`);
-    const original = chiTiet?.variants.find((v) => v.id === current.id);
-    if (original) {
-      updateExisting(index, { ...original, isEditing: false });
-    }
-  }
 
   // ===== XỬ LÝ BIẾN THỂ MỚI =====
   function themHangMoi() {
@@ -646,7 +626,9 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                       Biến thể hiện có
                     </h4>
                     <p className="mt-0.5 text-[12px] text-text-muted">
-                      Mỗi biến thể nằm trên một dòng; chọn “Sửa” để cập nhật trực tiếp.
+                      {isViewMode
+                        ? "Mỗi biến thể được hiển thị trên một dòng."
+                        : "Chỉnh sửa trực tiếp các trường có thể thay đổi trên từng dòng."}
                     </p>
                   </div>
                   <span className="text-[12px] font-semibold text-text-secondary">
@@ -660,99 +642,69 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                   </div>
                 ) : (
                   <div className="overflow-x-auto rounded-[12px] border border-border">
-                    <table className="w-full min-w-[900px] table-fixed text-left">
+                    <table className="w-full min-w-[760px] table-fixed text-left">
                       <thead>
                         <tr className="border-b border-border bg-surface-alt text-[11px] font-bold uppercase tracking-wide text-text-secondary">
-                          <th className="w-[20%] px-3 py-2">Màu sắc</th>
-                          <th className="w-[12%] px-3 py-2">Kích thước</th>
-                          <th className="w-[20%] px-3 py-2">Mã SKU</th>
-                          <th className="w-[10%] px-3 py-2 text-right">Tồn kho</th>
-                          <th className="w-[11%] px-3 py-2">Trạng thái tồn</th>
+                          <th className="w-[24%] px-3 py-2">Màu sắc</th>
+                          <th className="w-[14%] px-3 py-2">Kích thước</th>
+                          <th className="w-[24%] px-3 py-2">Mã SKU</th>
+                          <th className="w-[12%] px-3 py-2 text-right">Tồn kho</th>
+                          <th className="w-[14%] px-3 py-2">Trạng thái tồn</th>
                           <th className="w-[12%] px-3 py-2">Hiển thị</th>
-                          {!isViewMode && <th className="w-[15%] px-3 py-2 text-right">Thao tác</th>}
                         </tr>
                       </thead>
                       <tbody>
                         {existingFields.map((field, index) => {
                           const bt = dsBienTheEdit[index] ?? field;
                           return (
-                            <tr
-                              key={field.id}
-                              className={`border-b border-border/70 last:border-b-0 ${
-                                bt.isEditing ? "bg-primary-container/5" : "bg-surface"
-                              }`}
-                            >
+                            <tr key={field.id} className="border-b border-border/70 bg-surface last:border-b-0">
                               <td className="px-3 py-2">
-                                {bt.isEditing ? (
-                                  <CreatableColorSelect
-                                    value={{
-                                      name: bt.colorName,
-                                      hex: bt.colorHex,
-                                    }}
-                                    options={bangMau}
-                                    onChange={(color) => {
-                                      setValue(
-                                        `existingVariants.${index}.colorName`,
-                                        color?.name ?? ""
-                                      );
-                                      setValue(
-                                        `existingVariants.${index}.colorHex`,
-                                        color?.hex ?? ""
-                                      );
-                                    }}
-                                    disabled={bt.hasTransactions}
-                                    compact
-                                  />
-                                ) : (
-                                  <div className="flex min-w-0 items-center gap-2">
-                                    <span
-                                      className="h-5 w-5 shrink-0 rounded-full border border-border shadow-sm"
-                                      style={{ backgroundColor: bt.colorHex }}
-                                    />
-                                    <span className="truncate text-[13px] font-semibold text-text-main" title={bt.colorName}>
-                                      {bt.colorName}
-                                    </span>
-                                  </div>
-                                )}
+                                <CreatableColorSelect
+                                  value={{
+                                    name: bt.colorName,
+                                    hex: bt.colorHex,
+                                  }}
+                                  options={bangMau}
+                                  onChange={(color) => {
+                                    setValue(
+                                      `existingVariants.${index}.colorName`,
+                                      color?.name ?? ""
+                                    );
+                                    setValue(
+                                      `existingVariants.${index}.colorHex`,
+                                      color?.hex ?? ""
+                                    );
+                                  }}
+                                  disabled={isViewMode || bt.hasTransactions}
+                                  compact
+                                />
                               </td>
                               <td className="px-3 py-2">
-                                {bt.isEditing ? (
-                                  <input
-                                    type="text"
-                                    list="edit-product-sizes"
-                                    {...register(`existingVariants.${index}.size`)}
-                                    maxLength={50}
-                                    disabled={bt.hasTransactions}
-                                    className={`h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none ${
-                                      bt.hasTransactions
-                                        ? "cursor-not-allowed bg-surface-container opacity-60 text-text-muted"
-                                        : "focus:border-primary-container"
-                                    }`}
-                                  />
-                                ) : (
-                                  <span className="inline-flex rounded bg-surface-container px-2 py-0.5 text-[12px] font-semibold text-text-secondary">
-                                    {bt.size}
-                                  </span>
-                                )}
+                                <input
+                                  type="text"
+                                  list="edit-product-sizes"
+                                  {...register(`existingVariants.${index}.size`)}
+                                  maxLength={50}
+                                  disabled={isViewMode || bt.hasTransactions}
+                                  className={`h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none ${
+                                    isViewMode || bt.hasTransactions
+                                      ? "cursor-not-allowed bg-surface-container opacity-60 text-text-muted"
+                                      : "focus:border-primary-container"
+                                  }`}
+                                />
                               </td>
                               <td className="px-3 py-2">
-                                {bt.isEditing ? (
-                                  <input
-                                    type="text"
-                                    {...register(`existingVariants.${index}.sku`)}
-                                    maxLength={100}
-                                    disabled={bt.hasTransactions}
-                                    className={`h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 font-mono text-[12px] outline-none ${
-                                      bt.hasTransactions
-                                        ? "cursor-not-allowed bg-surface-container opacity-60 text-text-muted"
-                                        : "focus:border-primary-container"
-                                    }`}
-                                  />
-                                ) : (
-                                  <span className="block truncate font-mono text-[12px] text-text-secondary" title={bt.sku}>
-                                    {bt.sku}
-                                  </span>
-                                )}
+                                <input
+                                  type="text"
+                                  {...register(`existingVariants.${index}.sku`)}
+                                  maxLength={100}
+                                  disabled={isViewMode || bt.hasTransactions}
+                                  className={`h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 font-mono text-[12px] outline-none ${
+                                    isViewMode || bt.hasTransactions
+                                      ? "cursor-not-allowed bg-surface-container opacity-60 text-text-muted"
+                                      : "focus:border-primary-container"
+                                  }`}
+                                />
                               </td>
                               <td className="px-3 py-2 text-right">
                                 <span className="text-[13px] font-semibold text-text-main">
@@ -763,59 +715,15 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                                 <BadgeTonKho status={bt.inventoryStatus} />
                               </td>
                               <td className="px-3 py-2">
-                                {bt.isEditing ? (
-                                  <select
-                                    {...register(`existingVariants.${index}.status`)}
-                                    className="h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none focus:border-primary-container"
-                                  >
-                                    <option value="ACTIVE">Hiện</option>
-                                    <option value="INACTIVE">Ẩn</option>
-                                  </select>
-                                ) : (
-                                  <span
-                                    className={`inline-flex rounded px-2 py-0.5 text-[12px] font-semibold ${
-                                      bt.status === "ACTIVE"
-                                        ? "bg-success/10 text-success"
-                                        : "bg-surface-container text-text-muted"
-                                    }`}
-                                  >
-                                    {bt.status === "ACTIVE" ? "Hiện" : "Ẩn"}
-                                  </span>
-                                )}
+                                <select
+                                  {...register(`existingVariants.${index}.status`)}
+                                  disabled={isViewMode}
+                                  className="h-8 w-full rounded-[6px] border border-primary-container/40 bg-surface px-2 text-[12px] outline-none focus:border-primary-container disabled:cursor-not-allowed disabled:bg-surface-container disabled:opacity-60 disabled:text-text-muted"
+                                >
+                                  <option value="ACTIVE">Hiện</option>
+                                  <option value="INACTIVE">Ẩn</option>
+                                </select>
                               </td>
-                              {!isViewMode && (
-                                <td className="px-3 py-2">
-                                  <div className="flex items-center justify-end gap-1.5">
-                                    {bt.isEditing ? (
-                                      <>
-                                        <button
-                                          type="button"
-                                          onClick={() => luuBienTheDaChon(index)}
-                                          className="flex h-8 items-center gap-1 rounded-[6px] bg-primary-container px-3 text-[12px] font-semibold text-white hover:bg-primary-container/80 disabled:opacity-50"
-                                        >
-                                          Lưu tạm
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => huyBienThe(index)}
-                                          className="h-8 rounded-[6px] border border-border bg-surface px-3 text-[12px] font-semibold text-text-secondary hover:bg-surface-alt disabled:opacity-50"
-                                        >
-                                          Hủy
-                                        </button>
-                                      </>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => batDauSuaBienThe(index)}
-                                        className="flex h-8 items-center gap-1.5 rounded-[6px] border border-border bg-surface px-3 text-[12px] font-semibold text-text-secondary transition-colors hover:border-primary-container/30 hover:bg-primary-container/5 hover:text-primary-container"
-                                      >
-                                        <EditOutlined />
-                                        Sửa
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
-                              )}
                             </tr>
                           );
                         })}
