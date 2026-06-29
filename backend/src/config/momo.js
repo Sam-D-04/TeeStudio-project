@@ -1,7 +1,12 @@
 const DEFAULT_PAYMENT_URL = "https://test-payment.momo.vn/v2/gateway/api/create";
 const DEFAULT_QUERY_URL = "https://test-payment.momo.vn/v2/gateway/api/query";
+const DEFAULT_PAYMENT_EXPIRES_IN_MINUTES = 100;
 
 function getMomoConfig() {
+  const paymentExpiresInMinutes = Number(
+    process.env.MOMO_PAYMENT_EXPIRES_IN_MINUTES ||
+      DEFAULT_PAYMENT_EXPIRES_IN_MINUTES
+  );
   const config = {
     partnerCode: process.env.MOMO_PARTNER_CODE,
     accessKey: process.env.MOMO_ACCESS_KEY,
@@ -13,6 +18,7 @@ function getMomoConfig() {
     requestType: process.env.MOMO_REQUEST_TYPE || "payWithMethod",
     partnerName: process.env.MOMO_PARTNER_NAME || "TeeStudio",
     storeId: process.env.MOMO_STORE_ID || "TeeStudio",
+    paymentExpiresInMinutes,
   };
 
   if (
@@ -32,6 +38,17 @@ function getMomoConfig() {
   if (!new Set(["payWithMethod", "captureWallet"]).has(config.requestType)) {
     const error = new Error(
       "MOMO_REQUEST_TYPE không hợp lệ. Chỉ hỗ trợ payWithMethod hoặc captureWallet."
+    );
+    error.statusCode = 503;
+    throw error;
+  }
+
+  if (
+    !Number.isSafeInteger(config.paymentExpiresInMinutes) ||
+    config.paymentExpiresInMinutes <= 0
+  ) {
+    const error = new Error(
+      "MOMO_PAYMENT_EXPIRES_IN_MINUTES phải là số nguyên dương."
     );
     error.statusCode = 503;
     throw error;

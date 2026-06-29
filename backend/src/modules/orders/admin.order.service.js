@@ -11,6 +11,7 @@ const {
 const {
   taoLinkThanhToanMomo,
   taoMaGiaoDichMomoMoi,
+  layThoiDiemHetHanMomo,
 } = require("../payments/momo.service");
 
 const DEPOSIT_PERCENT = 50;
@@ -712,6 +713,9 @@ async function layChiTietDonHang(id) {
 
   const gatewayResponse = parseGatewayResponse(donHang.gatewayResponse);
   const isOnlinePayment = ONLINE_PAYMENT_METHODS.has(donHang.paymentMethod);
+  const paymentExpiresAt = donHang.paymentMethod === "MOMO"
+    ? layThoiDiemHetHanMomo(gatewayResponse)
+    : gatewayResponse.expiresAt || null;
   const thanhToan = {
     phuongThuc: donHang.paymentMethod || "COD",
     loai: donHang.paymentType || "FULL",
@@ -727,7 +731,7 @@ async function layChiTietDonHang(id) {
         : gatewayResponse.qrCodeValue || gatewayResponse.paymentUrl || null
       : null,
     requestType: isOnlinePayment ? gatewayResponse.requestType || null : null,
-    expiresAt: isOnlinePayment ? gatewayResponse.expiresAt || null : null,
+    expiresAt: isOnlinePayment ? paymentExpiresAt : null,
   };
 
   const [rowsHistory] = await db.pool.query(
@@ -1140,7 +1144,10 @@ async function taoLaiMaThanhToanOnline(id, actor, ipAddress) {
     }
 
     const currentGatewayResponse = parseGatewayResponse(payment.gatewayResponse);
-    const currentExpiresAt = Date.parse(currentGatewayResponse.expiresAt || "");
+    const effectiveExpiresAt = payment.paymentMethod === "MOMO"
+      ? layThoiDiemHetHanMomo(currentGatewayResponse)
+      : currentGatewayResponse.expiresAt;
+    const currentExpiresAt = Date.parse(effectiveExpiresAt || "");
     const isLegacyMomoPayment =
       payment.paymentMethod === "MOMO" &&
       currentGatewayResponse.requestType !== "payWithMethod";

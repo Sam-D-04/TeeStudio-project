@@ -104,8 +104,8 @@ function getPaymentBreakdown(
       ? Math.round(totalAmount * (DEPOSIT_PERCENT / 100))
       : 0;
   const codAmount =
-    (paymentMethod === "COD" || paymentType === "DEPOSIT") 
-      ? Math.max(0, totalAmount - depositAmount) 
+    (paymentMethod === "COD" || paymentType === "DEPOSIT")
+      ? Math.max(0, totalAmount - depositAmount)
       : 0;
 
   return { depositAmount, codAmount };
@@ -966,7 +966,7 @@ function PaymentShippingSection({
                 <Radio.Button value="COD" disabled={hasCustomDesign}>COD</Radio.Button>
               </Tooltip>
               <Radio.Button value="VNPAY">VNPAY</Radio.Button>
-              <Radio.Button value="MOMO">MoMo / ATM / Thẻ</Radio.Button>
+              <Radio.Button value="MOMO">MoMo</Radio.Button>
             </Space>
           </Radio.Group>
         </Form.Item>
@@ -1165,9 +1165,8 @@ function OrderSummary({
           <div key={label} className="flex items-center justify-between gap-3">
             <span className="text-xs text-text-secondary">{label}</span>
             <span
-              className={`text-xs font-bold ${
-                amount < 0 ? "text-success" : "text-text-main"
-              }`}
+              className={`text-xs font-bold ${amount < 0 ? "text-success" : "text-text-main"
+                }`}
             >
               {amount < 0 ? `-${formatCurrency(Math.abs(amount))}` : formatCurrency(amount)}
             </span>
@@ -1489,9 +1488,9 @@ export default function CreateOrderPage() {
 
     if (design) {
       setSelectedDesignById((prev) => ({ ...prev, [design.id]: design }));
-      
+
       const productType = items[rowIndex]?.productType ?? "CUSTOM";
-      
+
       items[rowIndex] = {
         ...items[rowIndex],
         productType,
@@ -1500,7 +1499,7 @@ export default function CreateOrderPage() {
         color: design.mauSanPham || design.mauNen,
         variantId: design.variantId ?? undefined,
       };
-      
+
       if (design.sanPham) {
         setSelectedProductById((prev) => ({ ...prev, [design.sanPham.id]: design.sanPham }));
       }
@@ -1510,7 +1509,7 @@ export default function CreateOrderPage() {
         designId,
       };
     }
-    
+
     form.setFieldsValue({ items });
   }
 

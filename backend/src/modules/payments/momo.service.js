@@ -1,7 +1,6 @@
 const crypto = require("crypto");
 const { getMomoConfig } = require("../../config/momo");
 
-const PAYMENT_EXPIRES_IN_MINUTES = 15;
 const MOMO_PENDING_RESULT_CODES = new Set([10, 43, 1000, 7000, 7002]);
 const MOMO_SUCCESS_RESULT_CODES = new Set([0, 9000]);
 
@@ -36,6 +35,43 @@ function taoRequestIdMomo() {
     .randomBytes(5)
     .toString("hex")
     .toUpperCase()}`;
+}
+
+function layThoiDiemHetHanMomo(gatewayResponse) {
+  let parsedResponse = gatewayResponse;
+  if (typeof parsedResponse === "string") {
+    try {
+      parsedResponse = JSON.parse(parsedResponse);
+    } catch {
+      return null;
+    }
+  }
+
+  if (!parsedResponse || typeof parsedResponse !== "object") return null;
+
+  const config = getMomoConfig();
+  const storedMinutes = Number(parsedResponse.expiresInMinutes);
+  const expiresInMinutes =
+    Number.isSafeInteger(storedMinutes) && storedMinutes > 0
+      ? storedMinutes
+      : config.paymentExpiresInMinutes;
+  const responseTime = Number(
+    parsedResponse.gatewayCreateResponse?.responseTime
+  );
+
+  if (Number.isFinite(responseTime) && responseTime > 0) {
+    const calculatedExpiresAt = new Date(
+      responseTime + expiresInMinutes * 60 * 1000
+    );
+    if (!Number.isNaN(calculatedExpiresAt.getTime())) {
+      return calculatedExpiresAt.toISOString();
+    }
+  }
+
+  const fallbackExpiresAt = Date.parse(parsedResponse.expiresAt || "");
+  return Number.isFinite(fallbackExpiresAt)
+    ? new Date(fallbackExpiresAt).toISOString()
+    : null;
 }
 
 function taoChuKyTaoThanhToan(params, accessKey) {
@@ -123,10 +159,6 @@ async function taoLinkThanhToanMomo({
 
   const orderId = String(transactionRef || taoMaGiaoDichMomoMoi(orderCode));
   const requestId = taoRequestIdMomo();
-  const createdAt = new Date();
-  const expiresAt = new Date(
-    createdAt.getTime() + PAYMENT_EXPIRES_IN_MINUTES * 60 * 1000
-  );
   const requestBody = {
     partnerCode: config.partnerCode,
     partnerName: config.partnerName,
@@ -182,6 +214,11 @@ async function taoLinkThanhToanMomo({
     throw error;
   }
 
+  const expiresAt = layThoiDiemHetHanMomo({
+    expiresInMinutes: config.paymentExpiresInMinutes,
+    gatewayCreateResponse: data,
+  });
+
   return {
     paymentUrl: data.payUrl,
     // Collection Link trả về payUrl HTTPS. Dùng chính URL này để QR có thể
@@ -193,7 +230,8 @@ async function taoLinkThanhToanMomo({
     providerQrCodeValue: data.qrCodeUrl || null,
     deeplink: data.deeplink || null,
     requestType: config.requestType,
-    expiresAt: expiresAt.toISOString(),
+    expiresInMinutes: config.paymentExpiresInMinutes,
+    expiresAt,
     transactionRef: orderId,
     requestId,
     gatewayCreateResponse: data,
@@ -260,6 +298,7 @@ function laGiaoDichMomoDangXuLy(resultCode) {
 module.exports = {
   taoMaGiaoDichMomoMoi,
   taoLinkThanhToanMomo,
+  layThoiDiemHetHanMomo,
   truyVanGiaoDichMomo,
   xacThucPhanHoiMomo,
   laGiaoDichMomoThanhCong,
