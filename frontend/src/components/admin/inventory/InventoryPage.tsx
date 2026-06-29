@@ -54,16 +54,25 @@ function tinhTrangThaiTheoKhaDung(khaDung: number): InventoryItem["trangThai"] {
 
 type InventoryPageProps = {
   initialStockFilter?: string;
+  initialVariantId?: number;
+  initialSearchKeyword?: string;
 };
 
 export default function InventoryPage({
   initialStockFilter = "tat_ca",
+  initialVariantId,
+  initialSearchKeyword = "",
 }: InventoryPageProps) {
   const router = useRouter();
   // ===== TRẠNG THÁI UI =====
 
   /** Từ khóa tìm kiếm trong ô search */
-  const [tuKhoaTimKiem, setTuKhoaTimKiem] = useState("");
+  const [tuKhoaTimKiem, setTuKhoaTimKiem] = useState(initialSearchKeyword);
+
+  /** ID biến thể khi đi từ link "Xem trong kho" ở trang phôi áo */
+  const [bienTheId, setBienTheId] = useState<number | undefined>(
+    initialVariantId
+  );
 
   /** Pill filter đang được chọn */
   const [boLocHienTai, setBoLocHienTai] = useState(initialStockFilter);
@@ -107,6 +116,7 @@ export default function InventoryPage({
       "inventory",
       "list",
       trangHienTai,
+      bienTheId,
       tuKhoaTimKiem,
       boLocHienTai,
       tuNgay,
@@ -116,6 +126,7 @@ export default function InventoryPage({
       inventoryService.layDanhSachTonKho({
         trang: trangHienTai,
         soMoiTrang: SO_MOI_TRANG,
+        variantId: bienTheId,
         tuKhoa: tuKhoaTimKiem,
         boLoc: boLocHienTai,
         tuNgay,
@@ -162,8 +173,20 @@ export default function InventoryPage({
 
   // ===== XỬ LÝ BỘ LỌC + TÌM KIẾM =====
 
+  /** Bỏ ràng buộc biến thể từ link khi người dùng chủ động thay đổi bộ lọc. */
+  function xoaBoLocBienTheTuLienKet() {
+    if (!bienTheId) return;
+
+    setBienTheId(undefined);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("variantId");
+    url.searchParams.delete("sku");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
   /** Reset về trang 1 khi đổi bộ lọc */
   function xuLyDoiBoLoc(key: string) {
+    xoaBoLocBienTheTuLienKet();
     setBoLocHienTai(key);
     setTrangHienTai(1);
     setIdDaChon([]);
@@ -171,12 +194,14 @@ export default function InventoryPage({
 
   /** Reset về trang 1 khi tìm kiếm */
   function xuLyTimKiem(val: string) {
+    xoaBoLocBienTheTuLienKet();
     setTuKhoaTimKiem(val);
     setTrangHienTai(1);
     setIdDaChon([]);
   }
 
   function xuLyDoiNgay(startDate: string, endDate: string) {
+    xoaBoLocBienTheTuLienKet();
     setTuNgay(startDate);
     setDenNgay(endDate);
     setTrangHienTai(1);
@@ -184,6 +209,7 @@ export default function InventoryPage({
   }
 
   function xuLyXoaNgay() {
+    xoaBoLocBienTheTuLienKet();
     setTuNgay("");
     setDenNgay("");
     setTrangHienTai(1);
@@ -191,6 +217,7 @@ export default function InventoryPage({
   }
 
   function xuLyKpiFilter(boLoc: string) {
+    xoaBoLocBienTheTuLienKet();
     setTuKhoaTimKiem("");
     setBoLocHienTai(boLoc);
     setTuNgay("");

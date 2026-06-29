@@ -64,6 +64,11 @@ const getDanhSachTonKhoSchema = {
       min: 1,
       max: 100,
     },
+    variantId: {
+      label: "Biến thể phôi áo",
+      type: "integer",
+      min: 1,
+    },
     tuKhoa: {
       label: "Từ khóa tìm kiếm",
       type: "string",

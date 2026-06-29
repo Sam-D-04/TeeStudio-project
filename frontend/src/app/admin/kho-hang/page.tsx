@@ -36,6 +36,15 @@ export default async function KhoHangPage({
   const stock = layGiaTriDauTien(params.stock).toUpperCase();
   const transaction = layGiaTriDauTien(params.transaction).toUpperCase();
   const period = layGiaTriDauTien(params.period).toUpperCase();
+  const variantIdParam = layGiaTriDauTien(params.variantId);
+  const parsedVariantId = Number(variantIdParam);
+  const initialVariantId =
+    Number.isInteger(parsedVariantId) && parsedVariantId > 0
+      ? parsedVariantId
+      : undefined;
+  const initialSearchKeyword = initialVariantId
+    ? layGiaTriDauTien(params.sku).trim()
+    : "";
   const initialStockFilter =
     stock === "LOW"
       ? "ton_thap"
@@ -49,8 +58,10 @@ export default async function KhoHangPage({
 
   return (
     <InventoryClient
-      key={initialStockFilter}
+      key={`${initialStockFilter}-${initialVariantId ?? "all"}`}
       initialStockFilter={initialStockFilter}
+      initialVariantId={initialVariantId}
+      initialSearchKeyword={initialSearchKeyword}
     />
   );
 }

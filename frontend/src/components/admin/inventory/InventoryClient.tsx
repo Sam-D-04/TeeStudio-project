@@ -8,8 +8,18 @@ import InventoryPage from "@/components/admin/inventory/InventoryPage";
  */
 export default function InventoryClient({
   initialStockFilter,
+  initialVariantId,
+  initialSearchKeyword,
 }: {
   initialStockFilter?: string;
+  initialVariantId?: number;
+  initialSearchKeyword?: string;
 }) {
-  return <InventoryPage initialStockFilter={initialStockFilter} />;
+  return (
+    <InventoryPage
+      initialStockFilter={initialStockFilter}
+      initialVariantId={initialVariantId}
+      initialSearchKeyword={initialSearchKeyword}
+    />
+  );
 }

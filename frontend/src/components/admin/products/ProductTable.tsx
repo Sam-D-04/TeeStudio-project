@@ -20,6 +20,7 @@ import {
   RightOutlined,
   SkinOutlined,
 } from "@ant-design/icons";
+import Link from "next/link";
 import { Fragment, useState } from "react";
 import type { SanPham, BienTheSanPham } from "@/services/admin/productService";
 import {
@@ -104,6 +105,9 @@ function VariantExpandedRow({ variants }: { variants: BienTheSanPham[] }) {
                   <th className="px-4 py-2 text-center font-normal">
                     Trạng thái
                   </th>
+                  <th className="px-4 py-2 text-center font-normal">
+                    Quản lý kho
+                  </th>
                 </tr>
               </thead>
               <tbody className="text-[13px] text-text-secondary">
@@ -152,6 +156,21 @@ function VariantExpandedRow({ variants }: { variants: BienTheSanPham[] }) {
                         <InventoryStatusBadge
                           status={variant.inventoryStatus}
                         />
+                      </td>
+                      {/* Điều hướng sang kho và lọc chính xác theo ID biến thể */}
+                      <td className="px-4 py-2 text-center">
+                        <Link
+                          href={{
+                            pathname: "/admin/kho-hang",
+                            query: {
+                              variantId: variant.id,
+                              sku: variant.sku,
+                            },
+                          }}
+                          className="font-semibold text-primary hover:underline"
+                        >
+                          Xem trong kho
+                        </Link>
                       </td>
                     </tr>
                   );

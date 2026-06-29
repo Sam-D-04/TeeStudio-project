@@ -65,6 +65,7 @@ export type KetQuaDanhSachTonKho = {
 export type ThamSoLocTonKho = {
   trang?: number;
   soMoiTrang?: number;
+  variantId?: number;
   tuKhoa?: string;
   boLoc?: string;
   tuNgay?: string;
@@ -213,6 +214,7 @@ export async function layDanhSachTonKho(
 
   if (thamSo.trang) params.trang = thamSo.trang;
   if (thamSo.soMoiTrang) params.soMoiTrang = thamSo.soMoiTrang;
+  if (thamSo.variantId) params.variantId = thamSo.variantId;
   if (thamSo.tuKhoa && thamSo.tuKhoa.trim()) params.tuKhoa = thamSo.tuKhoa.trim();
   if (thamSo.boLoc && thamSo.boLoc !== "tat_ca") params.boLoc = thamSo.boLoc;
   if (thamSo.tuNgay) params.tuNgay = thamSo.tuNgay;

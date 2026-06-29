@@ -115,6 +115,7 @@ async function layThongKeKho() {
  * @param {object} params
  * @param {number}  [params.trang=1]        - Trang hiện tại
  * @param {number}  [params.soMoiTrang=10]  - Số dòng mỗi trang
+ * @param {number}  [params.variantId]       - Lọc chính xác theo ID biến thể
  * @param {string}  [params.tuKhoa]         - Tìm theo SKU | tên | màu
  * @param {string}  [params.boLoc]          - "tat_ca" | "ton_thap" | "sap_het" | "can_xuat" | "nhap_thang" | "het_hang" | "con_hang" | tên sản phẩm
  * @param {string}  [params.tuNgay]          - Chỉ lấy SKU có biến động kho từ ngày này
@@ -125,6 +126,7 @@ async function layDanhSachTonKho(params = {}) {
   const trang = Math.max(1, parseInt(params.trang) || 1);
   const soMoiTrang = Math.min(100, Math.max(1, parseInt(params.soMoiTrang) || 10));
   const offset = (trang - 1) * soMoiTrang;
+  const variantId = Number(params.variantId) || null;
   const tuKhoa = params.tuKhoa ? params.tuKhoa.trim() : "";
   const boLoc = params.boLoc || "tat_ca";
   const tuNgay = laNgayHopLe(params.tuNgay) ? params.tuNgay : "";
@@ -132,6 +134,12 @@ async function layDanhSachTonKho(params = {}) {
 
   const conditions = [];
   const values = [];
+
+  // Link từ trang phôi áo dùng ID để luôn chọn đúng duy nhất một biến thể.
+  if (variantId) {
+    conditions.push("pv.id = ?");
+    values.push(variantId);
+  }
 
   // Lọc theo từ khóa tìm kiếm
   if (tuKhoa) {
