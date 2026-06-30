@@ -1,6 +1,6 @@
 "use client";
 
-import { SearchOutlined, FilterOutlined } from "@ant-design/icons";
+import { SearchOutlined } from "@ant-design/icons";
 import DateRangeFilter from "@/components/admin/common/DateRangeFilter";
 
 /**
@@ -58,7 +58,7 @@ export default function InventoryFilterBar({
     <div className="space-y-3 border-b border-border bg-surface-alt px-4 py-4">
 
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        {/* ---- Phần trái: Ô tìm kiếm + nút Bộ lọc ---- */}
+        {/* ---- Phần trái: Ô tìm kiếm ---- */}
         <div className="flex items-center gap-3">
 
           {/* Ô tìm kiếm SKU / tên phôi áo */}
@@ -77,14 +77,6 @@ export default function InventoryFilterBar({
             />
           </div>
 
-          {/* Nút "Bộ lọc" – dùng để mở filter nâng cao (mở rộng sau) */}
-          <button
-            type="button"
-            className="flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm text-text-secondary transition-colors hover:bg-surface-alt"
-          >
-            <FilterOutlined style={{ fontSize: 16 }} />
-            <span>Bộ lọc</span>
-          </button>
         </div>
 
         {/* ---- Phần phải: Dãy pill filter ---- */}

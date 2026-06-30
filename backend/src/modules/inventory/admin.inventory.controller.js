@@ -180,6 +180,23 @@ const getDanhSachNhaCungCap = async (req, res, next) => {
   }
 };
 
+/**
+ * POST /api/admin/inventory/suppliers
+ * Tạo nhanh nhà cung cấp mới từ trang nhập kho.
+ */
+const createNhaCungCap = async (req, res, next) => {
+  try {
+    const data = await inventoryService.taoNhaCungCap(req.body);
+    res.status(201).json({
+      success: true,
+      message: "Thêm nhà cung cấp thành công",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // =====================================================================
 // LỊCH SỬ TOÀN KHO (có phân trang + lọc + tìm kiếm)
 // =====================================================================
@@ -213,4 +230,5 @@ module.exports = {
   ghiGiaoDich,
   getDanhSachSanPhamVaBienThe,
   getDanhSachNhaCungCap,
+  createNhaCungCap,
 };

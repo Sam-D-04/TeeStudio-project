@@ -436,6 +436,15 @@ async function ghiGiaoDichKho(payload) {
     reason,
   } = payload;
 
+  // Giao dịch nhập kho phải gắn với nhà cung cấp để bảo toàn dấu vết nhập hàng.
+  if (transactionType === "IMPORT" && !supplierId) {
+    const error = new Error(
+      "Vui lòng chọn nhà cung cấp khi nhập kho từ nhà cung cấp"
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
   // Kiểm tra biến thể tồn tại
   const [variants] = await db.pool.query(
     `SELECT id, stockQty FROM ProductVariant WHERE id = ? FOR UPDATE`,
@@ -557,6 +566,27 @@ async function layDanhSachNhaCungCap() {
     ten: row.ten,
     soDienThoai: row.soDienThoai || "",
   }));
+}
+
+/**
+ * Tạo nhanh một nhà cung cấp để sử dụng ngay trong phiếu nhập kho.
+ *
+ * @param {{name: string, phone?: string}} payload
+ * @returns {Promise<{id: number, ten: string, soDienThoai: string}>}
+ */
+async function taoNhaCungCap(payload) {
+  const ten = payload.name.trim();
+  const soDienThoai = payload.phone?.trim() || null;
+  const result = await db.execute(
+    `INSERT INTO Supplier (name, phone) VALUES (?, ?)`,
+    [ten, soDienThoai]
+  );
+
+  return {
+    id: result.insertId,
+    ten,
+    soDienThoai: soDienThoai || "",
+  };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -711,4 +741,5 @@ module.exports = {
   ghiGiaoDichKho,
   layDanhSachSanPhamVaBienThe,
   layDanhSachNhaCungCap,
+  taoNhaCungCap,
 };

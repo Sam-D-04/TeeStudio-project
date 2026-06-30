@@ -7,12 +7,12 @@ import InventoryStatusBadge, { type InventoryStatus } from "./InventoryStatusBad
  * InventoryTable – bảng dữ liệu tồn kho chính.
  *
  * Mỗi hàng hiển thị một biến thể áo (SKU cụ thể: tên + màu + size).
- * Khi di chuột vào hàng, hai nút hành động xuất hiện:
+ * Mỗi hàng luôn hiển thị hai nút hành động:
  * - "Nhập/Xuất" (icon sync_alt): ghi nhận biến động tồn kho
  * - "Xem chi tiết" (icon visibility): mở drawer xem chi tiết
  *
  * Cột dữ liệu:
- * ☐ | Phôi áo | Biến thể | SKU | Tồn hiện tại | Đã giữ | Khả dụng | Trạng thái | Hành động
+ * Phôi áo | Biến thể | SKU | Tồn hiện tại | Đã giữ | Khả dụng | Trạng thái | Hành động
  */
 
 // Kiểu dữ liệu cho một biến thể phôi áo trong kho
@@ -32,24 +32,15 @@ export type InventoryItem = {
 // Kiểu dữ liệu props của bảng
 type InventoryTableProps = {
   items: InventoryItem[];              // Danh sách biến thể cần hiển thị
-  selectedIds: number[];               // Danh sách ID đang được tích checkbox
-  onSelectItem: (id: number) => void;  // Hàm tích/bỏ tích một hàng
-  onSelectAll: () => void;             // Hàm tích/bỏ tích tất cả
   onViewDetail: (item: InventoryItem) => void; // Hàm mở drawer xem chi tiết
   onGiaoDich: (item: InventoryItem) => void;   // Hàm mở modal nhập/xuất kho
 };
 
 export default function InventoryTable({
   items,
-  selectedIds,
-  onSelectItem,
-  onSelectAll,
   onViewDetail,
   onGiaoDich,
 }: InventoryTableProps) {
-  // Kiểm tra xem tất cả các dòng đang hiển thị có được chọn hết không
-  const isAllSelected = items.length > 0 && selectedIds.length === items.length;
-
   return (
     // Wrapper cho phép scroll ngang khi màn hình nhỏ
     <div className="overflow-x-auto">
@@ -58,17 +49,6 @@ export default function InventoryTable({
         {/* ===== HEADER BẢNG ===== */}
         <thead>
           <tr className="border-b border-border bg-surface-container-low text-text-secondary">
-
-            {/* Cột checkbox chọn tất cả */}
-            <th className="w-12 p-4">
-              <input
-                type="checkbox"
-                checked={isAllSelected}
-                onChange={onSelectAll}
-                className="rounded border-border accent-primary-container"
-                aria-label="Chọn tất cả"
-              />
-            </th>
 
             {/* Cột tên phôi áo (ảnh minh họa màu + tên + màu sắc) */}
             <th className="p-4 text-xs font-semibold uppercase tracking-wider">Phôi áo</th>
@@ -97,7 +77,7 @@ export default function InventoryTable({
             {/* Cột trạng thái tồn kho */}
             <th className="p-4 text-xs font-semibold uppercase tracking-wider">Trạng thái</th>
 
-            {/* Cột hành động (xuất hiện khi hover) */}
+            {/* Cột hành động */}
             <th className="p-4 text-right text-xs font-semibold uppercase tracking-wider">
               Hành động
             </th>
@@ -107,9 +87,6 @@ export default function InventoryTable({
         {/* ===== NỘI DUNG BẢNG ===== */}
         <tbody className="divide-y divide-border">
           {items.map((item) => {
-            // Kiểm tra dòng này có đang được tích checkbox không
-            const isSelected = selectedIds.includes(item.id);
-
             // Chọn màu hiển thị cho cột "Khả dụng" theo tình trạng tồn kho
             const khaDungColor =
               item.trangThai === "het_hang"
@@ -119,24 +96,11 @@ export default function InventoryTable({
                 : "text-primary-container"; // Xanh khi còn hàng
 
             return (
-              // Mỗi hàng: hover đổi nền, class "group" dùng để hiện nút hành động khi hover
+              // Mỗi hàng đổi nền khi hover
               <tr
                 key={item.id}
-                className={`group transition-colors hover:bg-surface-alt ${
-                  isSelected ? "bg-primary-container/5" : ""
-                }`}
+                className="transition-colors hover:bg-surface-alt"
               >
-                {/* Ô checkbox */}
-                <td className="p-4">
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => onSelectItem(item.id)}
-                    className="rounded border-border accent-primary-container"
-                    aria-label={`Chọn ${item.ten}`}
-                  />
-                </td>
-
                 {/* Ô thông tin phôi áo: ô màu minh họa + tên + màu */}
                 <td className="p-4">
                   <div className="flex items-center gap-3">
@@ -185,9 +149,9 @@ export default function InventoryTable({
                   <InventoryStatusBadge status={item.trangThai} />
                 </td>
 
-                {/* Ô hành động: ẩn mặc định, hiện khi hover vào hàng (group-hover) */}
+                {/* Ô hành động luôn hiển thị */}
                 <td className="p-4 text-right">
-                  <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="flex items-center justify-end gap-2">
 
                     {/* Nút nhập/xuất kho */}
                     <button
@@ -218,7 +182,7 @@ export default function InventoryTable({
           {/* Hiển thị khi không có dữ liệu */}
           {items.length === 0 && (
             <tr>
-              <td colSpan={9} className="py-12 text-center text-sm text-text-muted">
+              <td colSpan={8} className="py-12 text-center text-sm text-text-muted">
                 Không tìm thấy biến thể nào phù hợp.
               </td>
             </tr>

@@ -87,9 +87,6 @@ export default function InventoryPage({
   /** Trang hiện tại trong phân trang */
   const [trangHienTai, setTrangHienTai] = useState(1);
 
-  /** Danh sách ID các hàng đang được tích checkbox */
-  const [idDaChon, setIdDaChon] = useState<number[]>([]);
-
   /** Item đang được xem chi tiết trong drawer (null = drawer đóng) */
   const [itemDangXem, setItemDangXem] = useState<InventoryItem | null>(null);
 
@@ -151,26 +148,6 @@ export default function InventoryPage({
   const tongSo = ketQuaDanhSach?.tongSo ?? 0;
   const tongSoTrang = ketQuaDanhSach?.tongSoTrang ?? 1;
 
-  // ===== XỬ LÝ CHECKBOX =====
-
-  /** Tích/bỏ tích một item */
-  function xuLyChonItem(id: number) {
-    setIdDaChon((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  }
-
-  /** Tích/bỏ tích tất cả item của trang hiện tại */
-  function xuLyChonTatCa() {
-    const idTrangHienTai = danhSachHienThi.map((i) => i.id);
-    const tatCaDaChon = idTrangHienTai.every((id) => idDaChon.includes(id));
-    if (tatCaDaChon) {
-      setIdDaChon((prev) => prev.filter((id) => !idTrangHienTai.includes(id)));
-    } else {
-      setIdDaChon((prev) => [...new Set([...prev, ...idTrangHienTai])]);
-    }
-  }
-
   // ===== XỬ LÝ BỘ LỌC + TÌM KIẾM =====
 
   /** Bỏ ràng buộc biến thể từ link khi người dùng chủ động thay đổi bộ lọc. */
@@ -189,7 +166,6 @@ export default function InventoryPage({
     xoaBoLocBienTheTuLienKet();
     setBoLocHienTai(key);
     setTrangHienTai(1);
-    setIdDaChon([]);
   }
 
   /** Reset về trang 1 khi tìm kiếm */
@@ -197,7 +173,6 @@ export default function InventoryPage({
     xoaBoLocBienTheTuLienKet();
     setTuKhoaTimKiem(val);
     setTrangHienTai(1);
-    setIdDaChon([]);
   }
 
   function xuLyDoiNgay(startDate: string, endDate: string) {
@@ -205,7 +180,6 @@ export default function InventoryPage({
     setTuNgay(startDate);
     setDenNgay(endDate);
     setTrangHienTai(1);
-    setIdDaChon([]);
   }
 
   function xuLyXoaNgay() {
@@ -213,7 +187,6 @@ export default function InventoryPage({
     setTuNgay("");
     setDenNgay("");
     setTrangHienTai(1);
-    setIdDaChon([]);
   }
 
   function xuLyKpiFilter(boLoc: string) {
@@ -223,7 +196,6 @@ export default function InventoryPage({
     setTuNgay("");
     setDenNgay("");
     setTrangHienTai(1);
-    setIdDaChon([]);
   }
 
   function xuLyResetBoLoc() {
@@ -375,9 +347,6 @@ export default function InventoryPage({
           <div className={dangTaiDanhSach ? "opacity-60 transition-opacity" : ""}>
             <InventoryTable
               items={danhSachHienThi}
-              selectedIds={idDaChon}
-              onSelectItem={xuLyChonItem}
-              onSelectAll={xuLyChonTatCa}
               onViewDetail={(item) => setItemDangXem(item)}
               onGiaoDich={(item) => setItemGiaoDich(item)}
             />

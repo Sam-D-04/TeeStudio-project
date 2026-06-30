@@ -140,6 +140,12 @@ export type NhaCungCap = {
   soDienThoai: string;
 };
 
+/** Dữ liệu tạo nhanh nhà cung cấp */
+export type TaoNhaCungCapInput = {
+  ten: string;
+  soDienThoai?: string;
+};
+
 /** Một giao dịch kho trong lịch sử toàn kho */
 export type GiaoDichKho = {
   id: number;
@@ -299,6 +305,24 @@ export async function layDanhSachNhaCungCap(): Promise<NhaCungCap[]> {
   const res = await apiClient.get<{ success: boolean; data: NhaCungCap[] }>(
     "/admin/inventory/suppliers"
   );
+  return res.data.data;
+}
+
+/**
+ * Tạo nhanh nhà cung cấp từ trang nhập kho.
+ * POST /api/admin/inventory/suppliers
+ */
+export async function taoNhaCungCap(
+  payload: TaoNhaCungCapInput
+): Promise<NhaCungCap> {
+  const res = await apiClient.post<{
+    success: boolean;
+    message: string;
+    data: NhaCungCap;
+  }>("/admin/inventory/suppliers", {
+    name: payload.ten,
+    phone: payload.soDienThoai || undefined,
+  });
   return res.data.data;
 }
 

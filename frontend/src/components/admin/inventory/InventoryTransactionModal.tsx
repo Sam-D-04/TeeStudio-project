@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Modal, Select, message } from "antd";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { App, Modal, Select } from "antd";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { InventoryItem } from "./InventoryTable";
 import * as inventoryService from "@/services/admin/inventoryService";
 import type { LoaiGiaoDich } from "@/services/admin/inventoryService";
@@ -40,28 +40,39 @@ export default function InventoryTransactionModal({
   onClose,
   item,
 }: InventoryTransactionModalProps) {
+  const { message } = App.useApp();
   const queryClient = useQueryClient();
 
   // ===== TRẠNG THÁI FORM =====
   // Khai báo tất cả hook VÔ ĐIỀU KIỆN – không đặt return trước hook
   const [loaiGiaoDich, setLoaiGiaoDich] = useState<LoaiGiaoDich>("IMPORT");
+  const [nhaCungCapId, setNhaCungCapId] = useState<number | null>(null);
   const [soLuong, setSoLuong] = useState<string>("");
   const [lyDo, setLyDo] = useState<string>("");
   const [loiForm, setLoiForm] = useState<Record<string, string>>({});
 
-  // Reset form mỗi khi modal mở với item mới
-  useEffect(() => {
-    if (isOpen) {
-      setLoaiGiaoDich("IMPORT");
-      setSoLuong("");
-      setLyDo("");
-      setLoiForm({});
-    }
-  }, [isOpen, item?.id]);
+  function resetForm() {
+    setLoaiGiaoDich("IMPORT");
+    setNhaCungCapId(null);
+    setSoLuong("");
+    setLyDo("");
+    setLoiForm({});
+  }
 
   // Xác định dấu hiệu dương/âm theo loại giao dịch
   const infoLoai = LOAI_GIAO_DICH_OPTIONS.find((o) => o.value === loaiGiaoDich);
   const isNhap = infoLoai?.dauHieu === "+";
+
+  // Chỉ tải danh sách nhà cung cấp khi modal đang ghi nhận một giao dịch nhập kho.
+  const {
+    data: danhSachNhaCungCap = [],
+    isLoading: dangTaiNhaCungCap,
+  } = useQuery({
+    queryKey: ["inventory", "suppliers"],
+    queryFn: inventoryService.layDanhSachNhaCungCap,
+    enabled: isOpen && loaiGiaoDich === "IMPORT",
+    staleTime: 120_000,
+  });
 
   // ===== MUTATION GỌI API =====
   const mutation = useMutation<
@@ -93,6 +104,10 @@ export default function InventoryTransactionModal({
       loi.soLuong = "Số lượng phải là số nguyên dương";
     }
 
+    if (loaiGiaoDich === "IMPORT" && !nhaCungCapId) {
+      loi.nhaCungCap = "Vui lòng chọn nhà cung cấp";
+    }
+
     if (!lyDo.trim() || lyDo.trim().length < 3) {
       loi.lyDo = "Lý do phải có ít nhất 3 ký tự";
     } else if (lyDo.trim().length > 300) {
@@ -117,6 +132,8 @@ export default function InventoryTransactionModal({
       quantityChanged,
       transactionType: loaiGiaoDich,
       reason: lyDo.trim(),
+      supplierId:
+        loaiGiaoDich === "IMPORT" ? nhaCungCapId ?? undefined : undefined,
     });
   }
 
@@ -130,6 +147,9 @@ export default function InventoryTransactionModal({
     <Modal
       open={isOpen}
       onCancel={onClose}
+      afterOpenChange={(open) => {
+        if (!open) resetForm();
+      }}
       footer={null}
       title={null}
       width={480}
@@ -164,7 +184,11 @@ export default function InventoryTransactionModal({
           </label>
           <Select
             value={loaiGiaoDich}
-            onChange={(val) => setLoaiGiaoDich(val as LoaiGiaoDich)}
+            onChange={(val) => {
+              const loaiMoi = val as LoaiGiaoDich;
+              setLoaiGiaoDich(loaiMoi);
+              if (loaiMoi !== "IMPORT") setNhaCungCapId(null);
+            }}
             className="w-full"
             size="large"
             options={LOAI_GIAO_DICH_OPTIONS.map((o) => ({
@@ -173,6 +197,43 @@ export default function InventoryTransactionModal({
             }))}
           />
         </div>
+
+        {/* Trường: Nhà cung cấp – chỉ áp dụng cho giao dịch nhập kho */}
+        {loaiGiaoDich === "IMPORT" && (
+          <div className="mb-4">
+            <label className="mb-1.5 block text-sm font-semibold text-text-main">
+              Nhà cung cấp <span className="text-[#b91c1c]">*</span>
+            </label>
+            <Select
+              value={nhaCungCapId ?? undefined}
+              onChange={(value) => {
+                setNhaCungCapId(value ?? null);
+                setLoiForm((prev) => ({ ...prev, nhaCungCap: "" }));
+              }}
+              placeholder="Chọn nhà cung cấp..."
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              loading={dangTaiNhaCungCap}
+              disabled={dangTaiNhaCungCap}
+              status={loiForm.nhaCungCap ? "error" : undefined}
+              className="w-full"
+              size="large"
+              options={danhSachNhaCungCap.map((nhaCungCap) => ({
+                value: nhaCungCap.id,
+                label: nhaCungCap.ten,
+              }))}
+              notFoundContent={
+                dangTaiNhaCungCap ? null : "Không tìm thấy nhà cung cấp nào."
+              }
+            />
+            {loiForm.nhaCungCap && (
+              <p className="mt-1 text-xs text-[#b91c1c]">
+                {loiForm.nhaCungCap}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Trường: Số lượng */}
         <div className="mb-4">

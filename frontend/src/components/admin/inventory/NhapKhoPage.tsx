@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Select, message } from "antd";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { App, Select } from "antd";
 import {
   ArrowLeftOutlined,
   PlusOutlined,
@@ -16,6 +16,7 @@ import {
 } from "@ant-design/icons";
 import * as inventoryService from "@/services/admin/inventoryService";
 import type { BienTheNhapKho } from "@/services/admin/inventoryService";
+import AddSupplierModal from "./AddSupplierModal";
 
 // ──────────────────────────────────────────────────────────────────
 // TYPES
@@ -61,10 +62,11 @@ function dongNhapKhoMoi(): DongNhapKho {
  *  1. Chọn sản phẩm → tự lọc danh sách biến thể
  *  2. Chọn biến thể (màu/size)
  *  3. Nhập số lượng
- *  4. (Tuỳ chọn) Chọn nhà cung cấp và nhập ghi chú chung
+ *  4. Chọn nhà cung cấp và nhập ghi chú chung
  *  5. Nhấn "Xác nhận nhập kho" → gọi API tuần tự
  */
 export default function NhapKhoPage() {
+  const { message } = App.useApp();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -73,9 +75,11 @@ export default function NhapKhoPage() {
     dongNhapKhoMoi(),
   ]);
   const [nhaCungCapId, setNhaCungCapId] = useState<number | null>(null);
+  const [loiNhaCungCap, setLoiNhaCungCap] = useState("");
   const [ghiChuChung, setGhiChuChung] = useState("");
   const [loiGhiChu, setLoiGhiChu] = useState("");
   const [dangGui, setDangGui] = useState(false);
+  const [modalThemNCCOpen, setModalThemNCCOpen] = useState(false);
 
   // ── API: Danh sách sản phẩm + biến thể ──
   const {
@@ -178,6 +182,13 @@ export default function NhapKhoPage() {
       hopLe = false;
     }
 
+    if (!nhaCungCapId) {
+      setLoiNhaCungCap("Vui lòng chọn nhà cung cấp");
+      hopLe = false;
+    } else {
+      setLoiNhaCungCap("");
+    }
+
     // Kiểm tra ghi chú chung (bắt buộc)
     if (!ghiChuChung.trim() || ghiChuChung.trim().length < 3) {
       setLoiGhiChu("Ghi chú nhập kho phải có ít nhất 3 ký tự");
@@ -208,7 +219,7 @@ export default function NhapKhoPage() {
             quantityChanged: parseInt(dong.soLuong),
             transactionType: "IMPORT",
             reason: ghiChuChung.trim(),
-            supplierId: nhaCungCapId ?? undefined,
+            supplierId: nhaCungCapId!,
           });
           soThanhCong++;
         } catch (err: unknown) {
@@ -305,27 +316,27 @@ export default function NhapKhoPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-5 p-6 md:grid-cols-2">
-          {/* Nhà cung cấp (tuỳ chọn) */}
+          {/* Nhà cung cấp (bắt buộc) */}
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-text-main">
-              Nhà cung cấp{" "}
-              <span className="font-normal text-text-muted">(tuỳ chọn)</span>
+              Nhà cung cấp <span className="text-[#b91c1c]">*</span>
             </label>
-            {dangTaiNCC ? (
-              <div className="flex h-10 items-center gap-2 text-xs text-text-secondary">
-                <LoadingOutlined spin />
-                <span>Đang tải danh sách nhà cung cấp...</span>
-              </div>
-            ) : (
+            <div className="flex gap-2">
               <Select
                 placeholder="Chọn nhà cung cấp..."
                 allowClear
                 showSearch
                 optionFilterProp="label"
-                className="w-full"
+                className="min-w-0 flex-1"
                 size="large"
-                value={nhaCungCapId}
-                onChange={(val) => setNhaCungCapId(val ?? null)}
+                value={nhaCungCapId ?? undefined}
+                loading={dangTaiNCC}
+                disabled={dangTaiNCC}
+                status={loiNhaCungCap ? "error" : undefined}
+                onChange={(val) => {
+                  setNhaCungCapId(val ?? null);
+                  setLoiNhaCungCap("");
+                }}
                 options={danhSachNhaCungCap.map((ncc) => ({
                   value: ncc.id,
                   label: ncc.soDienThoai
@@ -338,6 +349,18 @@ export default function NhapKhoPage() {
                   </span>
                 }
               />
+              <button
+                type="button"
+                onClick={() => setModalThemNCCOpen(true)}
+                disabled={dangGui}
+                className="flex h-10 shrink-0 items-center gap-2 rounded-lg border border-primary-container px-3 text-sm font-semibold text-primary-container transition-colors hover:bg-primary-container/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <PlusOutlined />
+                Thêm nhà cung cấp
+              </button>
+            </div>
+            {loiNhaCungCap && (
+              <p className="mt-1 text-xs text-[#b91c1c]">{loiNhaCungCap}</p>
             )}
           </div>
 
@@ -417,7 +440,7 @@ export default function NhapKhoPage() {
 
             {/* Các dòng nhập */}
             <div className="divide-y divide-border">
-              {danhSachDong.map((dong, idx) => {
+              {danhSachDong.map((dong) => {
                 const bienThes = layBienTheCuaSanPham(dong.sanPhamId);
                 const bienTheHienTai = bienThes.find(
                   (bt) => bt.id === dong.bienTheId
@@ -621,6 +644,15 @@ export default function NhapKhoPage() {
           </div>
         </div>
       </div>
+
+      <AddSupplierModal
+        open={modalThemNCCOpen}
+        onClose={() => setModalThemNCCOpen(false)}
+        onCreated={(supplier) => {
+          setNhaCungCapId(supplier.id);
+          setLoiNhaCungCap("");
+        }}
+      />
 
     </div>
   );
