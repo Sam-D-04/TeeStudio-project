@@ -25,16 +25,16 @@ const quickRangeOptions: Array<{
   label: string;
   value: DateFilterPreset;
 }> = [
-  { label: "Hôm nay", value: "today" },
-  { label: "Hôm qua", value: "yesterday" },
-  { label: "7 ngày qua", value: "last7Days" },
-  { label: "30 ngày qua", value: "last30Days" },
-  { label: "Tháng này", value: "thisMonth" },
-  { label: "Tháng trước", value: "lastMonth" },
-  { label: "Quý này", value: "thisQuarter" },
-  { label: "Năm nay", value: "thisYear" },
-  { label: "Tùy chỉnh", value: "custom" },
-];
+    { label: "Hôm nay", value: "today" },
+    { label: "Hôm qua", value: "yesterday" },
+    { label: "7 ngày qua", value: "last7Days" },
+    { label: "30 ngày qua", value: "last30Days" },
+    { label: "Tháng này", value: "thisMonth" },
+    { label: "Tháng trước", value: "lastMonth" },
+    { label: "Quý này", value: "thisQuarter" },
+    { label: "Năm nay", value: "thisYear" },
+    { label: "Tùy chỉnh", value: "custom" },
+  ];
 
 function calculateDateRange(preset: DateFilterPreset): DateRange {
   if (preset === "custom") return [null, null];

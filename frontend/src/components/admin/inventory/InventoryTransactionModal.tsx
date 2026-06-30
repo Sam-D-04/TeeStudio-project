@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { App, Modal, Select } from "antd";
+import { Modal, Select, message } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { InventoryItem } from "./InventoryTable";
 import * as inventoryService from "@/services/admin/inventoryService";
@@ -40,7 +40,7 @@ export default function InventoryTransactionModal({
   onClose,
   item,
 }: InventoryTransactionModalProps) {
-  const { message } = App.useApp();
+  const [messageApi, messageContextHolder] = message.useMessage();
   const queryClient = useQueryClient();
 
   // ===== TRẠNG THÁI FORM =====
@@ -82,7 +82,7 @@ export default function InventoryTransactionModal({
   >({
     mutationFn: inventoryService.ghiGiaoDichKho,
     onSuccess: () => {
-      message.success("Ghi nhận giao dịch kho thành công!");
+      messageApi.success("Ghi nhận giao dịch kho thành công!");
       // Invalidate cache để làm mới danh sách và thống kê
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
       onClose();
@@ -91,7 +91,7 @@ export default function InventoryTransactionModal({
       const msg =
         (error as { response?: { data?: { message?: string } } })?.response
           ?.data?.message || "Ghi nhận thất bại. Vui lòng thử lại.";
-      message.error(msg);
+      messageApi.error(msg);
     },
   });
 
@@ -144,7 +144,9 @@ export default function InventoryTransactionModal({
   const coItem = !!item && item.id > 0;
 
   return (
-    <Modal
+    <>
+      {messageContextHolder}
+      <Modal
       open={isOpen}
       onCancel={onClose}
       afterOpenChange={(open) => {
@@ -319,6 +321,7 @@ export default function InventoryTransactionModal({
           </button>
         </div>
       </div>
-    </Modal>
+      </Modal>
+    </>
   );
 }

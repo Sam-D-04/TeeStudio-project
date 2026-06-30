@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { App, Select } from "antd";
+import { Select, message } from "antd";
 import {
   ArrowLeftOutlined,
   PlusOutlined,
@@ -66,7 +66,7 @@ function dongNhapKhoMoi(): DongNhapKho {
  *  5. Nhấn "Xác nhận nhập kho" → gọi API tuần tự
  */
 export default function NhapKhoPage() {
-  const { message } = App.useApp();
+  const [messageApi, messageContextHolder] = message.useMessage();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -178,7 +178,7 @@ export default function NhapKhoPage() {
       .map((d) => d.bienTheId);
     const bienTheTrung = bienTheIds.length !== new Set(bienTheIds).size;
     if (bienTheTrung) {
-      message.error("Có biến thể bị trùng lặp. Vui lòng kiểm tra lại.");
+      messageApi.error("Có biến thể bị trùng lặp. Vui lòng kiểm tra lại.");
       hopLe = false;
     }
 
@@ -230,7 +230,7 @@ export default function NhapKhoPage() {
           const bienThe = danhSachSanPham
             .flatMap((sp) => sp.danhSachBienThe)
             .find((bt) => bt.id === dong.bienTheId);
-          message.error(
+          messageApi.error(
             `Lỗi biến thể ${bienThe?.sku ?? dong.bienTheId}: ${msg}`
           );
         }
@@ -241,10 +241,10 @@ export default function NhapKhoPage() {
         queryClient.invalidateQueries({ queryKey: ["inventory"] });
 
         if (soThatBai === 0) {
-          message.success(`Đã nhập kho thành công ${soThanhCong} biến thể!`);
+          messageApi.success(`Đã nhập kho thành công ${soThanhCong} biến thể!`);
           router.push("/admin/kho-hang");
         } else {
-          message.warning(
+          messageApi.warning(
             `Nhập kho xong: ${soThanhCong} thành công, ${soThatBai} thất bại.`
           );
         }
@@ -264,7 +264,9 @@ export default function NhapKhoPage() {
   // RENDER
   // ──────────────────────────────────────────────────────────────
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <>
+      {messageContextHolder}
+      <div className="mx-auto max-w-5xl space-y-6">
 
       {/* ===== BREADCRUMB + TIÊU ĐỀ ===== */}
       <div>
@@ -654,6 +656,7 @@ export default function NhapKhoPage() {
         }}
       />
 
-    </div>
+      </div>
+    </>
   );
 }

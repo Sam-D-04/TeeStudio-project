@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { App } from "antd";
 import {
   canAccessAdminPath,
   getDefaultRouteForRole,
@@ -87,11 +86,7 @@ export default function AdminShell({ children }: AdminShellProps) {
       <AdminTopbar onMenuClick={() => setMobileSidebarOpen(true)} />
 
       <div className="admin-content-area">
-        <main className="admin-main">
-          <App component="div" className="contents">
-            {children}
-          </App>
-        </main>
+        <main className="admin-main">{children}</main>
       </div>
     </div>
   );

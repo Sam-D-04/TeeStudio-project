@@ -1,6 +1,6 @@
 "use client";
 
-import { App, Form, Input, Modal } from "antd";
+import { Form, Input, Modal, message } from "antd";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as inventoryService from "@/services/admin/inventoryService";
 
@@ -21,7 +21,7 @@ export default function AddSupplierModal({
   onCreated,
 }: AddSupplierModalProps) {
   const [form] = Form.useForm<SupplierFormValues>();
-  const { message } = App.useApp();
+  const [messageApi, messageContextHolder] = message.useMessage();
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
@@ -35,19 +35,21 @@ export default function AddSupplierModal({
           )
       );
       onCreated(supplier);
-      message.success("Đã thêm và chọn nhà cung cấp mới");
+      messageApi.success("Đã thêm và chọn nhà cung cấp mới");
       onClose();
     },
     onError: (error: unknown) => {
       const msg =
         (error as { response?: { data?: { message?: string } } })?.response
           ?.data?.message || "Không thể thêm nhà cung cấp. Vui lòng thử lại.";
-      message.error(msg);
+      messageApi.error(msg);
     },
   });
 
   return (
-    <Modal
+    <>
+      {messageContextHolder}
+      <Modal
       open={open}
       title="Thêm nhà cung cấp"
       okText="Thêm nhà cung cấp"
@@ -97,6 +99,7 @@ export default function AddSupplierModal({
           <Input inputMode="numeric" maxLength={10} placeholder="Ví dụ: 0901234567" />
         </Form.Item>
       </Form>
-    </Modal>
+      </Modal>
+    </>
   );
 }
