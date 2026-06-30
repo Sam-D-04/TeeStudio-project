@@ -6,16 +6,22 @@ import {
   CloseOutlined,
   CreditCardOutlined,
   DashboardOutlined,
+  DownOutlined,
   InboxOutlined,
+  LogoutOutlined,
   MenuOutlined,
   SkinOutlined,
   ShoppingCartOutlined,
   TagsOutlined,
   TeamOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
+import { Dropdown } from "antd";
+import type { MenuProps } from "antd";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, type ReactNode } from "react";
+import { authService } from "@/services/authService";
 import useAuthStore from "@/store/useAuthStore";
 import type { UserRole } from "@/types/auth";
 
@@ -37,6 +43,13 @@ const navItems: NavItem[] = [
   { label: "Tài khoản", icon: <TeamOutlined />, href: "/admin/tai-khoan", allowedRoles: ["ADMIN"] },
 ];
 
+const roleLabels: Record<UserRole, string> = {
+  ADMIN: "Quản trị viên",
+  WAREHOUSE: "Thủ kho",
+  PRODUCTION: "Thiết kế & in ấn",
+  CUSTOMER: "Khách hàng",
+};
+
 function SidebarContent({
   collapsed = false,
   showCloseButton = false,
@@ -49,10 +62,52 @@ function SidebarContent({
   onToggleCollapse?: () => void;
 }) {
   const pathname = usePathname();
-  const role = useAuthStore((state) => state.user?.role);
+  const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+  const clearSession = useAuthStore((state) => state.clearSession);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const role = user?.role;
   const visibleItems = navItems.filter(
     (item) => role && item.allowedRoles.includes(role),
   );
+
+  const handleAccountAction: MenuProps["onClick"] = async ({ key }) => {
+    if (key !== "logout") return;
+
+    try {
+      await authService.logout();
+    } catch {
+      // Thu hồi token phía máy chủ là best-effort; luôn xóa phiên cục bộ.
+    } finally {
+      clearSession();
+      onClose?.();
+      router.replace("/dang-nhap");
+      router.refresh();
+    }
+  };
+
+  const accountItems: MenuProps["items"] = [
+    {
+      key: "identity",
+      icon: <UserOutlined />,
+      label: (
+        <div>
+          <div className="font-semibold">{user?.fullName}</div>
+          <div className="text-xs text-slate-500">
+            {user ? roleLabels[user.role] : ""}
+          </div>
+        </div>
+      ),
+      disabled: true,
+    },
+    { type: "divider" },
+    {
+      key: "logout",
+      icon: <LogoutOutlined />,
+      label: "Đăng xuất",
+      danger: true,
+    },
+  ];
 
   return (
     <>
@@ -127,6 +182,47 @@ function SidebarContent({
           })}
         </ul>
       </nav>
+
+      <div className="mx-2 mt-4 border-t border-border pt-4">
+        <Dropdown
+          menu={{ items: accountItems, onClick: handleAccountAction }}
+          trigger={["click"]}
+          placement="topRight"
+          open={accountMenuOpen}
+          onOpenChange={setAccountMenuOpen}
+        >
+          <button
+            type="button"
+            aria-label="Tài khoản quản trị"
+            aria-expanded={accountMenuOpen}
+            title={collapsed ? user?.fullName || "Tài khoản" : undefined}
+            className={`flex h-14 w-full items-center rounded-[8px] text-left transition-colors hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+              collapsed ? "justify-center px-0" : "min-w-0 gap-3 px-2"
+            }`}
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-container text-sm font-bold text-on-primary shadow-sm">
+              {user?.fullName?.trim().charAt(0).toUpperCase() || "U"}
+            </span>
+            {collapsed ? null : (
+              <>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold text-text-primary">
+                    {user?.fullName || "Tài khoản"}
+                  </span>
+                  <span className="block truncate text-xs text-text-secondary">
+                    {user ? roleLabels[user.role] : ""}
+                  </span>
+                </span>
+                <DownOutlined
+                  className={`shrink-0 text-[11px] text-text-secondary transition-transform duration-200 ${
+                    accountMenuOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </>
+            )}
+          </button>
+        </Dropdown>
+      </div>
     </>
   );
 }
@@ -136,14 +232,29 @@ export default function AdminSidebar({
   mobileOpen,
   onClose,
   onToggleCollapse,
+  onOpenMobile,
 }: {
   collapsed: boolean;
   mobileOpen: boolean;
   onClose: () => void;
   onToggleCollapse: () => void;
+  onOpenMobile: () => void;
 }) {
   return (
     <>
+      {mobileOpen ? null : (
+        <button
+          type="button"
+          aria-label="Mở menu quản trị"
+          aria-controls="admin-mobile-sidebar"
+          aria-expanded={false}
+          onClick={onOpenMobile}
+          className="fixed bottom-5 right-5 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg transition-transform hover:scale-105 active:scale-95 md:hidden"
+        >
+          <MenuOutlined className="text-[20px]" />
+        </button>
+      )}
+
       <aside className="admin-sidebar-desktop" data-collapsed={collapsed}>
         <SidebarContent collapsed={collapsed} onToggleCollapse={onToggleCollapse} />
       </aside>
@@ -158,6 +269,7 @@ export default function AdminSidebar({
       ) : null}
 
       <aside
+        id="admin-mobile-sidebar"
         className={`fixed left-0 top-0 z-50 flex h-screen w-sidebar-w flex-col border-r border-border bg-surface py-base transition-transform duration-200 md:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
