@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 const { RangePicker } = DatePicker;
 
 export type DateFilterPreset =
+  | "all"
   | "today"
   | "yesterday"
   | "last7Days"
@@ -25,6 +26,7 @@ const quickRangeOptions: Array<{
   label: string;
   value: DateFilterPreset;
 }> = [
+  { label: "Tất cả", value: "all" },
     { label: "Hôm nay", value: "today" },
     { label: "Hôm qua", value: "yesterday" },
     { label: "7 ngày qua", value: "last7Days" },
@@ -37,7 +39,7 @@ const quickRangeOptions: Array<{
   ];
 
 function calculateDateRange(preset: DateFilterPreset): DateRange {
-  if (preset === "custom") return [null, null];
+  if (preset === "all" || preset === "custom") return [null, null];
 
   const today = dayjs();
   const yesterday = today.subtract(1, "day");
@@ -45,7 +47,7 @@ function calculateDateRange(preset: DateFilterPreset): DateRange {
   const quarterStartMonth = Math.floor(today.month() / 3) * 3;
   const quarterStart = today.month(quarterStartMonth).startOf("month");
 
-  const ranges: Record<Exclude<DateFilterPreset, "custom">, DateRange> = {
+  const ranges: Record<Exclude<DateFilterPreset, "all" | "custom">, DateRange> = {
     today: [today.startOf("day"), today.endOf("day")],
     yesterday: [yesterday.startOf("day"), yesterday.endOf("day")],
     last7Days: [today.subtract(6, "day").startOf("day"), today.endOf("day")],
@@ -79,6 +81,7 @@ export type DateRangeFilterProps = {
   initialStartDate?: string;
   initialEndDate?: string;
   allowClear?: boolean;
+  showAllOption?: boolean;
   disabled?: boolean;
   className?: string;
   selectClassName?: string;
@@ -98,12 +101,15 @@ export default function DateRangeFilter({
   initialStartDate,
   initialEndDate,
   allowClear = false,
+  showAllOption = true,
   disabled = false,
   className = "",
   selectClassName = "",
   rangePickerClassName = "",
 }: DateRangeFilterProps) {
   const onChangeRef = useRef(onChange);
+  const effectiveInitialPreset =
+    !showAllOption && initialPreset === "all" ? "thisMonth" : initialPreset;
   const [initialDates] = useState<DateRange>(() => {
     const startDate = initialStartDate ? dayjs(initialStartDate) : null;
     const endDate = initialEndDate ? dayjs(initialEndDate) : null;
@@ -112,10 +118,10 @@ export default function DateRangeFilter({
       return [startDate.startOf("day"), endDate.endOf("day")];
     }
 
-    return calculateDateRange(initialPreset);
+    return calculateDateRange(effectiveInitialPreset);
   });
   const [selectedPreset, setSelectedPreset] =
-    useState<DateFilterPreset>(initialPreset);
+    useState<DateFilterPreset>(effectiveInitialPreset);
   const [dates, setDates] = useState<DateRange>(initialDates);
 
   useEffect(() => {
@@ -131,6 +137,11 @@ export default function DateRangeFilter({
     setSelectedPreset(preset);
 
     if (preset === "custom") return;
+    if (preset === "all") {
+      setDates([null, null]);
+      onClear?.();
+      return;
+    }
 
     const calculatedDates = calculateDateRange(preset);
     setDates(calculatedDates);
@@ -140,7 +151,7 @@ export default function DateRangeFilter({
   function handleRangeChange(values: DateRange | null) {
     if (!values?.[0] || !values[1]) {
       setDates([null, null]);
-      setSelectedPreset("custom");
+      setSelectedPreset(showAllOption ? "all" : "custom");
       onClear?.();
       return;
     }
@@ -156,7 +167,11 @@ export default function DateRangeFilter({
       <Select<DateFilterPreset>
         aria-label="Chọn mốc thời gian nhanh"
         value={selectedPreset}
-        options={quickRangeOptions}
+        options={
+          showAllOption
+            ? quickRangeOptions
+            : quickRangeOptions.filter((option) => option.value !== "all")
+        }
         disabled={disabled}
         className={`w-full sm:w-[170px] ${selectClassName}`}
         onChange={handlePresetChange}

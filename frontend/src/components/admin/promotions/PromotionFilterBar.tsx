@@ -99,7 +99,9 @@ export default function PromotionFilterBar({ boDuc, onThayDoi, onReset }: Props)
           Thời gian hiệu lực
         </span>
         <DateRangeFilter
-          initialPreset="custom"
+          initialPreset={boDuc.tuNgay && boDuc.denNgay ? "custom" : "all"}
+          initialStartDate={boDuc.tuNgay}
+          initialEndDate={boDuc.denNgay}
           allowClear
           onChange={(startDate, endDate) =>
             onThayDoi({

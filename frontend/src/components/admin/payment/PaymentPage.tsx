@@ -475,7 +475,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
           methodFilter={methodFilter}
           onMethodFilterChange={handleMethodChange}
           dateFilterKey={dateFilterKey}
-          initialDatePreset="custom"
+          initialDatePreset={tuNgay && denNgay ? "custom" : "all"}
           initialStartDate={tuNgay || undefined}
           initialEndDate={denNgay || undefined}
           onDateChange={handleDateChange}

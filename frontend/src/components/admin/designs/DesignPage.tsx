@@ -4,12 +4,12 @@
  * DesignPage – Trang chính "Thiết kế & In ấn" (Orchestrator).
  *
  * Layout tổng thể:
- *  1. Tiêu đề trang + nhóm nút hành động (Thêm sticker, Thêm vị trí in, Xuất thông số in)
+ *  1. Tiêu đề trang + nhóm nút hành động (Thêm sticker, Xuất thông số in)
  *  2. 4 thẻ KPI thống kê
  *  3. Panel chính (Card trắng) với 3 tab:
  *     - Tab 1: Thiết kế khách hàng → FilterBar + DesignTable + Phân trang
  *     - Tab 2: Đơn cần in → PrintOrderTab
- *     - Tab 3: Tài nguyên thiết kế / Vị trí in → DesignResourceTab
+ *     - Tab 3: Tài nguyên thiết kế → DesignResourceTab
  *
  * Kiến trúc:
  *  - Dữ liệu lấy từ API thật qua React Query (useQuery/useMutation).
@@ -18,6 +18,7 @@
  */
 
 import { useState, Fragment } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   HighlightOutlined,
@@ -27,7 +28,6 @@ import {
   ExportOutlined,
   DownloadOutlined,
   PictureOutlined,
-  EnvironmentOutlined,
   LoadingOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
@@ -48,7 +48,7 @@ import DesignResourceTab from "./DesignResourceTab";
 const DANH_SACH_TAB = [
   { key: "thiet_ke_khach_hang", nhan: "Thiết kế khách hàng", icon: <HighlightOutlined /> },
   { key: "don_can_in", nhan: "Đơn cần in", icon: <PrinterOutlined /> },
-  { key: "tai_nguyen", nhan: "Tài nguyên thiết kế / Vị trí in", icon: <AppstoreOutlined /> },
+  { key: "tai_nguyen", nhan: "Tài nguyên thiết kế", icon: <AppstoreOutlined /> },
 ] as const;
 
 type TenTab = (typeof DANH_SACH_TAB)[number]["key"];
@@ -68,14 +68,17 @@ type DesignPageProps = {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function DesignPage({ initialFilters }: DesignPageProps) {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   // ── State điều hướng tab ──
   const [tabDangChon, setTabDangChon] = useState<TenTab>(
     initialFilters?.tab ?? "thiet_ke_khach_hang"
   );
   const [locTrangThaiDonIn, setLocTrangThaiDonIn] = useState(
-    initialFilters?.printStatus ?? ""
+    initialFilters?.printStatus ||
+      (initialFilters?.tab === "don_can_in" ? "cho_gui_xuong" : "")
   );
+  const [khoangNgayDonIn, setKhoangNgayDonIn] = useState({ tuNgay: "", denNgay: "" });
 
   // ── State phân trang bảng thiết kế ──
   const [trangHienTai, setTrangHienTai] = useState(1);
@@ -85,6 +88,8 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
     tuKhoa: "",
     trangThai: initialFilters?.designStatus ?? "",
     viTriIn: "",
+    tuNgay: "",
+    denNgay: "",
   });
 
   // ─── Fetch dữ liệu KPI thống kê ─────────────────────────────────────────
@@ -111,6 +116,8 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
         tu_khoa: boDuc.tuKhoa,
         trang_thai: boDuc.trangThai,
         vi_tri_in: boDuc.viTriIn,
+        tu_ngay: boDuc.tuNgay,
+        den_ngay: boDuc.denNgay,
       }),
     staleTime: 15_000,
   });
@@ -145,6 +152,45 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
   function xuLyThayDoiBoDuc(boDucMoi: BoDucThietKe) {
     setBoDuc(boDucMoi);
     setTrangHienTai(1);
+  }
+
+  function datLaiTatCaBoLoc() {
+    setBoDuc({
+      tuKhoa: "",
+      trangThai: "",
+      viTriIn: "",
+      tuNgay: "",
+      denNgay: "",
+    });
+    setLocTrangThaiDonIn("");
+    setKhoangNgayDonIn({ tuNgay: "", denNgay: "" });
+    setTrangHienTai(1);
+    router.replace("/admin/thiet-ke", { scroll: false });
+  }
+
+  function locThietKeTheoTrangThai(trangThai: string) {
+    setTabDangChon("thiet_ke_khach_hang");
+    setBoDuc({
+      tuKhoa: "",
+      trangThai,
+      viTriIn: "",
+      tuNgay: "",
+      denNgay: "",
+    });
+    setTrangHienTai(1);
+  }
+
+  function locDonInTheoTrangThai(trangThai: string) {
+    setTabDangChon("don_can_in");
+    setLocTrangThaiDonIn(trangThai);
+    setKhoangNgayDonIn({ tuNgay: "", denNgay: "" });
+  }
+
+  function chonTab(tab: TenTab) {
+    setTabDangChon(tab);
+    if (tab === "don_can_in" && !locTrangThaiDonIn) {
+      setLocTrangThaiDonIn("cho_gui_xuong");
+    }
   }
 
   // ─── Xử lý duyệt thiết kế ──────────────────────────────────────────────
@@ -258,39 +304,6 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
             Thêm sticker
           </button>
 
-          {/* Nút phụ 2: Thêm vị trí in */}
-          <button
-            onClick={() => setTabDangChon("tai_nguyen")}
-            style={{
-              height: 40,
-              padding: "0 16px",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              background: "#ffffff",
-              border: "1px solid #e2e8f0",
-              borderRadius: 10,
-              fontSize: 14,
-              fontWeight: 600,
-              color: "#475569",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              const btn = e.currentTarget as HTMLButtonElement;
-              btn.style.borderColor = "#0ea5e9";
-              btn.style.color = "#0ea5e9";
-            }}
-            onMouseLeave={(e) => {
-              const btn = e.currentTarget as HTMLButtonElement;
-              btn.style.borderColor = "#e2e8f0";
-              btn.style.color = "#475569";
-            }}
-          >
-            <EnvironmentOutlined style={{ fontSize: 16 }} />
-            Thêm vị trí in
-          </button>
-
           {/* Nút chính: Xuất thông số in */}
           <button
             onClick={() => alert("Chức năng xuất thông số in sẽ sinh file PDF/Excel cho xưởng in")}
@@ -343,11 +356,14 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
           mauNenBadge="#fef3c7"
           mauChuBadge="#d97706"
           href="/admin/thiet-ke?tab=DESIGNS&status=PENDING_REVIEW"
+          onClick={() => locThietKeTheoTrangThai("cho_kiem_tra")}
           isActive={
             tabDangChon === "thiet_ke_khach_hang" &&
             boDuc.trangThai === "cho_kiem_tra" &&
             boDuc.tuKhoa === "" &&
             boDuc.viTriIn === ""
+            && boDuc.tuNgay === ""
+            && boDuc.denNgay === ""
           }
         />
 
@@ -361,11 +377,14 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
           mauNenBadge="#f8fafc"
           mauChuBadge="#475569"
           href="/admin/thiet-ke?tab=DESIGNS&status=NEEDS_REVISION"
+          onClick={() => locThietKeTheoTrangThai("can_chinh_sua")}
           isActive={
             tabDangChon === "thiet_ke_khach_hang" &&
             boDuc.trangThai === "can_chinh_sua" &&
             boDuc.tuKhoa === "" &&
             boDuc.viTriIn === ""
+            && boDuc.tuNgay === ""
+            && boDuc.denNgay === ""
           }
         />
 
@@ -379,9 +398,12 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
           mauNenBadge="#e0f2fe"
           mauChuBadge="#0ea5e9"
           href="/admin/thiet-ke?tab=PRINT_ORDERS&status=APPROVED"
+          onClick={() => locDonInTheoTrangThai("cho_gui_xuong")}
           isActive={
             tabDangChon === "don_can_in" &&
             locTrangThaiDonIn === "cho_gui_xuong"
+            && khoangNgayDonIn.tuNgay === ""
+            && khoangNgayDonIn.denNgay === ""
           }
         />
 
@@ -395,9 +417,12 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
           mauNenBadge="#dcfce7"
           mauChuBadge="#10b981"
           href="/admin/thiet-ke?tab=PRINT_ORDERS&status=PRINTING"
+          onClick={() => locDonInTheoTrangThai("dang_in")}
           isActive={
             tabDangChon === "don_can_in" &&
             locTrangThaiDonIn === "dang_in"
+            && khoangNgayDonIn.tuNgay === ""
+            && khoangNgayDonIn.denNgay === ""
           }
         />
       </div>
@@ -429,7 +454,7 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
             return (
               <button
                 key={tab.key}
-                onClick={() => setTabDangChon(tab.key)}
+                onClick={() => chonTab(tab.key)}
                 style={{
                   height: 48,
                   padding: "0 16px",
@@ -469,7 +494,11 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
         {tabDangChon === "thiet_ke_khach_hang" && (
           <div>
             {/* Thanh lọc */}
-            <DesignFilterBar boDuc={boDuc} onThayDoi={xuLyThayDoiBoDuc} />
+            <DesignFilterBar
+              boDuc={boDuc}
+              onThayDoi={xuLyThayDoiBoDuc}
+              onDatLai={datLaiTatCaBoLoc}
+            />
 
             {/* Trạng thái đang tải */}
             {dangTaiThietKe && (
@@ -622,6 +651,9 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
           <PrintOrderTab
             statusFilter={locTrangThaiDonIn}
             onStatusFilterChange={setLocTrangThaiDonIn}
+            dateRange={khoangNgayDonIn}
+            onDateRangeChange={setKhoangNgayDonIn}
+            onResetFilters={datLaiTatCaBoLoc}
           />
         )}
 

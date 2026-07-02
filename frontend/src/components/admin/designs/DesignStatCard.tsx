@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { MouseEventHandler, ReactNode } from "react";
 
 /**
  * DesignStatCard – Thẻ thống kê KPI ở đầu trang Thiết kế & In ấn.
@@ -34,6 +34,7 @@ type DesignStatCardProps = {
   mauChuBadge?: string;   // Màu chữ badge
   href: string;
   isActive?: boolean;
+  onClick?: MouseEventHandler<HTMLAnchorElement>;
 };
 
 export default function DesignStatCard({
@@ -47,12 +48,14 @@ export default function DesignStatCard({
   mauChuBadge,
   href,
   isActive = false,
+  onClick,
 }: DesignStatCardProps) {
   return (
     // Card nền trắng, bo góc 20px theo DESIGN.md
     // Hover: đổi màu viền sang xanh nhạt bae6fd
     <Link
       href={href}
+      onClick={onClick}
       aria-label={`${nhan}: ${String(giaTri)}. Bấm để lọc danh sách`}
       aria-current={isActive ? "page" : undefined}
       style={{

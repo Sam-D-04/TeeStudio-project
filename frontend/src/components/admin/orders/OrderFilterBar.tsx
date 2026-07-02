@@ -116,7 +116,7 @@ export default function OrderFilterBar({
 
         {/* Lọc theo thời gian */}
         <DateRangeFilter
-          initialPreset="custom"
+          initialPreset={initialStartDate && initialEndDate ? "custom" : "all"}
           initialStartDate={initialStartDate}
           initialEndDate={initialEndDate}
           allowClear

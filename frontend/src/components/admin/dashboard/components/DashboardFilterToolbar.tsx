@@ -56,7 +56,10 @@ export default function DashboardFilterToolbar({
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <DateRangeFilter onChange={handleDateChange} />
+          <DateRangeFilter
+            onChange={handleDateChange}
+            showAllOption={false}
+          />
           <AdminButton
             variant="primary"
             icon={

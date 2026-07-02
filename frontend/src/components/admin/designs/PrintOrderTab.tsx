@@ -19,8 +19,10 @@ import {
   ClockCircleOutlined,
   LoadingOutlined,
   WarningOutlined,
+  SyncOutlined,
 } from "@ant-design/icons";
 import DesignPreview from "./DesignPreview";
+import DateRangeFilter from "@/components/admin/common/DateRangeFilter";
 
 import * as designService from "@/services/admin/designService";
 import type { DonCanIn } from "@/services/admin/designService";
@@ -55,11 +57,17 @@ const CAU_HINH_TRANG_THAI: Record<
 type PrintOrderTabProps = {
   statusFilter: string;
   onStatusFilterChange: (status: string) => void;
+  dateRange: { tuNgay: string; denNgay: string };
+  onDateRangeChange: (dateRange: { tuNgay: string; denNgay: string }) => void;
+  onResetFilters: () => void;
 };
 
 export default function PrintOrderTab({
   statusFilter,
   onStatusFilterChange,
+  dateRange,
+  onDateRangeChange,
+  onResetFilters,
 }: PrintOrderTabProps) {
   const queryClient = useQueryClient();
 
@@ -72,12 +80,14 @@ export default function PrintOrderTab({
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["don-can-in", trang, statusFilter],
+    queryKey: ["don-can-in", trang, statusFilter, dateRange],
     queryFn: () =>
       designService.layDanhSachDonCanIn({
         page: trang,
         limit: 10,
         trang_thai: statusFilter || undefined,
+        tu_ngay: dateRange.tuNgay || undefined,
+        den_ngay: dateRange.denNgay || undefined,
       }),
     staleTime: 15_000,
   });
@@ -158,8 +168,27 @@ export default function PrintOrderTab({
           </div>
         </div>
 
-        {/* Dropdown lọc trạng thái */}
-        <select
+        {/* Bộ lọc ngày và trạng thái */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <DateRangeFilter
+            key={`${dateRange.tuNgay}-${dateRange.denNgay}`}
+            initialPreset={dateRange.tuNgay && dateRange.denNgay ? "custom" : "all"}
+            initialStartDate={dateRange.tuNgay}
+            initialEndDate={dateRange.denNgay}
+            allowClear
+            onChange={(tuNgay, denNgay) => {
+              onDateRangeChange({ tuNgay, denNgay });
+              setTrang(1);
+            }}
+            onClear={() => {
+              onDateRangeChange({ tuNgay: "", denNgay: "" });
+              setTrang(1);
+            }}
+            className="w-full sm:w-auto"
+            selectClassName="h-9"
+            rangePickerClassName="h-9 min-w-[240px] sm:w-[280px]"
+          />
+          <select
           value={statusFilter}
           onChange={(e) => {
             onStatusFilterChange(e.target.value);
@@ -177,12 +206,23 @@ export default function PrintOrderTab({
             cursor: "pointer",
             minWidth: 160,
           }}
-        >
-          <option value="">Tất cả trạng thái</option>
-          <option value="cho_gui_xuong">Chờ gửi xưởng</option>
-          <option value="dang_in">Đang in</option>
-          <option value="da_in_xong">Đã in xong</option>
-        </select>
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="cho_gui_xuong">Chờ gửi xưởng</option>
+            <option value="dang_in">Đang in</option>
+            <option value="da_in_xong">Đã in xong</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              setTrang(1);
+              onResetFilters();
+            }}
+            className="flex h-9 shrink-0 items-center gap-2 rounded-lg border border-[#e2e8f0] bg-white px-3 text-sm font-medium text-[#475569] transition-colors hover:bg-[#f8fafc] hover:text-[#0f172a]"
+          >
+            <SyncOutlined /> Đặt lại
+          </button>
+        </div>
       </div>
 
       {/* ── Bảng danh sách đơn cần in ── */}
@@ -223,7 +263,7 @@ export default function PrintOrderTab({
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
               <thead>
                 <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                  {["MÃ ĐƠN", "THIẾT KẾ", "KHÁCH HÀNG", "SỐ LƯỢNG", "VỊ TRÍ IN", "TRẠNG THÁI", "NGÀY TẠO", "THAO TÁC"].map(
+                  {["MÃ ĐƠN", "THIẾT KẾ", "KHÁCH HÀNG", "SỐ LƯỢNG", "VỊ TRÍ IN", "TRẠNG THÁI", "NGÀY ĐẶT ĐƠN", "THAO TÁC"].map(
                     (tieuDe, viTri) => (
                       <th
                         key={tieuDe}
@@ -321,9 +361,9 @@ export default function PrintOrderTab({
                         </span>
                       </td>
 
-                      {/* Ngày tạo */}
+                      {/* Ngày khách đặt đơn (CustomerOrder.createdAt) */}
                       <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                        <span style={{ fontSize: 13, color: "#475569" }}>{don.ngayTao}</span>
+                        <span style={{ fontSize: 13, color: "#475569" }}>{don.ngayDatDon}</span>
                       </td>
 
                       {/* Thao tác */}

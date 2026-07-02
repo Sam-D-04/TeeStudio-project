@@ -5,7 +5,7 @@
  *  - CustomDesign      → danh sách thiết kế khách hàng
  *  - OrderProduction   → đơn cần in (sau khi thiết kế được duyệt)
  *  - Sticker           → sticker có sẵn trong Design Studio
- *  - PrintPosition     → vị trí in được cấu hình
+ *  - PrintPosition     → hai vị trí in cố định (mặt trước, mặt sau)
  *  - Account           → thông tin khách hàng
  *  - Product           → tên sản phẩm
  *  - CustomerOrder     → mã đơn hàng
@@ -46,6 +46,19 @@ const MAP_TRANG_THAI_DON_IN_FE_DB = {
   da_in_xong: "PACKED",
 };
 
+// Tương thích các OrderProduction cũ được tạo sau khi thiết kế đã duyệt nhưng
+// vẫn mang trạng thái WAITING_DESIGN_APPROVAL do lỗi ở luồng tạo đơn.
+const DIEU_KIEN_CHO_GUI_XUONG = `(
+  op.status = 'APPROVED'
+  OR (op.status = 'WAITING_DESIGN_APPROVAL' AND cd.status = 'APPROVED')
+)`;
+
+/** Hai vị trí in cố định được hỗ trợ trên giao diện thiết kế. */
+const MAP_VI_TRI_IN_FE_DB = {
+  mat_truoc: "MAT_TRUOC",
+  mat_sau: "MAT_SAU",
+};
+
 // =====================================================================
 // Hàm tiện ích
 // =====================================================================
@@ -71,6 +84,28 @@ function taoLoi(message, statusCode = 400) {
   return err;
 }
 
+function kiemTraKhoangNgay(tuNgay, denNgay) {
+  const dinhDangNgay = /^\d{4}-\d{2}-\d{2}$/;
+  const laNgayHopLe = (giaTri) => {
+    if (!dinhDangNgay.test(giaTri)) return false;
+    const [nam, thang, ngay] = giaTri.split("-").map(Number);
+    const date = new Date(Date.UTC(nam, thang - 1, ngay));
+    return date.getUTCFullYear() === nam
+      && date.getUTCMonth() === thang - 1
+      && date.getUTCDate() === ngay;
+  };
+
+  if (tuNgay && !laNgayHopLe(tuNgay)) {
+    throw taoLoi("Ngày bắt đầu không hợp lệ. Định dạng yêu cầu: YYYY-MM-DD.");
+  }
+  if (denNgay && !laNgayHopLe(denNgay)) {
+    throw taoLoi("Ngày kết thúc không hợp lệ. Định dạng yêu cầu: YYYY-MM-DD.");
+  }
+  if (tuNgay && denNgay && tuNgay > denNgay) {
+    throw taoLoi("Ngày bắt đầu không được sau ngày kết thúc.");
+  }
+}
+
 // =====================================================================
 // SERVICE 1: Lấy thống kê KPI (4 thẻ đầu trang)
 // GET /api/admin/designs/stats
@@ -93,8 +128,9 @@ async function layThongKe() {
   // Đếm đơn chờ gửi xưởng (OrderProduction với status APPROVED)
   const [rowsChoGuiXuong] = await db.pool.query(
     `SELECT COUNT(*) AS so_luong
-     FROM OrderProduction
-     WHERE status = 'APPROVED'`
+     FROM OrderProduction op
+     LEFT JOIN CustomDesign cd ON cd.id = op.designId
+     WHERE ${DIEU_KIEN_CHO_GUI_XUONG}`
   );
 
   // Đếm đơn đang in (OrderProduction với status PRINTING)
@@ -116,7 +152,9 @@ async function layThongKe() {
 // SERVICE 2: Lấy danh sách thiết kế (có lọc + phân trang)
 // GET /api/admin/designs
 // =====================================================================
-async function layDanhSachThietKe({ page, limit, tu_khoa, trang_thai, vi_tri_in }) {
+async function layDanhSachThietKe({
+  page, limit, tu_khoa, trang_thai, vi_tri_in, tu_ngay, den_ngay,
+}) {
   const trangHienTai = parseInt(page) || 1;
   const soMoi = parseInt(limit) || 10;
   const offset = (trangHienTai - 1) * soMoi;
@@ -129,6 +167,16 @@ async function layDanhSachThietKe({ page, limit, tu_khoa, trang_thai, vi_tri_in 
   ];
   const thamSo = [];
 
+  kiemTraKhoangNgay(tu_ngay, den_ngay);
+  if (tu_ngay) {
+    dieuKien.push("cd.createdAt >= ?");
+    thamSo.push(`${tu_ngay} 00:00:00`);
+  }
+  if (den_ngay) {
+    dieuKien.push("cd.createdAt < DATE_ADD(?, INTERVAL 1 DAY)");
+    thamSo.push(`${den_ngay} 00:00:00`);
+  }
+
   // Lọc theo trạng thái
   if (trang_thai) {
     const statusDB = MAP_TRANG_THAI_THIET_KE_FE_DB[trang_thai];
@@ -138,18 +186,14 @@ async function layDanhSachThietKe({ page, limit, tu_khoa, trang_thai, vi_tri_in 
     }
   }
 
-  // Lọc theo vị trí in (so sánh với PrintPosition.name, LIKE)
+  // Lọc theo một trong hai vị trí in cố định.
   if (vi_tri_in) {
-    const mapViTri = {
-      nguc_trai: "ngực trái",
-      nguc_phai: "ngực phải",
-      sau_lung: "sau lưng",
-      tay_trai: "tay trái",
-      tay_phai: "tay phải",
-    };
-    const tenViTri = mapViTri[vi_tri_in] || vi_tri_in;
-    dieuKien.push("pp.name LIKE ?");
-    thamSo.push(`%${tenViTri}%`);
+    const codeViTri = MAP_VI_TRI_IN_FE_DB[vi_tri_in];
+    if (!codeViTri) {
+      throw taoLoi("Vị trí in không hợp lệ. Chỉ hỗ trợ mặt trước hoặc mặt sau.");
+    }
+    dieuKien.push("pp.code = ?");
+    thamSo.push(codeViTri);
   }
 
   // Tìm kiếm theo từ khóa (mã TK hoặc tên khách)
@@ -296,8 +340,14 @@ async function yeuCauChinhSua(id, ghiChu) {
 // =====================================================================
 // SERVICE 5: Lấy danh sách đơn cần in
 // GET /api/admin/designs/don-can-in
+//
+// Bảng trung tâm là OrderProduction (mỗi dòng = 1 mặt hàng cần in).
+//      Bộ lọc ngày và cột ngayDatDon hiển thị đều dùng CustomerOrder.createdAt
+//      (ngày khách đặt đơn), KHÔNG phải OrderProduction.createdAt.
+//      Lý do: nhân viên xưởng in cần biết "hôm nay có bao nhiêu áo cần in
+//      để kịp giao cho khách" → họ quan tâm ngày khách bấm đặt hàng.
 // =====================================================================
-async function layDanhSachDonCanIn({ page, limit, trang_thai }) {
+async function layDanhSachDonCanIn({ page, limit, trang_thai, tu_ngay, den_ngay }) {
   const trangHienTai = parseInt(page) || 1;
   const soMoi = parseInt(limit) || 10;
   const offset = (trangHienTai - 1) * soMoi;
@@ -305,37 +355,50 @@ async function layDanhSachDonCanIn({ page, limit, trang_thai }) {
   const dieuKien = [];
   const thamSo = [];
 
+  kiemTraKhoangNgay(tu_ngay, den_ngay);
+  // Lọc theo ngày ĐẶT ĐƠN (CustomerOrder.createdAt), không phải ngày tạo OrderProduction.
+  if (tu_ngay) {
+    dieuKien.push("co.createdAt >= ?");
+    thamSo.push(`${tu_ngay} 00:00:00`);
+  }
+  if (den_ngay) {
+    dieuKien.push("co.createdAt < DATE_ADD(?, INTERVAL 1 DAY)");
+    thamSo.push(`${den_ngay} 00:00:00`);
+  }
+
   if (trang_thai) {
-    const statusDB = MAP_TRANG_THAI_DON_IN_FE_DB[trang_thai];
-    if (statusDB) {
+    if (trang_thai === "cho_gui_xuong") {
+      dieuKien.push(DIEU_KIEN_CHO_GUI_XUONG);
+    } else {
+      const statusDB = MAP_TRANG_THAI_DON_IN_FE_DB[trang_thai];
+      if (!statusDB) throw taoLoi("Trạng thái đơn in không hợp lệ.");
       dieuKien.push("op.status = ?");
       thamSo.push(statusDB);
     }
   } else {
-    // Mặc định: chỉ lấy các đơn đã duyệt thiết kế trở lên (không lấy WAITING_DESIGN_APPROVAL)
-    dieuKien.push("op.status IN ('APPROVED', 'PRINTING', 'PACKED')");
+    dieuKien.push(`(${DIEU_KIEN_CHO_GUI_XUONG} OR op.status IN ('PRINTING', 'PACKED'))`);
   }
 
   const menh_de_where =
     dieuKien.length > 0 ? "WHERE " + dieuKien.join(" AND ") : "";
 
-  // Đếm tổng
+  // OrderProduction.orderItemId là UNIQUE nên COUNT(*) chính là số dòng sản xuất.
   const sqlDem = `
-    SELECT COUNT(DISTINCT op.id) AS tong_so
+    SELECT COUNT(*) AS tong_so
     FROM OrderProduction op
     JOIN OrderItem oi ON oi.id = op.orderItemId
     JOIN CustomerOrder co ON co.id = oi.orderId
-    JOIN Account a ON a.id = co.userId
     LEFT JOIN CustomDesign cd ON cd.id = oi.designId
     ${menh_de_where}
   `;
   const [rowsDem] = await db.pool.query(sqlDem, thamSo);
   const tongSo = rowsDem[0].tong_so;
 
-  // Lấy dữ liệu
+  // Không JOIN trực tiếp DesignPrintPosition để tránh nhân bản rồi GROUP BY các dòng sản xuất.
   const sqlData = `
     SELECT
       op.id,
+      oi.id                AS orderItemId,
       co.orderCode         AS maDon,
       oi.designId,
       cd.id                AS thietKeId,
@@ -343,19 +406,25 @@ async function layDanhSachDonCanIn({ page, limit, trang_thai }) {
       cd.baseColor         AS mauAo,
       a.fullName           AS tenKhachHang,
       oi.quantity          AS soLuong,
-      pp.name              AS viTriIn,
-      op.status,
-      op.createdAt         AS ngayTao
+      (
+        SELECT GROUP_CONCAT(DISTINCT pp.name ORDER BY pp.id SEPARATOR ', ')
+        FROM DesignPrintPosition dpp
+        JOIN PrintPosition pp ON pp.id = dpp.printPositionId
+        WHERE dpp.designId = oi.designId
+      )                    AS viTriIn,
+      CASE
+        WHEN op.status = 'WAITING_DESIGN_APPROVAL' AND cd.status = 'APPROVED'
+          THEN 'APPROVED'
+        ELSE op.status
+      END                  AS status,
+      co.createdAt         AS ngayDatDon
     FROM OrderProduction op
     JOIN OrderItem oi ON oi.id = op.orderItemId
     JOIN CustomerOrder co ON co.id = oi.orderId
     JOIN Account a ON a.id = co.userId
     LEFT JOIN CustomDesign cd ON cd.id = oi.designId
-    LEFT JOIN DesignPrintPosition dpp ON dpp.designId = cd.id
-    LEFT JOIN PrintPosition pp ON pp.id = dpp.printPositionId
     ${menh_de_where}
-    GROUP BY op.id
-    ORDER BY op.createdAt DESC
+    ORDER BY co.createdAt DESC, op.id DESC
     LIMIT ? OFFSET ?
   `;
   const [rows] = await db.pool.query(sqlData, [...thamSo, soMoi, offset]);
@@ -372,7 +441,7 @@ async function layDanhSachDonCanIn({ page, limit, trang_thai }) {
     soLuong: row.soLuong || 1,
     viTriIn: row.viTriIn || "Chưa xác định",
     trangThai: MAP_TRANG_THAI_DON_IN_DB_FE[row.status] || "cho_gui_xuong",
-    ngayTao: formatNgay(row.ngayTao),
+    ngayDatDon: formatNgay(row.ngayDatDon),
   }));
 
   return {
@@ -391,7 +460,10 @@ async function layDanhSachDonCanIn({ page, limit, trang_thai }) {
 async function guiDonXuongIn(id) {
   // Kiểm tra tồn tại
   const [rows] = await db.pool.query(
-    "SELECT id, status FROM OrderProduction WHERE id = ?",
+    `SELECT op.id, op.status, cd.status AS designStatus
+     FROM OrderProduction op
+     LEFT JOIN CustomDesign cd ON cd.id = op.designId
+     WHERE op.id = ?`,
     [id]
   );
   if (!rows || rows.length === 0) {
@@ -399,7 +471,9 @@ async function guiDonXuongIn(id) {
   }
 
   const donHienTai = rows[0];
-  if (donHienTai.status !== "APPROVED") {
+  const laDonCuDaDuocDuyet = donHienTai.status === "WAITING_DESIGN_APPROVAL"
+    && donHienTai.designStatus === "APPROVED";
+  if (donHienTai.status !== "APPROVED" && !laDonCuDaDuocDuyet) {
     throw taoLoi("Chỉ có thể gửi xưởng các đơn đang ở trạng thái chờ gửi xưởng", 400);
   }
 
@@ -491,21 +565,21 @@ async function xoaSticker(id) {
 
 // =====================================================================
 // SERVICE 10: Lấy danh sách vị trí in
-// GET /api/admin/designs/vi-tri-in (và /api/vi-tri-in)
+// GET /api/vi-tri-in
 // =====================================================================
 async function layDanhSachViTriIn({ chiLayDangBat = false } = {}) {
   let sql = `
     SELECT id, name AS ten, extraCost AS moTa, isActive AS dangHoatDong
     FROM PrintPosition
+    WHERE code IN ('MAT_TRUOC', 'MAT_SAU')
   `;
-  const thamSo = [];
 
   if (chiLayDangBat) {
-    sql += " WHERE isActive = 1";
+    sql += " AND isActive = 1";
   }
-  sql += " ORDER BY id ASC";
+  sql += " ORDER BY FIELD(code, 'MAT_TRUOC', 'MAT_SAU')";
 
-  const [rows] = await db.pool.query(sql, thamSo);
+  const [rows] = await db.pool.query(sql);
 
   return rows.map((row) => ({
     id: row.id,
@@ -513,100 +587,6 @@ async function layDanhSachViTriIn({ chiLayDangBat = false } = {}) {
     moTa: row.moTa !== null ? `Phụ phí: ${Number(row.moTa).toLocaleString("vi-VN")}đ` : "Không có phụ phí",
     dangHoatDong: row.dangHoatDong === 1 || row.dangHoatDong === true,
   }));
-}
-
-// =====================================================================
-// SERVICE 11: Thêm vị trí in mới
-// POST /api/admin/designs/vi-tri-in
-// =====================================================================
-async function themViTriIn({ ten, moTa, dangHoatDong }) {
-  if (!ten || !ten.trim()) throw taoLoi("Vui lòng nhập tên vị trí in");
-
-  // Sinh code từ tên (slug hóa đơn giản)
-  const code = ten
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-
-  // Kiểm tra code trùng
-  const [existing] = await db.pool.query(
-    "SELECT id FROM PrintPosition WHERE code = ?",
-    [code]
-  );
-  if (existing && existing.length > 0) {
-    throw taoLoi(`Vị trí in với tên tương tự đã tồn tại`, 409);
-  }
-
-  const isActive = dangHoatDong !== false ? 1 : 0;
-
-  const [result] = await db.pool.query(
-    `INSERT INTO PrintPosition (code, name, extraCost, isActive)
-     VALUES (?, ?, 0, ?)`,
-    [code, ten.trim(), isActive]
-  );
-
-  return {
-    id: result.insertId,
-    ten: ten.trim(),
-    moTa: moTa || "",
-    dangHoatDong: isActive === 1,
-  };
-}
-
-// =====================================================================
-// SERVICE 12: Bật/tắt vị trí in
-// PATCH /api/admin/designs/vi-tri-in/:id
-// =====================================================================
-async function batTatViTriIn(id, dangHoatDong) {
-  const [rows] = await db.pool.query(
-    "SELECT id, isActive FROM PrintPosition WHERE id = ?",
-    [id]
-  );
-  if (!rows || rows.length === 0) {
-    throw taoLoi("Không tìm thấy vị trí in", 404);
-  }
-
-  const isActive = dangHoatDong ? 1 : 0;
-  await db.pool.query(
-    "UPDATE PrintPosition SET isActive = ? WHERE id = ?",
-    [isActive, id]
-  );
-
-  return { id: Number(id), dangHoatDong: isActive === 1 };
-}
-
-// =====================================================================
-// SERVICE 13: Xóa vị trí in
-// DELETE /api/admin/designs/vi-tri-in/:id
-// =====================================================================
-async function xoaViTriIn(id) {
-  const [rows] = await db.pool.query(
-    "SELECT id FROM PrintPosition WHERE id = ?",
-    [id]
-  );
-  if (!rows || rows.length === 0) {
-    throw taoLoi("Không tìm thấy vị trí in", 404);
-  }
-
-  // Kiểm tra ràng buộc: có thiết kế nào đang dùng vị trí này không?
-  const [designs] = await db.pool.query(
-    "SELECT COUNT(*) AS so_luong FROM DesignPrintPosition WHERE printPositionId = ?",
-    [id]
-  );
-  if (designs[0].so_luong > 0) {
-    throw taoLoi(
-      `Không thể xóa: có ${designs[0].so_luong} thiết kế đang sử dụng vị trí in này. Hãy tắt thay vì xóa.`,
-      409
-    );
-  }
-
-  await db.pool.query("DELETE FROM PrintPosition WHERE id = ?", [id]);
-
-  return { id: Number(id) };
 }
 
 module.exports = {
@@ -620,7 +600,4 @@ module.exports = {
   themSticker,
   xoaSticker,
   layDanhSachViTriIn,
-  themViTriIn,
-  batTatViTriIn,
-  xoaViTriIn,
 };

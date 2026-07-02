@@ -2060,16 +2060,16 @@ async function taoMoiDonHang(data, actor, ipAddress) {
           item.unitPrice,
           item.designFee,
           lineTotal,
-          item.designId ? "WAITING_DESIGN_APPROVAL" : "WAITING_DESIGN_APPROVAL",
+          item.designId ? "APPROVED" : "WAITING_DESIGN_APPROVAL",
         ]
       );
       const orderItemId = resultItem.insertId;
 
-      // Nếu item có thiết kế POD → tạo OrderProduction
+      // Thiết kế đã được kiểm tra là APPROVED ở trên nên mặt hàng có thể vào hàng chờ xưởng ngay.
       if (item.designId) {
         await conn.query(
           `INSERT INTO OrderProduction (orderItemId, designId, status)
-           VALUES (?, ?, 'WAITING_DESIGN_APPROVAL')`,
+           VALUES (?, ?, 'APPROVED')`,
           [orderItemId, item.designId]
         );
       }

@@ -46,7 +46,7 @@ export default async function ThietKePage({
             ? "da_duyet"
             : "",
     printStatus:
-      laTabDonIn && statusParam === "APPROVED"
+      laTabDonIn && (statusParam === "APPROVED" || statusParam === "READY_TO_PRINT")
         ? "cho_gui_xuong"
         : laTabDonIn && statusParam === "PRINTING"
           ? "dang_in"

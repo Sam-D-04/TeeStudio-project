@@ -109,7 +109,7 @@ export default function InventoryFilterBar({
             SKU có biến động trong khoảng
           </span>
           <DateRangeFilter
-            initialPreset="custom"
+            initialPreset="all"
             allowClear
             onChange={onDateChange}
             onClear={onDateClear}

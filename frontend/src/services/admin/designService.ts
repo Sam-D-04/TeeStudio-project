@@ -48,6 +48,8 @@ export type ThamSoLocThietKe = {
   tu_khoa?: string;
   trang_thai?: string;
   vi_tri_in?: string;
+  tu_ngay?: string;
+  den_ngay?: string;
 };
 
 /** Trạng thái đơn cần in */
@@ -64,7 +66,7 @@ export type DonCanIn = {
   soLuong: number;
   viTriIn: string;
   trangThai: TrangThaiDonIn;
-  ngayTao: string;
+  ngayDatDon: string;          // CustomerOrder.createdAt, format DD/MM/YYYY
 };
 
 /** Kết quả danh sách đơn cần in có phân trang */
@@ -82,14 +84,6 @@ export type Sticker = {
   ten: string;
   urlAnh: string;
   loai: "logo" | "hinh_ve" | "chu_viet";
-};
-
-/** Một vị trí in */
-export type ViTriIn = {
-  id: number;
-  ten: string;
-  moTa: string;
-  dangHoatDong: boolean;
 };
 
 /** Thống kê KPI 4 thẻ đầu trang */
@@ -121,7 +115,7 @@ export async function layThongKeThietKe(): Promise<ThongKeThietKe> {
 
 /**
  * Lấy danh sách thiết kế (phân trang + lọc).
- * GET /api/admin/designs?page=1&limit=10&...
+ * GET /api/admin/designs?page=1&limit=10&tu_ngay=...&den_ngay=...
  */
 export async function layDanhSachThietKe(
   thamSo: ThamSoLocThietKe = {}
@@ -133,6 +127,8 @@ export async function layDanhSachThietKe(
   if (thamSo.trang_thai) params.trang_thai = thamSo.trang_thai;
   if (thamSo.vi_tri_in) params.vi_tri_in = thamSo.vi_tri_in;
   if (thamSo.tu_khoa?.trim()) params.tu_khoa = thamSo.tu_khoa.trim();
+  if (thamSo.tu_ngay) params.tu_ngay = thamSo.tu_ngay;
+  if (thamSo.den_ngay) params.den_ngay = thamSo.den_ngay;
 
   const res = await apiClient.get<{ success: boolean; data: KetQuaThietKe }>(
     "/admin/designs",
@@ -174,15 +170,23 @@ export async function yeuCauChinhSua(
 
 /**
  * Lấy danh sách đơn cần in.
- * GET /api/admin/designs/don-can-in?page=1&limit=10&trang_thai=cho_gui_xuong
+ * GET /api/admin/designs/don-can-in?page=1&limit=10&trang_thai=cho_gui_xuong&tu_ngay=...&den_ngay=...
  */
 export async function layDanhSachDonCanIn(
-  thamSo: { page?: number; limit?: number; trang_thai?: string } = {}
+  thamSo: {
+    page?: number;
+    limit?: number;
+    trang_thai?: string;
+    tu_ngay?: string;
+    den_ngay?: string;
+  } = {}
 ): Promise<KetQuaDonCanIn> {
   const params: Record<string, string | number> = {};
   if (thamSo.page) params.page = thamSo.page;
   if (thamSo.limit) params.limit = thamSo.limit;
   if (thamSo.trang_thai) params.trang_thai = thamSo.trang_thai;
+  if (thamSo.tu_ngay) params.tu_ngay = thamSo.tu_ngay;
+  if (thamSo.den_ngay) params.den_ngay = thamSo.den_ngay;
 
   const res = await apiClient.get<{ success: boolean; data: KetQuaDonCanIn }>(
     "/admin/designs/don-can-in",
@@ -240,56 +244,4 @@ export async function themSticker(payload: {
  */
 export async function xoaSticker(id: number): Promise<void> {
   await apiClient.delete(`/admin/designs/stickers/${id}`);
-}
-
-// ─── VỊ TRÍ IN ──────────────────────────────────────────────────────────────
-
-/**
- * Lấy danh sách vị trí in (admin – bao gồm cả đã tắt).
- * GET /api/admin/designs/vi-tri-in
- */
-export async function layDanhSachViTriIn(): Promise<ViTriIn[]> {
-  const res = await apiClient.get<{ success: boolean; data: ViTriIn[] }>(
-    "/admin/designs/vi-tri-in"
-  );
-  return res.data.data;
-}
-
-/**
- * Thêm vị trí in mới.
- * POST /api/admin/designs/vi-tri-in
- */
-export async function themViTriIn(payload: {
-  ten: string;
-  moTa?: string;
-  dangHoatDong?: boolean;
-}): Promise<ViTriIn> {
-  const res = await apiClient.post<{ success: boolean; data: ViTriIn }>(
-    "/admin/designs/vi-tri-in",
-    payload
-  );
-  return res.data.data;
-}
-
-/**
- * Bật/tắt vị trí in.
- * PATCH /api/admin/designs/vi-tri-in/:id
- */
-export async function batTatViTriIn(
-  id: number,
-  dangHoatDong: boolean
-): Promise<{ id: number; dangHoatDong: boolean }> {
-  const res = await apiClient.patch<{
-    success: boolean;
-    data: { id: number; dangHoatDong: boolean };
-  }>(`/admin/designs/vi-tri-in/${id}`, { dangHoatDong });
-  return res.data.data;
-}
-
-/**
- * Xóa vị trí in (chỉ khi không có thiết kế nào đang dùng).
- * DELETE /api/admin/designs/vi-tri-in/:id
- */
-export async function xoaViTriIn(id: number): Promise<void> {
-  await apiClient.delete(`/admin/designs/vi-tri-in/${id}`);
 }
