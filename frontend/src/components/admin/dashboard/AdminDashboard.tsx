@@ -131,7 +131,7 @@ export default function AdminDashboard() {
     ? `&from=${encodeURIComponent(tuNgay)}&to=${encodeURIComponent(denNgay)}`
     : "";
   const completedOrdersHref =
-    `/admin/don-hang?status=COMPLETED&dateField=completed${dateQuery}`;
+    `/admin/don-hang?status=COMPLETED&payment=COMPLETED&dateField=completed${dateQuery}`;
 
   // ── Cấu hình thẻ chỉ số hàng 1 ──
   const primaryMetrics = [

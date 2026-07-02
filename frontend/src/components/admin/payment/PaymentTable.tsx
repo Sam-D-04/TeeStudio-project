@@ -1,4 +1,8 @@
 import type { MouseEvent } from "react";
+import {
+  getPaymentMethodLabel,
+  type PaymentType,
+} from "@/lib/paymentDisplay";
 import type { PaymentStatus } from "./PaymentStatusBadge";
 import PaymentStatusBadge from "./PaymentStatusBadge";
 
@@ -22,7 +26,7 @@ import PaymentStatusBadge from "./PaymentStatusBadge";
  */
 
 // Loại thanh toán ánh xạ từ cột paymentType trong bảng Payment (DB)
-export type PaymentType = "DEPOSIT" | "FULL" | "FULL_PAYMENT" | "COD_FINAL";
+export type { PaymentType } from "@/lib/paymentDisplay";
 
 // Nhãn tiếng Việt cho từng loại thanh toán
 const PAYMENT_TYPE_LABEL: Record<PaymentType, string> = {
@@ -42,12 +46,17 @@ const PAYMENT_TYPE_CLASS: Record<PaymentType, string> = {
 
 // Kiểu dữ liệu của một giao dịch thanh toán
 export type Payment = {
+  remainingAmountVnd?: number;
+  codAmountVnd?: number;
+  codReconciliationPaymentId?: number | null;
   id: number;
   payCode: string;           // Mã GD nội bộ, ví dụ "PAY-000128"
   orderCode: string;         // Mã đơn hàng liên kết, ví dụ "ORD-20260602-001"
   customerName: string;      // Tên khách hàng
   amountVnd: number;         // Số tiền (đơn vị VNĐ)
   paymentType: PaymentType;  // Loại thanh toán: cọc / toàn bộ / COD (ánh xạ từ DB.paymentType)
+  orderPaymentType: "FULL" | "DEPOSIT"; // Chính sách bất biến được khách chọn khi đặt đơn
+  orderPaymentStatus: "PENDING" | "PARTIALLY_PAID" | "PAID";
   method: "VNPAY" | "MOMO" | "COD";  // Phương thức thanh toán
   status: PaymentStatus;     // Trạng thái giao dịch
   gatewayCode: string;       // Mã tham chiếu từ cổng thanh toán
@@ -59,6 +68,7 @@ type PaymentTableProps = {
   onRowClick: (payment: Payment) => void; // Khi bấm vào hàng
   onViewDetail?: (payment: Payment, e: MouseEvent) => void; // Xem chi tiết (icon 👁️)
   onConfirmCod?: (payment: Payment, e: MouseEvent) => void;
+  confirmingCodId?: number | null;
 };
 
 // Hàm định dạng số tiền sang dạng "850.000đ"
@@ -71,6 +81,7 @@ export default function PaymentTable({
   onRowClick,
   onViewDetail,
   onConfirmCod,
+  confirmingCodId,
 }: PaymentTableProps) {
   return (
     // Bảng có thể cuộn ngang trên màn hình nhỏ
@@ -84,7 +95,7 @@ export default function PaymentTable({
             <th className="p-4">Mã Đơn</th>
             <th className="p-4">Khách hàng</th>
             <th className="p-4 text-right">Số tiền</th>
-            <th className="p-4">Loại thanh toán</th>
+            <th className="p-4">Chính sách thanh toán</th>
             <th className="p-4">Phương thức</th>
             <th className="p-4">Trạng thái</th>
             <th className="p-4">Mã cổng TT</th>
@@ -96,6 +107,13 @@ export default function PaymentTable({
         {/* Các hàng dữ liệu */}
         <tbody className="divide-y divide-border">
           {payments.map((payment) => {
+            const codConfirmationPaymentId =
+              payment.method === "COD" && payment.status === "can_doi_soat"
+                ? payment.id
+                : payment.paymentType === "DEPOSIT"
+                  ? payment.codReconciliationPaymentId ?? null
+                  : null;
+
             // Hàng thất bại: đổi nền thành đỏ nhạt khi hover
             const rowHoverClass =
               payment.status === "that_bai"
@@ -131,14 +149,13 @@ export default function PaymentTable({
                   {formatVnd(payment.amountVnd)}
                 </td>
 
-                {/* Loại thanh toán: cọc / toàn bộ / COD */}
+                {/* Chính sách ban đầu của đơn, không lấy từ giao dịch mới nhất */}
                 <td className="p-4">
                   <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      PAYMENT_TYPE_CLASS[payment.paymentType]
-                    }`}
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${PAYMENT_TYPE_CLASS[payment.orderPaymentType]
+                      }`}
                   >
-                    {PAYMENT_TYPE_LABEL[payment.paymentType]}
+                    {PAYMENT_TYPE_LABEL[payment.orderPaymentType]}
                   </span>
                 </td>
 
@@ -151,21 +168,39 @@ export default function PaymentTable({
                         <span className="flex h-4 w-6 items-center justify-center rounded bg-[#0ea5e9] text-[8px] font-bold text-white">
                           VN
                         </span>
-                        <span>VNPAY</span>
+                        <span>
+                          {getPaymentMethodLabel({
+                            method: payment.method,
+                            paymentType: payment.paymentType,
+                            status: payment.status,
+                          })}
+                        </span>
                       </>
                     ) : payment.method === "MOMO" ? (
                       <>
                         <span className="flex h-4 w-6 items-center justify-center rounded bg-[#a50064] text-[8px] font-bold text-white">
                           MO
                         </span>
-                        <span>MoMo</span>
+                        <span>
+                          {getPaymentMethodLabel({
+                            method: payment.method,
+                            paymentType: payment.paymentType,
+                            status: payment.status,
+                          })}
+                        </span>
                       </>
                     ) : (
                       <>
                         <span className="flex h-4 w-6 items-center justify-center rounded bg-[#f59e0b] text-[8px] font-bold text-white">
                           COD
                         </span>
-                        <span>COD</span>
+                        <span>
+                          {getPaymentMethodLabel({
+                            method: payment.method,
+                            paymentType: payment.paymentType,
+                            status: payment.status,
+                          })}
+                        </span>
                       </>
                     )}
                   </div>
@@ -173,7 +208,10 @@ export default function PaymentTable({
 
                 {/* Nhãn trạng thái màu sắc */}
                 <td className="p-4">
-                  <PaymentStatusBadge status={payment.status} />
+                  <PaymentStatusBadge
+                    status={payment.status}
+                    paymentType={payment.paymentType}
+                  />
                 </td>
 
                 {/* Mã cổng thanh toán – font mono để dễ đọc */}
@@ -225,15 +263,17 @@ export default function PaymentTable({
                       </svg>
                     </button>
 
-                    {payment.method === "COD" && (
+                    {codConfirmationPaymentId !== null && (
                       <button
                         type="button"
                         title="Xác nhận thu COD"
+                        aria-label={`Xác nhận thu COD cho đơn ${payment.orderCode}`}
+                        disabled={confirmingCodId === codConfirmationPaymentId}
                         onClick={(e) => {
                           e.stopPropagation();
                           onConfirmCod?.(payment, e);
                         }}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#bbf7d0] bg-surface text-[#15803d] transition-colors hover:border-[#15803d] hover:bg-[#f0fdf4]"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#bbf7d0] bg-surface text-[#15803d] transition-colors hover:border-[#15803d] hover:bg-[#f0fdf4] disabled:cursor-wait disabled:opacity-60"
                       >
                         <svg
                           className="h-4 w-4"

@@ -61,18 +61,13 @@ function formatKhoangThoiGian(dateRange?: KhoangThoiGian): string {
   return `${batDau.format("DD/MM/YYYY")} - ${ketThuc.format("DD/MM/YYYY")}`;
 }
 
-const groupByDescriptions: Record<DashboardGroupBy, string> = {
-  hour: "theo từng giờ",
-  day: "theo từng ngày",
-  month: "theo từng tháng",
-};
-
 function taoLinkDonHangTheoCot(
   item: DiemBieuDo,
   groupBy: DashboardGroupBy
 ): string {
   const params = new URLSearchParams({
     status: "COMPLETED",
+    payment: "COMPLETED",
     dateField: "completed",
   });
   const mocThoiGian = dayjs(item.ngay);
@@ -98,9 +93,6 @@ export default function RevenueOverviewChart({
   isError = false,
 }: RevenueOverviewChartProps) {
   const maxValue = data.length > 0 ? Math.max(...data.map((item) => item.doanhThuVnd)) : 0;
-  const tongDoanhThu = data.reduce((sum, item) => sum + item.doanhThuVnd, 0);
-  const tongDonHoanTat = data.reduce((sum, item) => sum + (item.soDonHoanTat || 0), 0);
-  const giaTriTrungBinh = tongDonHoanTat > 0 ? tongDoanhThu / tongDonHoanTat : 0;
   const coDoanhThu = maxValue > 0;
   const nhanTrucX = taoTapChiSoNhan(data.length, groupBy);
   const chartMinWidth = Math.max(560, data.length * 28);
@@ -116,32 +108,11 @@ export default function RevenueOverviewChart({
             <BarChartOutlined className="text-primary-container" />
             <span>Biểu đồ doanh thu tổng quan</span>
           </h3>
-          <p className="mt-1 text-xs text-text-secondary">
-            Doanh thu từ đơn hàng đã hoàn tất {groupByDescriptions[groupBy]}.
-            {" "}Nhấn vào từng cột để xem các đơn hàng chi tiết.
-          </p>
         </div>
         <span className="shrink-0 text-sm font-medium text-text-secondary">
           {khoangThoiGian}
         </span>
       </div>
-
-      {!isLoading && !isError && (
-        <div className="mb-4 flex flex-wrap gap-x-6 gap-y-2 border-b border-border pb-3 text-sm">
-          <span className="text-text-secondary">
-            Tổng doanh thu:{" "}
-            <strong className="font-bold text-text-main">{formatTienVnd(tongDoanhThu)}</strong>
-          </span>
-          <span className="text-text-secondary">
-            Đơn hoàn tất:{" "}
-            <strong className="font-bold text-text-main">{tongDonHoanTat.toLocaleString("vi-VN")}</strong>
-          </span>
-          <span className="text-text-secondary">
-            Trung bình/đơn:{" "}
-            <strong className="font-bold text-text-main">{formatTienVnd(giaTriTrungBinh)}</strong>
-          </span>
-        </div>
-      )}
 
       <div
         aria-label="Khu vực biểu đồ doanh thu tổng quan"
@@ -171,7 +142,7 @@ export default function RevenueOverviewChart({
         {!isLoading && !isError && !coDoanhThu && (
           <div className="absolute inset-0 flex items-center justify-center px-4 text-center">
             <span className="rounded-[8px] border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-text-secondary shadow-sm">
-              Chưa có doanh thu hoàn tất trong khoảng thời gian này.
+              Chưa có doanh thu đã thu trong khoảng thời gian này.
             </span>
           </div>
         )}
@@ -198,7 +169,7 @@ export default function RevenueOverviewChart({
                         href={taoLinkDonHangTheoCot(item, groupBy)}
                         aria-label={`Xem đơn hàng ${item.nhan}, doanh thu ${formatTienVnd(item.doanhThuVnd)}`}
                         className="group relative flex h-full min-w-[14px] flex-1 cursor-pointer items-end justify-center rounded-t-[6px] outline-none focus-visible:ring-2 focus-visible:ring-primary-container"
-                        title={`${item.nhan}: ${formatTienVnd(item.doanhThuVnd)} | ${item.soDonHoanTat || 0} đơn hoàn tất`}
+                        title={`${item.nhan}: ${formatTienVnd(item.doanhThuVnd)} | ${item.soDonHoanTat || 0} đơn đã thu đủ`}
                       >
                         <span
                           className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-[6px] bg-text-main px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100"

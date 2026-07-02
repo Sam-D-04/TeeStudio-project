@@ -13,11 +13,13 @@ function taoBoLocThanhToan(queryParams = {}) {
   const params = [];
 
   if (trangThai === "can_doi_soat") {
-    conditions.push("p.status = 'PENDING' AND p.paymentMethod = 'COD'");
+    conditions.push("p.status = 'PENDING_RECONCILIATION' AND p.paymentMethod = 'COD'");
+  } else if (trangThai === "da_dat_coc") {
+    conditions.push("p.status = 'COMPLETED' AND p.paymentType = 'DEPOSIT'");
   } else if (trangThai === "cho_thanh_toan") {
     conditions.push("p.status = 'PENDING' AND p.paymentMethod IN ('VNPAY', 'MOMO')");
   } else if (trangThai === "da_thanh_toan") {
-    conditions.push("p.status = 'COMPLETED'");
+    conditions.push("p.status = 'COMPLETED' AND p.paymentType <> 'DEPOSIT'");
   } else if (trangThai === "that_bai") {
     conditions.push("p.status IN ('FAILED', 'CANCELLED')");
   }

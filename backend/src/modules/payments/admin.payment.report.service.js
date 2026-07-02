@@ -10,6 +10,10 @@ async function taoBaoCaoThanhToan(queryParams) {
     `SELECT p.id, co.orderCode, a.fullName, a.phone, p.amount,
             p.paymentType, p.paymentMethod, p.status, p.transactionId,
             p.note,
+            CASE WHEN co.status = 'COMPLETED'
+                       AND p.status = 'COMPLETED'
+                       AND p.paymentType <> 'DEPOSIT'
+                 THEN co.totalAmount ELSE 0 END AS recognizedRevenue,
             DATE_FORMAT(p.paidAt, '%Y-%m-%d %H:%i:%s') AS paidAt,
             DATE_FORMAT(p.createdAt, '%Y-%m-%d %H:%i:%s') AS createdAt
      FROM Payment p
@@ -27,13 +31,13 @@ async function taoBaoCaoThanhToan(queryParams) {
       headers: [
         "Mã giao dịch", "Mã đơn", "Khách hàng", "Điện thoại", "Số tiền",
         "Loại thanh toán", "Phương thức", "Trạng thái", "Mã cổng thanh toán",
-        "Ghi chú", "Thời gian thanh toán", "Ngày tạo",
+        "Ghi chú", "Doanh thu ghi nhận", "Thời gian thanh toán", "Ngày tạo",
       ],
       rows: rows.map((row) => [
         `PAY-${String(row.id).padStart(6, "0")}`, row.orderCode, row.fullName,
         row.phone, Number(row.amount), row.paymentType, row.paymentMethod,
-        row.status, row.transactionId || "", row.note || "", row.paidAt || "",
-        row.createdAt,
+        row.status, row.transactionId || "", row.note || "",
+        Number(row.recognizedRevenue), row.paidAt || "", row.createdAt,
       ]),
     },
   ]);

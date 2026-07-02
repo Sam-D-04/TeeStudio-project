@@ -26,11 +26,21 @@ function createMomoReconciliationStrategy({
         throw new Error("Mã giao dịch MoMo đối soát không khớp");
       }
 
-      if (Number(result.amount) !== Number(payment.amount)) {
+      const isSuccessful = laGiaoDichMomoThanhCong(result.resultCode);
+      const isPending = laGiaoDichMomoDangXuLy(result.resultCode);
+      const hasAmount = result.amount !== undefined && result.amount !== null;
+
+      // Phản hồi lỗi cuối cùng (ví dụ 1005: hết hạn/không tồn tại) của MoMo
+      // không có amount. Chỉ bắt buộc amount với giao dịch thành công hoặc còn xử lý.
+      if ((isSuccessful || isPending) && !hasAmount) {
+        throw new Error("Phản hồi đối soát MoMo thiếu số tiền giao dịch");
+      }
+
+      if (hasAmount && Number(result.amount) !== Number(payment.amount)) {
         throw new Error("Số tiền giao dịch MoMo đối soát không khớp");
       }
 
-      if (laGiaoDichMomoThanhCong(result.resultCode)) {
+      if (isSuccessful) {
         return {
           nextStatus: PAYMENT_STATUS.COMPLETED,
           paidAt: parseMomoResponseTime(result.responseTime),
@@ -39,7 +49,7 @@ function createMomoReconciliationStrategy({
       }
 
       return {
-        nextStatus: laGiaoDichMomoDangXuLy(result.resultCode)
+        nextStatus: isPending
           ? PAYMENT_STATUS.PENDING
           : PAYMENT_STATUS.FAILED,
         paidAt: null,

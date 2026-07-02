@@ -38,15 +38,17 @@ export default async function ThanhToanPage({
   const initialFilters = isExplicit
     ? {
         status:
-          statuses.includes("PENDING") && method === "COD"
+          statuses.includes("PENDING_RECONCILIATION") && method === "COD"
             ? "can_doi_soat"
-            : statuses.includes("COMPLETED")
-          ? "da_thanh_toan"
-          : statuses.includes("PENDING")
-            ? "cho_thanh_toan"
-            : statuses.includes("FAILED") || statuses.includes("CANCELLED")
-              ? "that_bai"
-              : "tat_ca",
+            : statuses.includes("PARTIALLY_PAID")
+              ? "da_dat_coc"
+              : statuses.includes("COMPLETED")
+                ? "da_thanh_toan"
+                : statuses.includes("PENDING")
+                  ? "cho_thanh_toan"
+                  : statuses.includes("FAILED") || statuses.includes("CANCELLED")
+                    ? "that_bai"
+                    : "tat_ca",
         method:
           method === "VNPAY"
             ? "vnpay"

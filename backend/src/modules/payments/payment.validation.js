@@ -39,7 +39,13 @@ const updatePaymentStatusSchema = {
     status: {
       required: true,
       type: "string",
-      enum: ["PENDING", "COMPLETED", "FAILED", "CANCELLED"],
+      enum: [
+        "PENDING",
+        "PENDING_RECONCILIATION",
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED",
+      ],
     },
   },
 };
@@ -65,6 +71,7 @@ const getDanhSachThanhToanSchema = {
         "tat_ca",
         "cho_thanh_toan",
         "da_thanh_toan",
+        "da_dat_coc",
         "that_bai",
         "can_doi_soat",
       ],

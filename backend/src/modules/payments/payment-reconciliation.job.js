@@ -1,5 +1,6 @@
 const db = require("../../database/mysql");
 const { PAYMENT_STATUS } = require("../../common/constants/paymentStatus");
+const { syncOrderPaymentStatus } = require("./order-payment-progress.service");
 const {
   PAYMENT_RECONCILIATION_STRATEGIES,
 } = require("./reconciliation/payment-reconciliation.strategies");
@@ -50,6 +51,26 @@ function normalizeOutcome(outcome) {
   return { ...outcome, paidAt };
 }
 
+function formatGatewayFailure(paymentMethod, gatewayResult) {
+  if (!gatewayResult || typeof gatewayResult !== "object") return "";
+
+  if (paymentMethod === "MOMO") {
+    const code = gatewayResult.resultCode ?? "N/A";
+    const message = gatewayResult.message || "Không có mô tả";
+    return ` (mã ${code}: ${message})`;
+  }
+
+  if (paymentMethod === "VNPAY") {
+    const code = gatewayResult.vnp_TransactionStatus
+      || gatewayResult.vnp_ResponseCode
+      || "N/A";
+    const message = gatewayResult.vnp_Message || "Không có mô tả";
+    return ` (mã ${code}: ${message})`;
+  }
+
+  return "";
+}
+
 function createPaymentReconciliationJob({
   pool = db.pool,
   strategies = PAYMENT_RECONCILIATION_STRATEGIES,
@@ -88,7 +109,7 @@ function createPaymentReconciliationJob({
     try {
       const methodPlaceholders = paymentMethods.map(() => "?").join(", ");
       const [payments] = await pool.query(
-        `SELECT id, amount, paymentMethod, transactionId, gatewayResponse, createdAt
+        `SELECT id, orderId, amount, paymentMethod, transactionId, gatewayResponse, createdAt
          FROM Payment
          WHERE status = 'PENDING'
            AND paymentMethod IN (${methodPlaceholders})
@@ -135,9 +156,18 @@ function createPaymentReconciliationJob({
           );
 
           if (updateResult.affectedRows > 0) {
+            await syncOrderPaymentStatus(pool, payment.orderId);
             summary[outcome.nextStatus.toLowerCase()] += 1;
             if (outcome.nextStatus !== PAYMENT_STATUS.PENDING) {
               summary.updated += 1;
+            }
+            if (outcome.nextStatus === PAYMENT_STATUS.FAILED) {
+              logger.warn(
+                `[${payment.paymentMethod}] Đối soát ${payment.transactionId}: giao dịch thất bại${formatGatewayFailure(
+                  payment.paymentMethod,
+                  outcome.gatewayResult
+                )}.`
+              );
             }
           }
         } catch (error) {

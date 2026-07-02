@@ -32,6 +32,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
 import type { ChiTietDonHang } from "@/services/admin/orderService";
+import {
+  getOrderPaymentState,
+  getOrderPaymentMethodLabel,
+} from "@/lib/paymentDisplay";
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   cho_xac_nhan: { label: "Chờ xác nhận", color: "gold" },
@@ -444,7 +448,11 @@ function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
   const isOnlinePayment = ["VNPAY", "MOMO"].includes(
     order.thanhToan.phuongThuc
   );
-  const isPaid = order.thanhToan.status === "COMPLETED";
+  const isPaid = order.thanhToan.status === "PAID";
+  const paymentState = getOrderPaymentState({
+    paymentType: order.thanhToan.loai,
+    status: order.thanhToan.status,
+  });
 
   return (
     <section className="rounded-xl border border-border bg-surface shadow-admin-card">
@@ -478,18 +486,24 @@ function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
           </Descriptions.Item>
           <Descriptions.Item label="Thanh toán">
             <div className="flex flex-wrap items-center gap-1">
-              <span>{order.thanhToan.phuongThuc}</span>
+              <span>
+                {getOrderPaymentMethodLabel({
+                  method: order.thanhToan.phuongThuc,
+                  paymentType: order.thanhToan.loai,
+                })}
+              </span>
               <span className="text-text-muted">·</span>
-              <span>{order.thanhToan.loai || "FULL"}</span>
-              <span className="text-text-muted">·</span>
-              <span>{order.thanhToan.daThanh ? "Đã thanh toán" : "Chờ thanh toán"}</span>
-              {isOnlinePayment && !isPaid && order.trangThai !== "da_huy" ? (
+              <span className={paymentState.className}>{paymentState.label}</span>
+              {isOnlinePayment &&
+              order.thanhToan.transactionStatus === "PENDING" &&
+              !isPaid &&
+              order.trangThai !== "da_huy" ? (
                 <OnlinePaymentQrButton order={order} />
               ) : null}
               {isPaid ? (
                 <Tag color="green" className="m-0 text-xs">
                   <CheckCircleFilled className="mr-1" />
-                  Đã thanh toán lúc {formatDateTime(order.thanhToan.paidAt)}
+                  Ghi nhận lúc {formatDateTime(order.thanhToan.paidAt)}
                 </Tag>
               ) : null}
             </div>
@@ -604,7 +618,7 @@ export default function OrderDetailRouteClient() {
         ["VNPAY", "MOMO"].includes(
           currentOrder?.thanhToan.phuongThuc || ""
         ) &&
-        currentOrder?.thanhToan.status === "PENDING" &&
+        currentOrder?.thanhToan.transactionStatus === "PENDING" &&
         currentOrder?.trangThai !== "da_huy";
 
       return shouldPoll ? 3000 : false;

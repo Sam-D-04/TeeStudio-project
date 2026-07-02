@@ -16,7 +16,23 @@ function chuanHoaKhoangNgay(tuNgay, denNgay) {
 
 async function taoBaoCaoDashboard(tuNgay, denNgay) {
   const [batDau, ketThuc] = chuanHoaKhoangNgay(tuNgay, denNgay);
-  const [donHangResult, chiTietResult, tonKhoResult, thietKeResult] = await Promise.all([
+  const [doanhThuResult, donHangResult, chiTietResult, tonKhoResult, thietKeResult] = await Promise.all([
+    db.pool.query(
+      `SELECT COALESCE(SUM(co.totalAmount), 0) AS recognizedRevenue,
+              COUNT(*) AS paidCompletedOrders
+       FROM CustomerOrder co
+       JOIN (
+         SELECT orderId, MAX(paidAt) AS fullyPaidAt
+         FROM Payment
+         WHERE status = 'COMPLETED'
+           AND paymentType <> 'DEPOSIT'
+         GROUP BY orderId
+       ) pRevenue ON pRevenue.orderId = co.id
+       WHERE co.status = 'COMPLETED'
+         AND GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) >= ?
+         AND GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) < DATE_ADD(?, INTERVAL 1 DAY)`,
+      [batDau, ketThuc]
+    ),
     db.pool.query(
       `SELECT co.id, co.orderCode, a.fullName, a.email,
               COALESCE(NULLIF(ua.recipientName, ''), a.fullName) AS recipientName,
@@ -29,6 +45,12 @@ async function taoBaoCaoDashboard(tuNgay, denNgay) {
                ORDER BY p.createdAt DESC, p.id DESC LIMIT 1) AS paymentMethod,
               (SELECT p.status FROM Payment p WHERE p.orderId = co.id
                ORDER BY p.createdAt DESC, p.id DESC LIMIT 1) AS paymentStatus,
+              CASE WHEN co.status = 'COMPLETED' AND EXISTS (
+                SELECT 1 FROM Payment pPaid
+                WHERE pPaid.orderId = co.id
+                  AND pPaid.status = 'COMPLETED'
+                  AND pPaid.paymentType <> 'DEPOSIT'
+              ) THEN co.totalAmount ELSE 0 END AS recognizedRevenue,
               DATE_FORMAT(co.createdAt, '%Y-%m-%d %H:%i:%s') AS createdAt
        FROM CustomerOrder co
        JOIN Account a ON a.id = co.userId
@@ -81,17 +103,28 @@ async function taoBaoCaoDashboard(tuNgay, denNgay) {
 
   return taoBaoCaoExcel(`bao-cao-dashboard-${batDau}-den-${ketThuc}.xlsx`, [
     {
+      name: "Tổng quan doanh thu",
+      headers: ["Từ ngày", "Đến ngày", "Đơn hoàn tất đã thu đủ", "Doanh thu đã thu"],
+      rows: [[
+        batDau,
+        ketThuc,
+        Number(doanhThuResult[0][0].paidCompletedOrders),
+        Number(doanhThuResult[0][0].recognizedRevenue),
+      ]],
+    },
+    {
       name: "Đơn hàng",
       headers: ["ID", "Mã đơn", "Khách hàng", "Email", "Người nhận", "Điện thoại",
         "Trạng thái", "Số dòng SP", "Tổng số lượng", "Tạm tính", "Giảm giá",
         "Phí vận chuyển", "Tổng tiền", "Tiền đặt cọc", "Tiền COD", "Lý do hủy",
-        "Phương thức TT", "Trạng thái TT", "Ngày tạo"],
+        "Phương thức TT", "Trạng thái TT", "Doanh thu ghi nhận", "Ngày tạo"],
       rows: donHangResult[0].map((row) => [
         row.id, row.orderCode, row.fullName, row.email, row.recipientName, row.phone,
         row.status, Number(row.itemLines), Number(row.totalQty), Number(row.subtotal),
         Number(row.discountAmount), Number(row.shippingFee), Number(row.totalAmount),
         Number(row.depositAmount), Number(row.codAmount), row.cancelReason || "",
-        row.paymentMethod || "", row.paymentStatus || "", row.createdAt,
+        row.paymentMethod || "", row.paymentStatus || "",
+        Number(row.recognizedRevenue), row.createdAt,
       ]),
     },
     {

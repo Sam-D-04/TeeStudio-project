@@ -351,6 +351,8 @@ CREATE TABLE IF NOT EXISTS `CustomerOrder` (
 	`totalAmount` DECIMAL(15,2) NOT NULL,
 	`depositAmount` DECIMAL(15,2) NOT NULL DEFAULT 0,
 	`codAmount` DECIMAL(15,2) NOT NULL DEFAULT 0,
+	`paymentType` VARCHAR(20) NOT NULL COMMENT 'Chính sách thanh toán ban đầu, bất biến: FULL hoặc DEPOSIT',
+	`paymentStatus` VARCHAR(30) NOT NULL DEFAULT 'PENDING' COMMENT 'Tiến độ thanh toán tổng của đơn: PENDING, PARTIALLY_PAID, PAID',
 	`status` VARCHAR(30) NOT NULL DEFAULT 'PENDING',
 	`createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -359,6 +361,7 @@ CREATE TABLE IF NOT EXISTS `CustomerOrder` (
 	KEY `idx_customer_order_user_id` (`userId`),
 	KEY `idx_customer_order_promotion_id` (`promotionId`),
 	KEY `idx_customer_order_address_id` (`addressId`),
+	KEY `idx_customer_order_payment_type_status` (`paymentType`, `paymentStatus`),
 	CONSTRAINT `fk_customer_order_user`
 		FOREIGN KEY (`userId`) REFERENCES `Account` (`id`)
 		ON UPDATE NO ACTION ON DELETE RESTRICT,
@@ -369,6 +372,19 @@ CREATE TABLE IF NOT EXISTS `CustomerOrder` (
 		FOREIGN KEY (`addressId`) REFERENCES `UserAddress` (`id`)
 		ON UPDATE NO ACTION ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TRIGGER IF EXISTS `trg_customer_order_payment_type_immutable`;
+DELIMITER $$
+CREATE TRIGGER `trg_customer_order_payment_type_immutable`
+BEFORE UPDATE ON `CustomerOrder`
+FOR EACH ROW
+BEGIN
+	IF NOT (NEW.paymentType <=> OLD.paymentType) THEN
+		SIGNAL SQLSTATE '45000'
+			SET MESSAGE_TEXT = 'CustomerOrder.paymentType is immutable';
+	END IF;
+END$$
+DELIMITER ;
 
 
 CREATE TABLE IF NOT EXISTS `OrderItem` (
@@ -454,7 +470,7 @@ CREATE TABLE IF NOT EXISTS `Payment` (
 	`amount` DECIMAL(15,2) NOT NULL,
 	`paymentMethod` VARCHAR(30) NOT NULL COMMENT 'Phương thức thanh toán dùng chung: COD, VNPAY, MOMO',
 	`paymentType` VARCHAR(20) NOT NULL,
-	`status` VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+	`status` VARCHAR(30) NOT NULL DEFAULT 'PENDING',
 	`transactionId` VARCHAR(255) NULL,
 	`paidAt` DATETIME NULL,
 	`gatewayResponse` TEXT NULL,

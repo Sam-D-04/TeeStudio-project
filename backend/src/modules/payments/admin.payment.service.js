@@ -19,6 +19,7 @@ const {
   mapStatusToFrontend,
 } = require("../../common/constants/paymentStatus");
 const { taoBoLocThanhToan } = require("./payment-filter.util");
+const { syncOrderPaymentStatus } = require("./order-payment-progress.service");
 
 // =====================================================================
 // PHẦN 1: LOGIC RETURN / IPN CỦA CÁC CỔNG ONLINE
@@ -181,6 +182,8 @@ async function dongBoTrangThaiVnpay(query) {
       return { RspCode: "02", Message: "Order already confirmed" };
     }
 
+    await syncOrderPaymentStatus(conn, payment.orderId);
+
     await conn.commit();
 
     return { RspCode: "00", Message: "Confirm Success" };
@@ -303,6 +306,8 @@ async function dongBoTrangThaiMomo(payload, source = "ipn") {
       return { accepted: true, payment };
     }
 
+    await syncOrderPaymentStatus(conn, payment.orderId);
+
     await conn.commit();
     return {
       accepted: true,
@@ -396,11 +401,11 @@ async function layThongKeThanhToan() {
        AND paymentMethod IN ('VNPAY', 'MOMO')`
   );
 
-  // Giao dịch COD cần đối soát (COD PENDING)
+  // Giao dịch COD đã giao hàng, đang chờ kế toán đối soát
   const [canDoiSoatRows] = await db.pool.query(
     `SELECT COUNT(*) AS soLuong
      FROM Payment
-     WHERE status = 'PENDING'
+     WHERE status = 'PENDING_RECONCILIATION'
        AND paymentMethod = 'COD'`
   );
 
@@ -465,6 +470,20 @@ async function layDanhSachThanhToan(queryParams) {
        p.createdAt,
        p.note,
        co.orderCode,
+       co.totalAmount,
+       co.codAmount,
+       co.paymentType AS orderPaymentType,
+       co.paymentStatus AS orderPaymentStatus,
+       (
+         SELECT pCod.id
+         FROM Payment pCod
+         WHERE pCod.orderId = p.orderId
+           AND pCod.paymentMethod = 'COD'
+           AND pCod.paymentType <> 'DEPOSIT'
+           AND pCod.status = 'PENDING_RECONCILIATION'
+         ORDER BY pCod.createdAt DESC, pCod.id DESC
+         LIMIT 1
+       ) AS codReconciliationPaymentId,
        a.fullName AS customerName,
        a.phone AS customerPhone
      FROM Payment p
@@ -483,9 +502,19 @@ async function layDanhSachThanhToan(queryParams) {
     orderCode: row.orderCode,
     customerName: row.customerName,
     amountVnd: Number(row.amount),
+    remainingAmountVnd:
+      row.paymentType === "DEPOSIT"
+        ? Math.max(0, Number(row.totalAmount) - Number(row.amount))
+        : 0,
+    codAmountVnd: Number(row.codAmount || 0),
+    codReconciliationPaymentId: row.codReconciliationPaymentId
+      ? Number(row.codReconciliationPaymentId)
+      : null,
     paymentType: row.paymentType,
+    orderPaymentType: row.orderPaymentType,
+    orderPaymentStatus: row.orderPaymentStatus,
     method: row.paymentMethod,
-    status: mapStatusToFrontend(row.status, row.paymentMethod),
+    status: mapStatusToFrontend(row.status, row.paymentMethod, row.paymentType),
     gatewayCode: row.transactionId || `${row.paymentMethod}-${String(row.id).padStart(6, "0")}`,
     paidAt: formatDateVn(row.paidAt),
     createdAt: formatDateVn(row.createdAt),
@@ -517,6 +546,11 @@ async function layChiTietThanhToan(id) {
        p.createdAt,
        p.note,
        co.orderCode,
+       co.totalAmount,
+       co.codAmount,
+       co.createdAt AS orderCreatedAt,
+       co.paymentType AS orderPaymentType,
+       co.paymentStatus AS orderPaymentStatus,
        a.fullName AS customerName,
        a.phone AS customerPhone
      FROM Payment p
@@ -545,9 +579,16 @@ async function layChiTietThanhToan(id) {
     customerName: row.customerName,
     customerPhone: row.customerPhone || null,
     amountVnd: Number(row.amount),
+    remainingAmountVnd:
+      row.paymentType === "DEPOSIT"
+        ? Math.max(0, Number(row.totalAmount) - Number(row.amount))
+        : 0,
+    codAmountVnd: Number(row.codAmount || 0),
     paymentType: row.paymentType,
+    orderPaymentType: row.orderPaymentType,
+    orderPaymentStatus: row.orderPaymentStatus,
     method: row.paymentMethod,
-    status: mapStatusToFrontend(row.status, row.paymentMethod),
+    status: mapStatusToFrontend(row.status, row.paymentMethod, row.paymentType),
     gatewayCode: row.transactionId || `${row.paymentMethod}-${String(row.id).padStart(6, "0")}`,
     paidAt: formatDateVn(row.paidAt),
     createdAt: formatDateVn(row.createdAt),
@@ -562,6 +603,16 @@ async function layChiTietThanhToan(id) {
  */
 function buildIpnHistory(paymentRow) {
   const steps = [];
+
+  steps.push({
+    description:
+      paymentRow.orderPaymentType === "DEPOSIT"
+        ? "Khách chọn chính sách đặt cọc 50%"
+        : "Khách chọn chính sách thanh toán 100%",
+    time: formatDateVn(paymentRow.orderCreatedAt) || "",
+    note: "Lựa chọn ban đầu của đơn hàng, không thay đổi trong suốt vòng đời đơn",
+    isSuccess: true,
+  });
 
   // Bước 1: Khởi tạo giao dịch
   steps.push({
@@ -649,8 +700,10 @@ async function xacNhanThuCod(id) {
     await conn.beginTransaction();
 
     const [rows] = await conn.query(
-      `SELECT p.id, p.status, p.paymentMethod, p.orderId
+      `SELECT p.id, p.status, p.paymentMethod, p.orderId,
+              co.status AS orderStatus
        FROM Payment p
+       JOIN CustomerOrder co ON co.id = p.orderId
        WHERE p.id = ?
        LIMIT 1
        FOR UPDATE`,
@@ -673,9 +726,16 @@ async function xacNhanThuCod(id) {
       throw error;
     }
 
-    if (payment.status !== PAYMENT_STATUS.PENDING) {
+    if (payment.orderStatus !== "COMPLETED") {
       await conn.rollback();
-      const error = new Error("Chỉ có thể xác nhận giao dịch COD đang ở trạng thái chờ");
+      const error = new Error("Chỉ có thể thu COD sau khi đơn hàng đã hoàn tất");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (payment.status !== PAYMENT_STATUS.PENDING_RECONCILIATION) {
+      await conn.rollback();
+      const error = new Error("Chỉ có thể xác nhận giao dịch COD đang chờ đối soát");
       error.statusCode = 400;
       throw error;
     }
@@ -684,9 +744,12 @@ async function xacNhanThuCod(id) {
       `UPDATE Payment
        SET status = 'COMPLETED',
            paidAt = NOW()
-       WHERE id = ?`,
+       WHERE id = ?
+         AND status = 'PENDING_RECONCILIATION'`,
       [id]
     );
+
+    await syncOrderPaymentStatus(conn, payment.orderId);
 
     await conn.commit();
 

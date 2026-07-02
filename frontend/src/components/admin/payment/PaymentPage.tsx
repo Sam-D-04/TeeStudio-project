@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import type { MouseEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { message } from "antd";
+import { message, Modal } from "antd";
 import dayjs from "dayjs";
 import PaymentDetailDrawer, { type PaymentDetail } from "./PaymentDetailDrawer";
 import PaymentFilterBar from "./PaymentFilterBar";
@@ -50,6 +50,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const [messageApi, messageContextHolder] = message.useMessage();
+  const [modalApi, modalContextHolder] = Modal.useModal();
 
   // ===== STATE BỘ LỌC =====
   const [searchValue, setSearchValue] = useState("");
@@ -120,6 +121,12 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["admin-payments"] });
     queryClient.invalidateQueries({ queryKey: ["admin-payments-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] });
+    queryClient.invalidateQueries({
+      predicate: (query) =>
+        String(query.queryKey[0] || "").startsWith("dashboard/"),
+    });
     if (selectedPaymentId) {
       queryClient.invalidateQueries({ queryKey: ["admin-payment-detail", selectedPaymentId] });
     }
@@ -129,9 +136,13 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
     mutationFn: xacNhanThuCod,
     onSuccess: () => {
       invalidateAll();
+      messageApi.success("Đã xác nhận thu COD. Doanh thu đơn hàng đã được ghi nhận.");
       setActionLoading(false);
     },
-    onError: () => {
+    onError: (error) => {
+      messageApi.error(
+        getApiErrorMessage(error, "Không thể xác nhận thu COD.")
+      );
       setActionLoading(false);
     },
   });
@@ -165,7 +176,29 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
   // Icon ✅ Xác nhận thu COD
   function handleConfirmCod(payment: Payment, e: MouseEvent) {
     e.stopPropagation();
-    confirmCodMutation.mutate(payment.id);
+    const codPaymentId =
+      payment.method === "COD" && payment.status === "can_doi_soat"
+        ? payment.id
+        : payment.codReconciliationPaymentId;
+
+    if (!codPaymentId) {
+      messageApi.warning("Khoản COD của đơn hàng chưa sẵn sàng để đối soát.");
+      return;
+    }
+
+    const codAmount =
+      payment.paymentType === "DEPOSIT"
+        ? payment.codAmountVnd ?? payment.remainingAmountVnd ?? 0
+        : payment.amountVnd;
+
+    modalApi.confirm({
+      title: "Xác nhận đã nhận tiền COD?",
+      content: `Khoản COD ${formatVnd(codAmount)} của đơn ${payment.orderCode} sẽ được ghi nhận vào doanh thu.`,
+      okText: "Xác nhận thu COD",
+      cancelText: "Hủy",
+      okButtonProps: { loading: confirmCodMutation.isPending },
+      onOk: () => confirmCodMutation.mutateAsync(codPaymentId),
+    });
   }
 
   // Lưu ghi chú từ Drawer
@@ -269,6 +302,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
   return (
     <div>
       {messageContextHolder}
+      {modalContextHolder}
 
       {/* ======== Tiêu đề trang + nút hành động ======== */}
       <section className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
@@ -388,7 +422,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
               <circle cx="12" cy="12" r="9" />
             </svg>
           }
-          href="/admin/thanh-toan?status=PENDING&method=COD"
+          href="/admin/thanh-toan?status=PENDING_RECONCILIATION&method=COD"
           isActive={
             statusFilter === "can_doi_soat" &&
             methodFilter === "cod" &&
@@ -497,6 +531,11 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
                 onRowClick={handleRowClick}
                 onViewDetail={handleViewDetail}
                 onConfirmCod={handleConfirmCod}
+                confirmingCodId={
+                  confirmCodMutation.isPending
+                    ? confirmCodMutation.variables
+                    : null
+                }
               />
               <PaymentPagination
                 currentPage={currentPage}

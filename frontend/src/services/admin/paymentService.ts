@@ -28,12 +28,17 @@ export type ThongKeThanhToan = {
 
 /** Một giao dịch trong danh sách */
 export type GiaoDich = {
+  remainingAmountVnd?: number;
+  codAmountVnd?: number;
+  codReconciliationPaymentId?: number | null;
   id: number;
   payCode: string;
   orderCode: string;
   customerName: string;
   amountVnd: number;
   paymentType: PaymentType;
+  orderPaymentType: "FULL" | "DEPOSIT";
+  orderPaymentStatus: "PENDING" | "PARTIALLY_PAID" | "PAID";
   method: "VNPAY" | "MOMO" | "COD";
   status: PaymentStatus;
   gatewayCode: string;

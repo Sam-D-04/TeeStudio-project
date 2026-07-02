@@ -101,12 +101,21 @@ function formatNgay(date) {
 async function layTongQuanChiSo(tuNgay, denNgay) {
   const [batDau, ketThuc] = chuanHoaKhoangNgay(tuNgay, denNgay);
 
-  // --- Doanh thu tháng: tổng totalAmount các đơn COMPLETED trong khoảng ---
+  // Chỉ ghi nhận doanh thu khi đơn đã hoàn tất và có giao dịch thanh toán đủ.
+  // Giao dịch DEPOSIT chỉ là tiền cọc nên không đủ điều kiện ghi nhận toàn bộ đơn.
   const [rowsDoanhThu] = await db.pool.query(
-    `SELECT COALESCE(SUM(totalAmount), 0) AS doanh_thu
-     FROM CustomerOrder
-     WHERE status = 'COMPLETED'
-       AND DATE(updatedAt) >= ? AND DATE(updatedAt) <= ?`,
+    `SELECT COALESCE(SUM(co.totalAmount), 0) AS doanh_thu
+     FROM CustomerOrder co
+     JOIN (
+       SELECT orderId, MAX(paidAt) AS fullyPaidAt
+       FROM Payment
+       WHERE status = 'COMPLETED'
+         AND paymentType <> 'DEPOSIT'
+       GROUP BY orderId
+     ) pRevenue ON pRevenue.orderId = co.id
+     WHERE co.status = 'COMPLETED'
+       AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) >= ?
+       AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) <= ?`,
     [batDau, ketThuc]
   );
 
@@ -115,9 +124,17 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
     `SELECT COALESCE(SUM(oi.designFee), 0) AS doanh_thu_thiet_ke
      FROM OrderItem oi
      JOIN CustomerOrder co ON co.id = oi.orderId
+     JOIN (
+       SELECT orderId, MAX(paidAt) AS fullyPaidAt
+       FROM Payment
+       WHERE status = 'COMPLETED'
+         AND paymentType <> 'DEPOSIT'
+       GROUP BY orderId
+     ) pRevenue ON pRevenue.orderId = co.id
      WHERE co.status = 'COMPLETED'
        AND oi.designFee > 0
-       AND DATE(co.updatedAt) >= ? AND DATE(co.updatedAt) <= ?`,
+       AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) >= ?
+       AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) <= ?`,
     [batDau, ketThuc]
   );
 
@@ -143,11 +160,17 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
   // --- Thống kê đơn hàng trong khoảng: COMPLETED vs CANCELLED (tính AOV + tỷ lệ) ---
   const [rowsThongKeDon] = await db.pool.query(
     `SELECT
-       COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END)  AS so_hoan_tat,
-       COUNT(CASE WHEN status = 'CANCELLED' THEN 1 END)  AS so_da_huy,
-       COUNT(CASE WHEN status NOT IN ('CANCELLED') THEN 1 END) AS so_hop_le
-     FROM CustomerOrder
-     WHERE DATE(createdAt) >= ? AND DATE(createdAt) <= ?`,
+       COUNT(CASE WHEN co.status = 'COMPLETED' THEN 1 END) AS so_hoan_tat,
+       COUNT(CASE WHEN co.status = 'COMPLETED' AND EXISTS (
+         SELECT 1 FROM Payment pPaid
+         WHERE pPaid.orderId = co.id
+           AND pPaid.status = 'COMPLETED'
+           AND pPaid.paymentType <> 'DEPOSIT'
+       ) THEN 1 END) AS so_hoan_tat_da_thu,
+       COUNT(CASE WHEN co.status = 'CANCELLED' THEN 1 END) AS so_da_huy,
+       COUNT(CASE WHEN co.status NOT IN ('CANCELLED') THEN 1 END) AS so_hop_le
+     FROM CustomerOrder co
+     WHERE DATE(co.createdAt) >= ? AND DATE(co.createdAt) <= ?`,
     [batDau, ketThuc]
   );
 
@@ -169,13 +192,14 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
   const soVariantThap = Number(rowsTonKho[0].so_variant_thap) || 0;
 
   const soHoanTat = Number(rowsThongKeDon[0].so_hoan_tat) || 0;
+  const soHoanTatDaThu = Number(rowsThongKeDon[0].so_hoan_tat_da_thu) || 0;
   const soDaHuy = Number(rowsThongKeDon[0].so_da_huy) || 0;
   const soHopLe = Number(rowsThongKeDon[0].so_hop_le) || 0;
 
   const doanhThuKhac = Number(rowsDoanhThuKhac[0].doanh_thu_khac) || 0;
 
   // AOV = doanh thu / số đơn hoàn tất
-  const aov = soHoanTat > 0 ? Math.round(doanhThu / soHoanTat) : 0;
+  const aov = soHoanTatDaThu > 0 ? Math.round(doanhThu / soHoanTatDaThu) : 0;
 
   // Tỷ lệ thành công: COMPLETED / (tổng đơn không hủy)
   const tyLeThanhCong = soHopLe > 0
@@ -335,28 +359,49 @@ async function layDuLieuBieuDo(tuNgay, denNgay) {
   if (groupBy === "hour") {
     [rows] = await db.pool.query(
       `SELECT
-         DATE_FORMAT(updatedAt, '%H') AS moc_raw,
-         COALESCE(SUM(totalAmount), 0) AS doanh_thu,
+         DATE_FORMAT(
+           GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt)),
+           '%H'
+         ) AS moc_raw,
+         COALESCE(SUM(co.totalAmount), 0) AS doanh_thu,
          COUNT(*)                      AS so_don_hoan_tat
-       FROM CustomerOrder
-       WHERE status = 'COMPLETED'
-         AND DATE(updatedAt) = ?
-       GROUP BY DATE_FORMAT(updatedAt, '%H')
-       ORDER BY DATE_FORMAT(updatedAt, '%H') ASC`,
+       FROM CustomerOrder co
+       JOIN (
+         SELECT orderId, MAX(paidAt) AS fullyPaidAt
+         FROM Payment
+         WHERE status = 'COMPLETED'
+           AND paymentType <> 'DEPOSIT'
+         GROUP BY orderId
+       ) pRevenue ON pRevenue.orderId = co.id
+       WHERE co.status = 'COMPLETED'
+         AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) = ?
+       GROUP BY moc_raw
+       ORDER BY moc_raw ASC`,
       [batDau]
     );
     danhSach = taoDanhSachTheoGio(batDau, taoBanDoDoanhThu(rows));
   } else if (groupBy === "month") {
     [rows] = await db.pool.query(
       `SELECT
-         DATE_FORMAT(updatedAt, '%Y-%m') AS moc_raw,
-         COALESCE(SUM(totalAmount), 0)   AS doanh_thu,
+         DATE_FORMAT(
+           GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt)),
+           '%Y-%m'
+         ) AS moc_raw,
+         COALESCE(SUM(co.totalAmount), 0)   AS doanh_thu,
          COUNT(*)                        AS so_don_hoan_tat
-       FROM CustomerOrder
-       WHERE status = 'COMPLETED'
-         AND DATE(updatedAt) >= ? AND DATE(updatedAt) <= ?
-       GROUP BY DATE_FORMAT(updatedAt, '%Y-%m')
-       ORDER BY DATE_FORMAT(updatedAt, '%Y-%m') ASC`,
+       FROM CustomerOrder co
+       JOIN (
+         SELECT orderId, MAX(paidAt) AS fullyPaidAt
+         FROM Payment
+         WHERE status = 'COMPLETED'
+           AND paymentType <> 'DEPOSIT'
+         GROUP BY orderId
+       ) pRevenue ON pRevenue.orderId = co.id
+       WHERE co.status = 'COMPLETED'
+         AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) >= ?
+         AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) <= ?
+       GROUP BY moc_raw
+       ORDER BY moc_raw ASC`,
       [batDau, ketThuc]
     );
     danhSach = taoDanhSachTheoThang(
@@ -367,14 +412,25 @@ async function layDuLieuBieuDo(tuNgay, denNgay) {
   } else {
     [rows] = await db.pool.query(
       `SELECT
-         DATE_FORMAT(updatedAt, '%Y-%m-%d') AS moc_raw,
-         COALESCE(SUM(totalAmount), 0)      AS doanh_thu,
+         DATE_FORMAT(
+           GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt)),
+           '%Y-%m-%d'
+         ) AS moc_raw,
+         COALESCE(SUM(co.totalAmount), 0)      AS doanh_thu,
          COUNT(*)                           AS so_don_hoan_tat
-       FROM CustomerOrder
-       WHERE status = 'COMPLETED'
-         AND DATE(updatedAt) >= ? AND DATE(updatedAt) <= ?
-       GROUP BY DATE_FORMAT(updatedAt, '%Y-%m-%d')
-       ORDER BY DATE_FORMAT(updatedAt, '%Y-%m-%d') ASC`,
+       FROM CustomerOrder co
+       JOIN (
+         SELECT orderId, MAX(paidAt) AS fullyPaidAt
+         FROM Payment
+         WHERE status = 'COMPLETED'
+           AND paymentType <> 'DEPOSIT'
+         GROUP BY orderId
+       ) pRevenue ON pRevenue.orderId = co.id
+       WHERE co.status = 'COMPLETED'
+         AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) >= ?
+         AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) <= ?
+       GROUP BY moc_raw
+       ORDER BY moc_raw ASC`,
       [batDau, ketThuc]
     );
     danhSach = taoDanhSachTheoNgay(batDau, ketThuc, taoBanDoDoanhThu(rows));
@@ -500,7 +556,7 @@ async function layTonKhoCanhBao(nguong = 15, limit = 10) {
 
 /**
  * Lấy top `limit` sản phẩm bán chạy nhất theo tổng doanh thu (lineTotal)
- * trong khoảng [tuNgay, denNgay], chỉ tính đơn COMPLETED hoặc SHIPPING.
+ * trong khoảng [tuNgay, denNgay], chỉ tính đơn COMPLETED đã thu đủ tiền.
  */
 async function laySanPhamBanChay(tuNgay, denNgay, limit = 3) {
   const [batDau, ketThuc] = chuanHoaKhoangNgay(tuNgay, denNgay);
@@ -515,9 +571,17 @@ async function laySanPhamBanChay(tuNgay, denNgay, limit = 3) {
          FROM OrderItem oiBest
          JOIN ProductVariant pvBest ON pvBest.id = oiBest.variantId
          JOIN CustomerOrder coBest ON coBest.id = oiBest.orderId
+         JOIN (
+           SELECT orderId, MAX(paidAt) AS fullyPaidAt
+           FROM Payment
+           WHERE status = 'COMPLETED'
+             AND paymentType <> 'DEPOSIT'
+           GROUP BY orderId
+         ) pRevenueBest ON pRevenueBest.orderId = coBest.id
          WHERE pvBest.productId = p.id
-           AND coBest.status IN ('COMPLETED', 'SHIPPING')
-           AND DATE(coBest.updatedAt) >= ? AND DATE(coBest.updatedAt) <= ?
+           AND coBest.status = 'COMPLETED'
+           AND DATE(GREATEST(coBest.updatedAt, COALESCE(pRevenueBest.fullyPaidAt, coBest.updatedAt))) >= ?
+           AND DATE(GREATEST(coBest.updatedAt, COALESCE(pRevenueBest.fullyPaidAt, coBest.updatedAt))) <= ?
          GROUP BY pvBest.id
          ORDER BY SUM(oiBest.quantity) DESC
          LIMIT 1
@@ -528,8 +592,16 @@ async function laySanPhamBanChay(tuNgay, denNgay, limit = 3) {
      JOIN ProductVariant pv ON pv.id = oi.variantId
      JOIN Product p          ON p.id  = pv.productId
      JOIN CustomerOrder co   ON co.id = oi.orderId
-     WHERE co.status IN ('COMPLETED', 'SHIPPING')
-       AND DATE(co.updatedAt) >= ? AND DATE(co.updatedAt) <= ?
+     JOIN (
+       SELECT orderId, MAX(paidAt) AS fullyPaidAt
+       FROM Payment
+       WHERE status = 'COMPLETED'
+         AND paymentType <> 'DEPOSIT'
+       GROUP BY orderId
+     ) pRevenue ON pRevenue.orderId = co.id
+     WHERE co.status = 'COMPLETED'
+       AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) >= ?
+       AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) <= ?
      GROUP BY p.id, p.name
      ORDER BY tongDoanhThu DESC
      LIMIT ?`,

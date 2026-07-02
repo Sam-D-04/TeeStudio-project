@@ -48,6 +48,7 @@ function chuyenDoiSangOrder(don: orderService.DonHang): Order {
       type: don.thanhToan.loai,
       amountVnd: don.thanhToan.soTienVnd,
       isPaid: don.thanhToan.daThanh,
+      status: don.thanhToan.status,
     },
     status: don.trangThai as Order["status"],
   };

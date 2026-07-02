@@ -46,7 +46,9 @@ function chuyenThanhToanSangBoLoc(value: string): string {
   const payment = value.trim().toUpperCase();
 
   if (payment === "PENDING") return "cho_thanh_toan";
-  if (payment === "COMPLETED") return "da_thanh_toan";
+  if (payment === "PENDING_RECONCILIATION") return "can_doi_soat";
+  if (payment === "PARTIALLY_PAID") return "da_dat_coc";
+  if (payment === "PAID" || payment === "COMPLETED") return "da_thanh_toan";
 
   return "tat_ca";
 }

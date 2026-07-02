@@ -21,6 +21,7 @@ export type ThanhToanInfo = {
   soTienVnd?: number;
   daThanh: boolean;
   status?: string | null;
+  transactionStatus?: string | null;
   paidAt?: string | null;
   transactionId?: string | null;
   paymentUrl?: string | null;

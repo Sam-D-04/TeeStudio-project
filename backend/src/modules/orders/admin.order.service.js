@@ -16,6 +16,7 @@ const {
 
 const DEPOSIT_PERCENT = 50;
 const ONLINE_PAYMENT_METHODS = new Set(["VNPAY", "MOMO"]);
+const PREPAID_PAYMENT_TYPES = new Set(["FULL", "FULL_PAYMENT", "DEPOSIT"]);
 const ACTION_CUSTOMER_CREATED = "Khách hàng đặt đơn";
 const ACTION_ADMIN_CREATED = "Tạo đơn cho khách";
 const CREATION_ACTIONS = new Set([
@@ -117,6 +118,17 @@ const MAP_TEN_TRANG_THAI_DB = {
   COMPLETED: "Hoàn tất",
   CANCELLED: "Đã hủy",
 };
+
+const ALLOWED_ORDER_TRANSITIONS = Object.freeze({
+  PENDING: ["CONFIRMED"],
+  CONFIRMED: ["PROCESSING", "READY_TO_SHIP"],
+  PROCESSING: ["READY_TO_SHIP"],
+  PRINTING: ["READY_TO_SHIP"],
+  READY_TO_SHIP: ["SHIPPING"],
+  SHIPPING: ["COMPLETED"],
+  COMPLETED: [],
+  CANCELLED: [],
+});
 
 function layTenTrangThai(status) {
   return MAP_TEN_TRANG_THAI_DB[status] || status || "Không rõ";
@@ -324,7 +336,11 @@ function xayDungTimeline(donHang, thanhToan) {
   }
 
   // Thêm mốc đã thanh toán (nếu có)
-  if (thanhToan && thanhToan.paidAt && thanhToan.status === "COMPLETED") {
+  if (
+    thanhToan &&
+    thanhToan.paidAt &&
+    ["PARTIALLY_PAID", "PAID", "COMPLETED"].includes(thanhToan.status)
+  ) {
     timeline.push({
       moTa: `Đã thanh toán qua ${thanhToan.paymentMethod}`,
       thoiGian: formatNgayGio(thanhToan.paidAt),
@@ -423,9 +439,15 @@ async function layDanhSachDonHang({
 
   // Lọc theo thanh toán
   if (thanhToan === "da_thanh_toan") {
-    dieuKien.push("p.status = 'COMPLETED'");
+    dieuKien.push("co.paymentStatus = 'PAID'");
+  } else if (thanhToan === "da_dat_coc") {
+    dieuKien.push("co.paymentType = 'DEPOSIT' AND co.paymentStatus = 'PARTIALLY_PAID'");
   } else if (thanhToan === "cho_thanh_toan") {
-    dieuKien.push("p.status = 'PENDING'");
+    dieuKien.push("co.paymentStatus = 'PENDING'");
+  } else if (thanhToan === "can_doi_soat") {
+    dieuKien.push(
+      "EXISTS (SELECT 1 FROM Payment pReconcile WHERE pReconcile.orderId = co.id AND pReconcile.status = 'PENDING_RECONCILIATION')"
+    );
   }
 
   // Lọc theo thời gian. Ưu tiên khoảng ngày cụ thể từ RangePicker.
@@ -488,7 +510,13 @@ async function layDanhSachDonHang({
     FROM CustomerOrder co
     JOIN Account a ON a.id = co.userId
     LEFT JOIN UserAddress ua ON ua.id = co.addressId
-    LEFT JOIN Payment p ON p.orderId = co.id
+    LEFT JOIN Payment p ON p.id = (
+      SELECT pLatest.id
+      FROM Payment pLatest
+      WHERE pLatest.orderId = co.id
+      ORDER BY pLatest.createdAt ASC, pLatest.id ASC
+      LIMIT 1
+    )
     LEFT JOIN OrderItem oi ON oi.orderId = co.id
     ${menh_de_where}
   `;
@@ -503,11 +531,14 @@ async function layDanhSachDonHang({
       co.createdAt,
       co.totalAmount,
       co.status,
+      co.paymentType AS orderPaymentType,
+      co.paymentStatus AS orderPaymentStatus,
       co.shippedAt,
       COALESCE(NULLIF(ua.recipientName, ''), a.fullName) AS tenKhachHang,
       COALESCE(NULLIF(ua.phone, ''), a.phone)            AS sdtKhachHang,
       p.paymentMethod,
-      p.status         AS trangThaiThanhToan,
+      p.paymentType    AS transactionPaymentType,
+      p.status         AS transactionPaymentStatus,
       p.paidAt,
       -- Lấy sản phẩm đầu tiên trong đơn (đơn thường chỉ có 1 loại áo)
       prFirst.name          AS tenSanPham,
@@ -540,7 +571,13 @@ async function layDanhSachDonHang({
     FROM CustomerOrder co
     JOIN Account a ON a.id = co.userId
     LEFT JOIN UserAddress ua ON ua.id = co.addressId
-    LEFT JOIN Payment p ON p.orderId = co.id
+    LEFT JOIN Payment p ON p.id = (
+      SELECT pLatest.id
+      FROM Payment pLatest
+      WHERE pLatest.orderId = co.id
+      ORDER BY pLatest.createdAt ASC, pLatest.id ASC
+      LIMIT 1
+    )
     LEFT JOIN OrderItem oiFirst ON oiFirst.id = (
       SELECT oi2.id
       FROM OrderItem oi2
@@ -560,7 +597,7 @@ async function layDanhSachDonHang({
   // Định dạng dữ liệu trả về cho Frontend
   const danhSach = rows.map((row) => {
     const loaiDon = row.coThietKe ? "custom_design" : "ao_mau";
-    const daThanh = row.trangThaiThanhToan === "COMPLETED";
+    const daThanh = row.orderPaymentStatus === "PAID";
     const soDongSanPham = Number(row.soDongSanPham || 0);
 
     return {
@@ -580,6 +617,9 @@ async function layDanhSachDonHang({
       tongTienVnd: Number(row.totalAmount),
       thanhToan: {
         phuongThuc: row.paymentMethod || "COD",
+        loai: row.orderPaymentType || "FULL",
+        status: row.orderPaymentStatus || "PENDING",
+        transactionStatus: row.transactionPaymentStatus || null,
         daThanh: daThanh,
       },
       trangThai: MAP_TRANG_THAI_DB_SANG_FE[row.status] || "cho_xac_nhan",
@@ -613,16 +653,27 @@ async function layChiTietDonHang(id) {
        ua.district,
        ua.city,
        p.paymentMethod,
-       p.paymentType,
+       p.paymentType AS transactionPaymentType,
        p.amount      AS paymentAmount,
-       p.status     AS trangThaiThanhToan,
+       p.status     AS transactionPaymentStatus,
        p.paidAt,
        p.transactionId,
-       p.gatewayResponse
+       p.gatewayResponse,
+       (
+         SELECT MAX(pPaid.paidAt)
+         FROM Payment pPaid
+         WHERE pPaid.orderId = co.id AND pPaid.status = 'COMPLETED'
+       ) AS latestPaidAt
      FROM CustomerOrder co
      JOIN Account a ON a.id = co.userId
      LEFT JOIN UserAddress ua ON ua.id = co.addressId
-     LEFT JOIN Payment p ON p.orderId = co.id
+     LEFT JOIN Payment p ON p.id = (
+       SELECT pLatest.id
+       FROM Payment pLatest
+       WHERE pLatest.orderId = co.id
+       ORDER BY pLatest.createdAt ASC, pLatest.id ASC
+       LIMIT 1
+     )
      WHERE co.id = ?
      LIMIT 1`,
     [id]
@@ -720,9 +771,13 @@ async function layChiTietDonHang(id) {
     phuongThuc: donHang.paymentMethod || "COD",
     loai: donHang.paymentType || "FULL",
     soTienVnd: Number(donHang.paymentAmount || 0),
-    daThanh: donHang.trangThaiThanhToan === "COMPLETED",
-    paidAt: donHang.paidAt,
-    status: donHang.trangThaiThanhToan,
+    daThanh: donHang.paymentStatus === "PAID",
+    paidAt:
+      donHang.paymentStatus === "PAID"
+        ? donHang.latestPaidAt || donHang.paidAt
+        : donHang.paidAt,
+    status: donHang.paymentStatus || "PENDING",
+    transactionStatus: donHang.transactionPaymentStatus || null,
     transactionId: donHang.transactionId || null,
     paymentUrl: isOnlinePayment ? gatewayResponse.paymentUrl || null : null,
     qrCodeValue: isOnlinePayment
@@ -796,61 +851,151 @@ async function capNhatTrangThai(id, trangThaiFE, actor, shippingInfo = {}) {
     throw err;
   }
 
-  // Kiểm tra đơn hàng tồn tại
-  const [rows] = await db.pool.query(
-    "SELECT id, status FROM CustomerOrder WHERE id = ?",
-    [id]
-  );
-  if (!rows || rows.length === 0) {
-    const err = new Error("Không tìm thấy đơn hàng");
-    err.statusCode = 404;
-    throw err;
-  }
-
-  const donHienTai = rows[0];
-  if (donHienTai.status === trangThaiDB) {
-    return { id: Number(id), trangThai: trangThaiFE };
-  }
-
   if (trangThaiDB === "CANCELLED") {
     const err = new Error("Vui lòng sử dụng chức năng hủy đơn hàng");
     err.statusCode = 400;
     throw err;
   }
 
-  // Không cho phép cập nhật đơn đã hủy hoặc đã hoàn tất
-  if (donHienTai.status === "CANCELLED") {
-    const err = new Error("Không thể cập nhật đơn hàng đã hủy");
-    err.statusCode = 400;
-    throw err;
-  }
-  if (donHienTai.status === "COMPLETED" && trangThaiDB !== "CANCELLED") {
-    const err = new Error("Không thể thay đổi trạng thái đơn đã hoàn tất");
-    err.statusCode = 400;
-    throw err;
-  }
-
-  const capNhatThem = {};
-  if (trangThaiDB === "SHIPPING") {
-    capNhatThem.shippedAt = new Date();
-    if (shippingInfo.shippingCarrier) {
-      capNhatThem.shippingCarrier = shippingInfo.shippingCarrier;
-    }
-    if (shippingInfo.trackingCode) {
-      capNhatThem.trackingCode = shippingInfo.trackingCode;
-    }
-  }
-  if (trangThaiDB === "COMPLETED") {
-    capNhatThem.deliveredAt = new Date();
-  }
-
-  const cotCapNhatThem = Object.keys(capNhatThem);
-  const setClause = ["status = ?", ...cotCapNhatThem.map((k) => `${k} = ?`)].join(", ");
-
   const conn = await db.pool.getConnection();
 
   try {
     await conn.beginTransaction();
+
+    // Khóa đơn hàng và các giao dịch liên quan để việc chuyển trạng thái đơn +
+    // thanh toán luôn nguyên tử, không thể bị hai request cập nhật lệch nhau.
+    const [rows] = await conn.query(
+      `SELECT id, status, codAmount
+       FROM CustomerOrder
+       WHERE id = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [id]
+    );
+    if (!rows || rows.length === 0) {
+      const err = new Error("Không tìm thấy đơn hàng");
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const donHienTai = rows[0];
+
+    const [paymentsForStateLock] = await conn.query(
+      `SELECT paymentMethod, paymentType, status
+       FROM Payment
+       WHERE orderId = ?
+       FOR UPDATE`,
+      [id]
+    );
+    const thanhToanOnlineDangCho = paymentsForStateLock.some(
+      (payment) =>
+        ONLINE_PAYMENT_METHODS.has(payment.paymentMethod) &&
+        PREPAID_PAYMENT_TYPES.has(payment.paymentType) &&
+        payment.status === "PENDING"
+    );
+
+    // State Lock: đơn thanh toán online/đặt cọc chưa trả chỉ được phép hủy
+    // (qua API hủy riêng), không được đi tiếp trong quy trình sản xuất/giao hàng.
+    if (thanhToanOnlineDangCho) {
+      const err = new Error(
+        "Không thể cập nhật trạng thái đơn hàng khi khoản thanh toán online hoặc tiền cọc vẫn đang chờ thanh toán. Chỉ có thể hủy đơn hàng."
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (donHienTai.status === trangThaiDB) {
+      await conn.commit();
+      return { id: Number(id), trangThai: trangThaiFE };
+    }
+
+    const trangThaiDuocPhep = ALLOWED_ORDER_TRANSITIONS[donHienTai.status] || [];
+    if (!trangThaiDuocPhep.includes(trangThaiDB)) {
+      const err = new Error(
+        `Không thể chuyển trạng thái đơn hàng từ "${layTenTrangThai(donHienTai.status)}" sang "${layTenTrangThai(trangThaiDB)}"`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (trangThaiDB === "COMPLETED") {
+      const [payments] = await conn.query(
+        `SELECT id, amount, paymentMethod, paymentType, status
+         FROM Payment
+         WHERE orderId = ?
+         ORDER BY createdAt ASC, id ASC
+         FOR UPDATE`,
+        [id]
+      );
+
+      if (payments.length === 0) {
+        const err = new Error("Không thể hoàn tất đơn hàng chưa có thông tin thanh toán");
+        err.statusCode = 400;
+        throw err;
+      }
+
+      const giaoDichCod = payments.find(
+        (payment) => payment.paymentMethod === "COD" && payment.paymentType !== "DEPOSIT"
+      );
+      const giaoDichThanhToanDu = payments.find(
+        (payment) =>
+          payment.status === "COMPLETED" && payment.paymentType !== "DEPOSIT"
+      );
+      const giaoDichDatCoc = payments.find(
+        (payment) => payment.paymentType === "DEPOSIT" && payment.status === "COMPLETED"
+      );
+
+      if (giaoDichCod) {
+        if (giaoDichCod.status === "PENDING") {
+          await conn.query(
+            `UPDATE Payment
+             SET status = 'PENDING_RECONCILIATION'
+             WHERE id = ? AND status = 'PENDING'`,
+            [giaoDichCod.id]
+          );
+        } else if (
+          !["PENDING_RECONCILIATION", "COMPLETED"].includes(giaoDichCod.status)
+        ) {
+          const err = new Error(
+            "Không thể hoàn tất đơn hàng vì giao dịch COD không ở trạng thái hợp lệ"
+          );
+          err.statusCode = 400;
+          throw err;
+        }
+      } else if (Number(donHienTai.codAmount) > 0 && giaoDichDatCoc) {
+        // Đơn đã trả cọc online: tạo riêng giao dịch COD phần còn lại để kế toán
+        // đối soát, không ghi đè lịch sử giao dịch đặt cọc.
+        await conn.query(
+          `INSERT INTO Payment
+             (orderId, amount, paymentMethod, paymentType, status, note)
+           VALUES (?, ?, 'COD', 'COD_FINAL', 'PENDING_RECONCILIATION', ?)`,
+          [id, Number(donHienTai.codAmount), "Chờ đối soát khoản COD còn lại sau khi giao hàng"]
+        );
+      } else if (!giaoDichThanhToanDu) {
+        const err = new Error(
+          "Không thể hoàn tất đơn hàng khi khoản thanh toán chưa được xác nhận đầy đủ"
+        );
+        err.statusCode = 400;
+        throw err;
+      }
+    }
+
+    const capNhatThem = {};
+    if (trangThaiDB === "SHIPPING") {
+      capNhatThem.shippedAt = new Date();
+      if (shippingInfo.shippingCarrier) {
+        capNhatThem.shippingCarrier = shippingInfo.shippingCarrier;
+      }
+      if (shippingInfo.trackingCode) {
+        capNhatThem.trackingCode = shippingInfo.trackingCode;
+      }
+    }
+    if (trangThaiDB === "COMPLETED") {
+      capNhatThem.deliveredAt = new Date();
+    }
+
+    const cotCapNhatThem = Object.keys(capNhatThem);
+    const setClause = ["status = ?", ...cotCapNhatThem.map((k) => `${k} = ?`)].join(", ");
 
     await conn.query(
       `UPDATE CustomerOrder SET ${setClause} WHERE id = ?`,
@@ -1867,8 +2012,8 @@ async function taoMoiDonHang(data, actor, ipAddress) {
       `INSERT INTO CustomerOrder
          (orderCode, userId, promotionId, addressId,
           subtotal, discountAmount, shippingFee,
-          totalAmount, depositAmount, codAmount, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')`,
+          totalAmount, depositAmount, codAmount, paymentType, paymentStatus, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'PENDING')`,
       [
         orderCode,
         userId,
@@ -1880,6 +2025,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
         totalAmount,
         depositAmount,
         codAmount,
+        paymentType,
       ]
     );
     const orderId = resultOrder.insertId;
@@ -1957,6 +2103,12 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     }
 
     // ── Bước 3.4: INSERT Payment ──
+    const paymentTypeDb =
+      paymentMethod === "COD"
+        ? "COD_FINAL"
+        : paymentType === "DEPOSIT"
+          ? "DEPOSIT"
+          : "FULL_PAYMENT";
     await conn.query(
       `INSERT INTO Payment
          (orderId, amount, paymentMethod, paymentType, status, transactionId, gatewayResponse)
@@ -1965,7 +2117,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
         orderId,
         paymentAmount,
         paymentMethod,
-        paymentType,
+        paymentTypeDb,
         onlinePayment?.transactionRef || null,
         onlinePayment ? JSON.stringify(onlinePayment) : null,
       ]

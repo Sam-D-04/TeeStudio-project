@@ -58,6 +58,33 @@ function buildSignedQuery(params, hashSecret) {
   return `${signData}&vnp_SecureHash=${secureHash}`;
 }
 
+function formatVnpayConnectionError(cause) {
+  const rootCause = cause?.cause || cause;
+  const code = String(rootCause?.code || "");
+
+  if (
+    code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" ||
+    code === "UNABLE_TO_GET_ISSUER_CERT_LOCALLY" ||
+    code === "SELF_SIGNED_CERT_IN_CHAIN"
+  ) {
+    return `Node.js không xác thực được chứng chỉ bảo mật của máy chủ VNPAY. Đây là lỗi kết nối, không phải thông báo giao dịch đã hết hạn. Vì chưa nhận được phản hồi từ VNPAY, hệ thống chưa thể xác định giao dịch đã thanh toán, thất bại hay hết hạn. Hãy thử khởi động Node.js với --use-system-ca hoặc kiểm tra chuỗi chứng chỉ của VNPAY. Mã kỹ thuật: ${code}`;
+  }
+
+  if (code === "ERR_TLS_CERT_ALTNAME_INVALID") {
+    return `Chứng chỉ bảo mật mà máy chủ trả về không khớp với tên miền VNPAY. Mã kỹ thuật: ${code}`;
+  }
+
+  if (code === "CERT_HAS_EXPIRED") {
+    return `Chứng chỉ bảo mật của máy chủ VNPAY đã hết hạn. Mã kỹ thuật: ${code}`;
+  }
+
+  if (cause?.name === "TimeoutError" || code === "UND_ERR_CONNECT_TIMEOUT") {
+    return "Kết nối tới máy chủ VNPAY bị quá thời gian chờ";
+  }
+
+  return rootCause?.message || cause?.message || "Lỗi kết nối không xác định";
+}
+
 function taoMaGiaoDichVnpayMoi(orderCode) {
   const orderRef = String(orderCode).replace(/[^a-zA-Z0-9]/g, "").slice(0, 50);
   const timeRef = Date.now().toString(36).toUpperCase();
@@ -160,12 +187,21 @@ async function truyVanGiaoDichVnpay({ transactionRef, transactionDate }) {
   ].join("|");
   body.vnp_SecureHash = createSecureHash(signData, config.hashSecret);
 
-  const response = await fetch(config.apiUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(10000),
-  });
+  let response;
+  try {
+    response = await fetch(config.apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (cause) {
+    const error = new Error(
+      `Không thể kết nối tới API truy vấn VNPAY: ${formatVnpayConnectionError(cause)}`
+    );
+    error.cause = cause;
+    throw error;
+  }
   if (!response.ok) {
     throw new Error(`VNPAY QueryDR trả về HTTP ${response.status}`);
   }

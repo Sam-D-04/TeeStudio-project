@@ -103,8 +103,10 @@ export default function OrderFilterBar({
             className="h-control-h appearance-none rounded-lg border border-border bg-surface pl-3 pr-9 text-sm text-text-main outline-none focus:border-primary-container"
           >
             <option value="tat_ca">Tất cả thanh toán</option>
+            <option value="da_dat_coc">Đã đặt cọc (50%)</option>
             <option value="da_thanh_toan">Đã thanh toán</option>
             <option value="cho_thanh_toan">Chờ thanh toán</option>
+            <option value="can_doi_soat">Chờ đối soát COD</option>
           </select>
           {/* Icon mũi tên xuống */}
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary">

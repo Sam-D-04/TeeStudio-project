@@ -93,6 +93,7 @@ export default function PaymentFilterBar({
               className="h-control-h w-full appearance-none rounded-lg border border-border bg-surface-alt pl-3 pr-8 text-sm text-text-main outline-none focus:border-primary-container sm:w-36"
             >
               <option value="tat_ca">Tất cả</option>
+              <option value="da_dat_coc">Đã đặt cọc (50%)</option>
               <option value="da_thanh_toan">Đã thanh toán</option>
               <option value="cho_thanh_toan">Chờ thanh toán</option>
               <option value="can_doi_soat">Cần đối soát</option>
