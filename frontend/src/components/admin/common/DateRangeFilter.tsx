@@ -27,16 +27,16 @@ const quickRangeOptions: Array<{
   value: DateFilterPreset;
 }> = [
   { label: "Tất cả", value: "all" },
-    { label: "Hôm nay", value: "today" },
-    { label: "Hôm qua", value: "yesterday" },
-    { label: "7 ngày qua", value: "last7Days" },
-    { label: "30 ngày qua", value: "last30Days" },
-    { label: "Tháng này", value: "thisMonth" },
-    { label: "Tháng trước", value: "lastMonth" },
-    { label: "Quý này", value: "thisQuarter" },
-    { label: "Năm nay", value: "thisYear" },
-    { label: "Tùy chỉnh", value: "custom" },
-  ];
+  { label: "Hôm nay", value: "today" },
+  { label: "Hôm qua", value: "yesterday" },
+  { label: "7 ngày qua", value: "last7Days" },
+  { label: "30 ngày qua", value: "last30Days" },
+  { label: "Tháng này", value: "thisMonth" },
+  { label: "Tháng trước", value: "lastMonth" },
+  { label: "Quý này", value: "thisQuarter" },
+  { label: "Năm nay", value: "thisYear" },
+  { label: "Tùy chỉnh", value: "custom" },
+];
 
 function calculateDateRange(preset: DateFilterPreset): DateRange {
   if (preset === "all" || preset === "custom") return [null, null];
@@ -59,6 +59,33 @@ function calculateDateRange(preset: DateFilterPreset): DateRange {
   };
 
   return ranges[preset];
+}
+
+const selectablePresets: Exclude<DateFilterPreset, "all" | "custom">[] = [
+  "today",
+  "yesterday",
+  "last7Days",
+  "last30Days",
+  "thisMonth",
+  "lastMonth",
+  "thisQuarter",
+  "thisYear",
+];
+
+function detectPresetFromDates(dates: DateRange): DateFilterPreset | null {
+  const [startDate, endDate] = dates;
+  if (!startDate || !endDate) return null;
+
+  return (
+    selectablePresets.find((preset) => {
+      const [presetStartDate, presetEndDate] = calculateDateRange(preset);
+
+      return (
+        startDate.isSame(presetStartDate, "day") &&
+        endDate.isSame(presetEndDate, "day")
+      );
+    }) ?? null
+  );
 }
 
 function emitDateRange(
@@ -120,8 +147,11 @@ export default function DateRangeFilter({
 
     return calculateDateRange(effectiveInitialPreset);
   });
-  const [selectedPreset, setSelectedPreset] =
-    useState<DateFilterPreset>(effectiveInitialPreset);
+  const [selectedPreset, setSelectedPreset] = useState<DateFilterPreset>(() =>
+    effectiveInitialPreset === "custom"
+      ? detectPresetFromDates(initialDates) ?? "custom"
+      : effectiveInitialPreset
+  );
   const [dates, setDates] = useState<DateRange>(initialDates);
 
   useEffect(() => {
@@ -158,7 +188,7 @@ export default function DateRangeFilter({
 
     const selectedDates: DateRange = [values[0], values[1]];
     setDates(selectedDates);
-    setSelectedPreset("custom");
+    setSelectedPreset(detectPresetFromDates(selectedDates) ?? "custom");
     emitDateRange(selectedDates, onChangeRef.current);
   }
 
