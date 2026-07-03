@@ -9,6 +9,7 @@ import {
   ShoppingOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useState } from "react";
 import * as dashboardService from "@/services/admin/dashboardService";
 import type { DesignOrder } from "./components/DesignReviewTable";
@@ -266,15 +267,15 @@ export default function AdminDashboard() {
             <p className="mt-0.5 text-xs text-text-secondary">
               {isLoadingThietKe
                 ? "Đang tải..."
-                : `Hiển thị ${designOrders.length} thiết kế · Lọc: Chờ duyệt, Cần sửa`}
+                : `Hiển thị ${designOrders.length} thiết kế · Lọc: Chờ kiểm tra, Cần chỉnh sửa`}
             </p>
           </div>
-          <a
-            href="#"
+          <Link
+            href="/admin/thiet-ke?tab=DESIGNS&status=ACTION_REQUIRED"
             className="shrink-0 text-sm font-medium text-primary-container hover:underline"
           >
             Xem tất cả thiết kế →
-          </a>
+          </Link>
         </div>
         <DesignReviewTable orders={designOrders} />
       </section>

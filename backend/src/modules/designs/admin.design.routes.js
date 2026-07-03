@@ -33,6 +33,7 @@ router.delete("/stickers/:id", verifyToken, requireAdmin, controller.xoaSticker)
 router.get("/", verifyToken, requireAdmin, controller.getDanhSachThietKe);
 
 // Hành động trên từng thiết kế
+router.get("/:id", verifyToken, requireAdmin, controller.getChiTietThietKe);
 router.patch("/:id/duyet", verifyToken, requireAdmin, controller.duyetThietKe);
 router.patch("/:id/yeu-cau-chinh-sua", verifyToken, requireAdmin, controller.yeuCauChinhSua);
 

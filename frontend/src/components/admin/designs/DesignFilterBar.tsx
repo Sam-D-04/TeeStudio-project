@@ -20,7 +20,7 @@ import DateRangeFilter from "@/components/admin/common/DateRangeFilter";
 // Kiểu dữ liệu cho bộ lọc – dùng chung giữa DesignFilterBar và DesignPage
 export type BoDucThietKe = {
   tuKhoa: string;       // Từ khóa tìm kiếm theo mã TK hoặc tên khách
-  trangThai: string;    // Trạng thái: "" = tất cả | "cho_kiem_tra" | "can_chinh_sua" | "da_duyet"
+  trangThai: string;    // Trạng thái: "" = tất cả | "can_xu_ly" | "cho_kiem_tra" | "can_chinh_sua" | "da_duyet"
   viTriIn: string;      // Vị trí in: "" = tất cả | "mat_truoc" | "mat_sau"
   tuNgay: string;       // Ngày gửi từ (YYYY-MM-DD)
   denNgay: string;      // Ngày gửi đến (YYYY-MM-DD)
@@ -116,6 +116,7 @@ export default function DesignFilterBar({ boDuc, onThayDoi, onDatLai }: DesignFi
         }}
       >
         <option value="">Tất cả trạng thái</option>
+        <option value="can_xu_ly">Chờ kiểm tra &amp; Cần chỉnh sửa</option>
         <option value="cho_kiem_tra">Chờ kiểm tra</option>
         <option value="can_chinh_sua">Cần chỉnh sửa</option>
         <option value="da_duyet">Đã duyệt</option>

@@ -38,7 +38,9 @@ export default async function ThietKePage({
       ? ("don_can_in" as const)
       : ("thiet_ke_khach_hang" as const),
     designStatus:
-      statusParam === "PENDING_REVIEW"
+      statusParam === "ACTION_REQUIRED"
+        ? "can_xu_ly"
+        : statusParam === "PENDING_REVIEW"
         ? "cho_kiem_tra"
         : statusParam === "NEEDS_REVISION"
           ? "can_chinh_sua"

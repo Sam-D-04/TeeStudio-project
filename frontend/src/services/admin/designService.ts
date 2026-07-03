@@ -32,6 +32,10 @@ export type ThietKe = {
   ngayGui: string;             // Format DD/MM/YYYY
 };
 
+export type ChiTietThietKe = ThietKe & {
+  ghiChu: string | null;
+};
+
 /** Kết quả danh sách thiết kế có phân trang */
 export type KetQuaThietKe = {
   danhSach: ThietKe[];
@@ -133,6 +137,14 @@ export async function layDanhSachThietKe(
   const res = await apiClient.get<{ success: boolean; data: KetQuaThietKe }>(
     "/admin/designs",
     { params }
+  );
+  return res.data.data;
+}
+
+/** Lấy chi tiết một thiết kế khách hàng. */
+export async function layChiTietThietKe(id: number): Promise<ChiTietThietKe> {
+  const res = await apiClient.get<{ success: boolean; data: ChiTietThietKe }>(
+    `/admin/designs/${id}`
   );
   return res.data.data;
 }

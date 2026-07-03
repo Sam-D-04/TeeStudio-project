@@ -1,8 +1,11 @@
-import { EditOutlined, ThunderboltFilled } from "@ant-design/icons";
+"use client";
+
+import { ThunderboltFilled } from "@ant-design/icons";
+import { useRouter } from "next/navigation";
 import StatusBadge, { type DesignStatus } from "../../common/StatusBadge";
 
 export type DesignOrder = {
-  designId?: number;
+  designId: number;
   code: string;
   customerName: string;
   technique: string;
@@ -12,14 +15,15 @@ export type DesignOrder = {
 
 type DesignReviewTableProps = {
   orders: DesignOrder[];
-  /** Callback khi admin nhấn "Duyệt thiết kế" */
-  onDuyetThietKe?: (order: DesignOrder) => void;
 };
 
-export default function DesignReviewTable({
-  orders,
-  onDuyetThietKe,
-}: DesignReviewTableProps) {
+export default function DesignReviewTable({ orders }: DesignReviewTableProps) {
+  const router = useRouter();
+
+  function moChiTiet(order: DesignOrder) {
+    router.push(`/admin/thiet-ke/${order.designId}`);
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[460px] border-collapse text-left leading-5">
@@ -28,14 +32,13 @@ export default function DesignReviewTable({
             <th className="p-3 pl-5 font-bold">Mã đơn / Thiết kế</th>
             <th className="p-3 font-bold">Khách hàng</th>
             <th className="p-3 font-bold">Trạng thái</th>
-            <th className="p-3 pr-5 text-right font-bold">Thao tác</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
           {orders.length === 0 ? (
             <tr>
               <td
-                colSpan={4}
+                colSpan={3}
                 className="p-6 text-center text-sm text-text-secondary"
               >
                 Không có thiết kế nào cần xử lý.
@@ -44,8 +47,18 @@ export default function DesignReviewTable({
           ) : (
             orders.map((order) => (
               <tr
-                key={order.code}
-                className="transition-colors hover:bg-surface-alt/70"
+                key={order.designId}
+                role="link"
+                tabIndex={0}
+                aria-label={`Xem chi tiết thiết kế ${order.code}`}
+                className="cursor-pointer transition-colors hover:bg-surface-alt/70 focus-visible:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-container"
+                onClick={() => moChiTiet(order)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    moChiTiet(order);
+                  }
+                }}
               >
                 <td className="p-3 pl-5 align-middle font-medium text-text-main">
                   <div className="flex items-center gap-1.5">
@@ -63,16 +76,6 @@ export default function DesignReviewTable({
                 </td>
                 <td className="p-3 align-middle">
                   <StatusBadge status={order.status} />
-                </td>
-                <td className="p-3 pr-5 align-middle text-right">
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-end gap-1.5 text-sm font-medium text-primary-container transition-colors hover:text-[#0284c7]"
-                    onClick={() => onDuyetThietKe?.(order)}
-                  >
-                    <EditOutlined className="text-[14px]" />
-                    <span>Duyệt thiết kế</span>
-                  </button>
                 </td>
               </tr>
             ))

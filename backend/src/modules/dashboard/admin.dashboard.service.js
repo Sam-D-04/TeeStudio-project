@@ -461,8 +461,22 @@ async function layThietKeCanXuLy() {
        cd.status                 AS trangThaiThietKe,
        cd.createdAt              AS ngayTao,
        a.fullName                AS tenKhachHang,
-       co.orderCode              AS maDon,
-       co.id                     AS orderId,
+       (
+         SELECT co.orderCode
+         FROM OrderItem oi
+         JOIN CustomerOrder co ON co.id = oi.orderId
+         WHERE oi.designId = cd.id
+         ORDER BY co.createdAt DESC
+         LIMIT 1
+       ) AS maDon,
+       (
+         SELECT co.id
+         FROM OrderItem oi
+         JOIN CustomerOrder co ON co.id = oi.orderId
+         WHERE oi.designId = cd.id
+         ORDER BY co.createdAt DESC
+         LIMIT 1
+       ) AS orderId,
        -- Lấy phương pháp in đầu tiên (nếu có)
        (
          SELECT pm.name
@@ -473,11 +487,8 @@ async function layThietKeCanXuLy() {
        ) AS kyThuat
      FROM CustomDesign cd
      JOIN Account a ON a.id = cd.userId
-     -- Tìm đơn hàng chứa thiết kế này (nếu có)
-     LEFT JOIN OrderItem oi ON oi.designId = cd.id
-     LEFT JOIN CustomerOrder co ON co.id = oi.orderId
      WHERE cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION')
-     ORDER BY cd.updatedAt DESC
+     ORDER BY cd.createdAt DESC
      LIMIT 5`
   );
 

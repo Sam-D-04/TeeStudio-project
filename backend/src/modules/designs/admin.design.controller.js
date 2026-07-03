@@ -43,6 +43,21 @@ const getDanhSachThietKe = async (req, res, next) => {
   }
 };
 
+/** GET /api/admin/designs/:id - Chi tiết một thiết kế khách hàng. */
+const getChiTietThietKe = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id || id <= 0) {
+      return res.status(400).json({ success: false, message: "ID thiết kế không hợp lệ" });
+    }
+
+    const data = await designService.layChiTietThietKe(id);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /**
  * PATCH /api/admin/designs/:id/duyet
  * Duyệt thiết kế (chuyển sang trạng thái "Đã duyệt").
@@ -220,6 +235,7 @@ const getDanhSachViTriInCongKhai = async (req, res, next) => {
 module.exports = {
   getThongKe,
   getDanhSachThietKe,
+  getChiTietThietKe,
   duyetThietKe,
   yeuCauChinhSua,
   getDanhSachDonCanIn,

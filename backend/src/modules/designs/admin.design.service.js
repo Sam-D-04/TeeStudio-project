@@ -179,10 +179,14 @@ async function layDanhSachThietKe({
 
   // Lọc theo trạng thái
   if (trang_thai) {
-    const statusDB = MAP_TRANG_THAI_THIET_KE_FE_DB[trang_thai];
-    if (statusDB) {
-      dieuKien.push("cd.status = ?");
-      thamSo.push(statusDB);
+    if (trang_thai === "can_xu_ly") {
+      dieuKien.push("cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION')");
+    } else {
+      const statusDB = MAP_TRANG_THAI_THIET_KE_FE_DB[trang_thai];
+      if (statusDB) {
+        dieuKien.push("cd.status = ?");
+        thamSo.push(statusDB);
+      }
     }
   }
 
@@ -266,6 +270,59 @@ async function layDanhSachThietKe({
     trang: trangHienTai,
     soTrangMoiTrang: soMoi,
     tongSoTrang: Math.ceil(tongSo / soMoi),
+  };
+}
+
+// =====================================================================
+// SERVICE 2.1: Lấy chi tiết một thiết kế
+// GET /api/admin/designs/:id
+// =====================================================================
+async function layChiTietThietKe(id) {
+  const [rows] = await db.pool.query(
+    `SELECT
+       cd.id,
+       cd.previewUrl AS urlPreview,
+       cd.baseColor AS mauAo,
+       cd.status,
+       cd.createdAt AS ngayGui,
+       cd.adminNote AS ghiChu,
+       a.fullName AS tenKhachHang,
+       a.phone AS soDienThoai,
+       p.name AS tenSanPham,
+       pv.color AS tenMauAo,
+       (
+         SELECT GROUP_CONCAT(DISTINCT pp.name ORDER BY pp.name SEPARATOR ', ')
+         FROM DesignPrintPosition dpp
+         JOIN PrintPosition pp ON pp.id = dpp.printPositionId
+         WHERE dpp.designId = cd.id
+       ) AS viTriIn
+     FROM CustomDesign cd
+     JOIN Account a ON a.id = cd.userId
+     JOIN Product p ON p.id = cd.productId
+     LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
+     WHERE cd.id = ?
+       AND cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION', 'APPROVED')`,
+    [id]
+  );
+
+  if (!rows.length) {
+    throw taoLoi("Không tìm thấy thiết kế", 404);
+  }
+
+  const row = rows[0];
+  return {
+    id: row.id,
+    maThietKe: `TK-${String(row.id).padStart(4, "0")}`,
+    urlPreview: row.urlPreview || null,
+    mauAo: row.mauAo || "#ffffff",
+    tenKhachHang: row.tenKhachHang || "Khách hàng",
+    soDienThoai: row.soDienThoai || null,
+    tenSanPham: row.tenSanPham || "Sản phẩm",
+    tenMauAo: row.tenMauAo || "Không rõ",
+    viTriIn: row.viTriIn || "Chưa xác định",
+    trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[row.status] || "cho_kiem_tra",
+    ngayGui: formatNgay(row.ngayGui),
+    ghiChu: row.ghiChu || null,
   };
 }
 
@@ -592,6 +649,7 @@ async function layDanhSachViTriIn({ chiLayDangBat = false } = {}) {
 module.exports = {
   layThongKe,
   layDanhSachThietKe,
+  layChiTietThietKe,
   duyetThietKe,
   yeuCauChinhSua,
   layDanhSachDonCanIn,

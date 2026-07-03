@@ -6,11 +6,11 @@ type StatusBadgeProps = {
 
 const statusConfig: Record<DesignStatus, { label: string; className: string }> = {
   pending: {
-    label: "Chờ duyệt",
+    label: "Chờ kiểm tra",
     className: "bg-[#fef3c7] text-[#d97706]",
   },
   revision: {
-    label: "Cần sửa",
+    label: "Cần chỉnh sửa",
     className: "bg-[#fee2e2] text-[#b91c1c]",
   },
   ready: {
