@@ -126,20 +126,23 @@ const getDanhSachDonCanIn = async (req, res, next) => {
 };
 
 /**
- * PATCH /api/admin/designs/don-can-in/:id/gui-xuong
- * Gửi đơn đến xưởng in (chuyển sang "Đang in").
+ * PATCH /api/admin/designs/don-can-in/:id/trang-thai
+ * Cập nhật tuần tự tiến độ của một mặt hàng cần in.
  */
-const guiDonXuongIn = async (req, res, next) => {
+const capNhatTrangThaiDonIn = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
     if (!id || id <= 0) {
       return res.status(400).json({ success: false, message: "ID đơn in không hợp lệ" });
     }
 
-    const data = await designService.guiDonXuongIn(id);
+    const { trangThai } = req.body || {};
+    const data = await designService.capNhatTrangThaiDonIn(id, trangThai);
     res.json({
       success: true,
-      message: "Đã gửi đơn đến xưởng in thành công",
+      message: trangThai === "da_in_xong"
+        ? "Đã xác nhận in xong sản phẩm"
+        : "Đã bắt đầu in sản phẩm",
       data,
     });
   } catch (error) {
@@ -239,7 +242,7 @@ module.exports = {
   duyetThietKe,
   yeuCauChinhSua,
   getDanhSachDonCanIn,
-  guiDonXuongIn,
+  capNhatTrangThaiDonIn,
   getDanhSachSticker,
   themSticker,
   xoaSticker,

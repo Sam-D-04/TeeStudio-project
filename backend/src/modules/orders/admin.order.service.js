@@ -134,6 +134,12 @@ function layTenTrangThai(status) {
   return MAP_TEN_TRANG_THAI_DB[status] || status || "Không rõ";
 }
 
+function taoLoiCoStatus(message, statusCode = 400) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
 function laPhanDiaChiTam(value) {
   const normalized = String(value || "").trim().toLowerCase();
   return normalized === "khac" || normalized === "kh\u00e1c";
@@ -747,6 +753,7 @@ async function layChiTietDonHang(id) {
     productId: item.productId,
     variantId: item.variantId,
     designId: item.designId || null,
+    productionStatus: item.productionStatus || null,
     tenSanPham: item.tenSanPham || "Sản phẩm",
     mauSac: item.color || "",
     kichCo: item.size || "",
@@ -918,6 +925,41 @@ async function capNhatTrangThai(id, trangThaiFE, actor, shippingInfo = {}) {
       throw err;
     }
 
+    if (trangThaiDB === "CONFIRMED") {
+      const [rowsThietKeChuaDuyet] = await conn.query(
+        `SELECT COUNT(*) AS soLuong
+         FROM OrderItem oi
+         LEFT JOIN CustomDesign cd ON cd.id = oi.designId
+         WHERE oi.orderId = ?
+           AND oi.designId IS NOT NULL
+           AND (cd.id IS NULL OR cd.status <> 'APPROVED')`,
+        [id]
+      );
+      if (Number(rowsThietKeChuaDuyet[0].soLuong) > 0) {
+        throw taoLoiCoStatus(
+          "Chỉ có thể xác nhận đơn hàng sau khi tất cả thiết kế đã được duyệt",
+          400
+        );
+      }
+    }
+
+    if (trangThaiDB === "READY_TO_SHIP") {
+      const [rowsAoChuaInXong] = await conn.query(
+        `SELECT COUNT(*) AS soLuong
+         FROM OrderItem
+         WHERE orderId = ?
+           AND designId IS NOT NULL
+           AND (productionStatus IS NULL OR productionStatus NOT IN ('PRINTED', 'PACKED'))`,
+        [id]
+      );
+      if (Number(rowsAoChuaInXong[0].soLuong) > 0) {
+        throw taoLoiCoStatus(
+          "Chỉ có thể chuyển sang Chờ giao sau khi tất cả áo thiết kế đã được in xong",
+          400
+        );
+      }
+    }
+
     if (trangThaiDB === "COMPLETED") {
       const [payments] = await conn.query(
         `SELECT id, amount, paymentMethod, paymentType, status
@@ -1001,14 +1043,6 @@ async function capNhatTrangThai(id, trangThaiFE, actor, shippingInfo = {}) {
       `UPDATE CustomerOrder SET ${setClause} WHERE id = ?`,
       [trangThaiDB, ...Object.values(capNhatThem), id]
     );
-
-    // Cập nhật productionStatus trong OrderItem nếu cần
-    if (["PROCESSING", "PRINTING"].includes(trangThaiDB)) {
-      await conn.query(
-        "UPDATE OrderItem SET productionStatus = ? WHERE orderId = ?",
-        [trangThaiDB, id]
-      );
-    }
 
     let noteString = `Cập nhật trạng thái: ${layTenTrangThai(donHienTai.status)} → ${layTenTrangThai(trangThaiDB)}`;
     if (trangThaiDB === "SHIPPING" && capNhatThem.shippingCarrier) {
@@ -2060,7 +2094,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
           item.unitPrice,
           item.designFee,
           lineTotal,
-          item.designId ? "APPROVED" : "WAITING_DESIGN_APPROVAL",
+          item.designId ? "READY_TO_PRINT" : "WAITING_DESIGN_APPROVAL",
         ]
       );
       const orderItemId = resultItem.insertId;

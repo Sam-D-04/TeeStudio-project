@@ -1,7 +1,6 @@
 import { EyeOutlined, EditOutlined } from "@ant-design/icons";
 import {
   getOrderPaymentState,
-  getOrderPaymentMethodLabel,
   isOrderStatusLockedByPayment,
 } from "@/lib/paymentDisplay";
 import type { OrderStatus } from "./OrderStatusBadge";
@@ -74,16 +73,8 @@ function OrderPaymentSummary({ payment }: { payment: PaymentInfo }) {
     ["PAID", "da_thanh_toan"].includes(payment.status || "")
       ? "Đã thanh toán 100%"
       : paymentState.label;
-  const methodLabel = getOrderPaymentMethodLabel({
-    method: payment.method,
-    paymentType: payment.type,
-  });
-
   return (
-    <div className="mt-2 min-w-[220px] space-y-1.5">
-      <div className="whitespace-nowrap text-xs font-semibold text-text-secondary">
-        {methodLabel}
-      </div>
+    <div className="mt-2 min-w-[220px]">
       <span
         className={`inline-flex min-h-6 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold leading-none ${paymentState.badgeClassName}`}
       >

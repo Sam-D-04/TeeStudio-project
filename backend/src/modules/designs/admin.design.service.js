@@ -35,23 +35,37 @@ const MAP_TRANG_THAI_THIET_KE_FE_DB = {
 const MAP_TRANG_THAI_DON_IN_DB_FE = {
   WAITING_DESIGN_APPROVAL: "cho_gui_xuong",
   APPROVED: "cho_gui_xuong",
+  READY_TO_PRINT: "cho_gui_xuong",
+  PROCESSING: "cho_gui_xuong",
   PRINTING: "dang_in",
+  PRINTED: "da_in_xong",
   PACKED: "da_in_xong",
 };
 
 /** FE → DB (đơn cần in) */
 const MAP_TRANG_THAI_DON_IN_FE_DB = {
-  cho_gui_xuong: "APPROVED",
+  cho_gui_xuong: "READY_TO_PRINT",
   dang_in: "PRINTING",
-  da_in_xong: "PACKED",
+  da_in_xong: "PRINTED",
 };
 
-// Tương thích các OrderProduction cũ được tạo sau khi thiết kế đã duyệt nhưng
-// vẫn mang trạng thái WAITING_DESIGN_APPROVAL do lỗi ở luồng tạo đơn.
-const DIEU_KIEN_CHO_GUI_XUONG = `(
-  op.status = 'APPROVED'
-  OR (op.status = 'WAITING_DESIGN_APPROVAL' AND cd.status = 'APPROVED')
-)`;
+// Chuẩn hóa dữ liệu cũ (APPROVED/PROCESSING/PACKED) về ba mốc nghiệp vụ mới.
+// OrderItem.productionStatus là nguồn chính; OrderProduction chỉ là fallback cho
+// các đơn đã tồn tại trước khi luồng này được sửa.
+const BIEU_THUC_TRANG_THAI_DON_IN = `(CASE
+  WHEN oi.productionStatus = 'READY_TO_PRINT' THEN 'READY_TO_PRINT'
+  WHEN oi.productionStatus = 'PRINTING' THEN 'PRINTING'
+  WHEN oi.productionStatus IN ('PRINTED', 'PACKED') THEN 'PRINTED'
+  WHEN op.status = 'PRINTING' THEN 'PRINTING'
+  WHEN op.status IN ('PRINTED', 'PACKED') THEN 'PRINTED'
+  WHEN oi.productionStatus IN ('APPROVED', 'PROCESSING') THEN 'READY_TO_PRINT'
+  WHEN op.status = 'APPROVED'
+    OR (op.status = 'WAITING_DESIGN_APPROVAL' AND cd.status = 'APPROVED')
+    THEN 'READY_TO_PRINT'
+  ELSE NULL
+END)`;
+
+const DIEU_KIEN_CHO_GUI_XUONG = `${BIEU_THUC_TRANG_THAI_DON_IN} = 'READY_TO_PRINT'`;
 
 /** Hai vị trí in cố định được hỗ trợ trên giao diện thiết kế. */
 const MAP_VI_TRI_IN_FE_DB = {
@@ -129,6 +143,7 @@ async function layThongKe() {
   const [rowsChoGuiXuong] = await db.pool.query(
     `SELECT COUNT(*) AS so_luong
      FROM OrderProduction op
+     JOIN OrderItem oi ON oi.id = op.orderItemId
      LEFT JOIN CustomDesign cd ON cd.id = op.designId
      WHERE ${DIEU_KIEN_CHO_GUI_XUONG}`
   );
@@ -136,8 +151,10 @@ async function layThongKe() {
   // Đếm đơn đang in (OrderProduction với status PRINTING)
   const [rowsDangIn] = await db.pool.query(
     `SELECT COUNT(*) AS so_luong
-     FROM OrderProduction
-     WHERE status = 'PRINTING'`
+     FROM OrderProduction op
+     JOIN OrderItem oi ON oi.id = op.orderItemId
+     LEFT JOIN CustomDesign cd ON cd.id = op.designId
+     WHERE ${BIEU_THUC_TRANG_THAI_DON_IN} = 'PRINTING'`
   );
 
   return {
@@ -177,8 +194,8 @@ async function layDanhSachThietKe({
     thamSo.push(`${den_ngay} 00:00:00`);
   }
 
-  // Lọc theo trạng thái
-  if (trang_thai) {
+  // Khi có từ khóa, tìm trên toàn bộ trạng thái thiết kế.
+  if (trang_thai && !(tu_khoa && tu_khoa.trim())) {
     if (trang_thai === "can_xu_ly") {
       dieuKien.push("cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION')");
     } else {
@@ -190,21 +207,37 @@ async function layDanhSachThietKe({
     }
   }
 
-  // Lọc theo một trong hai vị trí in cố định.
+  // Lọc theo một vị trí hoặc yêu cầu thiết kế có đồng thời cả hai mặt.
   if (vi_tri_in) {
-    const codeViTri = MAP_VI_TRI_IN_FE_DB[vi_tri_in];
-    if (!codeViTri) {
-      throw taoLoi("Vị trí in không hợp lệ. Chỉ hỗ trợ mặt trước hoặc mặt sau.");
+    if (vi_tri_in === "in_2_mat") {
+      dieuKien.push(`EXISTS (
+        SELECT 1
+        FROM DesignPrintPosition dppHaiMat
+        JOIN PrintPosition ppHaiMat ON ppHaiMat.id = dppHaiMat.printPositionId
+        WHERE dppHaiMat.designId = cd.id
+          AND ppHaiMat.code IN ('MAT_TRUOC', 'MAT_SAU')
+        GROUP BY dppHaiMat.designId
+        HAVING COUNT(DISTINCT ppHaiMat.code) = 2
+      )`);
+    } else {
+      const codeViTri = MAP_VI_TRI_IN_FE_DB[vi_tri_in];
+      if (!codeViTri) {
+        throw taoLoi("Vị trí in không hợp lệ. Chỉ hỗ trợ mặt trước, mặt sau hoặc in 2 mặt.");
+      }
+      dieuKien.push("pp.code = ?");
+      thamSo.push(codeViTri);
     }
-    dieuKien.push("pp.code = ?");
-    thamSo.push(codeViTri);
   }
 
   // Tìm kiếm theo từ khóa (mã TK hoặc tên khách)
   if (tu_khoa && tu_khoa.trim()) {
     const tk = tu_khoa.trim();
-    dieuKien.push("(cd.id LIKE ? OR a.fullName LIKE ?)");
-    thamSo.push(`%${tk}%`, `%${tk}%`);
+    dieuKien.push(`(
+      CONCAT('TK-', LPAD(cd.id, 4, '0')) LIKE ?
+      OR CAST(cd.id AS CHAR) LIKE ?
+      OR a.fullName LIKE ?
+    )`);
+    thamSo.push(`%${tk}%`, `%${tk}%`, `%${tk}%`);
   }
 
   const menh_de_where =
@@ -236,7 +269,12 @@ async function layDanhSachThietKe({
       a.phone              AS soDienThoai,
       p.name               AS tenSanPham,
       pv.color             AS tenMauAo,
-      pp.name              AS viTriIn
+      (
+        SELECT GROUP_CONCAT(DISTINCT ppViTri.name ORDER BY ppViTri.id SEPARATOR ', ')
+        FROM DesignPrintPosition dppViTri
+        JOIN PrintPosition ppViTri ON ppViTri.id = dppViTri.printPositionId
+        WHERE dppViTri.designId = cd.id
+      )                    AS viTriIn
     FROM CustomDesign cd
     JOIN Account a ON a.id = cd.userId
     JOIN Product p ON p.id = cd.productId
@@ -331,41 +369,59 @@ async function layChiTietThietKe(id) {
 // PATCH /api/admin/designs/:id/duyet
 // =====================================================================
 async function duyetThietKe(id) {
-  // Kiểm tra tồn tại
-  const [rows] = await db.pool.query(
-    "SELECT id, status FROM CustomDesign WHERE id = ?",
-    [id]
-  );
-  if (!rows || rows.length === 0) {
-    throw taoLoi("Không tìm thấy thiết kế", 404);
-  }
+  return db.transaction(async (conn) => {
+    const [rows] = await conn.query(
+      "SELECT id, status FROM CustomDesign WHERE id = ? FOR UPDATE",
+      [id]
+    );
+    if (!rows || rows.length === 0) {
+      throw taoLoi("Không tìm thấy thiết kế", 404);
+    }
 
-  const thietKe = rows[0];
-  if (thietKe.status === "APPROVED") {
-    throw taoLoi("Thiết kế này đã được duyệt trước đó", 400);
-  }
+    const thietKe = rows[0];
+    if (thietKe.status === "APPROVED") {
+      throw taoLoi("Thiết kế này đã được duyệt trước đó", 400);
+    }
 
-  // Cập nhật trạng thái
-  await db.pool.query(
-    "UPDATE CustomDesign SET status = 'APPROVED' WHERE id = ?",
-    [id]
-  );
+    await conn.query(
+      "UPDATE CustomDesign SET status = 'APPROVED' WHERE id = ?",
+      [id]
+    );
 
-  // Tự động cập nhật OrderProduction nếu có thiết kế này trong đơn hàng
-  // Chuyển các bản ghi OrderProduction liên quan từ WAITING_DESIGN_APPROVAL → APPROVED
-  await db.pool.query(
-    `UPDATE OrderProduction op
-     JOIN OrderItem oi ON oi.id = op.orderItemId
-     SET op.status = 'APPROVED', op.approvedAt = NOW()
-     WHERE oi.designId = ? AND op.status = 'WAITING_DESIGN_APPROVAL'`,
-    [id]
-  );
+    // OrderItem.productionStatus là nguồn dữ liệu chính của tiến độ sản xuất.
+    await conn.query(
+      `UPDATE OrderItem
+       SET productionStatus = 'READY_TO_PRINT'
+       WHERE designId = ?
+         AND productionStatus IN ('WAITING_DESIGN_APPROVAL', 'APPROVED', 'PROCESSING')`,
+      [id]
+    );
 
-  return {
-    id: Number(id),
-    maThietKe: `TK-${String(id).padStart(4, "0")}`,
-    trangThai: "da_duyet",
-  };
+    // Tạo bản ghi tiến độ còn thiếu và đồng bộ bảng cũ để không làm hỏng dữ liệu hiện hữu.
+    await conn.query(
+      `INSERT INTO OrderProduction (orderItemId, designId, status, approvedAt)
+       SELECT oi.id, oi.designId, 'APPROVED', NOW()
+       FROM OrderItem oi
+       WHERE oi.designId = ?
+         AND NOT EXISTS (
+           SELECT 1 FROM OrderProduction op WHERE op.orderItemId = oi.id
+         )`,
+      [id]
+    );
+    await conn.query(
+      `UPDATE OrderProduction op
+       JOIN OrderItem oi ON oi.id = op.orderItemId
+       SET op.status = 'APPROVED', op.approvedAt = COALESCE(op.approvedAt, NOW())
+       WHERE oi.designId = ? AND op.status = 'WAITING_DESIGN_APPROVAL'`,
+      [id]
+    );
+
+    return {
+      id: Number(id),
+      maThietKe: `TK-${String(id).padStart(4, "0")}`,
+      trangThai: "da_duyet",
+    };
+  });
 }
 
 // =====================================================================
@@ -404,7 +460,7 @@ async function yeuCauChinhSua(id, ghiChu) {
 //      Lý do: nhân viên xưởng in cần biết "hôm nay có bao nhiêu áo cần in
 //      để kịp giao cho khách" → họ quan tâm ngày khách bấm đặt hàng.
 // =====================================================================
-async function layDanhSachDonCanIn({ page, limit, trang_thai, tu_ngay, den_ngay }) {
+async function layDanhSachDonCanIn({ page, limit, tu_khoa, trang_thai, tu_ngay, den_ngay }) {
   const trangHienTai = parseInt(page) || 1;
   const soMoi = parseInt(limit) || 10;
   const offset = (trangHienTai - 1) * soMoi;
@@ -423,17 +479,30 @@ async function layDanhSachDonCanIn({ page, limit, trang_thai, tu_ngay, den_ngay 
     thamSo.push(`${den_ngay} 00:00:00`);
   }
 
-  if (trang_thai) {
+  if (tu_khoa && tu_khoa.trim()) {
+    const tuKhoa = `%${tu_khoa.trim()}%`;
+    dieuKien.push(`(
+      CONCAT('TK-', LPAD(cd.id, 4, '0')) LIKE ?
+      OR CAST(cd.id AS CHAR) LIKE ?
+      OR co.orderCode LIKE ?
+      OR a.fullName LIKE ?
+      OR a.phone LIKE ?
+    )`);
+    thamSo.push(tuKhoa, tuKhoa, tuKhoa, tuKhoa, tuKhoa);
+  }
+
+  // Khi có từ khóa, tìm trên toàn bộ tiến độ và bỏ qua bộ lọc trạng thái hiện tại.
+  if (trang_thai && !(tu_khoa && tu_khoa.trim())) {
     if (trang_thai === "cho_gui_xuong") {
       dieuKien.push(DIEU_KIEN_CHO_GUI_XUONG);
     } else {
       const statusDB = MAP_TRANG_THAI_DON_IN_FE_DB[trang_thai];
       if (!statusDB) throw taoLoi("Trạng thái đơn in không hợp lệ.");
-      dieuKien.push("op.status = ?");
+      dieuKien.push(`${BIEU_THUC_TRANG_THAI_DON_IN} = ?`);
       thamSo.push(statusDB);
     }
   } else {
-    dieuKien.push(`(${DIEU_KIEN_CHO_GUI_XUONG} OR op.status IN ('PRINTING', 'PACKED'))`);
+    dieuKien.push(`${BIEU_THUC_TRANG_THAI_DON_IN} IS NOT NULL`);
   }
 
   const menh_de_where =
@@ -445,6 +514,7 @@ async function layDanhSachDonCanIn({ page, limit, trang_thai, tu_ngay, den_ngay 
     FROM OrderProduction op
     JOIN OrderItem oi ON oi.id = op.orderItemId
     JOIN CustomerOrder co ON co.id = oi.orderId
+    JOIN Account a ON a.id = co.userId
     LEFT JOIN CustomDesign cd ON cd.id = oi.designId
     ${menh_de_where}
   `;
@@ -469,11 +539,7 @@ async function layDanhSachDonCanIn({ page, limit, trang_thai, tu_ngay, den_ngay 
         JOIN PrintPosition pp ON pp.id = dpp.printPositionId
         WHERE dpp.designId = oi.designId
       )                    AS viTriIn,
-      CASE
-        WHEN op.status = 'WAITING_DESIGN_APPROVAL' AND cd.status = 'APPROVED'
-          THEN 'APPROVED'
-        ELSE op.status
-      END                  AS status,
+      ${BIEU_THUC_TRANG_THAI_DON_IN} AS status,
       co.createdAt         AS ngayDatDon
     FROM OrderProduction op
     JOIN OrderItem oi ON oi.id = op.orderItemId
@@ -511,39 +577,83 @@ async function layDanhSachDonCanIn({ page, limit, trang_thai, tu_ngay, den_ngay 
 }
 
 // =====================================================================
-// SERVICE 6: Gửi đơn đến xưởng in
-// PATCH /api/admin/designs/don-can-in/:id/gui-xuong
+// SERVICE 6: Cập nhật tiến độ in theo đúng thứ tự
+// PATCH /api/admin/designs/don-can-in/:id/trang-thai
 // =====================================================================
-async function guiDonXuongIn(id) {
-  // Kiểm tra tồn tại
-  const [rows] = await db.pool.query(
-    `SELECT op.id, op.status, cd.status AS designStatus
-     FROM OrderProduction op
-     LEFT JOIN CustomDesign cd ON cd.id = op.designId
-     WHERE op.id = ?`,
-    [id]
-  );
-  if (!rows || rows.length === 0) {
-    throw taoLoi("Không tìm thấy đơn cần in", 404);
-  }
-
-  const donHienTai = rows[0];
-  const laDonCuDaDuocDuyet = donHienTai.status === "WAITING_DESIGN_APPROVAL"
-    && donHienTai.designStatus === "APPROVED";
-  if (donHienTai.status !== "APPROVED" && !laDonCuDaDuocDuyet) {
-    throw taoLoi("Chỉ có thể gửi xưởng các đơn đang ở trạng thái chờ gửi xưởng", 400);
-  }
-
-  await db.pool.query(
-    "UPDATE OrderProduction SET status = 'PRINTING', printedAt = NOW() WHERE id = ?",
-    [id]
-  );
-
-  return {
-    id: Number(id),
-    trangThai: "dang_in",
-    ngayGuiXuong: formatNgay(new Date()),
+async function capNhatTrangThaiDonIn(id, trangThaiMoi) {
+  const TRANG_THAI_TIEP_THEO = {
+    READY_TO_PRINT: "PRINTING",
+    PRINTING: "PRINTED",
   };
+  const statusMoiDB = MAP_TRANG_THAI_DON_IN_FE_DB[trangThaiMoi];
+  if (!statusMoiDB || statusMoiDB === "READY_TO_PRINT") {
+    throw taoLoi("Trạng thái tiến độ in mới không hợp lệ.");
+  }
+
+  return db.transaction(async (conn) => {
+    const [rows] = await conn.query(
+      `SELECT op.id, op.orderItemId, op.status AS legacyStatus,
+              oi.productionStatus, cd.status AS designStatus
+       FROM OrderProduction op
+       JOIN OrderItem oi ON oi.id = op.orderItemId
+       LEFT JOIN CustomDesign cd ON cd.id = oi.designId
+       WHERE op.id = ?
+       FOR UPDATE`,
+      [id]
+    );
+    if (!rows || rows.length === 0) {
+      throw taoLoi("Không tìm thấy đơn cần in", 404);
+    }
+
+    const donHienTai = rows[0];
+    if (donHienTai.designStatus !== "APPROVED") {
+      throw taoLoi("Thiết kế chưa được duyệt nên chưa thể cập nhật tiến độ in.");
+    }
+
+    let statusHienTai;
+    if (donHienTai.productionStatus === "READY_TO_PRINT") {
+      statusHienTai = "READY_TO_PRINT";
+    } else if (donHienTai.productionStatus === "PRINTING") {
+      statusHienTai = "PRINTING";
+    } else if (["PRINTED", "PACKED"].includes(donHienTai.productionStatus)) {
+      statusHienTai = "PRINTED";
+    } else if (donHienTai.legacyStatus === "PRINTING") {
+      statusHienTai = "PRINTING";
+    } else if (["PRINTED", "PACKED"].includes(donHienTai.legacyStatus)) {
+      statusHienTai = "PRINTED";
+    } else if (["APPROVED", "PROCESSING"].includes(donHienTai.productionStatus)) {
+      statusHienTai = "READY_TO_PRINT";
+    } else if (["APPROVED", "WAITING_DESIGN_APPROVAL"].includes(donHienTai.legacyStatus)) {
+      statusHienTai = "READY_TO_PRINT";
+    }
+
+    if (TRANG_THAI_TIEP_THEO[statusHienTai] !== statusMoiDB) {
+      throw taoLoi("Chỉ được cập nhật tiến độ in sang mốc kế tiếp, không thể bỏ qua hoặc lùi trạng thái.");
+    }
+
+    await conn.query(
+      "UPDATE OrderItem SET productionStatus = ? WHERE id = ?",
+      [statusMoiDB, donHienTai.orderItemId]
+    );
+
+    if (statusMoiDB === "PRINTING") {
+      await conn.query(
+        "UPDATE OrderProduction SET status = 'PRINTING' WHERE id = ?",
+        [id]
+      );
+    } else {
+      await conn.query(
+        "UPDATE OrderProduction SET status = 'PRINTED', printedAt = NOW() WHERE id = ?",
+        [id]
+      );
+    }
+
+    return {
+      id: Number(id),
+      trangThai: trangThaiMoi,
+      productionStatus: statusMoiDB,
+    };
+  });
 }
 
 // =====================================================================
@@ -653,7 +763,7 @@ module.exports = {
   duyetThietKe,
   yeuCauChinhSua,
   layDanhSachDonCanIn,
-  guiDonXuongIn,
+  capNhatTrangThaiDonIn,
   layDanhSachSticker,
   themSticker,
   xoaSticker,

@@ -188,6 +188,7 @@ export async function layDanhSachDonCanIn(
   thamSo: {
     page?: number;
     limit?: number;
+    tu_khoa?: string;
     trang_thai?: string;
     tu_ngay?: string;
     den_ngay?: string;
@@ -196,6 +197,7 @@ export async function layDanhSachDonCanIn(
   const params: Record<string, string | number> = {};
   if (thamSo.page) params.page = thamSo.page;
   if (thamSo.limit) params.limit = thamSo.limit;
+  if (thamSo.tu_khoa?.trim()) params.tu_khoa = thamSo.tu_khoa.trim();
   if (thamSo.trang_thai) params.trang_thai = thamSo.trang_thai;
   if (thamSo.tu_ngay) params.tu_ngay = thamSo.tu_ngay;
   if (thamSo.den_ngay) params.den_ngay = thamSo.den_ngay;
@@ -207,17 +209,15 @@ export async function layDanhSachDonCanIn(
   return res.data.data;
 }
 
-/**
- * Gửi đơn đến xưởng in.
- * PATCH /api/admin/designs/don-can-in/:id/gui-xuong
- */
-export async function guiDonXuongIn(
-  id: number
-): Promise<{ id: number; trangThai: string; ngayGuiXuong: string }> {
+/** Cập nhật một bước tiến độ in; backend sẽ chặn bỏ qua hoặc lùi trạng thái. */
+export async function capNhatTrangThaiDonIn(
+  id: number,
+  trangThai: Exclude<TrangThaiDonIn, "cho_gui_xuong">
+): Promise<{ id: number; trangThai: TrangThaiDonIn; productionStatus: string }> {
   const res = await apiClient.patch<{
     success: boolean;
-    data: { id: number; trangThai: string; ngayGuiXuong: string };
-  }>(`/admin/designs/don-can-in/${id}/gui-xuong`);
+    data: { id: number; trangThai: TrangThaiDonIn; productionStatus: string };
+  }>(`/admin/designs/don-can-in/${id}/trang-thai`, { trangThai });
   return res.data.data;
 }
 

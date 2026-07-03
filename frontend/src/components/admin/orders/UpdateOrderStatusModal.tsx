@@ -35,6 +35,35 @@ function hasCustomDesignOrder(order?: ChiTietDonHang | null) {
   );
 }
 
+function areAllCustomItemsPrinted(order?: ChiTietDonHang | null) {
+  const customItems = order?.items?.filter((item) => Boolean(item.designId)) ?? [];
+  return customItems.length === 0 || customItems.every((item) =>
+    ["PRINTED", "PACKED"].includes(item.productionStatus || "")
+  );
+}
+
+function getProductionStatusBlockReason(order?: ChiTietDonHang | null) {
+  if (!order || order.trangThai !== "dang_xu_ly_in") return null;
+
+  const itemsChuaInXong = order.items?.filter(
+    (item) => Boolean(item.designId) && !["PRINTED", "PACKED"].includes(item.productionStatus || "")
+  ) ?? [];
+  if (itemsChuaInXong.length === 0) return null;
+
+  const soAoDangIn = itemsChuaInXong
+    .filter((item) => item.productionStatus === "PRINTING")
+    .reduce((tong, item) => tong + item.soLuong, 0);
+  const soAoChoGuiXuong = itemsChuaInXong
+    .filter((item) => item.productionStatus !== "PRINTING")
+    .reduce((tong, item) => tong + item.soLuong, 0);
+  const chiTiet = [
+    soAoChoGuiXuong > 0 ? `${soAoChoGuiXuong} áo Chờ gửi xưởng` : "",
+    soAoDangIn > 0 ? `${soAoDangIn} áo Đang in` : "",
+  ].filter(Boolean).join(", ");
+
+  return `Chưa thể chuyển sang Chờ giao vì còn sản phẩm chưa in xong (${chiTiet}). Hãy cập nhật tiến độ tại Thiết kế & In ấn → Đơn cần in. Trạng thái Chờ giao sẽ được mở khóa khi tất cả áo đã in xong.`;
+}
+
 function getAllowedNextStatuses(order?: ChiTietDonHang | null) {
   if (!order) return [];
 
@@ -50,6 +79,10 @@ function getAllowedNextStatuses(order?: ChiTietDonHang | null) {
 
   if (order.trangThai === "da_xac_nhan" && !hasCustomDesignOrder(order)) {
     return ["cho_giao"];
+  }
+
+  if (order.trangThai === "dang_xu_ly_in" && !areAllCustomItemsPrinted(order)) {
+    return [];
   }
 
   return ALLOWED_NEXT_STATUS[order.trangThai] ?? [];
@@ -117,6 +150,7 @@ export default function UpdateOrderStatusModal({
     paymentType: order?.thanhToan.loai,
     status: order?.thanhToan.status,
   });
+  const productionStatusBlockReason = getProductionStatusBlockReason(order);
 
   const updateStatusMutation = useMutation({
     mutationFn: (payload: { trangThai: string; shippingCarrier?: string; trackingCode?: string }) =>
@@ -236,12 +270,24 @@ export default function UpdateOrderStatusModal({
                 description="Khách hàng chưa thanh toán online hoặc tiền cọc. Bạn chỉ có thể hủy đơn hàng từ trang chi tiết đơn."
               />
             ) : null}
+            {!isStateLocked && productionStatusBlockReason ? (
+              <Alert
+                className="mb-4"
+                type="warning"
+                showIcon
+                title="Chưa đủ điều kiện chuyển trạng thái"
+                description={productionStatusBlockReason}
+              />
+            ) : null}
             <p className="mb-2 text-sm font-semibold text-text-main">Trạng thái mới</p>
             <Select
               value={newStatus || undefined}
-              placeholder="Chọn trạng thái"
+              placeholder={productionStatusBlockReason
+                ? "Chưa có trạng thái được phép chuyển"
+                : "Chọn trạng thái"}
               className="w-full"
-              disabled={isStateLocked}
+              disabled={isStateLocked || Boolean(productionStatusBlockReason)}
+              notFoundContent={productionStatusBlockReason || "Không có trạng thái tiếp theo phù hợp"}
               options={ORDER_STATUS_OPTIONS.filter(
                 (status) => getAllowedNextStatuses(order).includes(status.value)
               )}

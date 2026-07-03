@@ -22,7 +22,7 @@ router.get("/stats", verifyToken, requireAdmin, controller.getThongKe);
 
 // Danh sách đơn cần in – cũng phải khai báo trước /:id
 router.get("/don-can-in", verifyToken, requireAdmin, controller.getDanhSachDonCanIn);
-router.patch("/don-can-in/:id/gui-xuong", verifyToken, requireAdmin, controller.guiDonXuongIn);
+router.patch("/don-can-in/:id/trang-thai", verifyToken, requireAdmin, controller.capNhatTrangThaiDonIn);
 
 // Sticker
 router.get("/stickers", verifyToken, requireAdmin, controller.getDanhSachSticker);

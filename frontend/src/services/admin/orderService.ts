@@ -46,6 +46,7 @@ export type ChiTietDonHangItem = {
   productId: number;
   variantId: number;
   designId: number | null;
+  productionStatus: string | null;
   tenSanPham: string;
   mauSac: string;
   kichCo: string;

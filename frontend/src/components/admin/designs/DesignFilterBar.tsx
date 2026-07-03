@@ -6,7 +6,7 @@
  * Bao gồm:
  *  - Ô tìm kiếm theo mã TK hoặc tên khách
  *  - Dropdown lọc theo trạng thái (Tất cả / Chờ kiểm tra / Cần chỉnh sửa / Đã duyệt)
- *  - Dropdown lọc theo vị trí in (Mặt trước / Mặt sau)
+ *  - Dropdown lọc theo vị trí in (Mặt trước / Mặt sau / In 2 mặt)
  *  - Bộ lọc khoảng ngày gửi thiết kế
  *
  * Props:
@@ -21,7 +21,7 @@ import DateRangeFilter from "@/components/admin/common/DateRangeFilter";
 export type BoDucThietKe = {
   tuKhoa: string;       // Từ khóa tìm kiếm theo mã TK hoặc tên khách
   trangThai: string;    // Trạng thái: "" = tất cả | "can_xu_ly" | "cho_kiem_tra" | "can_chinh_sua" | "da_duyet"
-  viTriIn: string;      // Vị trí in: "" = tất cả | "mat_truoc" | "mat_sau"
+  viTriIn: string;      // Vị trí in: "" = tất cả | "mat_truoc" | "mat_sau" | "in_2_mat"
   tuNgay: string;       // Ngày gửi từ (YYYY-MM-DD)
   denNgay: string;      // Ngày gửi đến (YYYY-MM-DD)
 };
@@ -67,7 +67,14 @@ export default function DesignFilterBar({ boDuc, onThayDoi, onDatLai }: DesignFi
           type="text"
           placeholder="Tìm mã TK, tên khách..."
           value={boDuc.tuKhoa}
-          onChange={(e) => capNhatBoDuc("tuKhoa", e.target.value)}
+          onChange={(e) => {
+            const tuKhoaMoi = e.target.value;
+            onThayDoi({
+              ...boDuc,
+              tuKhoa: tuKhoaMoi,
+              trangThai: tuKhoaMoi.trim() ? "" : boDuc.trangThai,
+            });
+          }}
           style={{
             width: "100%",
             height: 40,
@@ -149,6 +156,7 @@ export default function DesignFilterBar({ boDuc, onThayDoi, onDatLai }: DesignFi
         <option value="">Mọi vị trí in</option>
         <option value="mat_truoc">Mặt trước</option>
         <option value="mat_sau">Mặt sau</option>
+        <option value="in_2_mat">In 2 mặt</option>
       </select>
 
       {/* ── Lọc theo ngày gửi thiết kế ── */}
