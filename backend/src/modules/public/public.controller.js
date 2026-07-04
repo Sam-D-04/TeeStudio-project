@@ -10,7 +10,7 @@ const publicService = require("./public.service");
  */
 const getDanhSachSanPham = async (req, res, next) => {
   try {
-    const data = await publicService.layDanhSachSanPhamCongKhai();
+    const data = await publicService.layDanhSachSanPhamCongKhai(req.query.search);
     res.json({ success: true, data });
   } catch (error) {
     next(error);
