@@ -6,6 +6,7 @@ const userDesignRoutes = require("../modules/users/user.design.routes");
 const pricingRoutes = require("../modules/pricing/admin.pricing.routes");
 const adminOrderRoutes = require("../modules/orders/admin.order.routes");
 const customerOrderRoutes = require("../modules/orders/customer.order.routes");
+const cartRoutes = require("../modules/cart/cart.routes");
 const adminDesignRoutes = require("../modules/designs/admin.design.routes");
 const paymentRoutes = require("../modules/payments/admin.payment.routes");
 const adminPaymentRoutes = require("../modules/payments/admin.payment.routes").adminRouter;
@@ -56,6 +57,15 @@ router.get("/public/products/:id", publicController.getChiTietSanPhamCongKhai);
 
 // Xác thực Return URL và nhận IPN từ VNPAY.
 router.use("/payments", paymentRoutes);
+
+// ── Giỏ hàng (yêu cầu đăng nhập) ───────────────────────────────────────────
+// GET    /api/cart           → lấy giỏ hàng
+// POST   /api/cart/items     → thêm sản phẩm
+// PUT    /api/cart/items/:id → cập nhật số lượng
+// DELETE /api/cart/items/:id → xóa 1 sản phẩm
+// DELETE /api/cart           → xóa toàn bộ
+// POST   /api/cart/sync      → đồng bộ localStorage → DB khi đăng nhập
+router.use("/cart", cartRoutes);
 
 // ── Customer đặt hàng ────────────────────────────────────────────────────────
 // POST /api/orders  → Khách đặt đơn (yêu cầu đăng nhập, role CUSTOMER)
