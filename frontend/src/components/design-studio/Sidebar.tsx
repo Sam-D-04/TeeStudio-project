@@ -31,6 +31,7 @@ const ImageIcon = () => (
 
 const TSHIRT_COLORS = ["#ffffff", "#000000", "#1d4ed8"];
 const POLO_COLORS   = ["#ffffff", "#f5f5dc", "#1d4ed8"];
+const HOODIE_COLORS = ["#9ca3af", "#8b4513"]; // Grey, Brown
 
 const FONTS = [
   "Arial",
@@ -358,7 +359,7 @@ export default function Sidebar({
 
             <div className="ds-section-title">Màu áo</div>
             <div className="ds-color-swatches" style={{ marginBottom: 16 }}>
-              {(shirtType === "polo" ? POLO_COLORS : TSHIRT_COLORS).map((color) => (
+              {(shirtType === "polo" ? POLO_COLORS : shirtType === "hoodie" ? HOODIE_COLORS : TSHIRT_COLORS).map((color) => (
                 <button
                   key={color}
                   className={`ds-color-swatch ${shirtColor === color ? "ds-color-swatch--active" : ""}`}

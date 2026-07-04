@@ -41,7 +41,6 @@ export default function DesignStudioApp() {
     shirtType, shirtColor, shirtView,
     addElement, removeElement, selectedId,
     undo, redo,
-    saveToLocal, loadFromLocal,
     setSelectedId, setShirtType, setShirtColor, setShirtView,
     currentDesignId, setCurrentDesignId,
   } = useDesignStore();
@@ -76,9 +75,8 @@ export default function DesignStudioApp() {
   const displayW = Math.round(CONTAINER_W * zoom);
   const displayH = Math.round(CONTAINER_H * zoom);
 
-  /* ── Init: load design + parse URL params ── */
+  /* ── Init: parse URL params (không tự load thiết kế cũ) ── */
   useEffect(() => {
-    loadFromLocal();
     const shirt = searchParams.get("shirt");
     const color = searchParams.get("color");
     const view  = searchParams.get("view");
@@ -87,6 +85,7 @@ export default function DesignStudioApp() {
     if (color) {
       const map: Record<string, string> = {
         Black: "#000000", White: "#ffffff", Navy: "#1d4ed8",
+        Grey: "#9ca3af", Brown: "#8b4513", Beige: "#d6b89a",
       };
       setShirtColor(map[color] ?? color);
     }
@@ -113,7 +112,7 @@ export default function DesignStudioApp() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undo, redo, saveToLocal, removeElement, showToast, setSelectedId]);
+  }, [undo, redo, removeElement, showToast, setSelectedId]);
 
   /* ── Upload ── */
   const handleUploadImages = useCallback((files: FileList) => {
@@ -164,6 +163,26 @@ export default function DesignStudioApp() {
     }
     setIsSaveModalOpen(true);
   }, [isAuthenticated, accessToken]);
+
+  /* Tạo thiết kế mới hoàn toàn – reset canvas và ID */
+  const handleNewDesign = useCallback(() => {
+    const currentElements = useDesignStore.getState().elements;
+    const doNew = () => {
+      useDesignStore.getState().clearDesign();
+      showToast("Thiết kế mới đã được tạo");
+    };
+    if (currentElements.length > 0) {
+      Modal.confirm({
+        title: "Tạo thiết kế mới?",
+        content: "Nội dung hiện tại sẽ bị xóa. Hãy lưu lại trước nếu bạn muốn giữ bản thiết kế này.",
+        okText: "Tạo mới",
+        cancelText: "Huỷ",
+        onOk: doNew,
+      });
+    } else {
+      doNew();
+    }
+  }, [showToast]);
 
   const handleConfirmSave = useCallback(async (name: string) => {
     if (!accessToken) return;
@@ -306,8 +325,14 @@ export default function DesignStudioApp() {
       const b = parseInt(hex.slice(4,6),16);
       return (r * 0.299 + g * 0.587 + b * 0.114) > 180;
     })();
-  const borderColor   = isLightShirt ? "rgba(0,0,0,0.55)"     : "rgba(234, 179, 8, 0.75)";
-  const labelColor    = isLightShirt ? "rgba(0,0,0,0.6)"       : "rgba(234,179,8,0.8)";
+  // Nếu áo màu sáng thì viền đậm (đen xám), màu tối thì viền sáng (vàng)
+  let borderColor   = isLightShirt ? "rgba(0,0,0,0.55)"     : "rgba(234, 179, 8, 0.75)";
+  let labelColor    = isLightShirt ? "rgba(0,0,0,0.6)"       : "rgba(234,179,8,0.8)";
+
+  if (shirtType === "hoodie" && shirtColor.toLowerCase() === "#8b4513") {
+    borderColor = "rgba(0,0,0,0.65)";
+    labelColor = "rgba(0,0,0,0.8)";
+  }
 
   /* ── Zoom controls ── */
   const zoomIn    = () => setZoom((z) => Math.min(+(z + 0.25).toFixed(2), 3));
@@ -321,6 +346,7 @@ export default function DesignStudioApp() {
         onDownloadImage={handleDownloadImage} 
         onShowToast={showToast} 
         onOpenMyDesigns={() => setIsMyDesignsOpen(true)}
+        onNewDesign={handleNewDesign}
         isSaving={isSaving}
       />
 
@@ -501,11 +527,11 @@ export default function DesignStudioApp() {
         </div>
 
       {/* Floating Toolbars for element properties */}
+      {/* Floating Toolbars for element properties */}
       <FloatingToolbar
         shirtContainerRef={shirtContainerRef}
         zoom={zoom}
       />
-      <StaticTextToolbar />
 
       {/* Modals */}
       <SaveDesignModal
