@@ -35,13 +35,21 @@ const TrashIcon = () => (
   </svg>
 );
 
+const FolderIcon = () => (
+  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776" />
+  </svg>
+);
+
 interface ToolbarProps {
   onSave: () => void;
   onDownloadImage: () => void;
   onShowToast: (msg: string) => void;
+  onOpenMyDesigns: () => void;
+  isSaving?: boolean;
 }
 
-export default function Toolbar({ onSave, onDownloadImage, onShowToast }: ToolbarProps) {
+export default function Toolbar({ onSave, onDownloadImage, onShowToast, onOpenMyDesigns, isSaving }: ToolbarProps) {
   const { undo, redo, undoStack, redoStack, clearDesign, shirtType } = useDesignStore();
 
   const shirtLabel =
@@ -122,6 +130,13 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast }: Toolba
       <div className="ds-toolbar-right">
         <button
           className="ds-toolbar-btn ds-toolbar-btn--outline"
+          onClick={onOpenMyDesigns}
+          title="Thiết kế của tôi"
+        >
+          <FolderIcon /> Của tôi
+        </button>
+        <button
+          className="ds-toolbar-btn ds-toolbar-btn--outline"
           onClick={onDownloadImage}
           title="Tải xuống ảnh PNG"
         >
@@ -131,8 +146,17 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast }: Toolba
           className="ds-toolbar-btn ds-toolbar-btn--primary"
           onClick={onSave}
           title="Lưu thiết kế (Ctrl+S)"
+          disabled={isSaving}
         >
-          <SaveIcon /> Lưu thiết kế
+          {isSaving ? (
+            <svg className="ds-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <SaveIcon />
+          )}
+          {isSaving ? "Đang lưu..." : "Lưu thiết kế"}
         </button>
       </div>
     </header>

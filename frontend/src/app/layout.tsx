@@ -6,6 +6,8 @@ import viVN from "antd/locale/vi_VN";
 import QueryProvider from "@/providers/QueryProvider";
 import "./globals.css";
 
+import { getGoogleFontsUrl } from "@/constants/fonts";
+
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin", "vietnamese"],
@@ -59,6 +61,9 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${inter.variable} h-full antialiased`}
     >
+      <head>
+        <link rel="stylesheet" href={getGoogleFontsUrl()} />
+      </head>
       <body
         suppressHydrationWarning
         className="min-h-full flex flex-col bg-[#f1f5f9]"

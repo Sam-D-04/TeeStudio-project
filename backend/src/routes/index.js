@@ -15,6 +15,9 @@ const adminDashboardRoutes = require("../modules/dashboard/admin.dashboard.route
 // Import controller cho 2 public endpoints (vi-tri-in, stickers dành cho Design Studio)
 const designController = require("../modules/designs/admin.design.controller");
 
+// Import controller cho public endpoints trang chủ
+const publicController = require("../modules/public/public.controller");
+
 router.get("/health", (req, res) => {
   res.json({
     success: true,
@@ -35,7 +38,17 @@ router.get("/vi-tri-in", designController.getDanhSachViTriInCongKhai);
 // GET /api/stickers → chỉ trả sticker đang bật
 router.get("/stickers", designController.getDanhSachSticker);
 
-// Xác thực Return URL và nhận IPN từ các cổng thanh toán online.
+// ── Public endpoints cho trang chủ ───────────────────────────────────────────
+// GET /api/public/products  → danh sách phôi áo ACTIVE (cho ProductCategories)
+router.get("/public/products", publicController.getDanhSachSanPham);
+
+// GET /api/public/products/colors → màu áo nổi bật còn hàng (cho ProductShowcase)
+router.get("/public/products/colors", publicController.getMauAoNoiBat);
+
+// GET /api/public/products/:id → chi tiết 1 sản phẩm (cho Product Detail Page)
+router.get("/public/products/:id", publicController.getChiTietSanPhamCongKhai);
+
+// Xác thực Return URL và nhận IPN từ các cổng thanh toán online / VNPAY.
 router.use("/payments", paymentRoutes);
 
 // ─────────────────────────────────────────────────────────────────────────────
