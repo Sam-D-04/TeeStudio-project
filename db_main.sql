@@ -269,7 +269,7 @@ CREATE TABLE IF NOT EXISTS `ProductVariant` (
 INSERT INTO `ProductVariant` (`id`, `productId`, `color`, `colorHex`, `size`, `sku`, `stockQty`, `status`, `createdAt`) VALUES
 (1, 1, 'Trắng', '#FFFFFF', 'S', 'ATCT-TRANG-S', 150, 'ACTIVE', '2026-01-07 08:00:00'),
 (2, 1, 'Trắng', '#FFFFFF', 'M', 'ATCT-TRANG-M', 200, 'ACTIVE', '2026-01-07 08:01:00'),
-(3, 1, 'Trắng', '#FFFFFF', 'L', 'ATCT-TRANG-L', 180, 'ACTIVE', '2026-01-07 08:02:00'),
+(3, 1, 'Trắng', '#FFFFFF', 'L', 'ATCT-TRANG-L', 1, 'ACTIVE', '2026-01-07 08:02:00'),
 (4, 1, 'Trắng', '#FFFFFF', 'XL', 'ATCT-TRANG-XL', 120, 'ACTIVE', '2026-01-07 08:03:00'),
 (5, 1, 'Đen', '#000000', 'S', 'ATCT-DEN-S', 130, 'ACTIVE', '2026-01-07 08:04:00'),
 (6, 1, 'Đen', '#000000', 'M', 'ATCT-DEN-M', 190, 'ACTIVE', '2026-01-07 08:05:00'),
@@ -280,17 +280,17 @@ INSERT INTO `ProductVariant` (`id`, `productId`, `color`, `colorHex`, `size`, `s
 (11, 2, 'Trắng', '#FFFFFF', 'XL', 'ATOS-TRANG-XL', 70, 'ACTIVE', '2026-01-07 08:10:00'),
 (12, 2, 'Xám', '#808080', 'M', 'ATOS-XAM-M', 75, 'ACTIVE', '2026-01-07 08:11:00'),
 (13, 2, 'Xám', '#808080', 'L', 'ATOS-XAM-L', 85, 'ACTIVE', '2026-01-07 08:12:00'),
-(14, 3, 'Đen', '#000000', 'M', 'AHN-DEN-M', 50, 'ACTIVE', '2026-01-07 08:13:00'),
-(15, 3, 'Đen', '#000000', 'L', 'AHN-DEN-L', 60, 'ACTIVE', '2026-01-07 08:14:00'),
+(14, 3, 'Đen', '#000000', 'M', 'AHN-DEN-M', 3, 'ACTIVE', '2026-01-07 08:13:00'),
+(15, 3, 'Đen', '#000000', 'L', 'AHN-DEN-L', 2, 'ACTIVE', '2026-01-07 08:14:00'),
 (16, 3, 'Đen', '#000000', 'XL', 'AHN-DEN-XL', 40, 'ACTIVE', '2026-01-07 08:15:00'),
-(17, 3, 'Xanh navy', '#003153', 'M', 'AHN-NAVY-M', 45, 'ACTIVE', '2026-01-07 08:16:00'),
-(18, 3, 'Xanh navy', '#003153', 'L', 'AHN-NAVY-L', 55, 'ACTIVE', '2026-01-07 08:17:00'),
+(17, 3, 'Xanh navy', '#003153', 'M', 'AHN-NAVY-M', 4, 'ACTIVE', '2026-01-07 08:16:00'),
+(18, 3, 'Xanh navy', '#003153', 'L', 'AHN-NAVY-L', 2, 'ACTIVE', '2026-01-07 08:17:00'),
 (19, 4, 'Trắng', '#FFFFFF', 'S', 'APL-TRANG-S', 60, 'ACTIVE', '2026-01-07 08:18:00'),
 (20, 4, 'Trắng', '#FFFFFF', 'M', 'APL-TRANG-M', 80, 'ACTIVE', '2026-01-07 08:19:00'),
-(21, 4, 'Trắng', '#FFFFFF', 'L', 'APL-TRANG-L', 75, 'ACTIVE', '2026-01-07 08:20:00'),
+(21, 4, 'Trắng', '#FFFFFF', 'L', 'APL-TRANG-L', 8, 'ACTIVE', '2026-01-07 08:20:00'),
 (22, 4, 'Xanh dương', '#0066CC', 'M', 'APL-XDUONG-M', 70, 'ACTIVE', '2026-01-07 08:21:00'),
-(23, 4, 'Xanh dương', '#0066CC', 'L', 'APL-XDUONG-L', 65, 'ACTIVE', '2026-01-07 08:22:00'),
-(24, 4, 'Xanh dương', '#0066CC', 'XL', 'APL-XDUONG-XL', 50, 'ACTIVE', '2026-01-07 08:23:00');
+(23, 4, 'Xanh dương', '#0066CC', 'L', 'APL-XDUONG-L', 0, 'ACTIVE', '2026-01-07 08:22:00'),
+(24, 4, 'Xanh dương', '#0066CC', 'XL', 'APL-XDUONG-XL', 0, 'ACTIVE', '2026-01-07 08:23:00');
 
 
 -- ============================================================
@@ -568,6 +568,23 @@ INSERT INTO `CustomDesign` (`id`, `userId`, `productId`, `variantId`, `name`, `b
 (9, 16, 3, NULL, 'Thiết kế chưa đặt tên2312', '#8b4513', '{"elements": [{"x": 203.2, "y": 235.20000000000005, "id": "50f64091-3316-4d8b-a907-0cafee631d80", "src": "https://res.cloudinary.com/dwol6aarv/image/upload/v1782033392/today_14356090_s4nfxf.png", "type": "image", "width": 93.6, "height": 93.6, "rotation": 0}], "shirtView": "front"}', 'https://res.cloudinary.com/dwol6aarv/image/upload/v1782222734/teestudio/user-designs/r0itp5mqlyfiyekrbtam.png', 0.00, 'DRAFT', NULL, '2026-06-23 20:52:16', '2026-06-23 20:52:16'),
 (10, 16, 4, NULL, 'Thiết kế chưa đặt tên', '#ffffff', '{"elements": [{"x": 211.8571428571429, "y": 236.42857142857144, "id": "96f497c3-73dd-4f78-a670-e6297906b786", "src": "https://res.cloudinary.com/dwol6aarv/image/upload/v1782034047/planner_8512483_u5u7mb.png", "type": "image", "width": 138, "height": 138, "rotation": 0}], "shirtView": "front"}', 'https://res.cloudinary.com/dwol6aarv/image/upload/v1783157435/teestudio/user-designs/ww36mcft3nfoi9usmkxu.png', 0.00, 'DRAFT', NULL, '2026-07-04 16:30:36', '2026-07-04 16:30:36');
 
+-- Các thiết kế đã gắn với đơn cũ phải ở trạng thái đã duyệt.
+UPDATE `CustomDesign`
+SET `status` = 'APPROVED',
+    `adminNote` = 'Thiết kế đã được duyệt để đưa vào sản xuất.'
+WHERE `id` IN (1, 2, 3, 4);
+
+-- Dữ liệu đa dạng để kiểm thử danh sách thiết kế theo khách hàng và trạng thái.
+INSERT INTO `CustomDesign`
+(`id`, `userId`, `productId`, `variantId`, `name`, `baseColor`, `canvasData`, `previewUrl`, `designFee`, `status`, `adminNote`, `createdAt`, `updatedAt`) VALUES
+(11, 2, 3, 14, 'Hoodie Câu lạc bộ Nhiếp ảnh', '#000000', '{"elements":[{"type":"text","text":"CAPTURE THE MOMENT","x":90,"y":110,"fill":"#FFFFFF"}],"shirtView":"front"}', 'https://res.cloudinary.com/teestudio/image/upload/v1/previews/hoodie-nhiep-anh.jpg', 120000.00, 'PENDING_REVIEW', NULL, '2026-06-14 08:00:00', '2026-06-14 08:30:00'),
+(12, 4, 4, 21, 'Polo Đội ngũ Kinh doanh', '#FFFFFF', '{"elements":[{"type":"image","src":"https://res.cloudinary.com/teestudio/image/upload/v1/logos/sales-team.png","x":145,"y":105,"width":110,"height":110}],"shirtView":"front"}', 'https://res.cloudinary.com/teestudio/image/upload/v1/previews/polo-sales-team.jpg', 180000.00, 'APPROVED', 'Đã duyệt logo ngực trái và màu in.', '2026-06-14 09:00:00', '2026-06-14 10:00:00'),
+(13, 7, 1, 3, 'Áo thun Sự kiện Mùa hè', '#FFFFFF', '{"elements":[{"type":"text","text":"SUMMER FEST 2026","x":95,"y":130,"fill":"#F97316"}],"shirtView":"front"}', 'https://res.cloudinary.com/teestudio/image/upload/v1/previews/summer-fest-2026.jpg', 80000.00, 'NEEDS_REVISION', 'Vui lòng tăng kích thước chữ và đưa nội dung vào giữa vùng in.', '2026-06-14 11:00:00', '2026-06-14 15:00:00'),
+(14, 8, 4, 23, 'Polo Câu lạc bộ Chạy bộ', '#0066CC', '{"elements":[{"type":"image","src":"https://res.cloudinary.com/teestudio/image/upload/v1/icons/running-club.png","x":150,"y":100,"width":100,"height":120}],"shirtView":"front"}', 'https://res.cloudinary.com/teestudio/image/upload/v1/previews/polo-running-club.jpg', 100000.00, 'APPROVED', 'Thiết kế đạt yêu cầu in DTG.', '2026-06-15 08:00:00', '2026-06-15 09:00:00'),
+(15, 1, 1, 5, 'Bản nháp Typography Tối giản', '#000000', '{"elements":[{"type":"text","text":"LESS IS MORE","x":120,"y":150,"fill":"#FFFFFF"}],"shirtView":"front"}', 'https://res.cloudinary.com/teestudio/image/upload/v1/previews/less-is-more-draft.jpg', 0.00, 'DRAFT', NULL, '2026-06-15 09:30:00', '2026-06-15 09:30:00'),
+(16, 2, 3, 15, 'Hoodie Team Building 2026', '#000000', '{"elements":[{"type":"text","text":"ONE TEAM ONE DREAM","x":75,"y":120,"fill":"#FACC15"}],"shirtView":"back"}', 'https://res.cloudinary.com/teestudio/image/upload/v1/previews/hoodie-team-building.jpg', 150000.00, 'APPROVED', 'Đã duyệt nội dung mặt sau.', '2026-06-15 10:00:00', '2026-06-15 11:00:00'),
+(17, 3, 3, 18, 'Hoodie Workshop Công nghệ', '#003153', '{"elements":[{"type":"text","text":"BUILD • LEARN • SHARE","x":80,"y":115,"fill":"#FFFFFF"}],"shirtView":"front"}', 'https://res.cloudinary.com/teestudio/image/upload/v1/previews/hoodie-tech-workshop.jpg', 180000.00, 'APPROVED', 'Đã duyệt mẫu in mặt trước.', '2026-06-16 08:00:00', '2026-06-16 09:00:00');
+
 
 -- ============================================================
 -- Bảng: DesignPrintPosition [BOTH]
@@ -600,6 +617,15 @@ INSERT INTO `DesignPrintPosition` (`id`, `designId`, `printPositionId`, `extraCo
 (4, 3, 1, 0.00),
 (5, 4, 2, 20000.00);
 
+INSERT INTO `DesignPrintPosition` (`id`, `designId`, `printPositionId`, `extraCost`) VALUES
+(6, 11, 1, 0.00),
+(7, 12, 1, 0.00),
+(8, 13, 2, 20000.00),
+(9, 14, 1, 0.00),
+(10, 15, 1, 0.00),
+(11, 16, 2, 20000.00),
+(12, 17, 1, 0.00);
+
 
 -- ============================================================
 -- Bảng: DesignPrintMethod [BOTH]
@@ -630,6 +656,15 @@ INSERT INTO `DesignPrintMethod` (`id`, `designId`, `printMethodId`, `extraCost`)
 (2, 2, 2, 30000.00),
 (3, 3, 1, 0.00),
 (4, 4, 1, 0.00);
+
+INSERT INTO `DesignPrintMethod` (`id`, `designId`, `printMethodId`, `extraCost`) VALUES
+(5, 11, 1, 0.00),
+(6, 12, 2, 30000.00),
+(7, 13, 3, 50000.00),
+(8, 14, 1, 0.00),
+(9, 15, 4, 20000.00),
+(10, 16, 2, 30000.00),
+(11, 17, 1, 0.00);
 
 
 -- ============================================================
@@ -810,6 +845,18 @@ INSERT INTO `CustomerOrder` (`id`, `orderCode`, `userId`, `promotionId`, `addres
 (9, '#TS-2026-00136', 1, NULL, 1, 300000.00, 0.00, 30000.00, NULL, NULL, NULL, NULL, NULL, NULL, 330000.00, 0.00, 0.00, 'FULL', 'PENDING', 'PENDING', '2026-06-03 11:00:00', '2026-06-03 11:00:00'),
 (10, '#TS-2026-00137', 2, 2, 2, 600000.00, 50000.00, 0.00, 'Viettel Post', 'Tiêu chuẩn', 'VTP20260603002', '2026-06-02 08:00:00', '2026-06-03 14:00:00', NULL, 550000.00, 0.00, 0.00, 'FULL', 'PAID', 'COMPLETED', '2026-05-30 08:00:00', '2026-06-03 14:00:00');
 
+-- Đơn mẫu bổ sung: đặt cọc, MOMO/VNPAY, COD chờ đối soát và thanh toán lỗi/chờ.
+INSERT INTO `CustomerOrder`
+(`id`, `orderCode`, `userId`, `promotionId`, `addressId`, `subtotal`, `discountAmount`, `shippingFee`, `shippingCarrier`, `shippingMethod`, `trackingCode`, `shippedAt`, `deliveredAt`, `cancelReason`, `totalAmount`, `depositAmount`, `codAmount`, `paymentType`, `paymentStatus`, `status`, `createdAt`, `updatedAt`) VALUES
+(11, '#TS-2026-00138', 4, NULL, 4, 720000.00, 0.00, 0.00, NULL, NULL, NULL, NULL, NULL, NULL, 900000.00, 450000.00, 450000.00, 'DEPOSIT', 'PARTIALLY_PAID', 'CONFIRMED', '2026-06-14 11:00:00', '2026-06-14 12:00:00'),
+(12, '#TS-2026-00139', 8, NULL, 8, 540000.00, 0.00, 0.00, NULL, NULL, NULL, NULL, NULL, NULL, 640000.00, 320000.00, 320000.00, 'DEPOSIT', 'PARTIALLY_PAID', 'PRINTING', '2026-06-15 10:00:00', '2026-06-16 09:00:00'),
+(13, '#TS-2026-00140', 2, NULL, 2, 560000.00, 0.00, 30000.00, NULL, NULL, NULL, NULL, NULL, NULL, 740000.00, 0.00, 0.00, 'FULL', 'PAID', 'PROCESSING', '2026-06-15 13:00:00', '2026-06-15 14:00:00'),
+(14, '#TS-2026-00141', 7, NULL, 7, 120000.00, 0.00, 30000.00, NULL, NULL, NULL, NULL, NULL, NULL, 150000.00, 0.00, 0.00, 'FULL', 'PENDING', 'PENDING', '2026-06-16 09:00:00', '2026-06-16 09:00:00'),
+(15, '#TS-2026-00142', 5, NULL, 5, 280000.00, 0.00, 30000.00, NULL, NULL, NULL, NULL, NULL, NULL, 310000.00, 0.00, 0.00, 'FULL', 'PENDING', 'PENDING', '2026-06-16 10:00:00', '2026-06-16 10:10:00'),
+(16, '#TS-2026-00143', 6, NULL, 6, 360000.00, 0.00, 30000.00, 'Giao Hàng Nhanh', 'Tiêu chuẩn', 'GHN202606180143', '2026-06-17 09:00:00', '2026-06-18 16:30:00', NULL, 390000.00, 0.00, 390000.00, 'FULL', 'PENDING', 'COMPLETED', '2026-06-16 14:00:00', '2026-06-18 16:30:00'),
+(17, '#TS-2026-00144', 3, NULL, 3, 560000.00, 0.00, 30000.00, 'Viettel Post', 'Nhanh', 'VTP202606190144', '2026-06-18 08:00:00', '2026-06-19 15:00:00', NULL, 770000.00, 385000.00, 385000.00, 'DEPOSIT', 'PARTIALLY_PAID', 'COMPLETED', '2026-06-17 08:00:00', '2026-06-19 15:00:00'),
+(18, '#TS-2026-00145', 1, NULL, 1, 280000.00, 0.00, 30000.00, NULL, NULL, NULL, NULL, NULL, NULL, 310000.00, 0.00, 0.00, 'FULL', 'PENDING', 'PENDING', '2026-06-17 10:00:00', '2026-06-17 10:00:00');
+
 -- Trigger: paymentType là bất biến sau khi đơn đã tạo [FROM ADMIN]
 DROP TRIGGER IF EXISTS `trg_customer_order_payment_type_immutable`;
 DELIMITER $$
@@ -875,6 +922,24 @@ INSERT INTO `OrderHistory` (`id`, `orderId`, `fromStatus`, `toStatus`, `action`,
 (17, 10, NULL, 'PENDING', 'Khách hàng đặt đơn', 2, 'CUSTOMER', 'Trần Văn Cường', 'Khách hàng đặt đơn', '2026-05-30 08:00:00'),
 (18, 10, 'PENDING', 'COMPLETED', 'STATUS_CHANGED', 9, 'ADMIN', 'Quản Trị Viên', NULL, '2026-06-03 14:00:00');
 
+INSERT INTO `OrderHistory` (`id`, `orderId`, `fromStatus`, `toStatus`, `action`, `actorId`, `actorRole`, `actorName`, `note`, `createdAt`) VALUES
+(19, 11, NULL, 'PENDING', 'Khách hàng đặt đơn', 4, 'CUSTOMER', 'Phạm Quốc Bảo', 'Đơn thanh toán cọc qua VNPAY.', '2026-06-14 11:00:00'),
+(20, 11, 'PENDING', 'CONFIRMED', 'STATUS_CHANGED', 11, 'ADMIN', 'Nguyen Thanh Hieu', 'Đã xác nhận tiền cọc; thiết kế đang chờ gửi xưởng.', '2026-06-14 12:00:00'),
+(21, 12, NULL, 'PENDING', 'Khách hàng đặt đơn', 8, 'CUSTOMER', 'Đinh Văn Nam', 'Đơn thanh toán cọc qua MOMO.', '2026-06-15 10:00:00'),
+(22, 12, 'PENDING', 'CONFIRMED', 'STATUS_CHANGED', 11, 'ADMIN', 'Nguyen Thanh Hieu', 'Đã xác nhận tiền cọc MOMO.', '2026-06-15 11:00:00'),
+(23, 12, 'CONFIRMED', 'PRINTING', 'STATUS_CHANGED', 14, 'PRODUCTION', 'Hiếu', 'Xưởng đang in thiết kế đã duyệt.', '2026-06-16 09:00:00'),
+(24, 13, NULL, 'PENDING', 'Khách hàng đặt đơn', 2, 'CUSTOMER', 'Trần Văn Cường', 'Thanh toán toàn bộ qua MOMO.', '2026-06-15 13:00:00'),
+(25, 13, 'PENDING', 'PROCESSING', 'STATUS_CHANGED', 11, 'ADMIN', 'Nguyen Thanh Hieu', 'Đã xác nhận thanh toán và chờ chuyển xưởng.', '2026-06-15 14:00:00'),
+(26, 14, NULL, 'PENDING', 'Khách hàng đặt đơn', 7, 'CUSTOMER', 'Võ Thị Thu', 'Đang chờ khách hoàn tất VNPAY.', '2026-06-16 09:00:00'),
+(27, 15, NULL, 'PENDING', 'Khách hàng đặt đơn', 5, 'CUSTOMER', 'Nguyễn Thị Lan', 'Giao dịch MOMO thất bại, có thể tạo lại mã thanh toán.', '2026-06-16 10:00:00'),
+(28, 16, NULL, 'PENDING', 'Khách hàng đặt đơn', 6, 'CUSTOMER', 'Hoàng Văn Đức', 'Đơn thanh toán COD.', '2026-06-16 14:00:00'),
+(29, 16, 'PENDING', 'SHIPPING', 'STATUS_CHANGED', 12, 'WAREHOUSE', 'Nguyen Thanh Hieu', 'Đã bàn giao đơn vị vận chuyển.', '2026-06-17 09:00:00'),
+(30, 16, 'SHIPPING', 'COMPLETED', 'STATUS_CHANGED', 11, 'ADMIN', 'Nguyen Thanh Hieu', 'Đã giao hàng, chờ kế toán đối soát COD.', '2026-06-18 16:30:00'),
+(31, 17, NULL, 'PENDING', 'Khách hàng đặt đơn', 3, 'CUSTOMER', 'Lê Thị Hoa', 'Đã thanh toán cọc qua VNPAY.', '2026-06-17 08:00:00'),
+(32, 17, 'PENDING', 'CONFIRMED', 'STATUS_CHANGED', 11, 'ADMIN', 'Nguyen Thanh Hieu', 'Đã xác nhận cọc và chuyển xưởng.', '2026-06-17 09:00:00'),
+(33, 17, 'CONFIRMED', 'COMPLETED', 'STATUS_CHANGED', 11, 'ADMIN', 'Nguyen Thanh Hieu', 'Đã giao hàng, phần COD còn lại chờ đối soát.', '2026-06-19 15:00:00'),
+(34, 18, NULL, 'PENDING', 'Khách hàng đặt đơn', 1, 'CUSTOMER', 'Nguyễn Minh Anh', 'Đang chờ khách hoàn tất MOMO.', '2026-06-17 10:00:00');
+
 
 -- ============================================================
 -- Bảng: OrderItem [BOTH]
@@ -913,12 +978,22 @@ INSERT INTO `OrderItem` (`id`, `orderId`, `variantId`, `designId`, `quantity`, `
 (2, 2, 14, NULL, 1, 280000.00, 0.00, 280000.00, 'WAITING_DESIGN_APPROVAL'),
 (3, 3, 20, 2, 8, 180000.00, 200000.00, 1640000.00, 'READY_TO_SHIP'),
 (4, 4, 8, NULL, 4, 120000.00, 0.00, 480000.00, 'COMPLETED'),
-(5, 5, 2, 3, 3, 120000.00, 100000.00, 460000.00, 'CONFIRMED'),
+(5, 5, 2, 3, 3, 120000.00, 100000.00, 460000.00, 'READY_TO_PRINT'),
 (6, 6, 12, 4, 3, 150000.00, 120000.00, 570000.00, 'PRINTING'),
 (7, 7, 1, NULL, 3, 120000.00, 0.00, 360000.00, 'SHIPPING'),
 (8, 8, 2, NULL, 2, 120000.00, 0.00, 240000.00, 'CANCELLED'),
 (9, 9, 22, NULL, 2, 150000.00, 0.00, 300000.00, 'WAITING_DESIGN_APPROVAL'),
 (10, 10, 6, NULL, 5, 120000.00, 0.00, 600000.00, 'COMPLETED');
+
+INSERT INTO `OrderItem` (`id`, `orderId`, `variantId`, `designId`, `quantity`, `unitPrice`, `designFee`, `lineTotal`, `productionStatus`) VALUES
+(11, 11, 21, 12, 4, 180000.00, 180000.00, 900000.00, 'READY_TO_PRINT'),
+(12, 12, 23, 14, 3, 180000.00, 100000.00, 640000.00, 'PRINTING'),
+(13, 13, 15, 16, 2, 280000.00, 150000.00, 710000.00, 'READY_TO_PRINT'),
+(14, 14, 3, NULL, 1, 120000.00, 0.00, 120000.00, 'WAITING_DESIGN_APPROVAL'),
+(15, 15, 17, NULL, 1, 280000.00, 0.00, 280000.00, 'WAITING_DESIGN_APPROVAL'),
+(16, 16, 24, NULL, 2, 180000.00, 0.00, 360000.00, 'COMPLETED'),
+(17, 17, 18, 17, 2, 280000.00, 180000.00, 740000.00, 'PACKED'),
+(18, 18, 15, NULL, 1, 280000.00, 0.00, 280000.00, 'WAITING_DESIGN_APPROVAL');
 
 
 -- ============================================================
@@ -952,8 +1027,16 @@ CREATE TABLE IF NOT EXISTS `OrderProduction` (
 INSERT INTO `OrderProduction` (`id`, `orderItemId`, `designId`, `status`, `note`, `approvedAt`, `printedAt`, `packedAt`, `createdAt`) VALUES
 (1, 1, 1, 'PROCESSING', 'Đã nhận file in, đang chuẩn bị máy in DTG', '2026-06-03 10:30:00', NULL, NULL, '2026-06-03 08:24:00'),
 (2, 3, 2, 'PACKED', 'Đồng phục công ty XYZ – 8 áo, đã kiểm tra chất lượng', '2026-06-02 14:10:00', '2026-06-02 16:00:00', '2026-06-03 08:30:00', '2026-06-02 13:40:00'),
-(3, 5, 3, 'CONFIRMED', 'Đã duyệt thiết kế, chờ xếp lịch in', '2026-06-03 11:00:00', NULL, NULL, '2026-06-03 10:15:00'),
+(3, 5, 3, 'APPROVED', 'Đã duyệt thiết kế, chờ gửi thông số xuống xưởng', '2026-06-03 11:00:00', NULL, NULL, '2026-06-03 10:15:00'),
 (4, 6, 4, 'PRINTING', 'Đang in lụa, dự kiến xong chiều nay', '2026-06-02 15:00:00', NULL, NULL, '2026-06-02 14:30:00');
+
+INSERT INTO `OrderProduction` (`id`, `orderItemId`, `designId`, `status`, `note`, `approvedAt`, `printedAt`, `packedAt`, `createdAt`) VALUES
+(5, 11, 12, 'APPROVED', 'Thiết kế đã duyệt, đơn đang chờ gửi thông số xuống xưởng.', '2026-06-14 12:00:00', NULL, NULL, '2026-06-14 11:00:00'),
+(6, 12, 14, 'PRINTING', 'Xưởng đang in DTG theo mẫu đã duyệt.', '2026-06-15 11:00:00', NULL, NULL, '2026-06-15 10:00:00'),
+(7, 13, 16, 'APPROVED', 'Đã duyệt mẫu, đang nằm trong hàng chờ gửi xưởng.', '2026-06-15 14:00:00', NULL, NULL, '2026-06-15 13:00:00'),
+(8, 14, NULL, 'WAITING_DESIGN_APPROVAL', 'Đơn áo trơn, chờ xác nhận yêu cầu sản xuất.', NULL, NULL, NULL, '2026-06-16 09:00:00'),
+(9, 15, NULL, 'WAITING_DESIGN_APPROVAL', 'Chưa chuyển sản xuất do thanh toán MOMO thất bại.', NULL, NULL, NULL, '2026-06-16 10:00:00'),
+(10, 17, 17, 'PACKED', 'Đã in xong, kiểm tra chất lượng và đóng gói.', '2026-06-17 09:00:00', '2026-06-17 15:00:00', '2026-06-18 07:30:00', '2026-06-17 08:00:00');
 
 
 -- ============================================================
@@ -989,16 +1072,27 @@ CREATE TABLE IF NOT EXISTS `Payment` (
 -- Dữ liệu cho bảng `Payment` [FROM MEMBER]
 --
 INSERT INTO `Payment` (`id`, `orderId`, `amount`, `paymentMethod`, `paymentType`, `status`, `transactionId`, `paidAt`, `gatewayResponse`, `note`, `createdAt`) VALUES
-(1, 1, 570000.00, 'VNPAY', 'FULL', 'COMPLETED', 'VNP20260603001', '2026-06-03 08:30:00', NULL, NULL, '2026-06-03 08:25:00'),
-(2, 2, 310000.00, 'COD', 'FULL', 'PENDING', NULL, NULL, NULL, NULL, '2026-06-03 09:05:00'),
-(3, 3, 1640000.00, 'BANK_TRANSFER', 'FULL', 'COMPLETED', 'CK20260602001', '2026-06-02 14:00:00', NULL, NULL, '2026-06-02 13:45:00'),
-(4, 4, 510000.00, 'VNPAY', 'FULL', 'COMPLETED', 'VNP20260531001', '2026-05-31 15:30:00', NULL, NULL, '2026-05-31 15:25:00'),
-(5, 5, 490000.00, 'COD', 'FULL', 'PENDING', NULL, NULL, NULL, NULL, '2026-06-03 10:15:00'),
-(6, 6, 600000.00, 'VNPAY', 'FULL', 'COMPLETED', 'VNP20260602001', '2026-06-02 14:35:00', NULL, NULL, '2026-06-02 14:31:00'),
-(7, 7, 390000.00, 'COD', 'FULL', 'PENDING', NULL, NULL, NULL, NULL, '2026-06-01 16:45:00'),
-(8, 8, 270000.00, 'COD', 'FULL', 'CANCELLED', NULL, NULL, NULL, NULL, '2026-06-01 09:00:00'),
-(9, 9, 330000.00, 'COD', 'FULL', 'PENDING', NULL, NULL, NULL, NULL, '2026-06-03 11:00:00'),
-(10, 10, 550000.00, 'VNPAY', 'FULL', 'COMPLETED', 'VNP20260530001', '2026-05-30 08:15:00', NULL, NULL, '2026-05-30 08:05:00');
+(1, 1, 570000.00, 'VNPAY', 'FULL_PAYMENT', 'COMPLETED', 'VNP20260603001', '2026-06-03 08:30:00', NULL, NULL, '2026-06-03 08:25:00'),
+(2, 2, 310000.00, 'COD', 'COD_FINAL', 'PENDING', NULL, NULL, NULL, NULL, '2026-06-03 09:05:00'),
+(3, 3, 1640000.00, 'BANK_TRANSFER', 'FULL_PAYMENT', 'COMPLETED', 'CK20260602001', '2026-06-02 14:00:00', NULL, NULL, '2026-06-02 13:45:00'),
+(4, 4, 510000.00, 'VNPAY', 'FULL_PAYMENT', 'COMPLETED', 'VNP20260531001', '2026-05-31 15:30:00', NULL, NULL, '2026-05-31 15:25:00'),
+(5, 5, 490000.00, 'COD', 'COD_FINAL', 'PENDING', NULL, NULL, NULL, NULL, '2026-06-03 10:15:00'),
+(6, 6, 600000.00, 'VNPAY', 'FULL_PAYMENT', 'COMPLETED', 'VNP20260602001', '2026-06-02 14:35:00', NULL, NULL, '2026-06-02 14:31:00'),
+(7, 7, 390000.00, 'COD', 'COD_FINAL', 'PENDING', NULL, NULL, NULL, NULL, '2026-06-01 16:45:00'),
+(8, 8, 270000.00, 'COD', 'COD_FINAL', 'CANCELLED', NULL, NULL, NULL, NULL, '2026-06-01 09:00:00'),
+(9, 9, 330000.00, 'COD', 'COD_FINAL', 'PENDING', NULL, NULL, NULL, NULL, '2026-06-03 11:00:00'),
+(10, 10, 550000.00, 'VNPAY', 'FULL_PAYMENT', 'COMPLETED', 'VNP20260530001', '2026-05-30 08:15:00', NULL, NULL, '2026-05-30 08:05:00');
+
+INSERT INTO `Payment` (`id`, `orderId`, `amount`, `paymentMethod`, `paymentType`, `status`, `transactionId`, `paidAt`, `gatewayResponse`, `note`, `createdAt`) VALUES
+(11, 11, 450000.00, 'VNPAY', 'DEPOSIT', 'COMPLETED', 'VNP202606140138', '2026-06-14 11:08:00', '{"vnp_ResponseCode":"00","vnp_TransactionNo":"2606140138","vnp_BankCode":"NCB"}', 'Đã thanh toán cọc 50% qua VNPAY.', '2026-06-14 11:00:00'),
+(12, 12, 320000.00, 'MOMO', 'DEPOSIT', 'COMPLETED', 'MOMO202606150139', '2026-06-15 10:06:00', '{"resultCode":0,"message":"Successful","transId":"2606150139"}', 'Đã thanh toán cọc 50% qua MOMO.', '2026-06-15 10:00:00'),
+(13, 13, 740000.00, 'MOMO', 'FULL_PAYMENT', 'COMPLETED', 'MOMO202606150140', '2026-06-15 13:05:00', '{"resultCode":0,"message":"Successful","transId":"2606150140"}', 'Đã thanh toán toàn bộ qua MOMO.', '2026-06-15 13:00:00'),
+(14, 14, 150000.00, 'VNPAY', 'FULL_PAYMENT', 'PENDING', 'VNP202606160141', NULL, '{"paymentUrlExpiresAt":"2026-06-16T09:15:00+07:00"}', 'Đang chờ khách hoàn tất VNPAY.', '2026-06-16 09:00:00'),
+(15, 15, 310000.00, 'MOMO', 'FULL_PAYMENT', 'FAILED', 'MOMO202606160142', NULL, '{"resultCode":1006,"message":"User denied payment"}', 'Giao dịch MOMO thất bại; cho phép tạo lại mã thanh toán.', '2026-06-16 10:00:00'),
+(16, 16, 390000.00, 'COD', 'COD_FINAL', 'PENDING_RECONCILIATION', NULL, NULL, NULL, 'Đơn đã giao, đang chờ kế toán xác nhận tiền COD từ đơn vị vận chuyển.', '2026-06-18 16:30:00'),
+(17, 17, 385000.00, 'VNPAY', 'DEPOSIT', 'COMPLETED', 'VNP202606170144', '2026-06-17 08:08:00', '{"vnp_ResponseCode":"00","vnp_TransactionNo":"2606170144","vnp_BankCode":"VCB"}', 'Đã thu cọc 50% qua VNPAY.', '2026-06-17 08:00:00'),
+(18, 17, 385000.00, 'COD', 'COD_FINAL', 'PENDING_RECONCILIATION', NULL, NULL, NULL, 'Phần tiền còn lại sau đặt cọc đang chờ đối soát COD.', '2026-06-19 15:00:00'),
+(19, 18, 310000.00, 'MOMO', 'FULL_PAYMENT', 'PENDING', 'MOMO202606170145', NULL, '{"payUrlExpiresAt":"2026-06-17T10:15:00+07:00"}', 'Đang chờ khách hoàn tất MOMO.', '2026-06-17 10:00:00');
 
 
 -- ============================================================
@@ -1042,7 +1136,7 @@ INSERT INTO `InventoryTransaction`
 (`id`, `variantId`, `orderId`, `supplierId`, `quantityChanged`, `transactionType`, `reason`, `createdAt`) VALUES
 (1, 1, NULL, 1, 153, 'IMPORT', 'Nhập phôi áo thun trắng size S', '2026-05-20 08:00:00'),
 (2, 2, NULL, 1, 203, 'IMPORT', 'Nhập phôi áo thun trắng size M', '2026-05-20 08:01:00'),
-(3, 3, NULL, 1, 180, 'IMPORT', 'Nhập phôi áo thun trắng size L', '2026-05-20 08:02:00'),
+(3, 3, NULL, 1, 2, 'IMPORT', 'Nhập phôi áo thun trắng size L', '2026-05-20 08:02:00'),
 (4, 4, NULL, 1, 120, 'IMPORT', 'Nhập phôi áo thun trắng size XL', '2026-05-20 08:03:00'),
 (5, 5, NULL, 1, 130, 'IMPORT', 'Nhập phôi áo thun đen size S', '2026-05-20 08:04:00'),
 (6, 6, NULL, 1, 195, 'IMPORT', 'Nhập phôi áo thun đen size M', '2026-05-20 08:05:00'),
@@ -1053,17 +1147,17 @@ INSERT INTO `InventoryTransaction`
 (11, 11, NULL, 1, 70, 'IMPORT', 'Nhập phôi áo thun oversize trắng size XL', '2026-05-20 08:10:00'),
 (12, 12, NULL, 1, 78, 'IMPORT', 'Nhập phôi áo thun oversize xám size M', '2026-05-20 08:11:00'),
 (13, 13, NULL, 1, 85, 'IMPORT', 'Nhập phôi áo thun oversize xám size L', '2026-05-20 08:12:00'),
-(14, 14, NULL, 2, 51, 'IMPORT', 'Nhập hoodie đen size M', '2026-05-20 08:13:00'),
-(15, 15, NULL, 2, 60, 'IMPORT', 'Nhập hoodie đen size L', '2026-05-20 08:14:00'),
+(14, 14, NULL, 2, 4, 'IMPORT', 'Nhập hoodie đen size M', '2026-05-20 08:13:00'),
+(15, 15, NULL, 2, 5, 'IMPORT', 'Nhập hoodie đen size L', '2026-05-20 08:14:00'),
 (16, 16, NULL, 2, 40, 'IMPORT', 'Nhập hoodie đen size XL', '2026-05-20 08:15:00'),
-(17, 17, NULL, 2, 45, 'IMPORT', 'Nhập hoodie xanh navy size M', '2026-05-20 08:16:00'),
-(18, 18, NULL, 2, 55, 'IMPORT', 'Nhập hoodie xanh navy size L', '2026-05-20 08:17:00'),
+(17, 17, NULL, 2, 5, 'IMPORT', 'Nhập hoodie xanh navy size M', '2026-05-20 08:16:00'),
+(18, 18, NULL, 2, 4, 'IMPORT', 'Nhập hoodie xanh navy size L', '2026-05-20 08:17:00'),
 (19, 19, NULL, 3, 60, 'IMPORT', 'Nhập áo polo trắng size S', '2026-05-20 08:18:00'),
 (20, 20, NULL, 3, 88, 'IMPORT', 'Nhập áo polo trắng size M', '2026-05-20 08:19:00'),
-(21, 21, NULL, 3, 75, 'IMPORT', 'Nhập áo polo trắng size L', '2026-05-20 08:20:00'),
+(21, 21, NULL, 3, 12, 'IMPORT', 'Nhập áo polo trắng size L', '2026-05-20 08:20:00'),
 (22, 22, NULL, 3, 72, 'IMPORT', 'Nhập áo polo xanh dương size M', '2026-05-20 08:21:00'),
-(23, 23, NULL, 3, 65, 'IMPORT', 'Nhập áo polo xanh dương size L', '2026-05-20 08:22:00'),
-(24, 24, NULL, 3, 50, 'IMPORT', 'Nhập áo polo xanh dương size XL', '2026-05-20 08:23:00'),
+(23, 23, NULL, 3, 3, 'IMPORT', 'Nhập áo polo xanh dương size L', '2026-05-20 08:22:00'),
+(24, 24, NULL, 3, 2, 'IMPORT', 'Nhập áo polo xanh dương size XL', '2026-05-20 08:23:00'),
 (25, 6, 10, NULL, -5, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00137', '2026-05-30 08:00:00'),
 (26, 8, 4, NULL, -4, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00131', '2026-05-31 15:20:00'),
 (27, 2, 8, NULL, -2, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00135', '2026-06-01 09:00:00'),
@@ -1074,7 +1168,17 @@ INSERT INTO `InventoryTransaction`
 (32, 10, 1, NULL, -3, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00128', '2026-06-03 08:24:00'),
 (33, 14, 2, NULL, -1, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00129', '2026-06-03 09:05:00'),
 (34, 2, 5, NULL, -3, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00132', '2026-06-03 10:15:00'),
-(35, 22, 9, NULL, -2, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00136', '2026-06-03 11:00:00');
+(35, 22, 9, NULL, -2, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00136', '2026-06-03 11:00:00'),
+(36, 21, 11, NULL, -4, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00138', '2026-06-14 11:00:00'),
+(37, 23, 12, NULL, -3, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00139', '2026-06-15 10:00:00'),
+(38, 15, 13, NULL, -2, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00140', '2026-06-15 13:00:00'),
+(39, 3, 14, NULL, -1, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00141', '2026-06-16 09:00:00'),
+(40, 17, 15, NULL, -1, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00142', '2026-06-16 10:00:00'),
+(41, 24, 16, NULL, -2, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00143', '2026-06-16 14:00:00'),
+(42, 18, 17, NULL, -2, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00144', '2026-06-17 08:00:00'),
+(43, 15, 18, NULL, -1, 'EXPORT', 'Giữ tồn kho cho đơn #TS-2026-00145', '2026-06-17 10:00:00'),
+(44, 14, NULL, 2, 10, 'IMPORT', 'Nhập bổ sung hoodie đen size M trong tháng hiện tại', '2026-07-01 08:00:00'),
+(45, 14, NULL, NULL, -10, 'ADJUSTMENT', 'Điều chỉnh giảm sau kiểm kê để phản ánh số tồn thực tế', '2026-07-02 09:00:00');
 
 
 -- ============================================================
