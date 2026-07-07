@@ -7,6 +7,7 @@ import AppFooter from "@/components/layout/AppFooter";
 import useAuthStore from "@/store/useAuthStore";
 import { useDesignStore } from "@/store/useDesignStore";
 import { userDesignService, SavedDesign } from "@/services/userDesignService";
+import AddToCartModal from "@/components/design-studio/AddToCartModal";
 
 export default function CollectionsPage() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function CollectionsPage() {
   const [designs, setDesigns] = useState<SavedDesign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [cartDesign, setCartDesign] = useState<SavedDesign | null>(null);
 
   useEffect(() => {
     if (isAuthenticated && accessToken) {
@@ -172,19 +174,35 @@ export default function CollectionsPage() {
                     </button>
                   </div>
                   <div style={{ padding: 20, flex: 1, display: "flex", flexDirection: "column" }}>
-                    <h3 style={{ margin: "0 0 8px 0", fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+                    <h3 style={{ margin: "0 0 4px 0", fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
                       {d.name || "Thiết kế chưa đặt tên"}
                     </h3>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
-                      <span style={{ fontSize: 13, color: "#64748b" }}>
-                        Cập nhật: {new Date(d.updatedAt).toLocaleDateString("vi-VN")}
-                      </span>
-                      <span style={{ 
+                    <span style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>
+                      Cập nhật: {new Date(d.updatedAt).toLocaleDateString("vi-VN")}
+                    </span>
+                    <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
+                      <span style={{
+                        flex: 1, textAlign: "center",
                         fontSize: 12, fontWeight: 600, color: "#38bdf8",
-                        background: "#e0f2fe", padding: "4px 10px", borderRadius: 20
+                        background: "#e0f2fe", padding: "7px 10px", borderRadius: 8,
+                        cursor: "pointer",
                       }}>
                         Tiếp tục sửa ➔
                       </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setCartDesign(d); }}
+                        style={{
+                          flex: 1,
+                          fontSize: 12, fontWeight: 700, color: "#fff",
+                          background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
+                          border: "none", padding: "7px 10px", borderRadius: 8,
+                          cursor: "pointer", transition: "opacity 0.15s",
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.opacity = "0.85")}
+                        onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+                      >
+                        🛒 Đặt hàng
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -194,6 +212,16 @@ export default function CollectionsPage() {
         </div>
       </div>
       <AppFooter />
+
+      {cartDesign && (
+        <AddToCartModal
+          open={!!cartDesign}
+          onClose={() => setCartDesign(null)}
+          productId={cartDesign.productId}
+          shirtColor={cartDesign.baseColor}
+          designId={cartDesign.id}
+        />
+      )}
     </main>
   );
 }

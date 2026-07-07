@@ -20,12 +20,12 @@ export default function AuthModal({ isOpen, defaultTab = "login", onClose }: Aut
   const setSession = useAuthStore((s) => s.setSession);
   const backdropRef = useRef<HTMLDivElement>(null);
 
-  // Sync tab when prop changes
+  // Đồng bộ tab đang chọn mỗi khi prop defaultTab thay đổi
   useEffect(() => {
     if (isOpen) setTab(defaultTab);
   }, [isOpen, defaultTab]);
 
-  // Close on Escape
+  // Đóng modal khi nhấn phím Escape
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -33,7 +33,7 @@ export default function AuthModal({ isOpen, defaultTab = "login", onClose }: Aut
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen, onClose]);
 
-  // Prevent body scroll
+  // Chặn cuộn trang nền khi modal đang mở
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
@@ -67,12 +67,12 @@ export default function AuthModal({ isOpen, defaultTab = "login", onClose }: Aut
         overflow: "hidden",
         animation: "ds-modal-in 0.2s cubic-bezier(0.34,1.56,0.64,1)",
       }}>
-        {/* Header */}
+        {/* Phần đầu modal: logo + nút đóng */}
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
           padding: "20px 24px 0",
         }}>
-          {/* Logo */}
+          {/* Logo TeeStudio */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
               <rect width="36" height="36" rx="8" fill="url(#amg)" />
@@ -87,7 +87,7 @@ export default function AuthModal({ isOpen, defaultTab = "login", onClose }: Aut
             <span style={{ fontWeight: 700, fontSize: 15, color: "#e2e8f0" }}>TeeStudio</span>
           </div>
 
-          {/* Close button */}
+          {/* Nút đóng modal */}
           <button onClick={onClose} style={{
             background: "none", border: "none", color: "#64748b",
             cursor: "pointer", padding: 4, borderRadius: 6,
@@ -99,7 +99,7 @@ export default function AuthModal({ isOpen, defaultTab = "login", onClose }: Aut
           </button>
         </div>
 
-        {/* Tabs */}
+        {/* Tab Đăng nhập / Đăng ký */}
         <div style={{
           display: "flex", gap: 0, padding: "20px 24px 0",
           borderBottom: "1px solid #1e293b",
@@ -119,7 +119,7 @@ export default function AuthModal({ isOpen, defaultTab = "login", onClose }: Aut
           ))}
         </div>
 
-        {/* Form area */}
+        {/* Nội dung form theo tab đang chọn */}
         <div style={{ padding: 24 }}>
           {tab === "login"
             ? <InlineLoginForm onSuccess={handleSuccess} onSwitchTab={() => setTab("register")} setSession={setSession} />
@@ -136,7 +136,7 @@ export default function AuthModal({ isOpen, defaultTab = "login", onClose }: Aut
   );
 }
 
-/* ── Inline Login Form ── */
+/* ── Form đăng nhập (nhúng trực tiếp trong modal) ── */
 function InlineLoginForm({
   onSuccess, onSwitchTab, setSession,
 }: {
@@ -203,7 +203,7 @@ function InlineLoginForm({
   );
 }
 
-/* ── Inline Register Form ── */
+/* ── Form đăng ký (nhúng trực tiếp trong modal) ── */
 function InlineRegisterForm({
   onSuccess, onSwitchTab, setSession,
 }: {
@@ -273,7 +273,7 @@ function InlineRegisterForm({
   );
 }
 
-/* ── Shared dark input ── */
+/* ── Ô nhập liệu dùng chung (nền tối) cho cả 2 form ── */
 function ModalInput({
   id, label, type = "text", value, onChange, placeholder, autoComplete, hint,
 }: {

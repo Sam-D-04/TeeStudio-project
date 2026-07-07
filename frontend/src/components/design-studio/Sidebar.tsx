@@ -3,11 +3,10 @@
 import React, { useCallback, useRef } from "react";
 import {
   ShirtType,
-  ShirtView,
   useDesignStore,
 } from "@/store/useDesignStore";
 
-/* ─── SVG Icons (inline for zero-dep) ─── */
+/* ─── Các icon SVG viết inline để không cần thêm thư viện ─── */
 const UploadIcon = () => (
   <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
@@ -31,18 +30,7 @@ const ImageIcon = () => (
 
 const TSHIRT_COLORS = ["#ffffff", "#000000", "#1d4ed8"];
 const POLO_COLORS   = ["#ffffff", "#f5f5dc", "#1d4ed8"];
-const HOODIE_COLORS = ["#9ca3af", "#8b4513"]; // Grey, Brown
-
-const FONTS = [
-  "Arial",
-  "Helvetica",
-  "Georgia",
-  "Times New Roman",
-  "Courier New",
-  "Verdana",
-  "Impact",
-  "Comic Sans MS",
-];
+const HOODIE_COLORS = ["#9ca3af", "#8b4513"]; // Xám, Nâu
 
 const StickerIcon = () => (
   <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -97,11 +85,8 @@ export default function Sidebar({
     shirtType, setShirtType,
     shirtColor, setShirtColor,
     shirtView, setShirtView,
-    selectedId, elements,
-    addElement, updateElement,
+    addElement,
   } = useDesignStore();
-
-  const selectedEl = elements.find((e) => e.id === selectedId);
 
   const handleFileDrop = useCallback(
     (e: React.DragEvent) => {
@@ -131,7 +116,7 @@ export default function Sidebar({
 
   return (
     <aside className="ds-sidebar">
-      {/* Tab bar */}
+      {/* Thanh chọn tab */}
       <div className="ds-sidebar-tabs">
         {tabs.map((tab) => (
           <button
@@ -145,9 +130,9 @@ export default function Sidebar({
         ))}
       </div>
 
-      {/* Tab content */}
+      {/* Nội dung của tab đang chọn */}
       <div className="ds-sidebar-content">
-        {/* ── Images Tab ── */}
+        {/* ── Tab Hình ảnh ── */}
         {activeTab === "images" && (
           <>
             <div className="ds-section-title">Tải lên hình ảnh</div>
@@ -209,11 +194,11 @@ export default function Sidebar({
           </>
         )}
 
-        {/* ── Stickers Tab ── */}
+        {/* ── Tab Họa tiết (Stickers) ── */}
         {activeTab === "stickers" && (
           <div className="ds-stickers-container">
 
-            {/* Search bar with icon */}
+            {/* Ô tìm kiếm có icon kính lúp */}
             <div className="ds-sticker-search-wrap">
               <svg className="ds-sticker-search-icon" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0Z" />
@@ -233,7 +218,7 @@ export default function Sidebar({
               )}
             </div>
 
-            {/* Category pills — wrap, not scroll */}
+            {/* Các nút danh mục — tự xuống dòng thay vì cuộn ngang */}
             {!searchStickerQuery && (
               <div className="ds-sticker-categories">
                 {["Tất cả", ...Array.from(new Set(stickers.map(s => s.loai || "Khác").filter(Boolean)))].map((cat) => (
@@ -248,7 +233,7 @@ export default function Sidebar({
               </div>
             )}
 
-            {/* Loading skeleton */}
+            {/* Khung xương hiển thị khi đang tải danh sách sticker */}
             {!hasFetchedStickers && (
               <div className="ds-sticker-grid">
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -257,7 +242,7 @@ export default function Sidebar({
               </div>
             )}
 
-            {/* Sticker grid */}
+            {/* Lưới hiển thị sticker sau khi đã lọc theo danh mục/từ khoá */}
             {hasFetchedStickers && (() => {
               const filtered = stickers
                 .filter(s => activeCategorySticker === "Tất cả" || (s.loai || "Khác") === activeCategorySticker)
@@ -291,7 +276,7 @@ export default function Sidebar({
           </div>
         )}
 
-        {/* ── Text Tab ── */}
+        {/* ── Tab Văn bản ── */}
         {activeTab === "text" && (
           <>
             <div className="ds-section-title">Thêm văn bản</div>
@@ -317,14 +302,14 @@ export default function Sidebar({
               <TypeIcon /> Thêm văn bản
             </button>
 
-            {/* Font selector always shown in text tab */}
+            {/* Bảng chọn font luôn hiển thị trong tab Văn bản */}
             <div className="ds-text-editor-container" style={{ flex: 1, overflow: 'hidden', marginTop: 12 }}>
               <FontSelectorPanel />
             </div>
           </>
         )}
 
-        {/* ── Shirt Tab ── */}
+        {/* ── Tab Phôi áo ── */}
         {activeTab === "shirt" && (
           <>
             <div className="ds-section-title">Loại áo</div>
@@ -375,7 +360,7 @@ export default function Sidebar({
             </div>
           </>
         )}
-        {/* ── My Designs Tab ── */}
+        {/* ── Tab Thiết kế của tôi ── */}
         {activeTab === "my-designs" && (
           <MyDesignsTab />
         )}
@@ -384,7 +369,7 @@ export default function Sidebar({
   );
 }
 
-/* Mini SVG icons for shirt type buttons */
+/* Icon SVG thu nhỏ cho các nút chọn loại áo */
 function ShirtMiniIcon({ type }: { type: ShirtType }) {
   if (type === "tshirt")
     return (

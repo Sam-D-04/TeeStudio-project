@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useDesignStore } from "@/store/useDesignStore";
 import { FONT_CATEGORIES, ALL_FONTS } from "@/constants/fonts";
 
 export default function FontSelectorPanel() {
-  const { selectedId, elements, updateElement, addElement, shirtType, shirtView } = useDesignStore();
+  const { selectedId, elements, updateElement, addElement } = useDesignStore();
   const selectedEl = elements.find((e) => e.id === selectedId);
 
   const [activeCategoryId, setActiveCategoryId] = useState<string>("all");
@@ -42,7 +42,7 @@ export default function FontSelectorPanel() {
 
   return (
     <div className="ds-font-selector">
-      {/* Search */}
+      {/* Ô tìm kiếm font */}
       <div className="ds-font-search">
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />

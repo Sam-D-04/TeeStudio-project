@@ -3,7 +3,9 @@
 import { create } from "zustand";
 import { v4 as uuidv4 } from "uuid";
 
-/* ── Element types ──────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────
+ * Kiểu dữ liệu cho một phần tử trên canvas thiết kế (ảnh hoặc chữ)
+ * ──────────────────────────────────────────────────────────── */
 export interface DesignElement {
   id: string;
   type: "image" | "text";
@@ -13,9 +15,13 @@ export interface DesignElement {
   height: number;
   rotation: number;
   locked?: boolean;
-  // image-specific
+
+  // Các thuộc tính chỉ dùng khi type === "image"
   src?: string;
-  // text-specific
+  flipH?: boolean;
+  flipV?: boolean;
+
+  // Các thuộc tính chỉ dùng khi type === "text"
   text?: string;
   fontSize?: number;
   fontFamily?: string;
@@ -32,24 +38,24 @@ export type ShirtType = "tshirt" | "polo" | "hoodie";
 export type ShirtView = "front" | "back";
 
 export interface DesignState {
-  /* Canvas content */
+  /* Nội dung canvas */
   elements: DesignElement[];
   selectedId: string | null;
 
-  /* Shirt config */
+  /* Cấu hình áo đang thiết kế */
   shirtType: ShirtType;
   shirtColor: string;
   shirtView: ShirtView;
 
-  /* Current DB state */
+  /* Trạng thái liên quan tới thiết kế đã lưu trong DB */
   currentDesignId: number | null;
   designName: string;
 
-  /* Undo / Redo stacks (snapshot of elements[]) */
+  /* Ngăn xếp Undo / Redo — mỗi phần tử là một bản snapshot của elements[] */
   undoStack: DesignElement[][];
   redoStack: DesignElement[][];
 
-  /* Actions ─ elements */
+  /* Hành động thao tác với phần tử trên canvas */
   addElement: (el: Omit<DesignElement, "id">) => void;
   updateElement: (id: string, attrs: Partial<DesignElement>) => void;
   removeElement: (id: string) => void;
@@ -59,28 +65,23 @@ export interface DesignState {
   moveElementDown: (id: string) => void;
   toggleLock: (id: string) => void;
 
-  /* Actions ─ shirt */
+  /* Hành động thay đổi cấu hình áo */
   setShirtType: (t: ShirtType) => void;
   setShirtColor: (c: string) => void;
   setShirtView: (v: ShirtView) => void;
-  
-  /* Actions - persistence state */
+
+  /* Hành động cập nhật trạng thái lưu trữ (id/tên thiết kế) */
   setCurrentDesignId: (id: number | null) => void;
   setDesignName: (name: string) => void;
 
-  /* Actions ─ history */
+  /* Hành động Undo / Redo */
   undo: () => void;
   redo: () => void;
   pushHistory: () => void;
 
-  /* Actions ─ persistence */
-  saveToLocal: () => void;
-  loadFromLocal: () => void;
+  /* Xoá toàn bộ thiết kế hiện tại, quay về trạng thái trống */
   clearDesign: () => void;
-  exportDesignJSON: () => string;
 }
-
-const STORAGE_KEY = "teestudio_design";
 
 export const useDesignStore = create<DesignState>((set, get) => ({
   elements: [],
@@ -95,7 +96,9 @@ export const useDesignStore = create<DesignState>((set, get) => ({
   undoStack: [],
   redoStack: [],
 
-  /* ── Push current state to history (before any mutation) ── */
+  /* Lưu lại trạng thái elements hiện tại vào undoStack trước khi thực hiện
+   * một thay đổi có thể cần hoàn tác (undo). Đồng thời xoá redoStack vì
+   * lịch sử "redo" cũ không còn hợp lệ sau khi có thay đổi mới. */
   pushHistory: () => {
     const { elements, undoStack } = get();
     set({
@@ -104,7 +107,8 @@ export const useDesignStore = create<DesignState>((set, get) => ({
     });
   },
 
-  /* ── Element CRUD ── */
+  /* ───────────── Thao tác thêm/sửa/xoá phần tử ───────────── */
+
   addElement: (el) => {
     const state = get();
     state.pushHistory();
@@ -112,6 +116,9 @@ export const useDesignStore = create<DesignState>((set, get) => ({
     set({ elements: [...state.elements, newEl], selectedId: newEl.id });
   },
 
+  // Cập nhật thuộc tính của phần tử (kéo/thả, đổi màu chữ, đổi cỡ...).
+  // Không pushHistory ở đây vì hàm này được gọi liên tục khi kéo/resize,
+  // việc lưu lịch sử được xử lý riêng ở nơi bắt đầu thao tác kéo/resize.
   updateElement: (id, attrs) => {
     set((s) => ({
       elements: s.elements.map((el) =>
@@ -131,6 +138,7 @@ export const useDesignStore = create<DesignState>((set, get) => ({
 
   setSelectedId: (id) => set({ selectedId: id }),
 
+  // Nhân bản phần tử đang chọn, đặt bản sao lệch 20px để dễ nhìn thấy
   duplicateElement: (id) => {
     const state = get();
     const el = state.elements.find((e) => e.id === id);
@@ -145,6 +153,7 @@ export const useDesignStore = create<DesignState>((set, get) => ({
     set({ elements: [...state.elements, dup], selectedId: dup.id });
   },
 
+  // Đưa phần tử lên trên 1 lớp (đổi vị trí với phần tử liền sau trong mảng)
   moveElementUp: (id) => {
     const state = get();
     const idx = state.elements.findIndex((e) => e.id === id);
@@ -155,6 +164,7 @@ export const useDesignStore = create<DesignState>((set, get) => ({
     set({ elements: arr });
   },
 
+  // Đưa phần tử xuống dưới 1 lớp (đổi vị trí với phần tử liền trước trong mảng)
   moveElementDown: (id) => {
     const state = get();
     const idx = state.elements.findIndex((e) => e.id === id);
@@ -173,9 +183,13 @@ export const useDesignStore = create<DesignState>((set, get) => ({
     }));
   },
 
-  /* ── Shirt config ── */
+  /* ───────────── Cấu hình áo (loại áo / màu áo / mặt trước-sau) ───────────── */
+
   setShirtType: (t) => set({ shirtType: t }),
   setShirtColor: (c) => set({ shirtColor: c }),
+
+  // Đổi mặt áo (trước/sau) cũng cần lưu lịch sử vì layout các phần tử
+  // in trên mỗi mặt là độc lập với nhau.
   setShirtView: (v) => {
     get().pushHistory();
     set({ shirtView: v });
@@ -184,7 +198,8 @@ export const useDesignStore = create<DesignState>((set, get) => ({
   setCurrentDesignId: (id) => set({ currentDesignId: id }),
   setDesignName: (name) => set({ designName: name }),
 
-  /* ─── Undo / Redo ─── */
+  /* ───────────── Undo / Redo ───────────── */
+
   undo: () => {
     const { undoStack, elements } = get();
     if (undoStack.length === 0) return;
@@ -209,42 +224,16 @@ export const useDesignStore = create<DesignState>((set, get) => ({
     });
   },
 
-  /* ── Persistence ── */
-  saveToLocal: () => {
-    const { elements, shirtType, shirtColor, shirtView, currentDesignId, designName } = get();
-    const data = { elements, shirtType, shirtColor, shirtView, currentDesignId, designName, savedAt: Date.now() };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  },
-
-  loadFromLocal: () => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const data = JSON.parse(raw);
-      set({
-        elements: data.elements || [],
-        shirtType: data.shirtType || "tshirt",
-        shirtColor: data.shirtColor || "#ffffff",
-        shirtView: data.shirtView || "front",
-        currentDesignId: data.currentDesignId || null,
-        designName: data.designName || "Thiết kế chưa đặt tên",
-        selectedId: null,
-        undoStack: [],
-        redoStack: [],
-      });
-    } catch {
-      /* ignore corrupt data */
-    }
-  },
+  /* ───────────── Xoá thiết kế hiện tại ───────────── */
 
   clearDesign: () => {
     const state = get();
     state.pushHistory();
-    set({ elements: [], selectedId: null, currentDesignId: null, designName: "Thiết kế chưa đặt tên" });
-  },
-
-  exportDesignJSON: () => {
-    const { elements, shirtType, shirtColor, shirtView } = get();
-    return JSON.stringify({ elements, shirtType, shirtColor, shirtView }, null, 2);
+    set({
+      elements: [],
+      selectedId: null,
+      currentDesignId: null,
+      designName: "Thiết kế chưa đặt tên",
+    });
   },
 }));

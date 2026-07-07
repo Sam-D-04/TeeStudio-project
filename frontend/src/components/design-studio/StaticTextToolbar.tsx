@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useDesignStore } from "@/store/useDesignStore";
 import { getPrintAreaBoundary } from "./ShirtMockupImage";
 import { ALL_FONTS } from "@/constants/fonts";
@@ -58,7 +58,7 @@ export default function StaticTextToolbar() {
 
   return (
     <div className="ds-text-toolbar">
-      {/* Font name — custom dropdown */}
+      {/* Tên font — dropdown tự viết (không dùng thẻ select mặc định) */}
       <FontDropdown
         value={selectedEl.fontFamily || "Inter"}
         onChange={(font) => updateElement(selectedId!, { fontFamily: font })}
@@ -66,7 +66,7 @@ export default function StaticTextToolbar() {
 
       <div className="ds-text-toolbar-divider" />
 
-      {/* Font size stepper */}
+      {/* Bộ tăng/giảm cỡ chữ */}
       <div className="ds-text-toolbar-size">
         <button
           className="ds-text-toolbar-size-btn"
@@ -85,7 +85,7 @@ export default function StaticTextToolbar() {
         >+</button>
       </div>
 
-      {/* Color */}
+      {/* Màu chữ */}
       <div className="ds-text-toolbar-color-wrap" title="Màu chữ">
         <input
           type="color"
@@ -101,7 +101,7 @@ export default function StaticTextToolbar() {
 
       <div className="ds-text-toolbar-divider" />
 
-      {/* Format buttons */}
+      {/* Các nút định dạng: đậm / nghiêng / gạch chân / gạch ngang / in hoa */}
       <div className="ds-text-toolbar-group">
         <button
           title="In đậm"
@@ -142,7 +142,7 @@ export default function StaticTextToolbar() {
 
       <div className="ds-text-toolbar-divider" />
 
-      {/* Align */}
+      {/* Căn lề văn bản (trái/giữa/phải) */}
       <div className="ds-text-toolbar-group">
         <button
           title="Căn trái"
@@ -169,7 +169,7 @@ export default function StaticTextToolbar() {
 
       <div className="ds-text-toolbar-divider" />
 
-      {/* Position */}
+      {/* Căn vị trí trong vùng in */}
       <div className="ds-text-toolbar-group">
         <button title="Căn mép trên"     className="ds-text-toolbar-btn" onClick={() => handlePosition("top")}>      <PosTopIcon />      </button>
         <button title="Căn giữa dọc"     className="ds-text-toolbar-btn" onClick={() => handlePosition("v-center")}> <PosMidVIcon />     </button>
@@ -194,14 +194,14 @@ const PosLeftIcon  = () => <svg width="14" height="14" viewBox="0 0 24 24" fill=
 const PosRightIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><line x1="21" y1="12" x2="3" y2="12"/><polyline points="15 18 21 12 15 6"/></svg>;
 const PosMidHIcon  = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>;
 
-/* ── Custom Font Dropdown ── */
+/* ── Dropdown chọn font tự viết ── */
 function FontDropdown({ value, onChange }: { value: string; onChange: (f: string) => void }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
+  // Đóng dropdown khi click ra ngoài
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -213,7 +213,7 @@ function FontDropdown({ value, onChange }: { value: string; onChange: (f: string
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Scroll active item into view when opening
+  // Cuộn tới font đang được chọn mỗi khi mở dropdown
   useEffect(() => {
     if (open && listRef.current) {
       const active = listRef.current.querySelector("[data-active='true']") as HTMLElement;
@@ -227,7 +227,7 @@ function FontDropdown({ value, onChange }: { value: string; onChange: (f: string
 
   return (
     <div ref={ref} style={{ position: "relative", height: "100%" }}>
-      {/* Trigger button */}
+      {/* Nút bấm để mở/đóng dropdown */}
       <button
         onClick={() => { setOpen(o => !o); setSearch(""); }}
         style={{
@@ -253,7 +253,7 @@ function FontDropdown({ value, onChange }: { value: string; onChange: (f: string
         </svg>
       </button>
 
-      {/* Dropdown panel */}
+      {/* Bảng dropdown hiển thị danh sách font */}
       {open && (
         <div style={{
           position: "fixed",
@@ -278,7 +278,7 @@ function FontDropdown({ value, onChange }: { value: string; onChange: (f: string
           flexDirection: "column",
           overflow: "hidden",
         }}>
-          {/* Search */}
+          {/* Ô tìm kiếm font */}
           <div style={{ padding: "8px 10px", borderBottom: "1px solid #334155" }}>
             <input
               autoFocus
@@ -299,7 +299,7 @@ function FontDropdown({ value, onChange }: { value: string; onChange: (f: string
             />
           </div>
 
-          {/* Font list */}
+          {/* Danh sách font (đã lọc theo từ khoá tìm kiếm) */}
           <div ref={listRef} style={{ maxHeight: 300, overflowY: "auto" }}>
             {filtered.length === 0 ? (
               <div style={{ padding: "12px", color: "#64748b", fontSize: 12, textAlign: "center" }}>

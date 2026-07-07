@@ -1,5 +1,5 @@
 /* =============================================
-   DESIGN STUDIO – CANVA-LIKE EDITOR
+   TRÌNH THIẾT KẾ (DESIGN STUDIO) – GIAO DIỆN KIỂU CANVA
    ============================================= */
 
 /* ── Root Layout ───────────────────────────── */
@@ -222,7 +222,7 @@
   margin-bottom: 12px;
 }
 
-/* Upload area */
+/* Khu vực tải ảnh lên (kéo thả / chọn file) */
 .ds-upload-area {
   border: 2px dashed #475569;
   border-radius: 12px;
@@ -255,7 +255,7 @@
   font-weight: 600;
 }
 
-/* Uploaded images gallery */
+/* Thư viện ảnh đã tải lên */
 .ds-image-gallery {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -314,7 +314,7 @@
   gap: 12px;
 }
 
-/* Search bar wrapper */
+/* Khung bao ô tìm kiếm sticker */
 .ds-sticker-search-wrap {
   position: relative;
   display: flex;
@@ -362,7 +362,7 @@
   background: #334155;
 }
 
-/* Category pills — wrap instead of scroll */
+/* Các nút danh mục sticker — tự xuống dòng thay vì cuộn ngang */
 .ds-sticker-categories {
   display: flex;
   flex-wrap: wrap;
@@ -394,14 +394,14 @@
   font-weight: 500;
 }
 
-/* Sticker grid */
+/* Lưới hiển thị sticker */
 .ds-sticker-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
 
-/* Sticker item — dark checkered bg to show transparency */
+/* Ô sticker — nền caro tối để thấy rõ vùng trong suốt của ảnh PNG */
 .ds-sticker-item {
   aspect-ratio: 1;
   border-radius: 8px;
@@ -436,7 +436,7 @@
   display: block;
 }
 
-/* Hover overlay with + button */
+/* Lớp phủ hiện nút "+" khi rê chuột vào sticker */
 .ds-sticker-item-overlay {
   position: absolute;
   inset: 0;
@@ -468,7 +468,7 @@
   opacity: 1;
 }
 
-/* Loading skeleton */
+/* Khung xương (skeleton) khi đang tải sticker */
 .ds-sticker-skeleton {
   aspect-ratio: 1;
   border-radius: 8px;
@@ -483,7 +483,7 @@
   100% { background-position: -200% 0; }
 }
 
-/* Empty state */
+/* Trạng thái không có kết quả tìm kiếm */
 .ds-sticker-empty {
   display: flex;
   flex-direction: column;
@@ -498,7 +498,7 @@
   margin: 0;
 }
 
-/* Text panel */
+/* Nút thêm văn bản mới */
 .ds-add-text-btn {
   width: 100%;
   padding: 14px;
@@ -523,7 +523,7 @@
   background: rgba(14, 165, 233, 0.05);
 }
 
-/* Text editor panel */
+/* Bảng chỉnh sửa văn bản */
 .ds-text-editor {
   display: flex;
   flex-direction: column;
@@ -568,79 +568,6 @@
   cursor: pointer;
 }
 
-.ds-font-size-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.ds-font-size-row input[type="number"] {
-  width: 70px;
-  padding: 8px 10px;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  background: #0f172a;
-  color: #f1f5f9;
-  font-size: 13px;
-  outline: none;
-  text-align: center;
-}
-
-.ds-font-size-row input[type="number"]:focus {
-  border-color: #0ea5e9;
-}
-
-.ds-font-style-btns {
-  display: flex;
-  gap: 4px;
-}
-
-.ds-font-style-btn {
-  width: 36px;
-  height: 36px;
-  border: 1px solid #334155;
-  border-radius: 6px;
-  background: transparent;
-  color: #94a3b8;
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-}
-
-.ds-font-style-btn:hover {
-  border-color: #64748b;
-  color: #e2e8f0;
-}
-
-.ds-font-style-btn--active {
-  border-color: #0ea5e9;
-  background: rgba(14, 165, 233, 0.1);
-  color: #0ea5e9;
-}
-
-.ds-color-input-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ds-color-input-row input[type="color"] {
-  width: 36px;
-  height: 36px;
-  border: 1px solid #334155;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  padding: 2px;
-}
-
-.ds-color-input-row input[type="text"] {
-  flex: 1;
-}
-
 /* Shirt selector */
 .ds-shirt-grid {
   display: grid;
@@ -681,7 +608,7 @@
   height: 32px;
 }
 
-/* Color swatches */
+/* Các ô chọn màu áo */
 .ds-color-swatches {
   display: flex;
   flex-wrap: wrap;
@@ -721,7 +648,7 @@
   text-shadow: 0 0 2px rgba(255,255,255,0.8);
 }
 
-/* View toggle (front/back) */
+/* Nút chuyển đổi mặt trước / mặt sau */
 .ds-view-toggle {
   display: flex;
   border: 1px solid #334155;
@@ -764,37 +691,9 @@
   background: #0f172a;
   overflow: hidden;
   position: relative;
-  /* subtle grid pattern */
+  /* hoạ tiết lưới chấm mờ làm nền workspace */
   background-image: radial-gradient(circle, #1e293b 1px, transparent 1px);
   background-size: 20px 20px;
-}
-
-.ds-canvas-container {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ds-shirt-preview {
-  position: absolute;
-  top: 0;
-  left: 0;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.ds-canvas-stage {
-  z-index: 2;
-}
-
-/* Print area guide */
-.ds-print-area-guide {
-  position: absolute;
-  border: 1px dashed rgba(14, 165, 233, 0.3);
-  border-radius: 4px;
-  pointer-events: none;
-  z-index: 3;
 }
 
 /* ── Right rail (Layers + Properties stacked) ── */
@@ -857,7 +756,7 @@
   color: #475569;
 }
 
-/* Layer row */
+/* Một hàng lớp (layer) trong danh sách */
 .ds-layer-item {
   display: flex;
   align-items: center;
@@ -889,7 +788,7 @@
   border-radius: 0 1px 1px 0;
 }
 
-/* Thumbnail */
+/* Ảnh thu nhỏ của lớp */
 .ds-layer-thumb {
   width: 32px;
   height: 32px;
@@ -910,7 +809,7 @@
   overflow: hidden;
 }
 
-/* Info row */
+/* Hàng thông tin (tên lớp, icon loại, icon khoá) */
 .ds-layer-info {
   flex: 1;
   display: flex;
@@ -944,7 +843,7 @@
   display: flex;
 }
 
-/* Delete button */
+/* Nút xoá lớp */
 .ds-layer-delete {
   background: none;
   border: none;
@@ -1202,18 +1101,6 @@
   color: #475569;
 }
 
-/* ── Legacy classes kept for compat ── */
-.ds-prop-group { display: flex; flex-direction: column; gap: 8px; }
-.ds-prop-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; }
-.ds-prop-row { display: flex; gap: 8px; align-items: center; }
-.ds-prop-input-label { font-size: 11px; color: #64748b; min-width: 14px; }
-.ds-prop-action-btn { width: 100%; padding: 10px; border: 1px solid #334155; border-radius: 8px; background: transparent; color: #cbd5e1; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.15s; }
-.ds-prop-action-btn:hover { border-color: #64748b; color: #f1f5f9; }
-.ds-prop-action-btn--danger { color: #f87171; border-color: rgba(248, 113, 113, 0.3); }
-.ds-prop-action-btn--danger:hover { background: rgba(248, 113, 113, 0.1); border-color: #f87171; }
-
-
-
 /* ── Zoom controls ── */
 .ds-zoom-controls {
   position: absolute;
@@ -1339,14 +1226,13 @@
   to   { opacity: 1; transform: scale(1)    translateY(0);   }
 }
 
-/* ── Locked item indicator (vẽ pattern chéo nhẹ bên trên canvas) ── */
+/* ── Đảm bảo con trỏ chuột đổi đúng kiểu khi hover trên canvas ── */
 .ds-workspace canvas {
-  /* ensures cursor changes properly */
 }
 
 
 /* ══════════════════════════════════════════════
-   STATIC TEXT TOOLBAR
+   THANH CÔNG CỤ VĂN BẢN CỐ ĐỊNH (STATIC TEXT TOOLBAR)
    ══════════════════════════════════════════════ */
 .ds-text-toolbar {
   display: flex;
@@ -1369,25 +1255,7 @@
   border-radius: 2px;
 }
 
-/* Font name chip */
-.ds-text-toolbar-font {
-  min-width: 120px;
-  max-width: 160px;
-  padding: 5px 10px;
-  background: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 6px;
-  color: #cbd5e1;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: default;
-  flex-shrink: 0;
-}
-
-/* Divider */
+/* Đường phân cách */
 .ds-text-toolbar-divider {
   width: 1px;
   height: 24px;
@@ -1396,7 +1264,7 @@
   flex-shrink: 0;
 }
 
-/* Size stepper */
+/* Bộ tăng/giảm cỡ chữ */
 .ds-text-toolbar-size {
   display: flex;
   align-items: center;
@@ -1445,7 +1313,7 @@
   -webkit-appearance: none;
 }
 
-/* Color picker */
+/* Bộ chọn màu chữ */
 .ds-text-toolbar-color-wrap {
   position: relative;
   display: flex;
@@ -1483,7 +1351,7 @@
   border-radius: 2px;
 }
 
-/* Button group */
+/* Nhóm các nút chức năng (in đậm/nghiêng/gạch chân...) */
 .ds-text-toolbar-group {
   display: flex;
   align-items: center;
@@ -1491,7 +1359,7 @@
   flex-shrink: 0;
 }
 
-/* Individual toolbar button */
+/* Một nút đơn lẻ trong thanh công cụ */
 .ds-text-toolbar-btn {
   width: 30px;
   height: 30px;
@@ -1527,7 +1395,7 @@
 }
 
 /* ══════════════════════════════════════════════
-   FONT SELECTOR PANEL
+   BẢNG CHỌN FONT CHỮ (FONT SELECTOR PANEL)
    ══════════════════════════════════════════════ */
 .ds-font-selector {
   display: flex;
@@ -1536,7 +1404,7 @@
   background: transparent;
 }
 
-/* Search bar */
+/* Ô tìm kiếm font */
 .ds-font-search {
   display: flex;
   align-items: center;
@@ -1570,7 +1438,7 @@
   color: #475569;
 }
 
-/* Two-column body */
+/* Nội dung 2 cột: danh mục + danh sách font */
 .ds-font-body {
   display: flex;
   flex: 1;
@@ -1580,7 +1448,7 @@
   border-radius: 10px;
 }
 
-/* Left: categories */
+/* Cột trái: danh mục font */
 .ds-font-categories {
   width: 100px;
   min-width: 100px;
@@ -1629,7 +1497,7 @@
   opacity: 0.55;
 }
 
-/* Right: font list */
+/* Cột phải: danh sách font */
 .ds-font-list {
   flex: 1;
   overflow-y: auto;
@@ -1688,7 +1556,7 @@
   font-size: 12px;
 }
 
-/* Hint bar */
+/* Thanh gợi ý/ghi chú */
 .ds-font-hint {
   display: flex;
   align-items: center;
@@ -1700,4 +1568,40 @@
   border-radius: 8px;
   color: #64748b;
   font-size: 11px;
+}
+
+/* ── Alignment section ── */
+.ds-prop-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.ds-prop-align-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+.ds-prop-align-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #0f172a;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+}
+
+.ds-prop-align-btn:hover {
+  border-color: #0ea5e9;
+  color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.08);
 }

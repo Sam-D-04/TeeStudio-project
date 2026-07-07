@@ -3,10 +3,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useDesignStore } from "@/store/useDesignStore";
 import useAuthStore from "@/store/useAuthStore";
+import { useCartStore } from "@/store/useCartStore";
 import { useRouter } from "next/navigation";
 import AuthModal from "./AuthModal";
 
-/* ─── SVG Icons ─── */
+/* ─── Các icon SVG dùng trong thanh công cụ ─── */
 const UndoIcon = () => (
   <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
@@ -37,6 +38,19 @@ const PlusIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
   </svg>
 );
+const CartIcon = () => (
+  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round"
+      d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+    <path d="M3 6h18M16 10a4 4 0 01-8 0" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const BagIcon = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round"
+      d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007Z" />
+  </svg>
+);
 
 interface ToolbarProps {
   onSave: () => void;
@@ -44,6 +58,8 @@ interface ToolbarProps {
   onShowToast: (msg: string) => void;
   onOpenMyDesigns: () => void;
   onNewDesign: () => void;
+  onAddToCart?: () => void;
+  onViewCart?: () => void;
   isSaving?: boolean;
 }
 
@@ -55,9 +71,10 @@ const menuItemStyle: React.CSSProperties = {
   textAlign: "left", transition: "background 0.1s",
 };
 
-export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDesign, isSaving }: ToolbarProps) {
+export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDesign, onAddToCart, onViewCart, isSaving }: ToolbarProps) {
   const { undo, redo, undoStack, redoStack, clearDesign, shirtType } = useDesignStore();
   const { isAuthenticated, user, clearSession, hydrate } = useAuthStore();
+  const cartCount = useCartStore((s) => s.totalItems());
   const router = useRouter();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -85,7 +102,7 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
   return (
     <>
     <header className="ds-toolbar">
-      {/* LEFT: Logo */}
+      {/* Bên trái: Logo + tên loại áo đang thiết kế */}
       <div className="ds-toolbar-left">
         <a href="/" className="ds-toolbar-logo" title="Về trang chủ">
           <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
@@ -104,7 +121,7 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
         <span style={{ fontSize: 13, color: "#94a3b8" }}>Thiết kế {shirtLabel}</span>
       </div>
 
-      {/* CENTER: Undo / Redo / New / Clear */}
+      {/* Ở giữa: Hoàn tác / Làm lại / Tạo mới / Xoá hết */}
       <div className="ds-toolbar-center">
         <button className="ds-toolbar-btn ds-toolbar-btn--icon" onClick={undo}
           disabled={undoStack.length === 0} title="Hoàn tác (Ctrl+Z)">
@@ -132,10 +149,40 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
         </button>
       </div>
 
-      {/* RIGHT: Download + Save + Auth */}
+      {/* Bên phải: Tải ảnh + Giỏ hàng + Lưu + Khu vực tài khoản */}
       <div className="ds-toolbar-right">
         <button className="ds-toolbar-btn ds-toolbar-btn--outline" onClick={onDownloadImage} title="Tải xuống ảnh PNG">
           <DownloadIcon /> Tải ảnh
+        </button>
+        {onAddToCart && (
+          <button
+            className="ds-toolbar-btn"
+            onClick={onAddToCart}
+            title="Thêm vào giỏ hàng"
+            style={{ background: "#0ea5e9", color: "#fff", border: "none" }}
+          >
+            <CartIcon /> Thêm vào giỏ
+          </button>
+        )}
+        <button
+          className="ds-toolbar-btn ds-toolbar-btn--icon"
+          onClick={onViewCart}
+          title={cartCount > 0 ? `Xem giỏ hàng (${cartCount} sản phẩm)` : "Xem giỏ hàng"}
+          style={{ position: "relative" }}
+        >
+          <BagIcon />
+          {cartCount > 0 && (
+            <span style={{
+              position: "absolute", top: -5, right: -5,
+              background: "#ef4444", color: "#fff",
+              fontSize: 9, fontWeight: 800,
+              borderRadius: "50%", width: 17, height: 17,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              lineHeight: 1, pointerEvents: "none",
+            }}>
+              {cartCount > 99 ? "99+" : cartCount}
+            </span>
+          )}
         </button>
         <button className="ds-toolbar-btn ds-toolbar-btn--primary" onClick={onSave}
           title="Lưu thiết kế (Ctrl+S)" disabled={isSaving}>
@@ -150,7 +197,7 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
 
         <div className="ds-toolbar-divider" />
 
-        {/* Auth area */}
+        {/* Khu vực tài khoản: chưa đăng nhập → nút Đăng nhập/Đăng ký; đã đăng nhập → menu avatar */}
         {!isAuthenticated ? (
           <div style={{ display: "flex", gap: 8 }}>
             <button
@@ -170,7 +217,7 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
           </div>
         ) : (
           <div ref={menuRef} style={{ position: "relative" }}>
-            {/* Avatar button */}
+            {/* Nút avatar mở/đóng menu tài khoản */}
             <button
               onClick={() => setMenuOpen(o => !o)}
               style={{
@@ -200,14 +247,14 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
               </svg>
             </button>
 
-            {/* Dropdown */}
+            {/* Menu thả xuống */}
             {menuOpen && (
               <div style={{
                 position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 9999,
                 width: 210, background: "#1e293b", border: "1px solid #334155",
                 borderRadius: 10, boxShadow: "0 8px 30px rgba(0,0,0,0.5)", overflow: "hidden",
               }}>
-                {/* User info header */}
+                {/* Phần đầu hiển thị tên và email người dùng */}
                 <div style={{ padding: "12px 14px", borderBottom: "1px solid #334155" }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", marginBottom: 2 }}>
                     {user?.fullName || "Người dùng"}

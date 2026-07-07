@@ -1,21 +1,20 @@
 "use client";
 
-import React from "react";
 import { ShirtType, ShirtView } from "@/store/useDesignStore";
 
 interface ShirtMockupImageProps {
   type: ShirtType;
   view: ShirtView;
-  color: string; // hex color, used to pick nearest available mockup
+  color: string; // Mã màu hex, dùng để chọn ảnh mockup có màu gần đúng nhất
   width: number;
   height: number;
 }
 
 /**
- * Maps shirt type + view + color to the correct PNG mockup filename.
+ * Ánh xạ loại áo + mặt (trước/sau) + màu sang tên file ảnh PNG mockup tương ứng.
  * TShirt:  /images/mockups/TShirt-{Black|White|Navy}-{Front|Back}.png
  * Polo:    /images/mockups/Polo-{Beige|White|Navy}-{Front|Back}.png
- *          Note: Polo-Navy-Back file is named "Polo-Navy-Backt.png" (typo kept as-is)
+ *          Lưu ý: file Polo-Navy-Back bị đặt tên sai chính tả thành "Polo-Navy-Backt.png" (giữ nguyên như vậy)
  */
 function resolveHoodieColor(hexColor: string): "Brown" | "Grey" {
   const brown = ["#92400e", "#78350f", "#b45309", "#d97706", "#8b4513", "#a0522d", "#cd853f", "#d2691e", "#f4a460"];
@@ -54,7 +53,7 @@ export function getMockupSrc(type: ShirtType, view: ShirtView, color: string): s
 
   if (type === "polo") {
     const colorKey = resolvePoloColor(color);
-    // Workaround: the Navy-Back file was uploaded with a typo
+    // Xử lý riêng: file Navy-Back được tải lên với tên bị gõ sai chính tả
     if (colorKey === "Navy" && viewKey === "Back") {
       return "/images/mockups/Polo-Navy-Backt.png";
     }
@@ -76,14 +75,15 @@ export function getMockupSrc(type: ShirtType, view: ShirtView, color: string): s
     return HOODIE_URLS[colorKey]?.[viewKey] || HOODIE_URLS.Grey.Front;
   }
 
-  // TShirt fall back
+  // Mặc định (áo thun / tshirt)
   const colorKey = resolveTShirtColor(color);
   return `/images/mockups/TShirt-${colorKey}-${viewKey}.png`;
 }
 
 /**
- * Returns the print area boundary (in px) relative to the container (width x height).
- * For polo front, this returns the BOUNDING BOX of the polygon (used for element drag constraints).
+ * Trả về ranh giới vùng in (đơn vị px) tính theo kích thước container (width x height).
+ * Với áo polo mặt trước, hàm này trả về HÌNH CHỮ NHẬT BAO (bounding box) của đa giác
+ * vùng in — dùng để giới hạn khi kéo/di chuyển phần tử trên canvas.
  */
 export function getPrintAreaBoundary(
   type: ShirtType,
@@ -183,9 +183,6 @@ export default function ShirtMockupImage({
         objectFit: "contain",
         pointerEvents: "none",
         userSelect: "none",
-        // Use mix-blend-mode to colorize white shirt with the shirt color
-        // This works best when the mockup is a white/light shirt
-        // For black/dark shirts the color picker won't change much
       }}
       draggable={false}
     />

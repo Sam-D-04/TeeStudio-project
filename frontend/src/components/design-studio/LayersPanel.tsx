@@ -1,9 +1,8 @@
 "use client";
 
-import React from "react";
 import { useDesignStore, DesignElement } from "@/store/useDesignStore";
 
-/* ─── Mini Icons ─── */
+/* ─── Các icon thu nhỏ ─── */
 const ImageIcon = () => (
   <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
@@ -30,7 +29,7 @@ const LayersIcon = () => (
   </svg>
 );
 
-/** Returns a display label for an element */
+/** Trả về nhãn hiển thị cho một phần tử (tên rút gọn) */
 function getLabel(el: DesignElement): string {
   if (el.type === "text") {
     const t = el.text || "";
@@ -39,7 +38,7 @@ function getLabel(el: DesignElement): string {
   return "Hình ảnh";
 }
 
-/** Returns a mini preview node */
+/** Trả về phần xem trước thu nhỏ (ảnh hoặc đoạn chữ mẫu) cho một phần tử */
 function Preview({ el }: { el: DesignElement }) {
   if (el.type === "image" && el.src) {
     return (
@@ -76,19 +75,19 @@ function Preview({ el }: { el: DesignElement }) {
 export default function LayersPanel() {
   const { elements, selectedId, setSelectedId, removeElement } = useDesignStore();
 
-  // Reversed: top layer first
+  // Đảo ngược mảng để lớp nằm trên cùng (thêm sau) hiển thị đầu danh sách
   const layers = [...elements].reverse();
 
   return (
     <div className="ds-layers-panel">
-      {/* Header */}
+      {/* Phần tiêu đề: icon + tên + số lượng lớp */}
       <div className="ds-layers-header">
         <LayersIcon />
         <span>Lớp</span>
         <span className="ds-layers-count">{elements.length}</span>
       </div>
 
-      {/* Layer list */}
+      {/* Danh sách các lớp */}
       <div className="ds-layers-list">
         {layers.length === 0 ? (
           <div className="ds-layers-empty">Chưa có lớp nào</div>
@@ -101,12 +100,12 @@ export default function LayersPanel() {
                 className={`ds-layer-item ${isSelected ? "ds-layer-item--selected" : ""}`}
                 onClick={() => setSelectedId(el.id)}
               >
-                {/* Thumbnail */}
+                {/* Ảnh thu nhỏ của lớp */}
                 <div className="ds-layer-thumb">
                   <Preview el={el} />
                 </div>
 
-                {/* Info */}
+                {/* Thông tin: icon loại, tên, trạng thái khoá */}
                 <div className="ds-layer-info">
                   <span className="ds-layer-type-icon">
                     {el.type === "image" ? <ImageIcon /> : <TypeIcon />}
@@ -117,7 +116,7 @@ export default function LayersPanel() {
                   )}
                 </div>
 
-                {/* Delete button */}
+                {/* Nút xoá lớp */}
                 <button
                   className="ds-layer-delete"
                   title="Xoá lớp"
