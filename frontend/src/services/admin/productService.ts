@@ -9,6 +9,7 @@
  */
 
 import apiClient from "@/lib/apiClient";
+import type { ProductColor } from "@/lib/productColors";
 
 // =====================================================================
 // KIỂU DỮ LIỆU (Types) – khớp với response từ Backend
@@ -33,8 +34,16 @@ export type BienTheSanPham = {
   sku: string;
   /** Số lượng tồn kho */
   stock: number;
-  /** Trạng thái tồn kho tự động tính từ stockQty */
+  /** Số lượng đang được giữ cho các đơn đang xử lý */
+  reserved: number;
+  /** Số lượng khả dụng = stock - reserved */
+  available: number;
+  /** Trạng thái tồn kho tự động tính từ available */
   inventoryStatus: TrangThaiTonKho;
+  /** Trạng thái hiển thị (từ DB) */
+  status: string;
+  /** Đã có giao dịch chưa */
+  hasTransactions: boolean;
 };
 
 /** Một phôi áo (blank product) trong danh sách */
@@ -90,6 +99,8 @@ export type CanhBaoTonKho = {
   size: string;
   sku: string;
   stock: number;
+  reserved: number;
+  available: number;
   severity: MucDoCanhBao;
 };
 
@@ -109,7 +120,7 @@ export type ThamSoLocSanPham = {
   tuKhoa?: string;
   danhMuc?: string;
   trangThai?: string;
-  tonKho?: string;
+  tonKho?: "tat_ca" | "ban_chay" | "con_hang" | "sap_het" | "het_hang";
 };
 
 /** Payload tạo phôi áo mới */
@@ -125,18 +136,29 @@ export type TaoSanPhamInput = {
 };
 
 /** Payload cập nhật phôi áo */
-export type CapNhatSanPhamInput = Partial<TaoSanPhamInput>;
+export type CapNhatSanPhamInput = Partial<TaoSanPhamInput> & {
+  displayStatus?: TrangThaiHienThi;
+  variants?: Array<Partial<ThemBienTheInput> & { id?: number; status?: string }>;
+};
 
 /** Payload thêm biến thể */
 export type ThemBienTheInput = {
   color: string;
+  colorHex: string;
   size: string;
   sku: string;
-  stockQty?: number;
 };
 
 /** Payload cập nhật biến thể */
-export type CapNhatBienTheInput = Partial<ThemBienTheInput>;
+export type CapNhatBienTheInput = Partial<ThemBienTheInput> & { status?: string };
+
+/** Kết quả thao tác xóa/ẩn phôi áo. */
+export type KetQuaXoaSanPham = {
+  id: number;
+  action: "deleted" | "archived";
+  affectedVariants: number;
+  message: string;
+};
 
 // =====================================================================
 // CÁC HÀM GỌI API
@@ -256,15 +278,29 @@ export async function capNhatTrangThaiSanPham(
 }
 
 /**
- * Xóa phôi áo (sẽ lỗi nếu còn đơn hàng).
+ * Xóa/ẩn phôi áo theo ràng buộc nghiệp vụ.
  * DELETE /api/admin/products/:id
  */
-export async function xoaSanPham(id: number): Promise<{ id: number }> {
+export async function xoaSanPham(id: number): Promise<KetQuaXoaSanPham> {
   const res = await apiClient.delete<{
     success: boolean;
     message: string;
-    data: { id: number };
+    data: Omit<KetQuaXoaSanPham, "message"> & { message?: string };
   }>(`/admin/products/${id}`);
+  return {
+    ...res.data.data,
+    message: res.data.data.message ?? res.data.message,
+  };
+}
+
+/**
+ * Lấy bảng màu đã được sử dụng trong các biến thể sản phẩm.
+ * GET /api/admin/products/colors
+ */
+export async function layBangMauSanPham(): Promise<ProductColor[]> {
+  const res = await apiClient.get<{ success: boolean; data: ProductColor[] }>(
+    "/admin/products/colors"
+  );
   return res.data.data;
 }
 

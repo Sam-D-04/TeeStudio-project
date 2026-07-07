@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 /**
@@ -20,6 +21,8 @@ type PaymentStatCardProps = {
   iconWrapperClassName?: string; // Lớp CSS màu nền/icon (mặc định: xám nhạt)
   badge?: ReactNode;       // Badge nhỏ ở góc trên phải (ví dụ: "+8%")
   isAlert?: boolean;       // Nếu true: vẽ thêm đường kẻ màu đỏ bên phải card
+  href: string;
+  isActive?: boolean;
 };
 
 export default function PaymentStatCard({
@@ -29,15 +32,22 @@ export default function PaymentStatCard({
   iconWrapperClassName = "bg-surface-alt text-text-secondary border border-border",
   badge,
   isAlert = false,
+  href,
+  isActive = false,
 }: PaymentStatCardProps) {
   return (
     // Card nền trắng, bo góc 12px, viền 1px mảnh, shadow nhẹ
     // Khi hover: dịch lên 2px (chỉ áp dụng nếu không phải alert)
-    <div
-      className={`relative overflow-hidden rounded-xl border bg-surface p-5 shadow-[0_1px_4px_rgba(0,0,0,0.05)] transition-transform duration-200 ${
-        isAlert
-          ? "border-[#ffdad6]" // Viền đỏ nhạt cho card cảnh báo
-          : "border-border hover:-translate-y-0.5" // Viền bình thường + hover nâng nhẹ
+    <Link
+      href={href}
+      aria-label={`${label}. Bấm để lọc danh sách giao dịch`}
+      aria-current={isActive ? "page" : undefined}
+      className={`relative block min-w-0 cursor-pointer overflow-hidden rounded-xl border bg-surface p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] outline-none transition-all duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-primary-container/30 ${
+        isActive
+          ? "border-primary-container ring-1 ring-primary-container/20"
+          : isAlert
+            ? "border-[#ffdad6]"
+            : "border-border"
       }`}
     >
       {/* Đường kẻ đỏ bên phải – chỉ hiển thị khi isAlert=true */}
@@ -46,10 +56,10 @@ export default function PaymentStatCard({
       )}
 
       {/* Hàng trên: Icon bên trái + Badge tùy chọn bên phải */}
-      <div className="mb-4 flex items-start justify-between">
+      <div className="mb-2 flex items-start justify-between gap-2">
         {/* Ô icon vuông 40x40, bo góc 8px */}
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-lg text-[20px] ${iconWrapperClassName}`}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[16px] ${iconWrapperClassName}`}
         >
           {icon}
         </div>
@@ -59,10 +69,14 @@ export default function PaymentStatCard({
       </div>
 
       {/* Nhãn mô tả nhỏ màu xám */}
-      <p className="mb-1 text-sm text-text-secondary">{label}</p>
+      <p className="mb-1 truncate text-xs leading-4 text-text-secondary" title={label}>
+        {label}
+      </p>
 
       {/* Giá trị lớn, đậm */}
-      <div className="text-2xl font-extrabold text-text-main">{value}</div>
-    </div>
+      <div className="truncate text-xl font-extrabold leading-6 text-text-main">
+        {value}
+      </div>
+    </Link>
   );
 }

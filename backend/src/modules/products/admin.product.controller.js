@@ -39,6 +39,19 @@ const getDanhMuc = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/admin/products/colors
+ * Lấy các màu đã dùng để tái sử dụng trong Creatable Select.
+ */
+const getBangMau = async (req, res, next) => {
+  try {
+    const data = await productService.layBangMau();
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // =====================================================================
 // CẢNH BÁO TỒN KHO
 // =====================================================================
@@ -63,7 +76,8 @@ const getCanhBaoTonKho = async (req, res, next) => {
 /**
  * GET /api/admin/products
  * Lấy danh sách phôi áo có phân trang và bộ lọc.
- * Query params: trang, soMoiTrang, tuKhoa, danhMuc, trangThai, tonKho
+ * Query params: trang, soMoiTrang, tuKhoa, danhMuc, trangThai,
+ * tonKho (tat_ca | ban_chay | con_hang | sap_het | het_hang)
  */
 const getDanhSachSanPham = async (req, res, next) => {
   try {
@@ -200,7 +214,7 @@ const xoaSanPham = async (req, res, next) => {
     const data = await productService.xoaSanPham(id);
     res.json({
       success: true,
-      message: "Xóa phôi áo thành công",
+      message: data.message || "Xóa/ẩn phôi áo thành công",
       data,
     });
   } catch (error) {
@@ -215,7 +229,7 @@ const xoaSanPham = async (req, res, next) => {
 /**
  * POST /api/admin/products/:id/variants
  * Thêm biến thể (màu + size) mới vào phôi áo.
- * Body: { color, size, sku, stockQty }
+ * Body: { color, colorHex, size, sku }
  */
 const themBienThe = async (req, res, next) => {
   try {
@@ -238,8 +252,8 @@ const themBienThe = async (req, res, next) => {
 
 /**
  * PUT /api/admin/products/:id/variants/:variantId
- * Cập nhật biến thể (màu, size, SKU, tồn kho).
- * Body: { color?, size?, sku?, stockQty? }
+ * Cập nhật thông tin biến thể (không cập nhật tồn kho).
+ * Body: { color?, colorHex?, size?, sku?, status? }
  */
 const capNhatBienThe = async (req, res, next) => {
   try {
@@ -264,6 +278,7 @@ const capNhatBienThe = async (req, res, next) => {
 module.exports = {
   getThongKe,
   getDanhMuc,
+  getBangMau,
   getCanhBaoTonKho,
   getDanhSachSanPham,
   getChiTietSanPham,

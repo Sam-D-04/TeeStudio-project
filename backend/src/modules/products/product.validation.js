@@ -56,6 +56,11 @@ const createVariantSchema = {
       type: "string",
       maxLength: 100,
     },
+    colorHex: {
+      required: true,
+      type: "string",
+      pattern: /^#[0-9a-fA-F]{6}$/,
+    },
     size: {
       required: true,
       type: "string",
@@ -65,10 +70,6 @@ const createVariantSchema = {
       required: true,
       type: "string",
       maxLength: 100,
-    },
-    stockQty: {
-      type: "integer",
-      min: 0,
     },
   },
 };

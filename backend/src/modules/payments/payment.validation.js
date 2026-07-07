@@ -17,7 +17,7 @@ const createPaymentSchema = {
     paymentMethod: {
       required: true,
       type: "string",
-      enum: ["COD", "VNPAY"],
+      enum: ["COD", "VNPAY", "MOMO"],
     },
     paymentType: {
       required: true,
@@ -39,7 +39,13 @@ const updatePaymentStatusSchema = {
     status: {
       required: true,
       type: "string",
-      enum: ["PENDING", "COMPLETED", "FAILED", "CANCELLED", "REFUNDED"],
+      enum: [
+        "PENDING",
+        "PENDING_RECONCILIATION",
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED",
+      ],
     },
   },
 };
@@ -65,20 +71,35 @@ const getDanhSachThanhToanSchema = {
         "tat_ca",
         "cho_thanh_toan",
         "da_thanh_toan",
+        "da_dat_coc",
         "that_bai",
-        "hoan_tien",
         "can_doi_soat",
       ],
     },
     phuongThuc: {
       required: false,
       type: "string",
-      enum: ["tat_ca", "vnpay", "cod"],
+      enum: ["tat_ca", "vnpay", "momo", "cod"],
     },
     tuKhoa: {
       required: false,
       type: "string",
       maxLength: 200,
+    },
+    tuNgay: {
+      required: false,
+      type: "string",
+      pattern: /^\d{4}-\d{2}-\d{2}$/,
+    },
+    denNgay: {
+      required: false,
+      type: "string",
+      pattern: /^\d{4}-\d{2}-\d{2}$/,
+    },
+    kieuNgay: {
+      required: false,
+      type: "string",
+      enum: ["ngay_tao", "ngay_thanh_toan"],
     },
   },
 };

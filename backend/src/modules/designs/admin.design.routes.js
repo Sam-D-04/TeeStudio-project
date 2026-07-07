@@ -1,10 +1,8 @@
 /**
- * design.routes.js – Khai báo tất cả routes cho module Thiết kế & In ấn.
+ * design.routes.js – Khai báo các route Admin cho module Thiết kế & In ấn.
  *
  * Gắn vào app qua index.js:
- *   router.use("/admin/designs", adminDesignRoutes);      ← Dành cho Admin
- *   router.use("/vi-tri-in", publicDesignRoutes.viTriIn); ← Công khai
- *   router.use("/stickers", publicDesignRoutes.sticker);  ← Công khai
+ *   router.use("/admin/designs", adminDesignRoutes);
  */
 
 const router = require("express").Router();
@@ -24,23 +22,18 @@ router.get("/stats", verifyToken, requireAdmin, controller.getThongKe);
 
 // Danh sách đơn cần in – cũng phải khai báo trước /:id
 router.get("/don-can-in", verifyToken, requireAdmin, controller.getDanhSachDonCanIn);
-router.patch("/don-can-in/:id/gui-xuong", verifyToken, requireAdmin, controller.guiDonXuongIn);
+router.patch("/don-can-in/:id/trang-thai", verifyToken, requireAdmin, controller.capNhatTrangThaiDonIn);
 
 // Sticker
 router.get("/stickers", verifyToken, requireAdmin, controller.getDanhSachSticker);
 router.post("/stickers", verifyToken, requireAdmin, controller.themSticker);
 router.delete("/stickers/:id", verifyToken, requireAdmin, controller.xoaSticker);
 
-// Vị trí in
-router.get("/vi-tri-in", verifyToken, requireAdmin, controller.getDanhSachViTriIn);
-router.post("/vi-tri-in", verifyToken, requireAdmin, controller.themViTriIn);
-router.patch("/vi-tri-in/:id", verifyToken, requireAdmin, controller.batTatViTriIn);
-router.delete("/vi-tri-in/:id", verifyToken, requireAdmin, controller.xoaViTriIn);
-
 // Danh sách thiết kế khách hàng
 router.get("/", verifyToken, requireAdmin, controller.getDanhSachThietKe);
 
 // Hành động trên từng thiết kế
+router.get("/:id", verifyToken, requireAdmin, controller.getChiTietThietKe);
 router.patch("/:id/duyet", verifyToken, requireAdmin, controller.duyetThietKe);
 router.patch("/:id/yeu-cau-chinh-sua", verifyToken, requireAdmin, controller.yeuCauChinhSua);
 

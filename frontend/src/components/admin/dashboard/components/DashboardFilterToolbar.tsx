@@ -1,53 +1,82 @@
-import { CalendarOutlined, DownloadOutlined, FilterOutlined } from "@ant-design/icons";
-import { DatePicker } from "antd";
-import dayjs from "dayjs";
-import type { Dayjs } from "dayjs";
+import {
+  DownloadOutlined,
+  FilterOutlined,
+  LoadingOutlined,
+} from "@ant-design/icons";
+import { message } from "antd";
+import { useState } from "react";
+import DateRangeFilter from "@/components/admin/common/DateRangeFilter";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
+import { xuatBaoCaoDashboard } from "@/services/admin/dashboardService";
 import AdminButton from "../../common/AdminButton";
 
-const { RangePicker } = DatePicker;
+type DashboardFilterToolbarProps = {
+  onDateChange: (startDate: string, endDate: string) => void;
+};
 
-type DateRange = [Dayjs, Dayjs];
+export default function DashboardFilterToolbar({
+  onDateChange,
+}: DashboardFilterToolbarProps) {
+  const [selectedDates, setSelectedDates] = useState({
+    startDate: "",
+    endDate: "",
+  });
+  const [isExporting, setIsExporting] = useState(false);
+  const [messageApi, messageContextHolder] = message.useMessage();
 
-function getWeekRange(): DateRange {
-  const today = dayjs();
-  const daysFromMonday = (today.day() + 6) % 7;
+  function handleDateChange(startDate: string, endDate: string) {
+    setSelectedDates({ startDate, endDate });
+    onDateChange(startDate, endDate);
+  }
 
-  return [today.subtract(daysFromMonday, "day"), today];
-}
+  async function handleExportReport() {
+    const { startDate, endDate } = selectedDates;
+    if (!startDate || !endDate || isExporting) return;
 
-export default function DashboardFilterToolbar() {
-  const today = dayjs();
-  const defaultRange: DateRange = [today.startOf("month"), today];
-  const [weekStart, weekEnd] = getWeekRange();
-
-  const rangePresets = [
-    { label: "Hôm nay", value: [today, today] as DateRange },
-    { label: "Tuần này", value: [weekStart, weekEnd] as DateRange },
-    { label: "Tháng này", value: defaultRange },
-  ];
+    setIsExporting(true);
+    try {
+      await xuatBaoCaoDashboard(startDate, endDate);
+      messageApi.success("Đã xuất báo cáo Excel thành công.");
+    } catch (error) {
+      messageApi.error(
+        getApiErrorMessage(error, "Không thể xuất báo cáo. Vui lòng thử lại.")
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   return (
-    <section className="admin-card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-2 text-sm font-semibold text-text-main">
-        <FilterOutlined className="text-primary-container" />
-        <span>Lọc theo thời gian</span>
-      </div>
+    <>
+      {messageContextHolder}
+      <section className="admin-card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 text-sm font-semibold text-text-main">
+          <FilterOutlined className="text-primary-container" />
+          <span>Lọc theo thời gian</span>
+        </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <RangePicker
-          aria-label="Chọn khoảng thời gian"
-          defaultValue={defaultRange}
-          format="YYYY-MM-DD"
-          presets={rangePresets}
-          separator="→"
-          suffixIcon={<CalendarOutlined />}
-          allowClear={false}
-          className="w-full sm:w-[320px]"
-        />
-        <AdminButton variant="primary" icon={<DownloadOutlined />}>
-          Xuất báo cáo
-        </AdminButton>
-      </div>
-    </section>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <DateRangeFilter
+            onChange={handleDateChange}
+            showAllOption={false}
+          />
+          <AdminButton
+            variant="primary"
+            icon={
+              isExporting ? <LoadingOutlined spin /> : <DownloadOutlined />
+            }
+            disabled={
+              isExporting ||
+              !selectedDates.startDate ||
+              !selectedDates.endDate
+            }
+            className="disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={handleExportReport}
+          >
+            {isExporting ? "Đang xuất..." : "Xuất báo cáo"}
+          </AdminButton>
+        </div>
+      </section>
+    </>
   );
 }

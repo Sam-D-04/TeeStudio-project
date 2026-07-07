@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { InfoCircleOutlined, LoadingOutlined, SaveOutlined } from "@ant-design/icons";
 import { message } from "antd";
@@ -8,14 +8,12 @@ import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import * as promotionService from "@/services/admin/promotionService";
 
 type FormState = {
-  roundingUnit: string;
   defaultShippingFee: string;
   freeShippingThreshold: string;
   vatPercent: string;
 };
 
 const EMPTY_FORM: FormState = {
-  roundingUnit: "",
   defaultShippingFee: "",
   freeShippingThreshold: "",
   vatPercent: "",
@@ -35,28 +33,27 @@ const inputStyle: React.CSSProperties = {
 
 export default function PriceFormulaTab() {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [formChanges, setFormChanges] = useState<Partial<FormState>>({});
   const query = useQuery({
     queryKey: ["admin-promotions", "pricing-formula"],
     queryFn: promotionService.layCongThucBaoGia,
   });
 
-  useEffect(() => {
-    if (query.data) {
-      const value = query.data.cauHinh;
-      setForm({
-        roundingUnit: String(value.roundingUnit),
-        defaultShippingFee: String(value.defaultShippingFee),
-        freeShippingThreshold: String(value.freeShippingThreshold),
-        vatPercent: String(value.vatPercent),
-      });
-    }
-  }, [query.data]);
+  const value = query.data?.cauHinh;
+  const form: FormState = {
+    ...(value
+      ? {
+          defaultShippingFee: String(value.defaultShippingFee),
+          freeShippingThreshold: String(value.freeShippingThreshold),
+          vatPercent: String(value.vatPercent),
+        }
+      : EMPTY_FORM),
+    ...formChanges,
+  };
 
   const mutation = useMutation({
     mutationFn: () =>
       promotionService.capNhatCongThucBaoGia({
-        roundingUnit: Number(form.roundingUnit),
         defaultShippingFee: Number(form.defaultShippingFee),
         freeShippingThreshold: Number(form.freeShippingThreshold),
         vatPercent: Number(form.vatPercent),
@@ -64,6 +61,7 @@ export default function PriceFormulaTab() {
     onSuccess: (data) => {
       message.success("Đã lưu công thức báo giá");
       queryClient.setQueryData(["admin-promotions", "pricing-formula"], data);
+      setFormChanges({});
     },
     onError: (error) => message.error(getApiErrorMessage(error)),
   });
@@ -84,7 +82,9 @@ export default function PriceFormulaTab() {
           max={options?.max}
           step={options?.step}
           value={form[key]}
-          onChange={(event) => setForm((old) => ({ ...old, [key]: event.target.value }))}
+          onChange={(event) =>
+            setFormChanges((old) => ({ ...old, [key]: event.target.value }))
+          }
           style={{ ...inputStyle, paddingRight: 55 }}
         />
         <span
@@ -126,7 +126,7 @@ export default function PriceFormulaTab() {
         <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
           <h3 style={{ margin: 0, fontSize: 15, color: "#0f172a" }}>Cấu hình công thức báo giá</h3>
           <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>
-            <InfoCircleOutlined /> Tổng báo giá = tạm tính sau giảm + VAT + phí vận chuyển, sau đó làm tròn lên.
+            <InfoCircleOutlined /> Tổng báo giá = tạm tính sau giảm + VAT + phí vận chuyển, sau đó làm tròn đến hàng nghìn gần nhất.
           </p>
         </div>
         <div
@@ -137,10 +137,6 @@ export default function PriceFormulaTab() {
             gap: 20,
           }}
         >
-          {field("roundingUnit", "Làm tròn giá đến", "Ví dụ 1.000đ để làm tròn lên hàng nghìn.", "VNĐ", {
-            min: 1,
-            step: 500,
-          })}
           {field(
             "defaultShippingFee",
             "Phí vận chuyển mặc định",

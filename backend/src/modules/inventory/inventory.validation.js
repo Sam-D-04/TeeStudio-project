@@ -50,6 +50,26 @@ const createInventoryTransactionSchema = {
   },
 };
 
+/** Schema tạo nhanh nhà cung cấp từ trang nhập kho */
+const createSupplierSchema = {
+  body: {
+    name: {
+      label: "Tên nhà cung cấp",
+      required: true,
+      type: "string",
+      minLength: 2,
+      maxLength: 200,
+      custom: (name) =>
+        name.trim().length >= 2 || "Tên nhà cung cấp phải có ít nhất 2 ký tự",
+    },
+    phone: {
+      label: "Số điện thoại",
+      type: "string",
+      pattern: /^\d{10}$/,
+    },
+  },
+};
+
 /** Schema lấy danh sách tồn kho (query params) */
 const getDanhSachTonKhoSchema = {
   query: {
@@ -64,6 +84,11 @@ const getDanhSachTonKhoSchema = {
       min: 1,
       max: 100,
     },
+    variantId: {
+      label: "Biến thể phôi áo",
+      type: "integer",
+      min: 1,
+    },
     tuKhoa: {
       label: "Từ khóa tìm kiếm",
       type: "string",
@@ -74,10 +99,21 @@ const getDanhSachTonKhoSchema = {
       type: "string",
       maxLength: 100,
     },
+    tuNgay: {
+      label: "Từ ngày",
+      type: "string",
+      pattern: /^\d{4}-\d{2}-\d{2}$/,
+    },
+    denNgay: {
+      label: "Đến ngày",
+      type: "string",
+      pattern: /^\d{4}-\d{2}-\d{2}$/,
+    },
   },
 };
 
 module.exports = {
   createInventoryTransactionSchema,
   getDanhSachTonKhoSchema,
+  createSupplierSchema,
 };

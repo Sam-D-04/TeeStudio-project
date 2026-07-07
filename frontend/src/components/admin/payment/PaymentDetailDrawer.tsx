@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { Payment, PaymentType } from "./PaymentTable";
 import PaymentStatusBadge from "./PaymentStatusBadge";
+import { getPaymentMethodLabel } from "@/lib/paymentDisplay";
 
 /**
  * PaymentDetailDrawer – ngăn kéo chi tiết giao dịch.
@@ -12,14 +13,12 @@ import PaymentStatusBadge from "./PaymentStatusBadge";
  * 1. Tiêu đề + mã GD + trạng thái
  * 2. Thông tin thanh toán (số tiền, phương thức, mã cổng, thời gian)
  * 3. Đơn hàng liên quan (mã đơn + thông tin khách)
- * 4. Lịch sử xử lý IPN (timeline)
- * 5. Ghi chú kế toán + nút hành động (Hoàn tiền, Đồng bộ VNPAY)
+ * 4. Lịch sử thanh toán (chính sách ban đầu + timeline giao dịch/IPN)
+ * 5. Ghi chú kế toán
  *
  * Props:
  * - payment: null = ẩn ngăn kéo | PaymentDetail = hiển thị ngăn kéo với dữ liệu
  * - onClose: gọi khi bấm nút X
- * - onRefund: gọi khi bấm nút Hoàn tiền
- * - onSyncVnpay: gọi khi bấm nút Đồng bộ VNPAY
  * - onSaveNote: gọi khi bấm nút Lưu ghi chú
  * - isActionLoading: true khi đang xử lý hành động (disable nút)
  */
@@ -27,9 +26,16 @@ import PaymentStatusBadge from "./PaymentStatusBadge";
 // Nhãn tiếng Việt cho từng loại thanh toán (ánh xạ từ DB.paymentType)
 const PAYMENT_TYPE_LABEL: Record<PaymentType, string> = {
   DEPOSIT: "Thanh toán cọc",
+  FULL: "Thanh toán toàn bộ",
   FULL_PAYMENT: "Thanh toán toàn bộ",
   COD_FINAL: "Thanh toán COD",
 };
+
+const ORDER_PAYMENT_STATUS_LABEL = {
+  PENDING: "Chờ thanh toán",
+  PARTIALLY_PAID: "Đã thanh toán một phần",
+  PAID: "Đã thanh toán đủ",
+} as const;
 
 // Kiểu mở rộng chứa thêm thông tin chi tiết (ngoài các trường cơ bản của Payment)
 export type PaymentDetail = Payment & {
@@ -50,8 +56,6 @@ type PaymentDetailDrawerProps = {
   payment: PaymentDetail | null;           // null = ẩn ngăn kéo
   onClose: () => void;                     // Đóng ngăn kéo
   isLoading?: boolean;                     // Đang tải chi tiết
-  onRefund?: (id: number) => void;         // Hoàn tiền
-  onSyncVnpay?: (id: number) => void;      // Đồng bộ VNPAY
   onSaveNote?: (id: number, note: string) => void; // Lưu ghi chú
   isActionLoading?: boolean;               // Đang xử lý hành động
 };
@@ -60,22 +64,12 @@ export default function PaymentDetailDrawer({
   payment,
   onClose,
   isLoading = false,
-  onRefund,
-  onSyncVnpay,
   onSaveNote,
   isActionLoading = false,
 }: PaymentDetailDrawerProps) {
-  // State lưu nội dung ghi chú kế toán
-  const [accountingNote, setAccountingNote] = useState("");
-
-  // Khi payment thay đổi, cập nhật ghi chú
-  useEffect(() => {
-    if (payment?.note !== undefined) {
-      setAccountingNote(payment.note);
-    } else {
-      setAccountingNote("");
-    }
-  }, [payment?.id, payment?.note]);
+  const [noteDraft, setNoteDraft] = useState({ paymentId: 0, value: "" });
+  const accountingNote =
+    noteDraft.paymentId === payment?.id ? noteDraft.value : payment?.note ?? "";
 
   // Hàm định dạng số tiền VNĐ
   function formatVnd(amount: number): string {
@@ -136,7 +130,10 @@ export default function PaymentDetailDrawer({
                 <p className="mb-1 text-xs text-text-secondary">Mã Giao Dịch</p>
                 <p className="text-lg font-bold text-text-main">{payment.payCode}</p>
               </div>
-              <PaymentStatusBadge status={payment.status} />
+              <PaymentStatusBadge
+                status={payment.status}
+                paymentType={payment.paymentType}
+              />
             </div>
           )}
 
@@ -153,15 +150,39 @@ export default function PaymentDetailDrawer({
                   {formatVnd(payment.amountVnd)}
                 </span>
 
-                <span className="text-text-secondary">Loại thanh toán:</span>
+                <span className="text-text-secondary">Chính sách ban đầu:</span>
+                <span className="text-right font-semibold text-text-main">
+                  {PAYMENT_TYPE_LABEL[payment.orderPaymentType]}
+                </span>
+
+                <span className="text-text-secondary">Tiến độ thanh toán:</span>
+                <span className="text-right font-medium text-text-main">
+                  {ORDER_PAYMENT_STATUS_LABEL[payment.orderPaymentStatus]}
+                </span>
+
+                <span className="text-text-secondary">Loại giao dịch này:</span>
                 <span className="text-right font-medium text-text-main">
                   {PAYMENT_TYPE_LABEL[payment.paymentType]}
                 </span>
 
                 <span className="text-text-secondary">Phương thức:</span>
                 <span className="text-right font-medium text-text-main">
-                  {payment.method}
+                  {getPaymentMethodLabel({
+                    method: payment.method,
+                    paymentType: payment.paymentType,
+                    status: payment.status,
+                  })}
                 </span>
+
+                {payment.orderPaymentType === "DEPOSIT" && (
+                  <>
+                    <span className="text-text-secondary">Khoản COD còn lại:</span>
+                    <span className="text-right font-semibold text-[#b45309]">
+                      {formatVnd(payment.codAmountVnd ?? payment.remainingAmountVnd ?? payment.amountVnd)}
+                      {" (50%)"}
+                    </span>
+                  </>
+                )}
 
                 <span className="text-text-secondary">Mã cổng thanh toán:</span>
                 <span className="text-right font-mono text-xs text-text-muted">
@@ -211,11 +232,11 @@ export default function PaymentDetailDrawer({
             </div>
           )}
 
-          {/* Phần 4: Lịch sử xử lý IPN – timeline theo chiều dọc */}
+          {/* Phần 4: Chính sách ban đầu và lịch sử xử lý giao dịch */}
           {payment && !isLoading && (
             <div>
               <h3 className="mb-3 text-xs font-bold uppercase text-text-secondary">
-                Lịch sử xử lý IPN
+                Lịch sử thanh toán
               </h3>
 
               {payment.ipnHistory.length === 0 ? (
@@ -254,7 +275,9 @@ export default function PaymentDetailDrawer({
               {/* Ô nhập ghi chú tự do */}
               <textarea
                 value={accountingNote}
-                onChange={(e) => setAccountingNote(e.target.value)}
+                onChange={(e) =>
+                  setNoteDraft({ paymentId: payment.id, value: e.target.value })
+                }
                 placeholder="Thêm ghi chú đối soát tại đây..."
                 className="min-h-[100px] w-full rounded-lg border border-border bg-surface-alt p-3 text-sm text-text-main outline-none focus:border-[#0ea5e9] focus:ring-1 focus:ring-[#0ea5e9]"
               />
@@ -274,38 +297,6 @@ export default function PaymentDetailDrawer({
             </div>
           )}
         </div>
-
-        {/* ---- Khu vực nút hành động cuối ngăn kéo ---- */}
-        {payment && !isLoading && (
-          <div className="flex shrink-0 gap-3 border-t border-border bg-surface p-5">
-            {/* Nút Hoàn tiền – màu đỏ nhạt */}
-            <button
-              type="button"
-              disabled={isActionLoading || payment.status !== "da_thanh_toan"}
-              onClick={() => {
-                if (payment && onRefund) {
-                  onRefund(payment.id);
-                }
-              }}
-              className="h-control-h flex-1 rounded-lg border border-[#fca5a5] bg-surface text-sm font-semibold text-[#b91c1c] transition-colors hover:bg-[#fef2f2] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Hoàn tiền
-            </button>
-            {/* Nút Đồng bộ VNPAY – màu xanh chính */}
-            <button
-              type="button"
-              disabled={isActionLoading || payment.method !== "VNPAY"}
-              onClick={() => {
-                if (payment && onSyncVnpay) {
-                  onSyncVnpay(payment.id);
-                }
-              }}
-              className="h-control-h flex-1 rounded-lg bg-[#0ea5e9] text-sm font-semibold text-white transition-colors hover:bg-[#0284c7] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Đồng bộ VNPAY
-            </button>
-          </div>
-        )}
       </div>
     </>
   );

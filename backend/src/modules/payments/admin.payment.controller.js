@@ -2,31 +2,61 @@
  * payment.controller.js – Nhận request HTTP, gọi service, trả response.
  *
  * Bao gồm:
- * - Phần 1: VNPAY Return / IPN (giữ nguyên từ trước)
- * - Phần 2: Admin quản lý thanh toán (mới)
+ * - Phần 1: Return / IPN dùng chung cho VNPAY và MoMo
+ * - Phần 2: Admin quản lý thanh toán
  */
 
 const paymentService = require("./admin.payment.service");
+const paymentReportService = require("./admin.payment.report.service");
+const { guiBaoCaoExcel } = require("../../common/utils/excel-report");
 
 // =====================================================================
-// PHẦN 1: VNPAY RETURN / IPN (GIỮ NGUYÊN)
+// PHẦN 1: RETURN / IPN DÙNG CHUNG CHO CÁC CỔNG THANH TOÁN ONLINE
 // =====================================================================
 
-const xacThucKetQuaTraVeVnpay = async (req, res, next) => {
+const ONLINE_GATEWAY_HANDLERS = Object.freeze({
+  vnpay: {
+    verifyReturn: paymentService.xacThucKetQuaTraVeVnpay,
+    processIpn: paymentService.xuLyIpnVnpay,
+  },
+  momo: {
+    verifyReturn: paymentService.xacThucKetQuaTraVeMomo,
+    processIpn: paymentService.xuLyIpnMomo,
+  },
+});
+
+function getOnlineGatewayHandler(gateway) {
+  const handler = ONLINE_GATEWAY_HANDLERS[String(gateway || "").toLowerCase()];
+  if (!handler) {
+    const error = new Error("Cổng thanh toán không được hỗ trợ");
+    error.statusCode = 404;
+    throw error;
+  }
+  return handler;
+}
+
+const xacThucKetQuaTraVe = async (req, res, next) => {
   try {
-    const data = await paymentService.xacThucKetQuaTraVeVnpay(req.query);
+    const handler = getOnlineGatewayHandler(req.params.gateway);
+    const data = await handler.verifyReturn(req.query);
     res.json({ success: true, data });
   } catch (error) {
     next(error);
   }
 };
 
-const xuLyIpnVnpay = async (req, res, next) => {
+const xuLyIpn = async (req, res, next) => {
   try {
-    const result = await paymentService.xuLyIpnVnpay(req.query);
-    res.json(result);
+    const gateway = String(req.params.gateway || "").toLowerCase();
+    const handler = getOnlineGatewayHandler(gateway);
+    const result = await handler.processIpn(gateway === "momo" ? req.body : req.query);
+
+    if (gateway === "momo") {
+      return res.status(204).send();
+    }
+    return res.json(result);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
@@ -57,6 +87,15 @@ const getDanhSachThanhToan = async (req, res, next) => {
     res.json({ success: true, data });
   } catch (error) {
     next(error);
+  }
+};
+
+const exportBaoCaoThanhToan = async (req, res, next) => {
+  try {
+    const report = await paymentReportService.taoBaoCaoThanhToan(req.query);
+    return guiBaoCaoExcel(res, report);
+  } catch (error) {
+    return next(error);
   }
 };
 
@@ -101,46 +140,6 @@ const xacNhanThuCod = async (req, res, next) => {
 };
 
 /**
- * POST /api/admin/payments/:id/sync-vnpay
- * Đồng bộ lại trạng thái từ VNPAY.
- */
-const dongBoLaiVnpay = async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (!id || id < 1) {
-      return res.status(400).json({ success: false, message: "ID không hợp lệ" });
-    }
-    const data = await paymentService.dongBoLaiVnpay(id);
-    res.json({ success: true, message: "Đã đồng bộ trạng thái VNPAY", data });
-  } catch (error) {
-    if (error.statusCode) {
-      return res.status(error.statusCode).json({ success: false, message: error.message });
-    }
-    next(error);
-  }
-};
-
-/**
- * POST /api/admin/payments/:id/refund
- * Hoàn tiền giao dịch.
- */
-const hoanTienGiaoDich = async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (!id || id < 1) {
-      return res.status(400).json({ success: false, message: "ID không hợp lệ" });
-    }
-    const data = await paymentService.hoanTienGiaoDich(id);
-    res.json({ success: true, message: "Đã hoàn tiền giao dịch", data });
-  } catch (error) {
-    if (error.statusCode) {
-      return res.status(error.statusCode).json({ success: false, message: error.message });
-    }
-    next(error);
-  }
-};
-
-/**
  * PATCH /api/admin/payments/:id/note
  * Lưu ghi chú kế toán.
  */
@@ -162,15 +161,14 @@ const luuGhiChu = async (req, res, next) => {
 };
 
 module.exports = {
-  // VNPAY Return / IPN
-  xacThucKetQuaTraVeVnpay,
-  xuLyIpnVnpay,
+  // Return / IPN dùng chung
+  xacThucKetQuaTraVe,
+  xuLyIpn,
   // Admin quản lý thanh toán
   getThongKeThanhToan,
   getDanhSachThanhToan,
+  exportBaoCaoThanhToan,
   getChiTietThanhToan,
   xacNhanThuCod,
-  dongBoLaiVnpay,
-  hoanTienGiaoDich,
   luuGhiChu,
 };

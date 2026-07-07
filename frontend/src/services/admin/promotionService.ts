@@ -40,6 +40,9 @@ export type BoLocKhuyenMai = {
   loaiGiam?: LoaiGiamKhuyenMai | "";
   tuNgay?: string;
   denNgay?: string;
+  hetHanTrongNgay?: number;
+  kySuDung?: "THIS_MONTH";
+  kyGiamGia?: "THIS_MONTH";
 };
 
 export type KetQuaDanhSachKhuyenMai = {
@@ -108,7 +111,6 @@ export type DanhSachPhuPhi = {
 };
 
 export type CauHinhBaoGia = {
-  roundingUnit: number;
   defaultShippingFee: number;
   freeShippingThreshold: number;
   vatPercent: number;

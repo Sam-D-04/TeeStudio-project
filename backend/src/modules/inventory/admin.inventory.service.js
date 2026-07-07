@@ -20,16 +20,36 @@ const db = require("../../database/mysql");
 
 /** Số lượng ≤ ngưỡng này → trạng thái "sap_het" */
 const NGUONG_SAP_HET = 20;
+const NGUONG_TON_THAP_DASHBOARD = 15;
+
+const RESERVED_STOCK_JOIN = `
+  LEFT JOIN (
+    SELECT oi.variantId, SUM(oi.quantity) AS daGiu
+    FROM OrderItem oi
+    INNER JOIN CustomerOrder co ON co.id = oi.orderId
+    WHERE co.status IN ('PENDING','CONFIRMED','PROCESSING','PRINTING','READY_TO_SHIP')
+    GROUP BY oi.variantId
+  ) reservedStock ON reservedStock.variantId = pv.id
+`;
+
+// stockQty đã được trừ ngay khi tạo đơn và được hoàn lại khi hủy đơn.
+// Vì vậy đây chính là lượng còn khả dụng; daGiu chỉ là chỉ số tham khảo,
+// không được trừ thêm lần nữa.
+const AVAILABLE_STOCK_SQL = "pv.stockQty";
 
 /**
- * Tính trạng thái tồn kho từ stockQty.
- * @param {number} stockQty
+ * Tính trạng thái tồn kho từ số lượng khả dụng.
+ * @param {number} availableQty
  * @returns {"con_hang"|"sap_het"|"het_hang"}
  */
-function tinhTrangThaiTonKho(stockQty) {
-  if (stockQty <= 0) return "het_hang";
-  if (stockQty <= NGUONG_SAP_HET) return "sap_het";
+function tinhTrangThaiTonKho(availableQty) {
+  if (availableQty <= 0) return "het_hang";
+  if (availableQty <= NGUONG_SAP_HET) return "sap_het";
   return "con_hang";
+}
+
+function laNgayHopLe(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -39,35 +59,37 @@ function tinhTrangThaiTonKho(stockQty) {
 /**
  * Lấy 4 thẻ thống kê KPI đầu trang kho hàng.
  * - Tổng phôi còn tồn (SUM stockQty)
- * - Biến thể sắp hết (stockQty > 0 AND <= NGUONG_SAP_HET)
+ * - Biến thể sắp hết (available > 0 AND <= NGUONG_SAP_HET)
  * - Cần xuất cho đơn in (tổng số áo đang bị giữ = quantityChanged âm chưa hoàn)
  * - Nhập kho trong tháng này (SUM quantityChanged > 0 trong tháng)
  */
 async function layThongKeKho() {
   // Tổng phôi còn tồn
-  const [tongPhoi] = await db.query(
+  const tongPhoi = await db.query(
     `SELECT COALESCE(SUM(stockQty), 0) AS tongPhoi FROM ProductVariant`
   );
 
   // Biến thể sắp hết
-  const [sapHet] = await db.query(
+  const sapHet = await db.query(
     `SELECT COUNT(*) AS sapHet
-     FROM ProductVariant
-     WHERE stockQty > 0 AND stockQty <= ?`,
+     FROM ProductVariant pv
+     ${RESERVED_STOCK_JOIN}
+     WHERE ${AVAILABLE_STOCK_SQL} > 0
+       AND ${AVAILABLE_STOCK_SQL} <= ?`,
     [NGUONG_SAP_HET]
   );
 
   // Số áo đang bị giữ = SUM của các giao dịch ORDER_EXPORT âm chưa RETURN
   // Đơn giản hóa: tổng số lượng đặt hàng đang chờ xử lý
-  const [daGiu] = await db.query(
+  const daGiu = await db.query(
     `SELECT COALESCE(SUM(oi.quantity), 0) AS daGiu
      FROM OrderItem oi
      INNER JOIN CustomerOrder co ON co.id = oi.orderId
-     WHERE co.status IN ('PENDING','CONFIRMED','PRINTING','PRINTED','PACKING')`
+     WHERE co.status IN ('PENDING','CONFIRMED','PROCESSING','PRINTING','READY_TO_SHIP')`
   );
 
   // Nhập kho trong tháng hiện tại
-  const [nhapThang] = await db.query(
+  const nhapThang = await db.query(
     `SELECT COALESCE(SUM(quantityChanged), 0) AS nhapThang
      FROM InventoryTransaction
      WHERE transactionType IN ('IMPORT')
@@ -93,19 +115,31 @@ async function layThongKeKho() {
  * @param {object} params
  * @param {number}  [params.trang=1]        - Trang hiện tại
  * @param {number}  [params.soMoiTrang=10]  - Số dòng mỗi trang
+ * @param {number}  [params.variantId]       - Lọc chính xác theo ID biến thể
  * @param {string}  [params.tuKhoa]         - Tìm theo SKU | tên | màu
- * @param {string}  [params.boLoc]          - "tat_ca" | "sap_het" | "het_hang" | "con_hang" | tên sản phẩm
+ * @param {string}  [params.boLoc]          - "tat_ca" | "ton_thap" | "sap_het" | "can_xuat" | "nhap_thang" | "het_hang" | "con_hang" | tên sản phẩm
+ * @param {string}  [params.tuNgay]          - Chỉ lấy SKU có biến động kho từ ngày này
+ * @param {string}  [params.denNgay]         - Chỉ lấy SKU có biến động kho đến ngày này
  * @returns {Promise<{danhSach: object[], tongSo: number, trang: number, soMoiTrang: number, tongSoTrang: number}>}
  */
 async function layDanhSachTonKho(params = {}) {
   const trang = Math.max(1, parseInt(params.trang) || 1);
   const soMoiTrang = Math.min(100, Math.max(1, parseInt(params.soMoiTrang) || 10));
   const offset = (trang - 1) * soMoiTrang;
+  const variantId = Number(params.variantId) || null;
   const tuKhoa = params.tuKhoa ? params.tuKhoa.trim() : "";
   const boLoc = params.boLoc || "tat_ca";
+  const tuNgay = laNgayHopLe(params.tuNgay) ? params.tuNgay : "";
+  const denNgay = laNgayHopLe(params.denNgay) ? params.denNgay : "";
 
   const conditions = [];
   const values = [];
+
+  // Link từ trang phôi áo dùng ID để luôn chọn đúng duy nhất một biến thể.
+  if (variantId) {
+    conditions.push("pv.id = ?");
+    values.push(variantId);
+  }
 
   // Lọc theo từ khóa tìm kiếm
   if (tuKhoa) {
@@ -115,16 +149,54 @@ async function layDanhSachTonKho(params = {}) {
   }
 
   // Lọc theo trạng thái tồn kho
-  if (boLoc === "sap_het") {
-    conditions.push(`pv.stockQty > 0 AND pv.stockQty <= ${NGUONG_SAP_HET}`);
+  if (boLoc === "ton_thap") {
+    conditions.push(
+      `${AVAILABLE_STOCK_SQL} <= ${NGUONG_TON_THAP_DASHBOARD}`
+    );
+  } else if (boLoc === "sap_het") {
+    conditions.push(
+      `${AVAILABLE_STOCK_SQL} > 0 AND ${AVAILABLE_STOCK_SQL} <= ${NGUONG_SAP_HET}`
+    );
   } else if (boLoc === "het_hang") {
-    conditions.push(`pv.stockQty <= 0`);
+    conditions.push(`${AVAILABLE_STOCK_SQL} <= 0`);
   } else if (boLoc === "con_hang") {
-    conditions.push(`pv.stockQty > ${NGUONG_SAP_HET}`);
+    conditions.push(`${AVAILABLE_STOCK_SQL} > ${NGUONG_SAP_HET}`);
+  } else if (boLoc === "can_xuat") {
+    conditions.push("COALESCE(reservedStock.daGiu, 0) > 0");
+  } else if (boLoc === "nhap_thang") {
+    conditions.push(
+      `EXISTS (
+        SELECT 1
+        FROM InventoryTransaction itNhap
+        WHERE itNhap.variantId = pv.id
+          AND itNhap.transactionType = 'IMPORT'
+          AND MONTH(itNhap.createdAt) = MONTH(CURDATE())
+          AND YEAR(itNhap.createdAt) = YEAR(CURDATE())
+      )`
+    );
   } else if (boLoc !== "tat_ca") {
     // Lọc theo tên sản phẩm (partial match)
     conditions.push(`p.name LIKE ?`);
     values.push(`%${boLoc}%`);
+  }
+
+  if (tuNgay || denNgay) {
+    const transactionConditions = ["it.variantId = pv.id"];
+    if (tuNgay) {
+      transactionConditions.push("it.createdAt >= ?");
+      values.push(tuNgay);
+    }
+    if (denNgay) {
+      transactionConditions.push("it.createdAt < DATE_ADD(?, INTERVAL 1 DAY)");
+      values.push(denNgay);
+    }
+    conditions.push(
+      `EXISTS (
+        SELECT 1
+        FROM InventoryTransaction it
+        WHERE ${transactionConditions.join(" AND ")}
+      )`
+    );
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -134,6 +206,7 @@ async function layDanhSachTonKho(params = {}) {
     `SELECT COUNT(*) AS total
      FROM ProductVariant pv
      INNER JOIN Product p ON p.id = pv.productId
+     ${RESERVED_STOCK_JOIN}
      ${whereClause}`,
     values
   );
@@ -145,18 +218,14 @@ async function layDanhSachTonKho(params = {}) {
        pv.id,
        p.name AS ten,
        pv.color AS mau,
+       pv.colorHex AS mauHex,
        pv.size,
        pv.sku,
        pv.stockQty AS tonHienTai,
-       COALESCE((
-         SELECT SUM(oi.quantity)
-         FROM OrderItem oi
-         INNER JOIN CustomerOrder co ON co.id = oi.orderId
-         WHERE oi.variantId = pv.id
-           AND co.status IN ('PENDING','CONFIRMED','PRINTING','PRINTED','PACKING')
-       ), 0) AS daGiu
+       COALESCE(reservedStock.daGiu, 0) AS daGiu
      FROM ProductVariant pv
      INNER JOIN Product p ON p.id = pv.productId
+     ${RESERVED_STOCK_JOIN}
      ${whereClause}
      ORDER BY p.name ASC, pv.color ASC, FIELD(pv.size,'XS','S','M','L','XL','XXL','2XL','3XL')
      LIMIT ? OFFSET ?`,
@@ -166,17 +235,18 @@ async function layDanhSachTonKho(params = {}) {
   const danhSach = rows.map((row) => {
     const daGiu = Number(row.daGiu);
     const tonHienTai = Number(row.tonHienTai);
-    const khaDung = Math.max(0, tonHienTai - daGiu);
+    const khaDung = tonHienTai;
     return {
       id: row.id,
       ten: row.ten,
       mau: row.mau,
+      mauHex: row.mauHex,
       size: row.size,
       sku: row.sku,
       tonHienTai,
       daGiu,
       khaDung,
-      trangThai: tinhTrangThaiTonKho(tonHienTai),
+      trangThai: tinhTrangThaiTonKho(khaDung),
     };
   });
 
@@ -203,18 +273,14 @@ async function layChiTietBienThe(variantId) {
        pv.id,
        p.name AS ten,
        pv.color AS mau,
+       pv.colorHex AS mauHex,
        pv.size,
        pv.sku,
        pv.stockQty AS tonHienTai,
-       COALESCE((
-         SELECT SUM(oi.quantity)
-         FROM OrderItem oi
-         INNER JOIN CustomerOrder co ON co.id = oi.orderId
-         WHERE oi.variantId = pv.id
-           AND co.status IN ('PENDING','CONFIRMED','PRINTING','PRINTED','PACKING')
-       ), 0) AS daGiu
+       COALESCE(reservedStock.daGiu, 0) AS daGiu
      FROM ProductVariant pv
      INNER JOIN Product p ON p.id = pv.productId
+     ${RESERVED_STOCK_JOIN}
      WHERE pv.id = ?`,
     [variantId]
   );
@@ -228,18 +294,19 @@ async function layChiTietBienThe(variantId) {
   const row = rows[0];
   const daGiu = Number(row.daGiu);
   const tonHienTai = Number(row.tonHienTai);
-  const khaDung = Math.max(0, tonHienTai - daGiu);
+  const khaDung = tonHienTai;
 
   return {
     id: row.id,
     ten: row.ten,
     mau: row.mau,
+    mauHex: row.mauHex,
     size: row.size,
     sku: row.sku,
     tonHienTai,
     daGiu,
     khaDung,
-    trangThai: tinhTrangThaiTonKho(tonHienTai),
+    trangThai: tinhTrangThaiTonKho(khaDung),
   };
 }
 
@@ -259,7 +326,7 @@ async function layDonChoXuat(variantId) {
      FROM OrderItem oi
      INNER JOIN CustomerOrder co ON co.id = oi.orderId
      WHERE oi.variantId = ?
-       AND co.status IN ('PENDING','CONFIRMED','PRINTING','PRINTED','PACKING')
+       AND co.status IN ('PENDING','CONFIRMED','PROCESSING','PRINTING','READY_TO_SHIP')
      ORDER BY co.createdAt ASC
      LIMIT 20`,
     [variantId]
@@ -369,6 +436,15 @@ async function ghiGiaoDichKho(payload) {
     reason,
   } = payload;
 
+  // Giao dịch nhập kho phải gắn với nhà cung cấp để bảo toàn dấu vết nhập hàng.
+  if (transactionType === "IMPORT" && !supplierId) {
+    const error = new Error(
+      "Vui lòng chọn nhà cung cấp khi nhập kho từ nhà cung cấp"
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
   // Kiểm tra biến thể tồn tại
   const [variants] = await db.pool.query(
     `SELECT id, stockQty FROM ProductVariant WHERE id = ? FOR UPDATE`,
@@ -446,6 +522,7 @@ async function layDanhSachSanPhamVaBienThe() {
     `SELECT id, productId, color AS mau, size, sku, stockQty AS tonHienTai
      FROM ProductVariant
      WHERE productId IN (${placeholders})
+       AND (status IS NULL OR status = 'ACTIVE')
      ORDER BY productId ASC, color ASC, FIELD(size,'XS','S','M','L','XL','XXL','2XL','3XL')`,
     productIds
   );
@@ -489,6 +566,27 @@ async function layDanhSachNhaCungCap() {
     ten: row.ten,
     soDienThoai: row.soDienThoai || "",
   }));
+}
+
+/**
+ * Tạo nhanh một nhà cung cấp để sử dụng ngay trong phiếu nhập kho.
+ *
+ * @param {{name: string, phone?: string}} payload
+ * @returns {Promise<{id: number, ten: string, soDienThoai: string}>}
+ */
+async function taoNhaCungCap(payload) {
+  const ten = payload.name.trim();
+  const soDienThoai = payload.phone?.trim() || null;
+  const result = await db.execute(
+    `INSERT INTO Supplier (name, phone) VALUES (?, ?)`,
+    [ten, soDienThoai]
+  );
+
+  return {
+    id: result.insertId,
+    ten,
+    soDienThoai: soDienThoai || "",
+  };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -643,4 +741,5 @@ module.exports = {
   ghiGiaoDichKho,
   layDanhSachSanPhamVaBienThe,
   layDanhSachNhaCungCap,
+  taoNhaCungCap,
 };

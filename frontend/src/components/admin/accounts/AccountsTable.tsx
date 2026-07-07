@@ -19,6 +19,7 @@ import {
   StopOutlined,
   CheckCircleOutlined,
   ReloadOutlined,
+  UserAddOutlined,
 } from "@ant-design/icons";
 import type { TaiKhoanKhachHang, ThamSoLocTaiKhoan } from "@/services/admin/accountService";
 import AccountStatusBadge from "./AccountStatusBadge";
@@ -32,6 +33,7 @@ type Props = {
   thamSoLoc: ThamSoLocTaiKhoan;
   onDoiTrang: (trang: number, soMoiTrang: number) => void;
   onDoiLoc: (thamSo: Partial<ThamSoLocTaiKhoan>) => void;
+  onThem: () => void;
   onSua: (taiKhoan: TaiKhoanKhachHang) => void;
   onVoHieuHoa: (taiKhoan: TaiKhoanKhachHang) => void;
   onKhoiPhuc: (taiKhoan: TaiKhoanKhachHang) => void;
@@ -46,6 +48,7 @@ export default function AccountsTable({
   thamSoLoc,
   onDoiTrang,
   onDoiLoc,
+  onThem,
   onSua,
   onVoHieuHoa,
   onKhoiPhuc,
@@ -288,13 +291,12 @@ export default function AccountsTable({
 
         {/* Lọc theo trạng thái */}
         <Select
-          value={thamSoLoc.status ?? "tat_ca"}
+          value={thamSoLoc.status || "tat_ca"}
           onChange={(value) => onDoiLoc({ status: value, page: 1 })}
           options={[
             { value: "tat_ca", label: "Tất cả trạng thái" },
             { value: "ACTIVE", label: "Đang hoạt động" },
             { value: "INACTIVE", label: "Đã vô hiệu hóa" },
-            { value: "SUSPENDED", label: "Đình chỉ" },
           ]}
           style={{ width: 190, height: 40 }}
         />
@@ -315,7 +317,25 @@ export default function AccountsTable({
             fontWeight: 500,
           }}
         >
-          Làm mới
+          Đặt lại
+        </Button>
+
+        <Button
+          type="primary"
+          icon={<UserAddOutlined />}
+          onClick={onThem}
+          style={{
+            height: 40,
+            borderRadius: 8,
+            background: "#0ea5e9",
+            border: "none",
+            fontWeight: 600,
+            fontSize: 14,
+            paddingInline: 20,
+            boxShadow: "0 2px 8px rgba(14,165,233,0.25)",
+          }}
+        >
+          Thêm tài khoản
         </Button>
       </div>
 
@@ -330,8 +350,7 @@ export default function AccountsTable({
           current: trang,
           pageSize: soMoiTrang,
           total: tongSo,
-          showSizeChanger: true,
-          pageSizeOptions: ["10", "20", "50"],
+          showSizeChanger: false,
           showTotal: (total, range) =>
             `${range[0]}–${range[1]} trong ${total} tài khoản`,
           onChange: onDoiTrang,

@@ -1,6 +1,7 @@
 "use client";
 
 import { SearchOutlined } from "@ant-design/icons";
+import DateRangeFilter from "@/components/admin/common/DateRangeFilter";
 import type { PromotionStatus } from "./PromotionStatusBadge";
 
 export type BoDucMaKhuyenMai = {
@@ -14,6 +15,7 @@ export type BoDucMaKhuyenMai = {
 type Props = {
   boDuc: BoDucMaKhuyenMai;
   onThayDoi: (boDucMoi: BoDucMaKhuyenMai) => void;
+  onReset: () => void;
 };
 
 const controlStyle: React.CSSProperties = {
@@ -27,7 +29,7 @@ const controlStyle: React.CSSProperties = {
   outline: "none",
 };
 
-export default function PromotionFilterBar({ boDuc, onThayDoi }: Props) {
+export default function PromotionFilterBar({ boDuc, onThayDoi, onReset }: Props) {
   function capNhat<K extends keyof BoDucMaKhuyenMai>(
     truong: K,
     giaTri: BoDucMaKhuyenMai[K],
@@ -92,24 +94,54 @@ export default function PromotionFilterBar({ boDuc, onThayDoi }: Props) {
         <option value="mien_phi_van_chuyen">Miễn phí vận chuyển</option>
       </select>
 
-      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569" }}>
-        Từ ngày
-        <input
-          type="date"
-          value={boDuc.tuNgay}
-          onChange={(event) => capNhat("tuNgay", event.target.value)}
-          style={controlStyle}
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-semibold text-text-secondary">
+          Thời gian hiệu lực
+        </span>
+        <DateRangeFilter
+          initialPreset={boDuc.tuNgay && boDuc.denNgay ? "custom" : "all"}
+          initialStartDate={boDuc.tuNgay}
+          initialEndDate={boDuc.denNgay}
+          allowClear
+          onChange={(startDate, endDate) =>
+            onThayDoi({
+              ...boDuc,
+              tuNgay: startDate,
+              denNgay: endDate,
+            })
+          }
+          onClear={() =>
+            onThayDoi({
+              ...boDuc,
+              tuNgay: "",
+              denNgay: "",
+            })
+          }
+          selectClassName="h-10"
+          rangePickerClassName="h-10 sm:w-[280px]"
         />
-      </label>
-      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569" }}>
-        Đến ngày
-        <input
-          type="date"
-          value={boDuc.denNgay}
-          onChange={(event) => capNhat("denNgay", event.target.value)}
-          style={controlStyle}
-        />
-      </label>
+      </div>
+
+      <button
+        onClick={onReset}
+        style={{
+          height: 40,
+          padding: "0 16px",
+          background: "#f1f5f9",
+          border: "1px solid #e2e8f0",
+          borderRadius: 8,
+          fontSize: 14,
+          fontWeight: 500,
+          color: "#475569",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }}
+        className="hover:bg-slate-200 transition-colors"
+      >
+        Đặt lại
+      </button>
     </div>
   );
 }

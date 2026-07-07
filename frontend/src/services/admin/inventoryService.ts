@@ -34,7 +34,7 @@ export type MucTonKho = {
   tonHienTai: number;
   /** Số áo đang bị giữ cho đơn hàng đang xử lý */
   daGiu: number;
-  /** Số áo khả dụng = tonHienTai - daGiu */
+  /** Số áo khả dụng; tonHienTai đã được giảm ngay khi đơn được tạo */
   khaDung: number;
   /** Trạng thái tồn kho */
   trangThai: TrangThaiTonKho;
@@ -65,8 +65,11 @@ export type KetQuaDanhSachTonKho = {
 export type ThamSoLocTonKho = {
   trang?: number;
   soMoiTrang?: number;
+  variantId?: number;
   tuKhoa?: string;
   boLoc?: string;
+  tuNgay?: string;
+  denNgay?: string;
 };
 
 /** Một đơn hàng đang chờ xuất phôi áo */
@@ -135,6 +138,12 @@ export type NhaCungCap = {
   id: number;
   ten: string;
   soDienThoai: string;
+};
+
+/** Dữ liệu tạo nhanh nhà cung cấp */
+export type TaoNhaCungCapInput = {
+  ten: string;
+  soDienThoai?: string;
 };
 
 /** Một giao dịch kho trong lịch sử toàn kho */
@@ -211,8 +220,11 @@ export async function layDanhSachTonKho(
 
   if (thamSo.trang) params.trang = thamSo.trang;
   if (thamSo.soMoiTrang) params.soMoiTrang = thamSo.soMoiTrang;
+  if (thamSo.variantId) params.variantId = thamSo.variantId;
   if (thamSo.tuKhoa && thamSo.tuKhoa.trim()) params.tuKhoa = thamSo.tuKhoa.trim();
   if (thamSo.boLoc && thamSo.boLoc !== "tat_ca") params.boLoc = thamSo.boLoc;
+  if (thamSo.tuNgay) params.tuNgay = thamSo.tuNgay;
+  if (thamSo.denNgay) params.denNgay = thamSo.denNgay;
 
   const res = await apiClient.get<{
     success: boolean;
@@ -293,6 +305,24 @@ export async function layDanhSachNhaCungCap(): Promise<NhaCungCap[]> {
   const res = await apiClient.get<{ success: boolean; data: NhaCungCap[] }>(
     "/admin/inventory/suppliers"
   );
+  return res.data.data;
+}
+
+/**
+ * Tạo nhanh nhà cung cấp từ trang nhập kho.
+ * POST /api/admin/inventory/suppliers
+ */
+export async function taoNhaCungCap(
+  payload: TaoNhaCungCapInput
+): Promise<NhaCungCap> {
+  const res = await apiClient.post<{
+    success: boolean;
+    message: string;
+    data: NhaCungCap;
+  }>("/admin/inventory/suppliers", {
+    name: payload.ten,
+    phone: payload.soDienThoai || undefined,
+  });
   return res.data.data;
 }
 

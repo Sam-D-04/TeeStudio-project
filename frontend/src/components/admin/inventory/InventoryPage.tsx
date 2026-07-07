@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import {
   HistoryOutlined,
   PlusSquareOutlined,
@@ -43,21 +44,48 @@ import * as inventoryService from "@/services/admin/inventoryService";
 
 // Số dòng hiển thị mỗi trang
 const SO_MOI_TRANG = 10;
+const NGUONG_SAP_HET = 20;
 
-export default function InventoryPage() {
+function tinhTrangThaiTheoKhaDung(khaDung: number): InventoryItem["trangThai"] {
+  if (khaDung <= 0) return "het_hang";
+  if (khaDung <= NGUONG_SAP_HET) return "sap_het";
+  return "con_hang";
+}
+
+type InventoryPageProps = {
+  initialStockFilter?: string;
+  initialVariantId?: number;
+  initialSearchKeyword?: string;
+};
+
+export default function InventoryPage({
+  initialStockFilter = "tat_ca",
+  initialVariantId,
+  initialSearchKeyword = "",
+}: InventoryPageProps) {
+  const router = useRouter();
   // ===== TRẠNG THÁI UI =====
 
   /** Từ khóa tìm kiếm trong ô search */
-  const [tuKhoaTimKiem, setTuKhoaTimKiem] = useState("");
+  const [tuKhoaTimKiem, setTuKhoaTimKiem] = useState(initialSearchKeyword);
+
+  /** ID biến thể khi đi từ link "Xem trong kho" ở trang phôi áo */
+  const [bienTheId, setBienTheId] = useState<number | undefined>(
+    initialVariantId
+  );
 
   /** Pill filter đang được chọn */
-  const [boLocHienTai, setBoLocHienTai] = useState("tat_ca");
+  const [boLocHienTai, setBoLocHienTai] = useState(initialStockFilter);
+
+  /** Khoảng ngày phát sinh biến động kho */
+  const [tuNgay, setTuNgay] = useState("");
+  const [denNgay, setDenNgay] = useState("");
+
+  /** Key để force re-render components bộ lọc (vd: xoá ngày tháng về null) */
+  const [filterKey, setFilterKey] = useState(0);
 
   /** Trang hiện tại trong phân trang */
   const [trangHienTai, setTrangHienTai] = useState(1);
-
-  /** Danh sách ID các hàng đang được tích checkbox */
-  const [idDaChon, setIdDaChon] = useState<number[]>([]);
 
   /** Item đang được xem chi tiết trong drawer (null = drawer đóng) */
   const [itemDangXem, setItemDangXem] = useState<InventoryItem | null>(null);
@@ -81,56 +109,99 @@ export default function InventoryPage() {
     isLoading: dangTaiDanhSach,
     isError: loiDanhSach,
   } = useQuery({
-    queryKey: ["inventory", "list", trangHienTai, tuKhoaTimKiem, boLocHienTai],
+    queryKey: [
+      "inventory",
+      "list",
+      trangHienTai,
+      bienTheId,
+      tuKhoaTimKiem,
+      boLocHienTai,
+      tuNgay,
+      denNgay,
+    ],
     queryFn: () =>
       inventoryService.layDanhSachTonKho({
         trang: trangHienTai,
         soMoiTrang: SO_MOI_TRANG,
+        variantId: bienTheId,
         tuKhoa: tuKhoaTimKiem,
         boLoc: boLocHienTai,
+        tuNgay,
+        denNgay,
       }),
     staleTime: 15_000,
     placeholderData: (prev) => prev, // giữ dữ liệu cũ khi đang tải trang mới
   });
 
-  const danhSachHienThi = ketQuaDanhSach?.danhSach ?? [];
+  const danhSachHienThi: InventoryItem[] = (ketQuaDanhSach?.danhSach ?? []).map(
+    (item) => {
+      // Backend đã giảm tonHienTai ngay khi đơn được tạo.
+      // daGiu là lượng thuộc các đơn đang hoạt động, không trừ thêm lần nữa.
+      const khaDung = item.khaDung ?? item.tonHienTai;
+      return {
+        ...item,
+        khaDung,
+        trangThai: tinhTrangThaiTheoKhaDung(khaDung),
+      };
+    }
+  );
   const tongSo = ketQuaDanhSach?.tongSo ?? 0;
   const tongSoTrang = ketQuaDanhSach?.tongSoTrang ?? 1;
 
-  // ===== XỬ LÝ CHECKBOX =====
-
-  /** Tích/bỏ tích một item */
-  function xuLyChonItem(id: number) {
-    setIdDaChon((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  }
-
-  /** Tích/bỏ tích tất cả item của trang hiện tại */
-  function xuLyChonTatCa() {
-    const idTrangHienTai = danhSachHienThi.map((i) => i.id);
-    const tatCaDaChon = idTrangHienTai.every((id) => idDaChon.includes(id));
-    if (tatCaDaChon) {
-      setIdDaChon((prev) => prev.filter((id) => !idTrangHienTai.includes(id)));
-    } else {
-      setIdDaChon((prev) => [...new Set([...prev, ...idTrangHienTai])]);
-    }
-  }
-
   // ===== XỬ LÝ BỘ LỌC + TÌM KIẾM =====
+
+  /** Bỏ ràng buộc biến thể từ link khi người dùng chủ động thay đổi bộ lọc. */
+  function xoaBoLocBienTheTuLienKet() {
+    if (!bienTheId) return;
+
+    setBienTheId(undefined);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("variantId");
+    url.searchParams.delete("sku");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }
 
   /** Reset về trang 1 khi đổi bộ lọc */
   function xuLyDoiBoLoc(key: string) {
+    xoaBoLocBienTheTuLienKet();
     setBoLocHienTai(key);
     setTrangHienTai(1);
-    setIdDaChon([]);
   }
 
   /** Reset về trang 1 khi tìm kiếm */
   function xuLyTimKiem(val: string) {
+    xoaBoLocBienTheTuLienKet();
     setTuKhoaTimKiem(val);
     setTrangHienTai(1);
-    setIdDaChon([]);
+  }
+
+  function xuLyDoiNgay(startDate: string, endDate: string) {
+    xoaBoLocBienTheTuLienKet();
+    setTuNgay(startDate);
+    setDenNgay(endDate);
+    setTrangHienTai(1);
+  }
+
+  function xuLyXoaNgay() {
+    xoaBoLocBienTheTuLienKet();
+    setTuNgay("");
+    setDenNgay("");
+    setTrangHienTai(1);
+  }
+
+  function xuLyKpiFilter(boLoc: string) {
+    xoaBoLocBienTheTuLienKet();
+    setTuKhoaTimKiem("");
+    setBoLocHienTai(boLoc);
+    setTuNgay("");
+    setDenNgay("");
+    setTrangHienTai(1);
+  }
+
+  function xuLyResetBoLoc() {
+    xuLyKpiFilter("tat_ca");
+    setFilterKey((prev) => prev + 1);
+    router.replace("/admin/kho-hang");
   }
 
   // ===== HIỂN THỊ GIÁ TRỊ THỐNG KÊ =====
@@ -184,6 +255,13 @@ export default function InventoryPage() {
           value={dangTaiThongKe ? "..." : tongPhoi.toLocaleString("vi-VN")}
           badge="+5%"
           colorScheme="default"
+          onClick={xuLyResetBoLoc}
+          isActive={
+            boLocHienTai === "tat_ca" &&
+            tuKhoaTimKiem === "" &&
+            tuNgay === "" &&
+            denNgay === ""
+          }
         />
         {/* Thẻ 2: Biến thể sắp hết */}
         <InventoryStatCard
@@ -193,6 +271,14 @@ export default function InventoryPage() {
           valueSuffix="SKU"
           badge="Cảnh báo"
           colorScheme="warning"
+          href="/admin/kho-hang?stock=LOW_STOCK"
+          onClick={() => xuLyKpiFilter("sap_het")}
+          isActive={
+            boLocHienTai === "sap_het" &&
+            tuKhoaTimKiem === "" &&
+            tuNgay === "" &&
+            denNgay === ""
+          }
         />
         {/* Thẻ 3: Cần xuất cho đơn in */}
         <InventoryStatCard
@@ -200,6 +286,14 @@ export default function InventoryPage() {
           title="Cần xuất cho đơn in"
           value={dangTaiThongKe ? "..." : daGiu}
           colorScheme="accent"
+          href="/admin/kho-hang?stock=RESERVED"
+          onClick={() => xuLyKpiFilter("can_xuat")}
+          isActive={
+            boLocHienTai === "can_xuat" &&
+            tuKhoaTimKiem === "" &&
+            tuNgay === "" &&
+            denNgay === ""
+          }
         />
         {/* Thẻ 4: Nhập kho trong tháng */}
         <InventoryStatCard
@@ -207,6 +301,14 @@ export default function InventoryPage() {
           title="Nhập kho trong tháng"
           value={dangTaiThongKe ? "..." : `+${nhapThang.toLocaleString("vi-VN")}`}
           colorScheme="success"
+          href="/admin/kho-hang?transaction=IMPORT&period=THIS_MONTH"
+          onClick={() => xuLyKpiFilter("nhap_thang")}
+          isActive={
+            boLocHienTai === "nhap_thang" &&
+            tuKhoaTimKiem === "" &&
+            tuNgay === "" &&
+            denNgay === ""
+          }
         />
       </div>
 
@@ -215,10 +317,14 @@ export default function InventoryPage() {
 
         {/* Thanh lọc */}
         <InventoryFilterBar
+          key={`filter-bar-${filterKey}`}
           searchValue={tuKhoaTimKiem}
           onSearchChange={xuLyTimKiem}
           activeFilter={boLocHienTai}
           onFilterChange={xuLyDoiBoLoc}
+          onDateChange={xuLyDoiNgay}
+          onDateClear={xuLyXoaNgay}
+          onResetFilters={xuLyResetBoLoc}
         />
 
         {/* Trạng thái lỗi */}
@@ -241,9 +347,6 @@ export default function InventoryPage() {
           <div className={dangTaiDanhSach ? "opacity-60 transition-opacity" : ""}>
             <InventoryTable
               items={danhSachHienThi}
-              selectedIds={idDaChon}
-              onSelectItem={xuLyChonItem}
-              onSelectAll={xuLyChonTatCa}
               onViewDetail={(item) => setItemDangXem(item)}
               onGiaoDich={(item) => setItemGiaoDich(item)}
             />

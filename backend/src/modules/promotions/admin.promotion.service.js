@@ -1,11 +1,12 @@
 const db = require("../../database/mysql");
 
 const DEFAULT_FORMULA = {
-  roundingUnit: 1000,
   defaultShippingFee: 30000,
   freeShippingThreshold: 500000,
   vatPercent: 0,
 };
+
+const ROUNDING_UNIT = 1000;
 
 const taoLoi = (message, statusCode = 400) => {
   const error = new Error(message);
@@ -105,19 +106,22 @@ async function layThongKeKhuyenMai() {
         `SELECT COUNT(*) AS tong
          FROM Promotion p
          WHERE p.status = 'ACTIVE'
+           AND p.startDate <= NOW()
            AND p.endDate BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 7 DAY)
            AND (p.usageLimit IS NULL OR p.usedCount < p.usageLimit)`
       ),
       db.pool.query(
         `SELECT COUNT(*) AS tong
          FROM PromotionUsage
-         WHERE usedAt >= DATE_FORMAT(CURDATE(), '%Y-%m-01')`
+         WHERE usedAt >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+           AND usedAt < DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY)`
       ),
       db.pool.query(
         `SELECT COALESCE(SUM(discountAmount), 0) AS tong
          FROM CustomerOrder
          WHERE promotionId IS NOT NULL
-           AND createdAt >= DATE_FORMAT(CURDATE(), '%Y-%m-01')`
+           AND createdAt >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+           AND createdAt < DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY)`
       ),
     ]);
 
@@ -137,6 +141,9 @@ async function layDanhSachKhuyenMai({
   loaiGiam,
   tuNgay,
   denNgay,
+  hetHanTrongNgay,
+  kySuDung,
+  kyGiamGia,
 }) {
   const page = Math.max(1, Number(trang) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(soMoiTrang) || 10));
@@ -163,6 +170,38 @@ async function layDanhSachKhuyenMai({
   if (denNgay) {
     conditions.push("p.startDate <= ?");
     params.push(chuanHoaNgay(denNgay, true));
+  }
+  if (hetHanTrongNgay) {
+    conditions.push(`p.status = 'ACTIVE'`);
+    conditions.push("p.startDate <= NOW()");
+    conditions.push(
+      "p.endDate BETWEEN NOW() AND TIMESTAMPADD(DAY, ?, NOW())"
+    );
+    conditions.push("(p.usageLimit IS NULL OR p.usedCount < p.usageLimit)");
+    params.push(Number(hetHanTrongNgay));
+  }
+  if (kySuDung === "THIS_MONTH") {
+    conditions.push(
+      `EXISTS (
+         SELECT 1
+         FROM PromotionUsage pu
+         WHERE pu.promotionId = p.id
+           AND pu.usedAt >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+           AND pu.usedAt < DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY)
+       )`
+    );
+  }
+  if (kyGiamGia === "THIS_MONTH") {
+    conditions.push(
+      `EXISTS (
+         SELECT 1
+         FROM CustomerOrder co
+         WHERE co.promotionId = p.id
+           AND co.discountAmount > 0
+           AND co.createdAt >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+           AND co.createdAt < DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY)
+       )`
+    );
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -438,7 +477,6 @@ async function capNhatPhuPhi(id, { loai, extraCost, isActive }) {
 }
 
 const mapFormula = (row) => ({
-  roundingUnit: Number(row.roundingUnit),
   defaultShippingFee: Number(row.defaultShippingFee),
   freeShippingThreshold: Number(row.freeShippingThreshold),
   vatPercent: Number(row.vatPercent),
@@ -454,14 +492,13 @@ const taoXemTruocCongThuc = (formula) => {
       ? 0
       : formula.defaultShippingFee;
   const truocLamTron = tamTinh + thueVat + phiVanChuyen;
-  const tongCong =
-    Math.ceil(truocLamTron / formula.roundingUnit) * formula.roundingUnit;
+  const tongCong = Math.round(truocLamTron / ROUNDING_UNIT) * ROUNDING_UNIT;
   return { giaPhoiMau, phuPhiInMau, tamTinh, thueVat, phiVanChuyen, truocLamTron, tongCong };
 };
 
 async function layCongThucBaoGia() {
   const [rows] = await db.pool.query(
-    `SELECT roundingUnit, defaultShippingFee, freeShippingThreshold, vatPercent
+    `SELECT defaultShippingFee, freeShippingThreshold, vatPercent
      FROM PricingConfiguration WHERE id = 1 LIMIT 1`
   );
   const formula = rows.length ? mapFormula(rows[0]) : DEFAULT_FORMULA;
@@ -470,22 +507,19 @@ async function layCongThucBaoGia() {
 
 async function capNhatCongThucBaoGia(data) {
   const formula = {
-    roundingUnit: Number(data.roundingUnit),
     defaultShippingFee: Number(data.defaultShippingFee),
     freeShippingThreshold: Number(data.freeShippingThreshold),
     vatPercent: Number(data.vatPercent),
   };
   await db.pool.query(
     `INSERT INTO PricingConfiguration
-       (id, roundingUnit, defaultShippingFee, freeShippingThreshold, vatPercent)
-     VALUES (1, ?, ?, ?, ?)
+       (id, defaultShippingFee, freeShippingThreshold, vatPercent)
+     VALUES (1, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
-       roundingUnit = VALUES(roundingUnit),
        defaultShippingFee = VALUES(defaultShippingFee),
        freeShippingThreshold = VALUES(freeShippingThreshold),
        vatPercent = VALUES(vatPercent)`,
     [
-      formula.roundingUnit,
       formula.defaultShippingFee,
       formula.freeShippingThreshold,
       formula.vatPercent,

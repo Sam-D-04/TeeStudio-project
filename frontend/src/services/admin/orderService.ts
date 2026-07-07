@@ -21,9 +21,12 @@ export type ThanhToanInfo = {
   soTienVnd?: number;
   daThanh: boolean;
   status?: string | null;
+  transactionStatus?: string | null;
   paidAt?: string | null;
   transactionId?: string | null;
   paymentUrl?: string | null;
+  qrCodeValue?: string | null;
+  requestType?: "payWithMethod" | "captureWallet" | null;
   expiresAt?: string | null;
 };
 
@@ -43,6 +46,7 @@ export type ChiTietDonHangItem = {
   productId: number;
   variantId: number;
   designId: number | null;
+  productionStatus: string | null;
   tenSanPham: string;
   mauSac: string;
   kichCo: string;
@@ -128,6 +132,8 @@ export type ThamSoLocDonHang = {
   thoiGian?: string;
   tuNgay?: string;
   denNgay?: string;
+  kieuNgay?: "ngay_tao" | "ngay_hoan_tat";
+  gio?: string;
   loai?: string;
   tuKhoa?: string;
 };
@@ -164,6 +170,8 @@ export async function layDanhSachDonHang(
   if (thamSo.thoiGian && thamSo.thoiGian !== "tat_ca") params.thoiGian = thamSo.thoiGian;
   if (thamSo.tuNgay) params.tuNgay = thamSo.tuNgay;
   if (thamSo.denNgay) params.denNgay = thamSo.denNgay;
+  if (thamSo.kieuNgay) params.kieuNgay = thamSo.kieuNgay;
+  if (thamSo.gio) params.gio = thamSo.gio;
   if (thamSo.loai && thamSo.loai !== "tat_ca") params.loai = thamSo.loai;
   if (thamSo.tuKhoa && thamSo.tuKhoa.trim()) params.tuKhoa = thamSo.tuKhoa.trim();
 
@@ -244,23 +252,25 @@ export async function capNhatDiaChiDonHang({
   return res.data.data;
 }
 
-export type KetQuaTaoLaiMaVnpay = {
+export type KetQuaTaoLaiMaThanhToan = {
+  paymentMethod: "VNPAY" | "MOMO";
   paymentUrl: string;
+  qrCodeValue: string;
   paymentUrlExpiresAt: string;
   transactionId: string;
 };
 
 /**
- * Tạo lại mã thanh toán VNPAY đã hết hạn.
- * POST /api/admin/orders/:id/vnpay/recreate
+ * Tạo lại mã thanh toán online đã hết hạn.
+ * POST /api/admin/orders/:id/payment/recreate
  */
-export async function taoLaiMaThanhToanVnpay(
+export async function taoLaiMaThanhToanOnline(
   id: number
-): Promise<KetQuaTaoLaiMaVnpay> {
+): Promise<KetQuaTaoLaiMaThanhToan> {
   const res = await apiClient.post<{
     success: boolean;
-    data: KetQuaTaoLaiMaVnpay;
-  }>(`/admin/orders/${id}/vnpay/recreate`);
+    data: KetQuaTaoLaiMaThanhToan;
+  }>(`/admin/orders/${id}/payment/recreate`);
   return res.data.data;
 }
 
@@ -359,7 +369,7 @@ export type TaoMoiDonHangInput = {
   phone: string;
   addressLine: string;
   items: OrderItemInput[];
-  paymentMethod: "COD" | "VNPAY";
+  paymentMethod: "COD" | "VNPAY" | "MOMO";
   paymentType: "FULL" | "DEPOSIT";
   shippingFee: number;
   promotionId?: number | null;
@@ -374,7 +384,9 @@ export type KetQuaTaoMoiDonHang = {
   depositAmount: number;
   codAmount: number;
   paymentAmount: number;
+  paymentMethod: "COD" | "VNPAY" | "MOMO";
   paymentUrl: string | null;
+  qrCodeValue: string | null;
   paymentUrlExpiresAt: string | null;
 };
 

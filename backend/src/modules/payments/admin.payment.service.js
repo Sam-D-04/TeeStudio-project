@@ -2,20 +2,27 @@
  * payment.service.js – Nghiệp vụ thanh toán.
  *
  * Bao gồm:
- * - Phần 1: Logic VNPAY Return / IPN (giữ nguyên từ trước)
- * - Phần 2: Logic Admin quản lý thanh toán (mới)
+ * - Phần 1: Logic Return / IPN của VNPAY và MoMo
+ * - Phần 2: Logic Admin quản lý thanh toán
  */
 
 const db = require("../../database/mysql");
 const { xacThucPhanHoiVnpay } = require("./vnpay.service");
 const {
+  xacThucPhanHoiMomo,
+  laGiaoDichMomoThanhCong,
+  laGiaoDichMomoDangXuLy,
+} = require("./momo.service");
+const {
   PAYMENT_STATUS,
   PAYMENT_METHOD,
   mapStatusToFrontend,
 } = require("../../common/constants/paymentStatus");
+const { taoBoLocThanhToan } = require("./payment-filter.util");
+const { syncOrderPaymentStatus } = require("./order-payment-progress.service");
 
 // =====================================================================
-// PHẦN 1: LOGIC VNPAY RETURN / IPN (GIỮ NGUYÊN)
+// PHẦN 1: LOGIC RETURN / IPN CỦA CÁC CỔNG ONLINE
 // =====================================================================
 
 function parseVnpayAmount(query) {
@@ -30,7 +37,27 @@ function isVnpayTransactionSuccessful(query) {
   );
 }
 
-async function findVnpayPayment(executor, transactionRef, lockForUpdate = false) {
+function shouldReconcileVnpayLater(query) {
+  return ["07", "99"].includes(String(query.vnp_ResponseCode || ""));
+}
+
+function mergeGatewayResponse(currentResponse, query) {
+  try {
+    const current = typeof currentResponse === "string"
+      ? JSON.parse(currentResponse)
+      : currentResponse;
+    return JSON.stringify({ ...(current || {}), ...query });
+  } catch {
+    return JSON.stringify(query);
+  }
+}
+
+async function findOnlinePayment(
+  executor,
+  transactionRef,
+  paymentMethod,
+  lockForUpdate = false
+) {
   const [rows] = await executor.query(
     `SELECT
        p.id,
@@ -40,14 +67,15 @@ async function findVnpayPayment(executor, transactionRef, lockForUpdate = false)
        p.paymentMethod,
        p.paymentType,
        p.paidAt,
+       p.gatewayResponse,
        co.orderCode,
        co.status AS orderStatus
      FROM Payment p
      JOIN CustomerOrder co ON co.id = p.orderId
      WHERE p.transactionId = ?
-       AND p.paymentMethod = 'VNPAY'
+       AND p.paymentMethod = ?
      LIMIT 1${lockForUpdate ? " FOR UPDATE" : ""}`,
-    [transactionRef]
+    [transactionRef, paymentMethod]
   );
 
   return rows[0] || null;
@@ -60,6 +88,7 @@ function buildPublicResult(query, payment, isValidChecksum) {
     isValidChecksum && amountMatches && isVnpayTransactionSuccessful(query);
 
   return {
+    gateway: PAYMENT_METHOD.VNPAY,
     isValidChecksum,
     isSuccessful,
     responseCode: isValidChecksum ? String(query.vnp_ResponseCode || "") : "",
@@ -88,7 +117,7 @@ async function xacThucKetQuaTraVeVnpay(query) {
   }
 
   const payment = isValidChecksum && transactionRef
-    ? await findVnpayPayment(db.pool, transactionRef)
+    ? await findOnlinePayment(db.pool, transactionRef, PAYMENT_METHOD.VNPAY)
     : null;
 
   return buildPublicResult(query, payment, isValidChecksum);
@@ -100,7 +129,12 @@ async function dongBoTrangThaiVnpay(query) {
 
   try {
     await conn.beginTransaction();
-    const payment = await findVnpayPayment(conn, transactionRef, true);
+    const payment = await findOnlinePayment(
+      conn,
+      transactionRef,
+      PAYMENT_METHOD.VNPAY,
+      true
+    );
 
     if (!payment) {
       await conn.rollback();
@@ -123,6 +157,11 @@ async function dongBoTrangThaiVnpay(query) {
     }
 
     const isSuccessful = isVnpayTransactionSuccessful(query);
+    const nextStatus = isSuccessful
+      ? "COMPLETED"
+      : shouldReconcileVnpayLater(query)
+        ? "PENDING"
+        : "FAILED";
     const [updateResult] = await conn.query(
       `UPDATE Payment
        SET status = ?,
@@ -131,9 +170,9 @@ async function dongBoTrangThaiVnpay(query) {
        WHERE id = ?
          AND status = 'PENDING'`,
       [
-        isSuccessful ? "COMPLETED" : "FAILED",
+        nextStatus,
         isSuccessful ? new Date() : null,
-        JSON.stringify(query),
+        mergeGatewayResponse(payment.gatewayResponse, query),
         payment.id,
       ]
     );
@@ -142,6 +181,8 @@ async function dongBoTrangThaiVnpay(query) {
       await conn.rollback();
       return { RspCode: "02", Message: "Order already confirmed" };
     }
+
+    await syncOrderPaymentStatus(conn, payment.orderId);
 
     await conn.commit();
 
@@ -160,6 +201,154 @@ async function xuLyIpnVnpay(query) {
   }
 
   return dongBoTrangThaiVnpay(query);
+}
+
+function parseMomoAmount(payload) {
+  const amount = Number(payload.amount);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function parseMomoPaidAt(payload) {
+  const responseTime = Number(payload.responseTime);
+  const paidAt = Number.isFinite(responseTime) ? new Date(responseTime) : new Date();
+  return Number.isNaN(paidAt.getTime()) ? new Date() : paidAt;
+}
+
+function buildMomoPublicResult(payload, payment, isValidChecksum) {
+  const amount = isValidChecksum ? parseMomoAmount(payload) : 0;
+  const amountMatches = Boolean(payment) && Number(payment.amount) === amount;
+  const isSuccessful =
+    isValidChecksum &&
+    amountMatches &&
+    laGiaoDichMomoThanhCong(payload.resultCode);
+
+  return {
+    gateway: PAYMENT_METHOD.MOMO,
+    isValidChecksum,
+    isSuccessful,
+    responseCode: isValidChecksum ? String(payload.resultCode ?? "") : "",
+    transactionStatus: isValidChecksum ? String(payload.resultCode ?? "") : "",
+    transactionRef: isValidChecksum ? String(payload.orderId || "") : "",
+    transactionNo: isValidChecksum ? String(payload.transId || "") : "",
+    bankCode: isValidChecksum ? String(payload.payType || "") : "",
+    orderCode: payment?.orderCode || null,
+    amount,
+    paymentType: payment?.paymentType || null,
+    databaseStatus: payment?.status || null,
+    paidAt: payment?.paidAt || null,
+  };
+}
+
+async function dongBoTrangThaiMomo(payload, source = "ipn") {
+  const transactionRef = String(payload.orderId || "");
+  const conn = await db.pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+    const payment = await findOnlinePayment(
+      conn,
+      transactionRef,
+      PAYMENT_METHOD.MOMO,
+      true
+    );
+
+    if (!payment) {
+      await conn.rollback();
+      return { accepted: false, reason: "Không tìm thấy giao dịch MoMo" };
+    }
+
+    if (Number(payment.amount) !== parseMomoAmount(payload)) {
+      await conn.rollback();
+      return { accepted: false, reason: "Số tiền giao dịch MoMo không khớp" };
+    }
+
+    if (payment.status === PAYMENT_STATUS.COMPLETED) {
+      await conn.rollback();
+      return { accepted: true, payment };
+    }
+
+    if (
+      payment.status !== PAYMENT_STATUS.PENDING ||
+      payment.orderStatus === "CANCELLED"
+    ) {
+      await conn.rollback();
+      return { accepted: false, reason: "Giao dịch MoMo không còn khả dụng" };
+    }
+
+    const isSuccessful = laGiaoDichMomoThanhCong(payload.resultCode);
+    const nextStatus = isSuccessful
+      ? PAYMENT_STATUS.COMPLETED
+      : laGiaoDichMomoDangXuLy(payload.resultCode)
+        ? PAYMENT_STATUS.PENDING
+        : PAYMENT_STATUS.FAILED;
+    const paidAt = isSuccessful ? parseMomoPaidAt(payload) : null;
+
+    const [updateResult] = await conn.query(
+      `UPDATE Payment
+       SET status = ?,
+           paidAt = ?,
+           gatewayResponse = ?
+       WHERE id = ?
+         AND status = 'PENDING'`,
+      [
+        nextStatus,
+        paidAt,
+        mergeGatewayResponse(payment.gatewayResponse, {
+          ...payload,
+          source,
+        }),
+        payment.id,
+      ]
+    );
+
+    if (updateResult.affectedRows === 0) {
+      await conn.rollback();
+      return { accepted: true, payment };
+    }
+
+    await syncOrderPaymentStatus(conn, payment.orderId);
+
+    await conn.commit();
+    return {
+      accepted: true,
+      payment: { ...payment, status: nextStatus, paidAt },
+    };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+async function xacThucKetQuaTraVeMomo(payload) {
+  const isValidChecksum = xacThucPhanHoiMomo(payload);
+  const transactionRef = String(payload.orderId || "");
+
+  if (isValidChecksum && transactionRef) {
+    await dongBoTrangThaiMomo(payload, "return");
+  }
+
+  const payment = isValidChecksum && transactionRef
+    ? await findOnlinePayment(db.pool, transactionRef, PAYMENT_METHOD.MOMO)
+    : null;
+
+  return buildMomoPublicResult(payload, payment, isValidChecksum);
+}
+
+async function xuLyIpnMomo(payload) {
+  if (!xacThucPhanHoiMomo(payload)) {
+    const error = new Error("Chữ ký IPN MoMo không hợp lệ");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const result = await dongBoTrangThaiMomo(payload, "ipn");
+  if (!result.accepted) {
+    const error = new Error(result.reason);
+    error.statusCode = 400;
+    throw error;
+  }
 }
 
 // =====================================================================
@@ -204,19 +393,19 @@ async function layThongKeThanhToan() {
        AND DATE(paidAt) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`
   );
 
-  // Giao dịch chờ thanh toán (VNPAY PENDING)
+  // Giao dịch online đang chờ thanh toán (VNPAY/MOMO PENDING)
   const [choThanhToanRows] = await db.pool.query(
     `SELECT COUNT(*) AS soLuong
      FROM Payment
      WHERE status = 'PENDING'
-       AND paymentMethod = 'VNPAY'`
+       AND paymentMethod IN ('VNPAY', 'MOMO')`
   );
 
-  // Giao dịch COD cần đối soát (COD PENDING)
+  // Giao dịch COD đã giao hàng, đang chờ kế toán đối soát
   const [canDoiSoatRows] = await db.pool.query(
     `SELECT COUNT(*) AS soLuong
      FROM Payment
-     WHERE status = 'PENDING'
+     WHERE status = 'PENDING_RECONCILIATION'
        AND paymentMethod = 'COD'`
   );
 
@@ -254,50 +443,7 @@ async function layDanhSachThanhToan(queryParams) {
   const soMoiTrang = Math.min(100, Math.max(1, parseInt(queryParams.soMoiTrang) || 10));
   const offset = (trang - 1) * soMoiTrang;
 
-  const trangThai = queryParams.trangThai || "tat_ca";
-  const phuongThuc = queryParams.phuongThuc || "tat_ca";
-  const tuKhoa = (queryParams.tuKhoa || "").trim();
-  const tab = queryParams.tab || "tat_ca"; // Tab pill nhanh
-
-  // Xây dựng WHERE động
-  const conditions = [];
-  const params = [];
-
-  // Lọc theo tab (pill nhanh) – tab ưu tiên hơn dropdown trangThai
-  const filterKey = tab !== "tat_ca" ? tab : trangThai;
-
-  if (filterKey && filterKey !== "tat_ca") {
-    if (filterKey === "can_doi_soat") {
-      conditions.push("p.status = 'PENDING' AND p.paymentMethod = 'COD'");
-    } else if (filterKey === "cho_thanh_toan") {
-      conditions.push("p.status = 'PENDING' AND p.paymentMethod = 'VNPAY'");
-    } else if (filterKey === "da_thanh_toan") {
-      conditions.push("p.status = 'COMPLETED'");
-    } else if (filterKey === "that_bai") {
-      conditions.push("p.status IN ('FAILED', 'CANCELLED')");
-    } else if (filterKey === "hoan_tien") {
-      conditions.push("p.status = 'REFUNDED'");
-    }
-  }
-
-  // Lọc theo phương thức thanh toán
-  if (phuongThuc !== "tat_ca") {
-    conditions.push("p.paymentMethod = ?");
-    params.push(phuongThuc.toUpperCase());
-  }
-
-  // Tìm kiếm theo mã đơn hoặc mã giao dịch (transactionId)
-  if (tuKhoa) {
-    conditions.push(
-      "(co.orderCode LIKE ? OR p.transactionId LIKE ? OR a.fullName LIKE ?)"
-    );
-    const like = `%${tuKhoa}%`;
-    params.push(like, like, like);
-  }
-
-  const whereClause = conditions.length > 0
-    ? `WHERE ${conditions.join(" AND ")}`
-    : "";
+  const { whereClause, params } = taoBoLocThanhToan(queryParams);
 
   // Đếm tổng
   const [countRows] = await db.pool.query(
@@ -324,6 +470,20 @@ async function layDanhSachThanhToan(queryParams) {
        p.createdAt,
        p.note,
        co.orderCode,
+       co.totalAmount,
+       co.codAmount,
+       co.paymentType AS orderPaymentType,
+       co.paymentStatus AS orderPaymentStatus,
+       (
+         SELECT pCod.id
+         FROM Payment pCod
+         WHERE pCod.orderId = p.orderId
+           AND pCod.paymentMethod = 'COD'
+           AND pCod.paymentType <> 'DEPOSIT'
+           AND pCod.status = 'PENDING_RECONCILIATION'
+         ORDER BY pCod.createdAt DESC, pCod.id DESC
+         LIMIT 1
+       ) AS codReconciliationPaymentId,
        a.fullName AS customerName,
        a.phone AS customerPhone
      FROM Payment p
@@ -335,25 +495,6 @@ async function layDanhSachThanhToan(queryParams) {
     [...params, soMoiTrang, offset]
   );
 
-  // Đếm số lượng cho các tab pill
-  const [tabCountRows] = await db.pool.query(
-    `SELECT
-       COUNT(*) AS tatCa,
-       SUM(CASE WHEN p.status = 'PENDING' AND p.paymentMethod = 'VNPAY' THEN 1 ELSE 0 END) AS choThanhToan,
-       SUM(CASE WHEN p.status = 'COMPLETED' THEN 1 ELSE 0 END) AS daThanhToan,
-       SUM(CASE WHEN p.status IN ('FAILED', 'CANCELLED') THEN 1 ELSE 0 END) AS thatBai,
-       SUM(CASE WHEN p.status = 'PENDING' AND p.paymentMethod = 'COD' THEN 1 ELSE 0 END) AS canDoiSoat
-     FROM Payment p`
-  );
-
-  const tabCounts = {
-    tat_ca: Number(tabCountRows[0].tatCa),
-    cho_thanh_toan: Number(tabCountRows[0].choThanhToan),
-    da_thanh_toan: Number(tabCountRows[0].daThanhToan),
-    that_bai: Number(tabCountRows[0].thatBai),
-    can_doi_soat: Number(tabCountRows[0].canDoiSoat),
-  };
-
   // Map sang format frontend
   const danhSach = rows.map((row) => ({
     id: row.id,
@@ -361,9 +502,19 @@ async function layDanhSachThanhToan(queryParams) {
     orderCode: row.orderCode,
     customerName: row.customerName,
     amountVnd: Number(row.amount),
+    remainingAmountVnd:
+      row.paymentType === "DEPOSIT"
+        ? Math.max(0, Number(row.totalAmount) - Number(row.amount))
+        : 0,
+    codAmountVnd: Number(row.codAmount || 0),
+    codReconciliationPaymentId: row.codReconciliationPaymentId
+      ? Number(row.codReconciliationPaymentId)
+      : null,
     paymentType: row.paymentType,
+    orderPaymentType: row.orderPaymentType,
+    orderPaymentStatus: row.orderPaymentStatus,
     method: row.paymentMethod,
-    status: mapStatusToFrontend(row.status, row.paymentMethod),
+    status: mapStatusToFrontend(row.status, row.paymentMethod, row.paymentType),
     gatewayCode: row.transactionId || `${row.paymentMethod}-${String(row.id).padStart(6, "0")}`,
     paidAt: formatDateVn(row.paidAt),
     createdAt: formatDateVn(row.createdAt),
@@ -375,7 +526,6 @@ async function layDanhSachThanhToan(queryParams) {
     trang,
     soMoiTrang,
     tongSoTrang: Math.ceil(tongSo / soMoiTrang),
-    tabCounts,
   };
 }
 
@@ -396,6 +546,11 @@ async function layChiTietThanhToan(id) {
        p.createdAt,
        p.note,
        co.orderCode,
+       co.totalAmount,
+       co.codAmount,
+       co.createdAt AS orderCreatedAt,
+       co.paymentType AS orderPaymentType,
+       co.paymentStatus AS orderPaymentStatus,
        a.fullName AS customerName,
        a.phone AS customerPhone
      FROM Payment p
@@ -424,9 +579,16 @@ async function layChiTietThanhToan(id) {
     customerName: row.customerName,
     customerPhone: row.customerPhone || null,
     amountVnd: Number(row.amount),
+    remainingAmountVnd:
+      row.paymentType === "DEPOSIT"
+        ? Math.max(0, Number(row.totalAmount) - Number(row.amount))
+        : 0,
+    codAmountVnd: Number(row.codAmount || 0),
     paymentType: row.paymentType,
+    orderPaymentType: row.orderPaymentType,
+    orderPaymentStatus: row.orderPaymentStatus,
     method: row.paymentMethod,
-    status: mapStatusToFrontend(row.status, row.paymentMethod),
+    status: mapStatusToFrontend(row.status, row.paymentMethod, row.paymentType),
     gatewayCode: row.transactionId || `${row.paymentMethod}-${String(row.id).padStart(6, "0")}`,
     paidAt: formatDateVn(row.paidAt),
     createdAt: formatDateVn(row.createdAt),
@@ -441,6 +603,16 @@ async function layChiTietThanhToan(id) {
  */
 function buildIpnHistory(paymentRow) {
   const steps = [];
+
+  steps.push({
+    description:
+      paymentRow.orderPaymentType === "DEPOSIT"
+        ? "Khách chọn chính sách đặt cọc 50%"
+        : "Khách chọn chính sách thanh toán 100%",
+    time: formatDateVn(paymentRow.orderCreatedAt) || "",
+    note: "Lựa chọn ban đầu của đơn hàng, không thay đổi trong suốt vòng đời đơn",
+    isSuccess: true,
+  });
 
   // Bước 1: Khởi tạo giao dịch
   steps.push({
@@ -461,12 +633,43 @@ function buildIpnHistory(paymentRow) {
       // Bỏ qua nếu parse lỗi
     }
 
-    if (gwData) {
-      const isSuccess = gwData.vnp_ResponseCode === "00";
+    const hasVnpayResult =
+      paymentRow.paymentMethod === PAYMENT_METHOD.VNPAY &&
+      gwData?.vnp_ResponseCode !== undefined;
+    const hasMomoResult =
+      paymentRow.paymentMethod === PAYMENT_METHOD.MOMO &&
+      gwData?.resultCode !== undefined;
+
+    if (gwData && (hasVnpayResult || hasMomoResult)) {
+      const isVnpay = paymentRow.paymentMethod === PAYMENT_METHOD.VNPAY;
+      const isQuery = isVnpay
+        ? gwData.vnp_Command === "querydr"
+        : gwData.source === "query";
+      const isReturn = !isVnpay && gwData.source === "return";
+      const responseCode = isVnpay
+        ? String(gwData.vnp_ResponseCode || "N/A")
+        : String(gwData.resultCode ?? "N/A");
+      const isSuccess = isVnpay
+        ? gwData.vnp_ResponseCode === "00" &&
+          (!gwData.vnp_TransactionStatus || gwData.vnp_TransactionStatus === "00")
+        : laGiaoDichMomoThanhCong(gwData.resultCode);
+      const gatewayName = isVnpay ? "VNPAY" : "MoMo";
       steps.push({
-        description: isSuccess ? "Nhận IPN thành công" : `Nhận IPN – Mã lỗi: ${gwData.vnp_ResponseCode || "N/A"}`,
+        description: isSuccess
+          ? isQuery
+            ? `Đối soát ${gatewayName} tự động thành công`
+            : isReturn
+              ? `Xác minh redirect ${gatewayName} thành công`
+              : "Nhận IPN thành công"
+          : `Nhận phản hồi ${gatewayName} – Mã: ${responseCode}`,
         time: formatDateVn(paymentRow.paidAt) || formatDateVn(paymentRow.createdAt) || "",
-        note: isSuccess ? "Payload matched" : `ResponseCode: ${gwData.vnp_ResponseCode || "N/A"}`,
+        note: isSuccess
+          ? isQuery
+            ? "Query transaction matched"
+            : isReturn
+              ? "Return payload matched"
+              : "IPN payload matched"
+          : `ResponseCode: ${responseCode}`,
         isSuccess,
       });
     }
@@ -484,16 +687,6 @@ function buildIpnHistory(paymentRow) {
     }
   }
 
-  // Nếu bị hoàn tiền
-  if (paymentRow.status === PAYMENT_STATUS.REFUNDED) {
-    steps.push({
-      description: "Đã hoàn tiền",
-      time: formatDateVn(paymentRow.paidAt) || "",
-      note: paymentRow.note || "Admin xử lý hoàn tiền",
-      isSuccess: true,
-    });
-  }
-
   // Đảo ngược: bước mới nhất lên trên
   return steps.reverse();
 }
@@ -507,8 +700,10 @@ async function xacNhanThuCod(id) {
     await conn.beginTransaction();
 
     const [rows] = await conn.query(
-      `SELECT p.id, p.status, p.paymentMethod, p.orderId
+      `SELECT p.id, p.status, p.paymentMethod, p.orderId,
+              co.status AS orderStatus
        FROM Payment p
+       JOIN CustomerOrder co ON co.id = p.orderId
        WHERE p.id = ?
        LIMIT 1
        FOR UPDATE`,
@@ -531,9 +726,16 @@ async function xacNhanThuCod(id) {
       throw error;
     }
 
-    if (payment.status !== PAYMENT_STATUS.PENDING) {
+    if (payment.orderStatus !== "COMPLETED") {
       await conn.rollback();
-      const error = new Error("Chỉ có thể xác nhận giao dịch COD đang ở trạng thái chờ");
+      const error = new Error("Chỉ có thể thu COD sau khi đơn hàng đã hoàn tất");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (payment.status !== PAYMENT_STATUS.PENDING_RECONCILIATION) {
+      await conn.rollback();
+      const error = new Error("Chỉ có thể xác nhận giao dịch COD đang chờ đối soát");
       error.statusCode = 400;
       throw error;
     }
@@ -542,100 +744,16 @@ async function xacNhanThuCod(id) {
       `UPDATE Payment
        SET status = 'COMPLETED',
            paidAt = NOW()
-       WHERE id = ?`,
+       WHERE id = ?
+         AND status = 'PENDING_RECONCILIATION'`,
       [id]
     );
+
+    await syncOrderPaymentStatus(conn, payment.orderId);
 
     await conn.commit();
 
     return { id, trangThai: "da_thanh_toan" };
-  } catch (error) {
-    await conn.rollback();
-    throw error;
-  } finally {
-    conn.release();
-  }
-}
-
-// ── Đồng bộ lại VNPAY ────────────────────────────────────────────────
-
-async function dongBoLaiVnpay(id) {
-  const [rows] = await db.pool.query(
-    `SELECT p.id, p.status, p.paymentMethod, p.transactionId
-     FROM Payment p
-     WHERE p.id = ?
-     LIMIT 1`,
-    [id]
-  );
-
-  if (rows.length === 0) {
-    const error = new Error("Không tìm thấy giao dịch thanh toán");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  const payment = rows[0];
-
-  if (payment.paymentMethod !== PAYMENT_METHOD.VNPAY) {
-    const error = new Error("Giao dịch này không phải VNPAY");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  // Trả về trạng thái hiện tại – trong thực tế sẽ gọi VNPAY QueryDR API
-  // Hiện tại chỉ trả lại trạng thái trong DB (Sandbox không hỗ trợ QueryDR)
-  return {
-    id: payment.id,
-    trangThai: mapStatusToFrontend(payment.status, payment.paymentMethod),
-    dbStatus: payment.status,
-    transactionId: payment.transactionId,
-    thongBao: "Đã kiểm tra trạng thái giao dịch",
-  };
-}
-
-// ── Hoàn tiền ─────────────────────────────────────────────────────────
-
-async function hoanTienGiaoDich(id) {
-  const conn = await db.pool.getConnection();
-
-  try {
-    await conn.beginTransaction();
-
-    const [rows] = await conn.query(
-      `SELECT p.id, p.status, p.paymentMethod
-       FROM Payment p
-       WHERE p.id = ?
-       LIMIT 1
-       FOR UPDATE`,
-      [id]
-    );
-
-    if (rows.length === 0) {
-      await conn.rollback();
-      const error = new Error("Không tìm thấy giao dịch thanh toán");
-      error.statusCode = 404;
-      throw error;
-    }
-
-    const payment = rows[0];
-
-    if (payment.status !== PAYMENT_STATUS.COMPLETED) {
-      await conn.rollback();
-      const error = new Error("Chỉ có thể hoàn tiền cho giao dịch đã thanh toán thành công");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    await conn.query(
-      `UPDATE Payment
-       SET status = 'REFUNDED'
-       WHERE id = ?`,
-      [id]
-    );
-
-    await conn.commit();
-
-    return { id, trangThai: "hoan_tien" };
   } catch (error) {
     await conn.rollback();
     throw error;
@@ -667,15 +785,15 @@ async function luuGhiChu(id, note) {
 }
 
 module.exports = {
-  // VNPAY Return / IPN (giữ nguyên)
+  // Return / IPN của các cổng thanh toán online
   xacThucKetQuaTraVeVnpay,
   xuLyIpnVnpay,
+  xacThucKetQuaTraVeMomo,
+  xuLyIpnMomo,
   // Admin quản lý thanh toán (mới)
   layThongKeThanhToan,
   layDanhSachThanhToan,
   layChiTietThanhToan,
   xacNhanThuCod,
-  dongBoLaiVnpay,
-  hoanTienGiaoDich,
   luuGhiChu,
 };

@@ -25,6 +25,7 @@ import {
   Input,
 } from "antd";
 import { isAxiosError } from "axios";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
@@ -103,8 +104,8 @@ function getPaymentBreakdown(
       ? Math.round(totalAmount * (DEPOSIT_PERCENT / 100))
       : 0;
   const codAmount =
-    (paymentMethod === "COD" || paymentType === "DEPOSIT") 
-      ? Math.max(0, totalAmount - depositAmount) 
+    (paymentMethod === "COD" || paymentType === "DEPOSIT")
+      ? Math.max(0, totalAmount - depositAmount)
       : 0;
 
   return { depositAmount, codAmount };
@@ -369,11 +370,11 @@ function SectionPanel({
   children,
 }: {
   title: string;
-  description?: string;
+  description?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-border bg-surface p-4 shadow-admin-card">
+    <section>
       <div className="mb-3">
         <h3 className="text-sm font-bold text-text-main">{title}</h3>
         {description ? (
@@ -399,9 +400,20 @@ function CustomerSection({
   return (
     <SectionPanel
       title="1. Khách hàng & Địa chỉ giao hàng"
-      description="Tìm khách hàng — form tự điền địa chỉ mặc định. Admin có thể chỉnh sửa trực tiếp."
+      description={
+        <>
+          Khách chưa có tài khoản?{" "}
+          <Link
+            href="/admin/tai-khoan"
+            className="font-semibold text-primary-container hover:underline"
+          >
+            Tạo tài khoản khách hàng
+          </Link>{" "}
+          trước khi tạo đơn.
+        </>
+      }
     >
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-x-3 gap-y-2 md:grid-cols-3">
         <Form.Item
           label="Khách hàng"
           name="userId"
@@ -459,7 +471,7 @@ function CustomerSection({
           rules={[{ required: true, message: "Vui lòng nhập địa chỉ giao hàng" }]}
         >
           <Input.TextArea
-            rows={2}
+            autoSize={{ minRows: 1, maxRows: 2 }}
             placeholder="Ví dụ: 123 Đường ABC, Phường XYZ, Quận 1, TP HCM..."
             disabled={!customers.length}
           />
@@ -755,7 +767,7 @@ function ProductItemRow({
             options={availableSizeVariants.map((item) => ({
               value: item.id,
               disabled: item.tonKho <= 0,
-              label: `${item.kichCo} · SKU ${item.sku} · Tồn ${item.tonKho}`,
+              label: item.kichCo,
             }))}
           />
         </Form.Item>
@@ -944,10 +956,17 @@ function PaymentShippingSection({
         >
           <Radio.Group>
             <Space wrap>
-              <Tooltip title={hasCustomDesign ? "Áo POD bắt buộc VNPAY" : ""}>
+              <Tooltip
+                title={
+                  hasCustomDesign
+                    ? "Áo POD chỉ được thanh toán online bằng VNPAY hoặc MoMo"
+                    : ""
+                }
+              >
                 <Radio.Button value="COD" disabled={hasCustomDesign}>COD</Radio.Button>
               </Tooltip>
               <Radio.Button value="VNPAY">VNPAY</Radio.Button>
+              <Radio.Button value="MOMO">MoMo</Radio.Button>
             </Space>
           </Radio.Group>
         </Form.Item>
@@ -1029,7 +1048,9 @@ function PaymentShippingSection({
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-text-secondary">Tiền cọc (VNPAY)</span>
+              <span className="text-xs text-text-secondary">
+                Tiền cọc ({paymentMethod || "Thanh toán online"})
+              </span>
               <strong className="text-primary-container">{formatCurrency(depositAmount)}</strong>
             </div>
             <div className="flex items-center justify-between gap-2">
@@ -1037,12 +1058,12 @@ function PaymentShippingSection({
               <strong className="text-text-main">{formatCurrency(codAmount)}</strong>
             </div>
           </div>
-          {paymentMethod === "VNPAY" ? (
+          {paymentMethod === "VNPAY" || paymentMethod === "MOMO" ? (
             <Alert
               className="mt-2"
               showIcon
               type="info"
-              title={`VNPAY yêu cầu khách cọc ${formatCurrency(depositAmount)}. Phần còn lại thu COD khi giao.`}
+              title={`${paymentMethod} yêu cầu khách cọc ${formatCurrency(depositAmount)}. Phần còn lại thu COD khi giao.`}
             />
           ) : null}
         </div>
@@ -1061,12 +1082,12 @@ function ShippingFeeInput({
   id?: string;
 }) {
   return (
-    <Space.Compact className="w-full">
+    <div className="inline-flex h-8 w-auto max-w-full items-stretch">
       <InputNumber<number>
         id={id}
         value={value}
         onChange={onChange}
-        className="w-full"
+        className="!h-8 !w-[150px] rounded-r-none [&_.ant-input-number-input]:!h-8 [&_.ant-input-number-input]:!py-0"
         min={0}
         step={1000}
         formatter={(inputValue) =>
@@ -1074,14 +1095,13 @@ function ShippingFeeInput({
         }
         parser={(inputValue) => Number((inputValue ?? "").replace(/[^\d]/g, ""))}
       />
-      <Button
-        disabled
-        tabIndex={-1}
-        className="h-10 min-w-16 rounded-l-none rounded-r-[8px] border-border bg-surface-alt font-semibold text-text-secondary"
+      <span
+        aria-hidden="true"
+        className="inline-flex h-8 w-12 shrink-0 items-center justify-center rounded-r-[8px] border border-l-0 border-border bg-surface-alt text-xs font-semibold leading-none text-text-secondary"
       >
         VND
-      </Button>
-    </Space.Compact>
+      </span>
+    </div>
   );
 }
 
@@ -1102,7 +1122,7 @@ function OrderSummary({
   ] as const;
 
   return (
-    <aside className="sticky top-5 rounded-xl border border-border bg-surface p-4 shadow-admin-card">
+    <aside className="sticky top-5">
       <div className="mb-3">
         <h3 className="text-sm font-bold text-text-main">Tóm tắt giá (preview)</h3>
         <p className="mt-0.5 text-xs text-text-secondary">
@@ -1112,7 +1132,7 @@ function OrderSummary({
 
       {/* Chi tiết từng dòng sản phẩm */}
       {preview.lines.length > 0 ? (
-        <div className="mb-3 space-y-1.5 rounded-lg border border-border bg-surface-alt p-2">
+        <div className="mb-3 grid grid-cols-1 gap-2 rounded-lg border border-border bg-surface-alt p-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
           {preview.lines.map((line, index) => (
             <div
               key={`${line.product?.id ?? "empty"}-${index}`}
@@ -1137,15 +1157,16 @@ function OrderSummary({
         </div>
       ) : null}
 
+      <Divider className="my-3" />
+
       {/* Bảng tổng */}
-      <div className="space-y-1.5">
+      <div className="grid grid-cols-1 gap-x-5 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
         {rows.map(([label, amount]) => (
           <div key={label} className="flex items-center justify-between gap-3">
             <span className="text-xs text-text-secondary">{label}</span>
             <span
-              className={`text-xs font-bold ${
-                amount < 0 ? "text-success" : "text-text-main"
-              }`}
+              className={`text-xs font-bold ${amount < 0 ? "text-success" : "text-text-main"
+                }`}
             >
               {amount < 0 ? `-${formatCurrency(Math.abs(amount))}` : formatCurrency(amount)}
             </span>
@@ -1164,9 +1185,9 @@ function OrderSummary({
 
       <Divider className="my-3" />
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <Button
-          className="h-9 rounded-[10px] font-semibold"
+          className="h-9 w-auto rounded-[10px] px-4 font-semibold"
           onClick={onCancel}
         >
           Hủy
@@ -1176,7 +1197,7 @@ function OrderSummary({
           htmlType="submit"
           icon={<PlusOutlined />}
           loading={isSubmitting}
-          className="h-9 rounded-[10px] font-semibold"
+          className="h-9 w-auto rounded-[10px] px-4 font-semibold"
         >
           Tạo đơn hàng
         </Button>
@@ -1304,7 +1325,7 @@ export default function CreateOrderPage() {
     const newValues: Partial<CreateOrderFormValues> = {};
 
     if (hasCustomDesign) {
-      if (values.paymentMethod !== "VNPAY") {
+      if (values.paymentMethod === "COD") {
         newValues.paymentMethod = "VNPAY";
       }
     } else {
@@ -1325,15 +1346,24 @@ export default function CreateOrderPage() {
     const currentPhone = form.getFieldValue("phone");
     const currentAddress = form.getFieldValue("addressLine");
 
-    if (currentName || currentPhone || currentAddress) return;
-
     const defaultAddress = addresses.find((address) => address.laMacDinh) ?? addresses[0];
-    
-    form.setFieldsValue({
-      recipientName: defaultAddress.tenNguoiNhan,
-      phone: defaultAddress.soDienThoai,
-      addressLine: defaultAddress.diaChiDayDu,
-    });
+    const nextValues: Partial<CreateOrderFormValues> = {};
+
+    if (!currentName) {
+      nextValues.recipientName = defaultAddress.tenNguoiNhan;
+    }
+
+    if (!currentPhone) {
+      nextValues.phone = defaultAddress.soDienThoai;
+    }
+
+    if (!currentAddress) {
+      nextValues.addressLine = defaultAddress.diaChiDayDu;
+    }
+
+    if (Object.keys(nextValues).length > 0) {
+      form.setFieldsValue(nextValues);
+    }
   }, [addresses, form, userId]);
 
   function syncStockAfterCreateOrder(items: TaoMoiDonHangInput["items"]) {
@@ -1403,6 +1433,7 @@ export default function CreateOrderPage() {
         userId: customer.id,
         recipientName: customer.hoTen,
         phone: customer.soDienThoai ?? "",
+        addressLine: "",
       });
     }
   }
@@ -1447,7 +1478,7 @@ export default function CreateOrderPage() {
     form.setFieldsValue({ items });
   }
 
-  function handleVariantChange(rowIndex: number) {
+  function handleVariantChange() {
     // Form Item tự xử lý value update
   }
 
@@ -1457,9 +1488,9 @@ export default function CreateOrderPage() {
 
     if (design) {
       setSelectedDesignById((prev) => ({ ...prev, [design.id]: design }));
-      
+
       const productType = items[rowIndex]?.productType ?? "CUSTOM";
-      
+
       items[rowIndex] = {
         ...items[rowIndex],
         productType,
@@ -1468,7 +1499,7 @@ export default function CreateOrderPage() {
         color: design.mauSanPham || design.mauNen,
         variantId: design.variantId ?? undefined,
       };
-      
+
       if (design.sanPham) {
         setSelectedProductById((prev) => ({ ...prev, [design.sanPham.id]: design.sanPham }));
       }
@@ -1478,7 +1509,7 @@ export default function CreateOrderPage() {
         designId,
       };
     }
-    
+
     form.setFieldsValue({ items });
   }
 
@@ -1507,7 +1538,7 @@ export default function CreateOrderPage() {
     });
   }
 
-  function handleFinishFailed({ errorFields }: any) {
+  function handleFinishFailed({ errorFields }: { errorFields: unknown[] }) {
     if (errorFields.length > 0) {
       messageApi.error("Vui lòng kiểm tra lại thông tin biểu mẫu");
     }
@@ -1554,10 +1585,10 @@ export default function CreateOrderPage() {
         onFinish={handleFinish}
         onFinishFailed={handleFinishFailed}
         requiredMark={false}
-        className="rounded-2xl border border-border bg-surface-alt p-3 shadow-admin-card md:p-4"
+        className="rounded-2xl border border-border bg-surface shadow-admin-card"
       >
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-5 p-6 md:p-8 xl:grid-cols-[minmax(0,1fr)_440px]">
+          <div className="space-y-3">
             <CustomerSection
               customers={customers}
               isSearchingCustomers={isSearchingCustomers}
@@ -1619,3 +1650,4 @@ export default function CreateOrderPage() {
     </div>
   );
 }
+

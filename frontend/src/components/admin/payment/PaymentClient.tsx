@@ -1,6 +1,7 @@
 "use client";
 
 import PaymentPage from "@/components/admin/payment/PaymentPage";
+import type { PaymentInitialFilters } from "@/components/admin/payment/PaymentPage";
 
 /**
  * PaymentClient – client boundary cho trang Quản lý thanh toán.
@@ -14,6 +15,10 @@ import PaymentPage from "@/components/admin/payment/PaymentPage";
  * - Tách riêng như vậy để trang admin/layout.tsx (AdminShell) không bị
  *   ảnh hưởng, giữ đúng kiến trúc của toàn bộ admin module.
  */
-export default function PaymentClient() {
-  return <PaymentPage />;
+export default function PaymentClient({
+  initialFilters,
+}: {
+  initialFilters?: PaymentInitialFilters;
+}) {
+  return <PaymentPage initialFilters={initialFilters} />;
 }

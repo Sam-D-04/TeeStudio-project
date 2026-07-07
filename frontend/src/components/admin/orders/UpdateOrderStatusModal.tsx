@@ -1,7 +1,8 @@
-import { AutoComplete, Input, Modal, Select, message } from "antd";
+import { Alert, AutoComplete, Input, Modal, Select, message } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { isAxiosError } from "axios";
+import { isOrderStatusLockedByPayment } from "@/lib/paymentDisplay";
 import * as orderService from "@/services/admin/orderService";
 import type { ChiTietDonHang } from "@/services/admin/orderService";
 
@@ -34,11 +35,54 @@ function hasCustomDesignOrder(order?: ChiTietDonHang | null) {
   );
 }
 
+function areAllCustomItemsPrinted(order?: ChiTietDonHang | null) {
+  const customItems = order?.items?.filter((item) => Boolean(item.designId)) ?? [];
+  return customItems.length === 0 || customItems.every((item) =>
+    ["PRINTED", "PACKED"].includes(item.productionStatus || "")
+  );
+}
+
+function getProductionStatusBlockReason(order?: ChiTietDonHang | null) {
+  if (!order || order.trangThai !== "dang_xu_ly_in") return null;
+
+  const itemsChuaInXong = order.items?.filter(
+    (item) => Boolean(item.designId) && !["PRINTED", "PACKED"].includes(item.productionStatus || "")
+  ) ?? [];
+  if (itemsChuaInXong.length === 0) return null;
+
+  const soAoDangIn = itemsChuaInXong
+    .filter((item) => item.productionStatus === "PRINTING")
+    .reduce((tong, item) => tong + item.soLuong, 0);
+  const soAoChoGuiXuong = itemsChuaInXong
+    .filter((item) => item.productionStatus !== "PRINTING")
+    .reduce((tong, item) => tong + item.soLuong, 0);
+  const chiTiet = [
+    soAoChoGuiXuong > 0 ? `${soAoChoGuiXuong} áo Chờ gửi xưởng` : "",
+    soAoDangIn > 0 ? `${soAoDangIn} áo Đang in` : "",
+  ].filter(Boolean).join(", ");
+
+  return `Chưa thể chuyển sang Chờ giao vì còn sản phẩm chưa in xong (${chiTiet}). Hãy cập nhật tiến độ tại Thiết kế & In ấn → Đơn cần in. Trạng thái Chờ giao sẽ được mở khóa khi tất cả áo đã in xong.`;
+}
+
 function getAllowedNextStatuses(order?: ChiTietDonHang | null) {
   if (!order) return [];
 
+  if (
+    isOrderStatusLockedByPayment({
+      method: order.thanhToan.phuongThuc,
+      paymentType: order.thanhToan.loai,
+      status: order.thanhToan.status,
+    })
+  ) {
+    return [];
+  }
+
   if (order.trangThai === "da_xac_nhan" && !hasCustomDesignOrder(order)) {
     return ["cho_giao"];
+  }
+
+  if (order.trangThai === "dang_xu_ly_in" && !areAllCustomItemsPrinted(order)) {
+    return [];
   }
 
   return ALLOWED_NEXT_STATUS[order.trangThai] ?? [];
@@ -49,6 +93,34 @@ function getApiErrorMessage(error: unknown) {
     return error.response?.data?.message || error.message;
   }
   return error instanceof Error ? error.message : "Đã xảy ra lỗi";
+}
+
+function isCodWaitingForDeliveryReconciliation(order?: ChiTietDonHang | null) {
+  return Boolean(
+    order &&
+      order.thanhToan.phuongThuc === "COD" &&
+      order.thanhToan.status === "PENDING"
+  );
+}
+
+function canCompleteOrder(order?: ChiTietDonHang | null) {
+  if (!order) return false;
+
+  const payment = order.thanhToan;
+  if (payment.phuongThuc === "COD") {
+    return ["PENDING", "PARTIALLY_PAID", "PAID"].includes(
+      payment.status || ""
+    );
+  }
+
+  if (payment.loai === "DEPOSIT") {
+    return (
+      ["PARTIALLY_PAID", "PAID"].includes(payment.status || "") &&
+      order.tienThuHoCodVnd > 0
+    );
+  }
+
+  return payment.status === "PAID";
 }
 
 export default function UpdateOrderStatusModal({
@@ -73,6 +145,12 @@ export default function UpdateOrderStatusModal({
     queryFn: () => orderService.layChiTietDonHang(orderId!),
     enabled: Boolean(orderId) && open,
   });
+  const isStateLocked = isOrderStatusLockedByPayment({
+    method: order?.thanhToan.phuongThuc,
+    paymentType: order?.thanhToan.loai,
+    status: order?.thanhToan.status,
+  });
+  const productionStatusBlockReason = getProductionStatusBlockReason(order);
 
   const updateStatusMutation = useMutation({
     mutationFn: (payload: { trangThai: string; shippingCarrier?: string; trackingCode?: string }) =>
@@ -91,6 +169,12 @@ export default function UpdateOrderStatusModal({
         }),
         queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-payments"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-payments-stats"] }),
+        queryClient.invalidateQueries({
+          predicate: (query) =>
+            String(query.queryKey[0] || "").startsWith("dashboard/"),
+        }),
       ]);
       onClose();
     },
@@ -109,7 +193,7 @@ export default function UpdateOrderStatusModal({
         okText="Xác nhận"
         cancelText="Đóng"
         confirmLoading={updateStatusMutation.isPending || isLoading}
-        okButtonProps={{ disabled: !newStatus || isLoading }}
+        okButtonProps={{ disabled: !newStatus || isLoading || isStateLocked }}
         mask={{ closable: true }}
         onCancel={() => {
           setNewStatus("");
@@ -125,6 +209,20 @@ export default function UpdateOrderStatusModal({
             }
           }
 
+          if (isStateLocked) {
+            messageApi.error(
+              "Đơn hàng đang chờ thanh toán online hoặc tiền cọc; chỉ có thể hủy đơn hàng."
+            );
+            return;
+          }
+
+          if (newStatus === "hoan_tat" && !canCompleteOrder(order)) {
+            messageApi.error(
+              "Không thể hoàn tất: khoản thanh toán của đơn hàng chưa ở trạng thái hợp lệ."
+            );
+            return;
+          }
+
           const performUpdate = () => {
             updateStatusMutation.mutate({
               trangThai: newStatus,
@@ -133,14 +231,19 @@ export default function UpdateOrderStatusModal({
             });
           };
 
+          // Modal hiện tại đã là bước xác nhận; không mở thêm hộp xác nhận
+          // khi hoàn tất đơn hàng.
+          if (newStatus === "hoan_tat") {
+            performUpdate();
+            return;
+          }
+
           if (newStatus) {
             const statusLabel = ORDER_STATUS_OPTIONS.find((s) => s.value === newStatus)?.label || "";
             let confirmContent = "Hệ thống không cho phép lùi trạng thái sau khi đã cập nhật. Bạn có chắc chắn muốn chuyển sang trạng thái này?";
 
             if (newStatus === "dang_giao") {
               confirmContent = "Hệ thống không cho phép lùi trạng thái sau khi đã cập nhật. Bạn có chắc chắn đơn hàng này đã được bàn giao cho đơn vị vận chuyển?";
-            } else if (newStatus === "hoan_tat") {
-              confirmContent = "Hệ thống không cho phép lùi trạng thái sau khi đã cập nhật. Bạn có chắc chắn khách hàng đã nhận được hàng và thanh toán đủ?";
             }
 
             modal.confirm({
@@ -158,16 +261,47 @@ export default function UpdateOrderStatusModal({
           <p className="mb-4 text-sm text-text-secondary">Đang tải thông tin đơn hàng...</p>
         ) : (
           <>
+            {isStateLocked ? (
+              <Alert
+                className="mb-4"
+                type="warning"
+                showIcon
+                title="Đã khóa cập nhật trạng thái"
+                description="Khách hàng chưa thanh toán online hoặc tiền cọc. Bạn chỉ có thể hủy đơn hàng từ trang chi tiết đơn."
+              />
+            ) : null}
+            {!isStateLocked && productionStatusBlockReason ? (
+              <Alert
+                className="mb-4"
+                type="warning"
+                showIcon
+                title="Chưa đủ điều kiện chuyển trạng thái"
+                description={productionStatusBlockReason}
+              />
+            ) : null}
             <p className="mb-2 text-sm font-semibold text-text-main">Trạng thái mới</p>
             <Select
               value={newStatus || undefined}
-              placeholder="Chọn trạng thái"
+              placeholder={productionStatusBlockReason
+                ? "Chưa có trạng thái được phép chuyển"
+                : "Chọn trạng thái"}
               className="w-full"
+              disabled={isStateLocked || Boolean(productionStatusBlockReason)}
+              notFoundContent={productionStatusBlockReason || "Không có trạng thái tiếp theo phù hợp"}
               options={ORDER_STATUS_OPTIONS.filter(
                 (status) => getAllowedNextStatuses(order).includes(status.value)
               )}
               onChange={setNewStatus}
             />
+            {newStatus === "hoan_tat" && isCodWaitingForDeliveryReconciliation(order) && (
+              <Alert
+                className="mt-4"
+                type="warning"
+                showIcon
+                title="Đơn COD chưa đối soát"
+                description="Khi hoàn tất đơn, hệ thống chỉ chuyển khoản COD sang Chờ đối soát. Doanh thu sẽ được ghi nhận sau khi xác nhận thu COD tại trang Thanh toán."
+              />
+            )}
             {newStatus === "dang_giao" && (
               <div className="mt-4 space-y-3 rounded-lg border border-border bg-surface-alt p-4">
                 <div>

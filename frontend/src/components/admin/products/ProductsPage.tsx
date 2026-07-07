@@ -9,9 +9,7 @@
  * Cấu trúc layout:
  * - Tiêu đề + nút hành động (đầu trang)
  * - 4 thẻ KPI thống kê
- * - Grid 12 cột:
- *     - Cột trái (9/12): bảng phôi áo
- *     - Cột phải (3/12): panel cảnh báo tồn kho
+ * - Bảng phôi áo
  */
 
 import {
@@ -19,12 +17,13 @@ import {
   WarningOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { message, Modal } from "antd";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import * as productService from "@/services/admin/productService";
 import type { SanPham } from "@/services/admin/productService";
-import InventoryAlertPanel from "./InventoryAlertPanel";
 import ProductFilterBar from "./ProductFilterBar";
 import ProductPagination from "./ProductPagination";
 import ProductStatCard from "./ProductStatCard";
@@ -32,18 +31,36 @@ import ProductTable from "./ProductTable";
 
 // ===== HẰNG SỐ =====
 const SO_MOI_TRANG = 10;
+const NGUONG_SAP_HET = 10;
 
-export default function ProductsPage() {
+function tinhTrangThaiTheoKhaDung(khaDung: number) {
+  if (khaDung <= 0) return "het_hang" as const;
+  if (khaDung <= NGUONG_SAP_HET) return "sap_het" as const;
+  return "con_hang" as const;
+}
+
+export type ProductsInitialFilters = {
+  status?: string;
+  stock?: "tat_ca" | "ban_chay" | "con_hang" | "sap_het" | "het_hang";
+};
+
+type ProductsPageProps = {
+  initialFilters?: ProductsInitialFilters;
+};
+
+export default function ProductsPage({ initialFilters }: ProductsPageProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [messageApi, messageContextHolder] = message.useMessage();
+  const [modalApi, modalContextHolder] = Modal.useModal();
 
   // ===== STATE QUẢN LÝ FILTER =====
   const [searchKeyword, setSearchKeyword] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState(initialFilters?.status ?? "");
   const [stockFilter, setStockFilter] = useState<
-    "tat_ca" | "con_hang" | "sap_het" | "het_hang"
-  >("tat_ca");
+    "tat_ca" | "ban_chay" | "con_hang" | "sap_het" | "het_hang"
+  >(initialFilters?.stock ?? "tat_ca");
 
   // ===== STATE PHÂN TRANG =====
   const [currentPage, setCurrentPage] = useState(1);
@@ -88,27 +105,23 @@ export default function ProductsPage() {
     placeholderData: (previousData) => previousData,
   });
 
-  /** Cảnh báo tồn kho thấp (panel bên phải) */
-  const { data: danhSachCanhBao } = useQuery({
-    queryKey: ["products", "inventory-alerts"],
-    queryFn: productService.layCanhBaoTonKho,
-    staleTime: 60_000,
-  });
-
   // ===== MUTATION XÓA =====
   const { mutate: thucHienXoa, isPending: dangXoa } = useMutation({
     mutationFn: (id: number) => productService.xoaSanPham(id),
-    onSuccess: () => {
+    onSuccess: (ketQua) => {
+      messageApi.success(
+        ketQua.message ||
+          (ketQua.action === "deleted"
+            ? "Đã xóa phôi áo sạch khỏi database."
+            : "Đã ẩn phôi áo.")
+      );
       // Làm mới danh sách và thống kê sau khi xóa
       queryClient.invalidateQueries({ queryKey: ["products"] });
     },
-    onError: (error: unknown) => {
-      const msg =
-        error instanceof Error
-          ? error.message
-          : "Đã xảy ra lỗi khi xóa phôi áo";
-      alert(`Lỗi: ${msg}`);
-    },
+    onError: (error: unknown) =>
+      messageApi.error(
+        getApiErrorMessage(error, "Đã xảy ra lỗi khi xóa/ẩn phôi áo")
+      ),
   });
 
   // ===== XỬ LÝ FILTER (reset về trang 1 khi filter thay đổi) =====
@@ -127,42 +140,113 @@ export default function ProductsPage() {
     setCurrentPage(1);
   }
 
-  function handleStockFilterChange(value: "tat_ca" | "con_hang" | "sap_het" | "het_hang") {
+  function handleStockFilterChange(
+    value: "tat_ca" | "ban_chay" | "con_hang" | "sap_het" | "het_hang"
+  ) {
     setStockFilter(value);
     setCurrentPage(1);
   }
 
-  // ===== XỬ LÝ HÀNH ĐỘNG =====
-
-  /** Xem chi tiết: chuyển tới trang xem và sửa phôi áo */
-  function handleView(product: SanPham) {
-    router.push(`/admin/san-pham-phoi-ao/${product.id}`);
+  function handleResetFilters() {
+    setSearchKeyword("");
+    setCategoryFilter("");
+    setStatusFilter("");
+    setStockFilter("tat_ca");
+    setCurrentPage(1);
+    router.replace("/admin/san-pham-phoi-ao");
   }
+
+  function handleKpiFilter({
+    status = "",
+    stock = "tat_ca",
+  }: {
+    status?: string;
+    stock?: "tat_ca" | "ban_chay" | "con_hang" | "sap_het" | "het_hang";
+  }) {
+    setSearchKeyword("");
+    setCategoryFilter("");
+    setStatusFilter(status);
+    setStockFilter(stock);
+    setCurrentPage(1);
+  }
+
+  // ===== XỬ LÝ HÀNH ĐỘNG =====
 
   /** Chỉnh sửa: dùng chung trang xem và sửa phôi áo */
   function handleEdit(product: SanPham) {
     router.push(`/admin/san-pham-phoi-ao/${product.id}`);
   }
 
+  /** Xem chi tiết: chuyển hướng với mode=view */
+  function handleView(product: SanPham) {
+    router.push(`/admin/san-pham-phoi-ao/${product.id}?mode=view`);
+  }
+
   /** Xóa: hiển thị hộp thoại xác nhận rồi gọi API */
   function handleDelete(product: SanPham) {
-    if (
-      window.confirm(
-        `Bạn có chắc muốn xóa "${product.name}"?\n\nLưu ý: Không thể xóa nếu phôi áo đang có trong đơn hàng.`
-      )
-    ) {
-      thucHienXoa(product.id);
-    }
+    modalApi.confirm({
+      title: `Xóa/ẩn phôi áo "${product.name}"?`,
+      content: (
+        <div className="space-y-2 text-[14px] leading-6 text-text-secondary">
+          <p>
+            Hệ thống sẽ kiểm tra tồn kho, đơn hàng đang xử lý và lịch sử phát
+            sinh trước khi thực hiện.
+          </p>
+          <p>
+            Nếu phôi áo đã có dữ liệu liên quan, hệ thống chỉ ẩn khỏi kênh bán
+            hàng và giữ nguyên dữ liệu phục vụ báo cáo.
+          </p>
+        </div>
+      ),
+      okText: "Tiếp tục",
+      cancelText: "Hủy",
+      okButtonProps: { danger: true },
+      centered: true,
+      onOk: () => thucHienXoa(product.id),
+    });
   }
 
   // ===== DỮ LIỆU HIỂN THỊ =====
-  const danhSachSanPham = ketQuaDanhSach?.danhSach ?? [];
+  const danhSachSanPham = (ketQuaDanhSach?.danhSach ?? []).map((product) => ({
+    ...product,
+    variants: product.variants.map((variant) => {
+      const available = variant.available ?? variant.stock;
+      return {
+        ...variant,
+        available,
+        inventoryStatus: tinhTrangThaiTheoKhaDung(available),
+      };
+    }),
+  }));
   const tongSo = ketQuaDanhSach?.tongSo ?? 0;
   const tongSoTrang = ketQuaDanhSach?.tongSoTrang ?? 1;
-  const danhSachCanhBaoHienThi = danhSachCanhBao ?? [];
+
+  const dangCoBoLoc =
+    searchKeyword.trim() !== "" ||
+    categoryFilter !== "" ||
+    statusFilter !== "" ||
+    stockFilter !== "tat_ca";
+  const dangCoBoLocKhac =
+    searchKeyword.trim() !== "" ||
+    categoryFilter !== "" ||
+    statusFilter !== "";
+
+  const emptyMessage =
+    stockFilter === "ban_chay"
+      ? dangCoBoLocKhac
+        ? "Không tìm thấy sản phẩm bán chạy nào phù hợp với bộ lọc hiện tại."
+        : "Chưa có dữ liệu sản phẩm bán chạy trong tháng hiện tại."
+      : stockFilter === "het_hang"
+      ? "Không có phôi áo nào hết hàng theo điều kiện lọc hiện tại."
+      : dangCoBoLoc
+        ? "Không tìm thấy phôi áo nào phù hợp với bộ lọc hiện tại."
+        : "Chưa có phôi áo nào. Bấm “Thêm phôi áo” để bắt đầu.";
 
   return (
-    <div>
+    <>
+      {messageContextHolder}
+      {modalContextHolder}
+      <div>
       {/* ===================================================
           TIÊU ĐỀ TRANG + CÁC NÚT HÀNH ĐỘNG
           =================================================== */}
@@ -202,24 +286,44 @@ export default function ProductsPage() {
           <ProductStatCard
             label="Tổng phôi áo"
             value={dangTaiThongKe ? "..." : (thongKe?.tongPhoi ?? 0)}
+            onClick={handleResetFilters}
+            isActive={!dangCoBoLoc}
           />
 
           {/* Số phôi đang hiển thị trên cửa hàng */}
           <ProductStatCard
             label="Đang hiển thị"
             value={dangTaiThongKe ? "..." : (thongKe?.dangHienThi ?? 0)}
+            href="/admin/san-pham-phoi-ao?status=ACTIVE"
+            onClick={() => handleKpiFilter({ status: "dang_hien_thi" })}
+            isActive={
+              statusFilter === "dang_hien_thi" &&
+              stockFilter === "tat_ca" &&
+              searchKeyword.trim() === "" &&
+              categoryFilter === ""
+            }
           />
 
           {/* Tổng số biến thể (tổng tất cả màu × kích thước) */}
           <ProductStatCard
             label="Tổng biến thể"
             value={dangTaiThongKe ? "..." : (thongKe?.tongBienThe ?? 0)}
+            href="/admin/san-pham-phoi-ao?stock=ALL"
+            onClick={() => handleKpiFilter({ stock: "tat_ca" })}
           />
 
           {/* Biến thể sắp hết hàng – có accent cam vàng + badge cảnh báo */}
           <ProductStatCard
             label="Sắp hết hàng"
             value={dangTaiThongKe ? "..." : (thongKe?.sapHetHang ?? 0)}
+            href="/admin/san-pham-phoi-ao?stock=LOW"
+            onClick={() => handleKpiFilter({ stock: "sap_het" })}
+            isActive={
+              stockFilter === "sap_het" &&
+              statusFilter === "" &&
+              searchKeyword.trim() === "" &&
+              categoryFilter === ""
+            }
             accentColor="#f59e0b"
             extraContent={
               <span className="flex items-center gap-1 rounded-full bg-warning/10 px-2.5 py-0.5 text-[11px] font-bold tracking-wider text-warning">
@@ -230,11 +334,11 @@ export default function ProductsPage() {
           />
         </section>
 
-        {/* ===== BẢNG + CẢNH BÁO TỒN KHO ===== */}
+        {/* ===== BẢNG DỮ LIỆU ===== */}
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
 
-          {/* === Cột trái: Bảng phôi áo (9/12 cột) === */}
-          <div className="xl:col-span-9">
+          {/* === Bảng phôi áo === */}
+          <div className="xl:col-span-12">
             <section className="overflow-hidden rounded-[20px] border border-border bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
               {/* Thanh filter: tìm kiếm + dropdown + pill filter */}
               <ProductFilterBar
@@ -246,6 +350,7 @@ export default function ProductsPage() {
                 onStatusChange={handleStatusChange}
                 stockFilter={stockFilter}
                 onStockFilterChange={handleStockFilterChange}
+                onResetFilters={handleResetFilters}
               />
 
               {/* Trạng thái loading */}
@@ -276,6 +381,7 @@ export default function ProductsPage() {
                 <>
                   <ProductTable
                     products={danhSachSanPham}
+                    emptyMessage={emptyMessage}
                     isLoading={dangXoa}
                     onView={handleView}
                     onEdit={handleEdit}
@@ -295,19 +401,13 @@ export default function ProductsPage() {
             </section>
           </div>
 
-          {/* === Cột phải: Panel cảnh báo tồn kho (3/12 cột) === */}
-          <div className="xl:col-span-3">
-            <InventoryAlertPanel
-              alerts={danhSachCanhBaoHienThi}
-              totalAlertCount={danhSachCanhBaoHienThi.length}
-            />
-          </div>
         </div>
       </div>
 
       {/* Khoảng trống phía dưới để trang không bị sát */}
       <div className="h-12" />
 
-    </div>
+      </div>
+    </>
   );
 }

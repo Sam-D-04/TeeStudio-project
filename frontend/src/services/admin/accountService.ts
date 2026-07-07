@@ -36,6 +36,9 @@ export type KetQuaDanhSachTaiKhoan = {
   page: number;
   limit: number;
   totalPages: number;
+  statTotal?: number;
+  statActive?: number;
+  statInactive?: number;
 };
 
 /** Tham số lọc danh sách tài khoản */
@@ -49,7 +52,6 @@ export type ThamSoLocTaiKhoan = {
 /** Payload tạo tài khoản khách hàng mới */
 export type TaoTaiKhoanInput = {
   email: string;
-  password: string;
   fullName: string;
   phone: string;
 };

@@ -1,4 +1,10 @@
-export type VnpayReturnResult = {
+import axios from "axios";
+import apiClient from "@/lib/apiClient";
+
+export type OnlinePaymentGateway = "VNPAY" | "MOMO";
+
+export type OnlinePaymentReturnResult = {
+  gateway: OnlinePaymentGateway;
   isValidChecksum: boolean;
   isSuccessful: boolean;
   responseCode: string;
@@ -13,25 +19,23 @@ export type VnpayReturnResult = {
   paidAt: string | null;
 };
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-
-export async function xacThucKetQuaVnpay(
+export async function xacThucKetQuaThanhToan(
+  gateway: OnlinePaymentGateway,
   queryString: string
-): Promise<VnpayReturnResult> {
-  const response = await fetch(
-    `${API_BASE_URL}/payments/vnpay/return?${queryString}`,
-    { cache: "no-store" }
-  );
-
-  if (!response.ok) {
-    throw new Error("Không thể xác minh kết quả thanh toán");
-  }
-
-  const payload = (await response.json()) as {
+): Promise<OnlinePaymentReturnResult> {
+  const response = await apiClient.get<{
     success: boolean;
-    data: VnpayReturnResult;
-  };
+    data: OnlinePaymentReturnResult;
+  }>(`/payments/${gateway.toLowerCase()}/return?${queryString}`);
 
-  return payload.data;
+  return response.data.data;
+}
+
+export function isPaymentVerificationConnectionError(error: unknown) {
+  if (!axios.isAxiosError(error)) return false;
+
+  return (
+    !error.response ||
+    ["ECONNABORTED", "ETIMEDOUT", "ERR_NETWORK"].includes(error.code || "")
+  );
 }

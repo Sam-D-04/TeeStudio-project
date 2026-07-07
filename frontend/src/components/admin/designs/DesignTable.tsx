@@ -10,7 +10,7 @@
  *  4. Sản phẩm/Màu  – tên áo + chấm màu + nhãn màu
  *  5. Vị trí in      – ví dụ "Ngực trái"
  *  6. Trạng thái     – badge màu (component DesignStatusBadge)
- *  7. Thao tác       – nút Xem / Yêu cầu chỉnh sửa / Duyệt (hiện khi hover)
+ *  7. Thao tác       – nút Xem / Yêu cầu chỉnh sửa / Duyệt
  *
  * Props:
  *  - danhSach: danh sách thiết kế cần hiển thị
@@ -136,7 +136,7 @@ export default function DesignTable({
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component phụ: 1 hàng trong bảng
-// Tách ra để logic hover/state không ảnh hưởng toàn bảng
+// Tách ra để logic của từng hàng không ảnh hưởng toàn bảng
 // ─────────────────────────────────────────────────────────────────────────────
 function HangThietKe({
   thietKe,
@@ -163,15 +163,9 @@ function HangThietKe({
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "#f8fafc";
-        // Hiện nhóm nút thao tác khi hover
-        const nhomNut = e.currentTarget.querySelector(".nhom-nut-thao-tac") as HTMLElement;
-        if (nhomNut) nhomNut.style.opacity = "1";
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "transparent";
-        // Ẩn nhóm nút thao tác khi không hover
-        const nhomNut = e.currentTarget.querySelector(".nhom-nut-thao-tac") as HTMLElement;
-        if (nhomNut) nhomNut.style.opacity = "0";
       }}
     >
       {/* Cột 1: Mã thiết kế */}
@@ -237,17 +231,14 @@ function HangThietKe({
         <DesignStatusBadge trangThai={thietKe.trangThai} />
       </td>
 
-      {/* Cột 7: Thao tác – ẩn mặc định, hiện khi hover hàng */}
+      {/* Cột 7: Thao tác */}
       <td style={{ padding: "14px 16px", textAlign: "right", whiteSpace: "nowrap" }}>
         <div
-          className="nhom-nut-thao-tac"
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "flex-end",
             gap: 6,
-            opacity: 0,
-            transition: "opacity 0.15s ease",
           }}
         >
           {/* Nút Xem */}

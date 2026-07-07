@@ -32,11 +32,26 @@ const getThongKe = async (req, res, next) => {
  * GET /api/admin/designs
  * Danh sách thiết kế với lọc và phân trang.
  *
- * Query params: page, limit, tu_khoa, trang_thai, vi_tri_in
+ * Query params: page, limit, tu_khoa, trang_thai, vi_tri_in, tu_ngay, den_ngay
  */
 const getDanhSachThietKe = async (req, res, next) => {
   try {
     const data = await designService.layDanhSachThietKe(req.query);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** GET /api/admin/designs/:id - Chi tiết một thiết kế khách hàng. */
+const getChiTietThietKe = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id || id <= 0) {
+      return res.status(400).json({ success: false, message: "ID thiết kế không hợp lệ" });
+    }
+
+    const data = await designService.layChiTietThietKe(id);
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -99,7 +114,7 @@ const yeuCauChinhSua = async (req, res, next) => {
  * GET /api/admin/designs/don-can-in
  * Danh sách đơn cần in (đã duyệt thiết kế, chờ/đang in).
  *
- * Query params: page, limit, trang_thai
+ * Query params: page, limit, trang_thai, tu_ngay, den_ngay
  */
 const getDanhSachDonCanIn = async (req, res, next) => {
   try {
@@ -111,20 +126,23 @@ const getDanhSachDonCanIn = async (req, res, next) => {
 };
 
 /**
- * PATCH /api/admin/designs/don-can-in/:id/gui-xuong
- * Gửi đơn đến xưởng in (chuyển sang "Đang in").
+ * PATCH /api/admin/designs/don-can-in/:id/trang-thai
+ * Cập nhật tuần tự tiến độ của một mặt hàng cần in.
  */
-const guiDonXuongIn = async (req, res, next) => {
+const capNhatTrangThaiDonIn = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
     if (!id || id <= 0) {
       return res.status(400).json({ success: false, message: "ID đơn in không hợp lệ" });
     }
 
-    const data = await designService.guiDonXuongIn(id);
+    const { trangThai } = req.body || {};
+    const data = await designService.capNhatTrangThaiDonIn(id, trangThai);
     res.json({
       success: true,
-      message: "Đã gửi đơn đến xưởng in thành công",
+      message: trangThai === "da_in_xong"
+        ? "Đã xác nhận in xong sản phẩm"
+        : "Đã bắt đầu in sản phẩm",
       data,
     });
   } catch (error) {
@@ -205,19 +223,6 @@ const xoaSticker = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * GET /api/admin/designs/vi-tri-in
- * Danh sách tất cả vị trí in (kể cả đã tắt) – dành cho Admin.
- */
-const getDanhSachViTriIn = async (req, res, next) => {
-  try {
-    const data = await designService.layDanhSachViTriIn({ chiLayDangBat: false });
-    res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * GET /api/vi-tri-in (PUBLIC)
  * Danh sách vị trí in đang bật – dành cho Design Studio khách hàng.
  */
@@ -230,94 +235,16 @@ const getDanhSachViTriInCongKhai = async (req, res, next) => {
   }
 };
 
-/**
- * POST /api/admin/designs/vi-tri-in
- * Thêm vị trí in mới.
- *
- * Body: { ten, moTa, dangHoatDong }
- */
-const themViTriIn = async (req, res, next) => {
-  try {
-    const { ten, moTa, dangHoatDong } = req.body;
-
-    if (!ten) {
-      return res.status(400).json({ success: false, message: "Vui lòng nhập tên vị trí in" });
-    }
-
-    const data = await designService.themViTriIn({ ten, moTa, dangHoatDong });
-    res.status(201).json({
-      success: true,
-      message: "Thêm vị trí in thành công",
-      data,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * PATCH /api/admin/designs/vi-tri-in/:id
- * Bật/tắt vị trí in.
- *
- * Body: { dangHoatDong: boolean }
- */
-const batTatViTriIn = async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (!id || id <= 0) {
-      return res.status(400).json({ success: false, message: "ID vị trí in không hợp lệ" });
-    }
-
-    const { dangHoatDong } = req.body;
-    if (typeof dangHoatDong !== "boolean") {
-      return res.status(400).json({
-        success: false,
-        message: "Trường dangHoatDong phải là true hoặc false",
-      });
-    }
-
-    const data = await designService.batTatViTriIn(id, dangHoatDong);
-    res.json({
-      success: true,
-      message: dangHoatDong ? "Đã bật vị trí in" : "Đã tắt vị trí in",
-      data,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * DELETE /api/admin/designs/vi-tri-in/:id
- * Xóa vị trí in (chỉ xóa được khi không có thiết kế nào dùng).
- */
-const xoaViTriIn = async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (!id || id <= 0) {
-      return res.status(400).json({ success: false, message: "ID vị trí in không hợp lệ" });
-    }
-
-    await designService.xoaViTriIn(id);
-    res.json({ success: true, message: "Đã xóa vị trí in thành công" });
-  } catch (error) {
-    next(error);
-  }
-};
-
 module.exports = {
   getThongKe,
   getDanhSachThietKe,
+  getChiTietThietKe,
   duyetThietKe,
   yeuCauChinhSua,
   getDanhSachDonCanIn,
-  guiDonXuongIn,
+  capNhatTrangThaiDonIn,
   getDanhSachSticker,
   themSticker,
   xoaSticker,
-  getDanhSachViTriIn,
   getDanhSachViTriInCongKhai,
-  themViTriIn,
-  batTatViTriIn,
-  xoaViTriIn,
 };

@@ -11,7 +11,12 @@
  */
 
 import ProductsPage from "@/components/admin/products/ProductsPage";
+import type { ProductsInitialFilters } from "@/components/admin/products/ProductsPage";
 
-export default function ProductsClient() {
-  return <ProductsPage />;
+export default function ProductsClient({
+  initialFilters,
+}: {
+  initialFilters?: ProductsInitialFilters;
+}) {
+  return <ProductsPage initialFilters={initialFilters} />;
 }

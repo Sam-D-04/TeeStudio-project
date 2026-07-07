@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Select } from "antd";
 import {
@@ -121,6 +122,8 @@ function SoLuongBadge({ soLuong }: { soLuong: number }) {
  * có phân trang, tìm kiếm theo SKU/sản phẩm và lọc theo loại giao dịch.
  */
 export default function LichSuKhoPage() {
+  const router = useRouter();
+
   // ── Bộ lọc + tìm kiếm ──
   const [trangHienTai, setTrangHienTai] = useState(1);
   const [loaiGiaoDich, setLoaiGiaoDich] = useState("tat_ca");
@@ -136,6 +139,14 @@ export default function LichSuKhoPage() {
   function xuLyDoiLoai(val: string) {
     setLoaiGiaoDich(val);
     setTrangHienTai(1);
+  }
+
+  function xuLyResetBoLoc() {
+    setTuKhoa("");
+    setTuKhoaInput("");
+    setLoaiGiaoDich("tat_ca");
+    setTrangHienTai(1);
+    router.replace("/admin/kho-hang/lich-su");
   }
 
   // ── Gọi API ──
@@ -241,6 +252,15 @@ export default function LichSuKhoPage() {
             options={TU_KHOA_LOAI_GD}
           />
         </div>
+
+        {/* Nút Đặt lại */}
+        <button
+          type="button"
+          onClick={xuLyResetBoLoc}
+          className="flex h-10 items-center justify-center rounded-[10px] bg-surface-alt px-4 text-sm font-semibold text-text-secondary transition-colors hover:bg-border hover:text-text-main sm:ml-auto"
+        >
+          Đặt lại
+        </button>
       </div>
 
       {/* ===== BẢNG LỊCH SỬ ===== */}
@@ -366,12 +386,7 @@ export default function LichSuKhoPage() {
                           {(tuKhoa || loaiGiaoDich !== "tat_ca") && (
                             <button
                               type="button"
-                              onClick={() => {
-                                setTuKhoa("");
-                                setTuKhoaInput("");
-                                setLoaiGiaoDich("tat_ca");
-                                setTrangHienTai(1);
-                              }}
+                              onClick={xuLyResetBoLoc}
                               className="text-xs text-primary-container underline hover:no-underline"
                             >
                               Xóa bộ lọc

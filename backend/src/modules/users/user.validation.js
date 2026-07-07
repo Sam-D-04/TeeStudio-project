@@ -74,14 +74,6 @@ const createStaffSchema = {
       email: true,
       maxLength: 255,
     },
-    password: {
-      label: "Mật khẩu",
-      required: true,
-      type: "string",
-      minLength: 8,
-      maxLength: 100,
-      pattern: /^(?=.*[A-Za-z])(?=.*\d).+$/,
-    },
     fullName: {
       label: "Họ và tên",
       required: true,
@@ -138,14 +130,6 @@ const createCustomerSchema = {
       type: "string",
       email: true,
       maxLength: 255,
-    },
-    password: {
-      label: "Mật khẩu",
-      required: true,
-      type: "string",
-      minLength: 8,
-      maxLength: 100,
-      pattern: /^(?=.*[A-Za-z])(?=.*\d).+$/,
     },
     fullName: {
       label: "Họ và tên",

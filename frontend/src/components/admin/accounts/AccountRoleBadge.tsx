@@ -14,7 +14,7 @@ const roleStyles: Record<StaffRole, string> = {
   PRODUCTION: "bg-[#bee9ff] text-[#1e4c5f]",
 };
 
-export default function SettingRoleBadge({ role }: { role: StaffRole }) {
+export default function AccountRoleBadge({ role }: { role: StaffRole }) {
   return (
     <span
       className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold ${roleStyles[role]}`}

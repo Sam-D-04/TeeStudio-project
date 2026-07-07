@@ -102,12 +102,12 @@ router.post(
   orderController.taoMoiDonHang
 );
 
-// POST /api/admin/orders/:id/vnpay/recreate – Tạo lại mã VNPAY đã hết hạn
+// POST /api/admin/orders/:id/payment/recreate – Tạo lại mã thanh toán online
 router.post(
-  "/:id/vnpay/recreate",
+  "/:id/payment/recreate",
   verifyToken,
   requireAdmin,
-  orderController.taoLaiMaThanhToanVnpay
+  orderController.taoLaiMaThanhToanOnline
 );
 
 // ─────────────────────────────────────────────────────────────────────────────

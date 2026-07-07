@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 /**
@@ -25,6 +26,12 @@ type ProductStatCardProps = {
    * Ví dụ: "#f59e0b" cho thẻ "Sắp hết hàng".
    */
   accentColor?: string;
+  /** URL dùng khi card là nút lọc điều hướng. Bỏ trống để giữ card chỉ đọc. */
+  href?: string;
+  /** Hành động dùng cho card dạng button, ví dụ reset toàn bộ bộ lọc. */
+  onClick?: () => void;
+  /** Hiển thị trạng thái card đang là bộ lọc được áp dụng. */
+  isActive?: boolean;
 };
 
 export default function ProductStatCard({
@@ -32,11 +39,22 @@ export default function ProductStatCard({
   value,
   extraContent,
   accentColor,
+  href,
+  onClick,
+  isActive = false,
 }: ProductStatCardProps) {
-  return (
-    // Card nền trắng, bo góc 12px (rounded-xl), viền 1px, shadow nhẹ
-    // Nếu có accentColor thì hiển thị đường viền màu bên phải
-    <div className="relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface p-5 shadow-[0_1px_4px_rgba(0,0,0,0.05)] transition-all duration-200 hover:-translate-y-0.5">
+  const cardClassName = `relative flex w-full flex-col overflow-hidden rounded-xl border bg-surface p-5 text-left shadow-[0_1px_4px_rgba(0,0,0,0.05)] outline-none transition-all duration-200 ${
+    href || onClick
+      ? "cursor-pointer hover:-translate-y-0.5 hover:border-[#76a1b6] focus-visible:ring-2 focus-visible:ring-primary-container/30"
+      : ""
+  } ${
+    isActive
+      ? "border-primary-container ring-1 ring-primary-container/20"
+      : "border-border"
+  }`;
+
+  const content = (
+    <>
       {/* Đường accent màu bên phải (chỉ hiển thị nếu có accentColor) */}
       {accentColor && (
         <div
@@ -56,6 +74,36 @@ export default function ProductStatCard({
         {/* Slot cho badge hoặc nội dung bổ sung */}
         {extraContent}
       </div>
-    </div>
+    </>
   );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        onClick={onClick}
+        aria-label={`${label}: ${value}. Bấm để lọc danh sách`}
+        aria-current={isActive ? "page" : undefined}
+        className={cardClassName}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={`${label}: ${value}. Bấm để xóa toàn bộ bộ lọc`}
+        aria-pressed={isActive}
+        className={cardClassName}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return <article className={cardClassName}>{content}</article>;
 }

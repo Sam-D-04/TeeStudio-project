@@ -1,97 +1,74 @@
 "use client";
 
-/**
- * AccountsPage – Component trang Quản lý Tài khoản Khách hàng.
- *
- * Đây là component orchestrator (điều phối):
- * nó lắp ghép tất cả component con vào layout hoàn chỉnh và
- * quản lý toàn bộ trạng thái + gọi API qua React Query.
- *
- * Cấu trúc:
- * ┌──────────────────────────────────────────────────────────┐
- * │ Tiêu đề trang + Nút "Thêm tài khoản"                    │
- * ├──────────────────────────────────────────────────────────┤
- * │ [KPI: Tổng] [KPI: Hoạt động] [KPI: Vô hiệu]            │
- * ├──────────────────────────────────────────────────────────┤
- * │ Bảng dữ liệu tài khoản (lọc, phân trang, hành động)    │
- * └──────────────────────────────────────────────────────────┘
- */
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { App, Tabs } from "antd";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
-import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button, App } from "antd";
-import { UserAddOutlined } from "@ant-design/icons";
-
+import AccountFormModal from "./AccountFormDrawer";
+import AccountStaffTable from "./AccountStaffTable";
 import AccountStatCards from "./AccountStatCards";
 import AccountsTable from "./AccountsTable";
-import AccountFormDrawer from "./AccountFormDrawer";
-
 import {
+  capNhatTaiKhoan,
   layDanhSachTaiKhoan,
   taoTaiKhoan,
-  capNhatTaiKhoan,
   voHieuHoaTaiKhoan,
-  type TaiKhoanKhachHang,
-  type ThamSoLocTaiKhoan,
-  type TaoTaiKhoanInput,
   type CapNhatTaiKhoanInput,
+  type TaiKhoanKhachHang,
+  type TaoTaiKhoanInput,
+  type ThamSoLocTaiKhoan,
 } from "@/services/admin/accountService";
+
+type AccountsTabKey = "customers" | "staff";
 
 export default function AccountsPage() {
   const queryClient = useQueryClient();
   const { notification: api } = App.useApp();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  // ── Trạng thái bộ lọc & phân trang ────────────────────────────────
+  const [activeTab, setActiveTab] = useState<AccountsTabKey>("customers");
   const [thamSoLoc, setThamSoLoc] = useState<ThamSoLocTaiKhoan>({
     page: 1,
-    limit: 20,
+    limit: 10,
     search: "",
-    status: "",
+    status: searchParams?.get("status") || "",
   });
-
-  // ── Trạng thái Drawer form thêm/sửa ───────────────────────────────
-  const [drawer, setDrawer] = useState<{
+  const [accountModal, setAccountModal] = useState<{
     open: boolean;
     mode: "them" | "sua";
     taiKhoan: TaiKhoanKhachHang | null;
   }>({ open: false, mode: "them", taiKhoan: null });
 
-  // ── Query: Lấy danh sách tài khoản ───────────────────────────────
-  const queryKey = ["admin", "accounts", thamSoLoc];
-  const {
-    data,
-    isFetching,
-  } = useQuery({
+  const queryKey = ["admin", "accounts", "customers", thamSoLoc];
+  const { data, isFetching } = useQuery({
     queryKey,
     queryFn: () => layDanhSachTaiKhoan(thamSoLoc),
     placeholderData: (prev) => prev,
     staleTime: 30_000,
   });
 
-  const danhSach = data?.items ?? [];
-  const tongSo = data?.total ?? 0;
+  const danhSach = useMemo(() => data?.items ?? [], [data?.items]);
+  const tongSoList = data?.total ?? 0; // Dùng cho phân trang
   const trang = data?.page ?? 1;
-  const soMoiTrang = data?.limit ?? 20;
+  const soMoiTrang = data?.limit ?? 10;
 
-  // ── Tính KPI thống kê ──────────────────────────────────────────────
-  const { soHoatDong, soVoHieuHoa } = useMemo(() => {
-    return {
-      soHoatDong: danhSach.filter((t) => t.status === "ACTIVE").length,
-      soVoHieuHoa: danhSach.filter((t) => t.status !== "ACTIVE").length,
-    };
-  }, [danhSach]);
+  const tongSo = data?.statTotal ?? tongSoList;
+  const soHoatDong = data?.statActive ?? 0;
+  const soVoHieuHoa = data?.statInactive ?? 0;
 
-  // ── Mutation: Tạo tài khoản ────────────────────────────────────────
   const mutationThem = useMutation({
     mutationFn: (payload: TaoTaiKhoanInput) => taoTaiKhoan(payload),
     onSuccess: (data) => {
       api.success({
         title: "Tạo tài khoản thành công",
-        description: `Tài khoản cho ${data.fullName} đã được tạo.`,
+        description: `Tài khoản cho ${data.fullName} đã được tạo và mật khẩu đã được gửi đến ${data.email}.`,
         placement: "topRight",
       });
       queryClient.invalidateQueries({ queryKey: ["admin", "accounts"] });
-      setDrawer({ open: false, mode: "them", taiKhoan: null });
+      setAccountModal({ open: false, mode: "them", taiKhoan: null });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
       api.error({
@@ -103,7 +80,6 @@ export default function AccountsPage() {
     },
   });
 
-  // ── Mutation: Cập nhật tài khoản ───────────────────────────────────
   const mutationSua = useMutation({
     mutationFn: ({
       id,
@@ -119,7 +95,7 @@ export default function AccountsPage() {
         placement: "topRight",
       });
       queryClient.invalidateQueries({ queryKey: ["admin", "accounts"] });
-      setDrawer({ open: false, mode: "them", taiKhoan: null });
+      setAccountModal({ open: false, mode: "them", taiKhoan: null });
     },
     onError: (err: { response?: { data?: { message?: string } } }) => {
       api.error({
@@ -131,7 +107,6 @@ export default function AccountsPage() {
     },
   });
 
-  // ── Mutation: Vô hiệu hóa (soft-delete) ───────────────────────────
   const mutationVoHieu = useMutation({
     mutationFn: (id: number) => voHieuHoaTaiKhoan(id, "INACTIVE"),
     onSuccess: (data) => {
@@ -152,7 +127,6 @@ export default function AccountsPage() {
     },
   });
 
-  // ── Mutation: Khôi phục tài khoản ─────────────────────────────────
   const mutationKhoiPhuc = useMutation({
     mutationFn: (id: number) => capNhatTaiKhoan(id, { status: "ACTIVE" }),
     onSuccess: (data) => {
@@ -173,49 +147,58 @@ export default function AccountsPage() {
     },
   });
 
-  // ── Handlers ──────────────────────────────────────────────────────
-  const handleMoDrawerThem = () => {
-    setDrawer({ open: true, mode: "them", taiKhoan: null });
+  const handleMoModalThem = () => {
+    setAccountModal({ open: true, mode: "them", taiKhoan: null });
   };
 
-  const handleMoDrawerSua = (taiKhoan: TaiKhoanKhachHang) => {
-    setDrawer({ open: true, mode: "sua", taiKhoan });
+  const handleMoModalSua = (taiKhoan: TaiKhoanKhachHang) => {
+    setAccountModal({ open: true, mode: "sua", taiKhoan });
   };
 
-  const handleDongDrawer = () => {
-    setDrawer({ open: false, mode: "them", taiKhoan: null });
+  const handleDongModal = () => {
+    setAccountModal({ open: false, mode: "them", taiKhoan: null });
   };
 
   const handleSubmitForm = (values: TaoTaiKhoanInput | CapNhatTaiKhoanInput) => {
-    if (drawer.mode === "them") {
+    if (accountModal.mode === "them") {
       mutationThem.mutate(values as TaoTaiKhoanInput);
-    } else if (drawer.taiKhoan) {
+    } else if (accountModal.taiKhoan) {
       mutationSua.mutate({
-        id: drawer.taiKhoan.id,
+        id: accountModal.taiKhoan.id,
         payload: values as CapNhatTaiKhoanInput,
       });
     }
   };
 
   const handleDoiLoc = (thamSoMoi: Partial<ThamSoLocTaiKhoan>) => {
+    const newStatus = thamSoMoi.status !== undefined
+      ? (thamSoMoi.status === "tat_ca" ? "" : thamSoMoi.status)
+      : thamSoLoc.status;
+
     setThamSoLoc((prev) => ({
       ...prev,
       ...thamSoMoi,
-      ...(thamSoMoi.status !== undefined ? { status: thamSoMoi.status === "tat_ca" ? "" : thamSoMoi.status } : {}),
+      status: newStatus,
     }));
+
+    // Cập nhật URL query param
+    const currentParams = new URLSearchParams(Array.from(searchParams?.entries() || []));
+    if (newStatus) {
+      currentParams.set("status", newStatus);
+    } else {
+      currentParams.delete("status");
+    }
+
+    const newUrl = currentParams.toString() ? `${pathname}?${currentParams.toString()}` : pathname;
+    router.replace(newUrl, { scroll: false });
   };
 
-  const dangLuuForm =
-    mutationThem.isPending || mutationSua.isPending;
+  const dangLuuForm = mutationThem.isPending || mutationSua.isPending;
 
   return (
     <div className="flex flex-col gap-6">
-      {/* ============================================================
-          PHẦN 1: TIÊU ĐỀ TRANG + NÚT HÀNH ĐỘNG
-          ============================================================ */}
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        {/* Tiêu đề và mô tả */}
-        <div>
+        <div className="flex items-baseline gap-3">
           <h2
             style={{
               fontSize: 28,
@@ -231,70 +214,61 @@ export default function AccountsPage() {
             style={{
               fontSize: 14,
               color: "#94a3b8",
-              margin: "6px 0 0",
+              margin: 0,
             }}
           >
-            Quản lý tài khoản khách hàng – xem, thêm mới, cập nhật và vô hiệu hóa.
+            (Quản lý tài khoản khách hàng và nhân sự nội bộ.)
           </p>
         </div>
 
-        {/* Nút thêm tài khoản */}
-        <Button
-          type="primary"
-          icon={<UserAddOutlined />}
-          onClick={handleMoDrawerThem}
-          style={{
-            height: 40,
-            borderRadius: 8,
-            background: "#0ea5e9",
-            border: "none",
-            fontWeight: 600,
-            fontSize: 14,
-            paddingInline: 20,
-            boxShadow: "0 2px 8px rgba(14,165,233,0.25)",
-          }}
-        >
-          Thêm tài khoản
-        </Button>
       </div>
 
-      {/* ============================================================
-          PHẦN 2: THẺ THỐNG KÊ KPI
-          ============================================================ */}
-      <AccountStatCards
-        tongSo={tongSo}
-        soHoatDong={soHoatDong}
-        soVoHieuHoa={soVoHieuHoa}
+      <Tabs
+        activeKey={activeTab}
+        onChange={(key) => setActiveTab(key as AccountsTabKey)}
+        items={[
+          { key: "customers", label: "Khách hàng" },
+          { key: "staff", label: "Nhân sự nội bộ" },
+        ]}
       />
 
-      {/* ============================================================
-          PHẦN 3: BẢNG DỮ LIỆU
-          ============================================================ */}
-      <AccountsTable
-        danhSach={danhSach}
-        tongSo={tongSo}
-        trang={trang}
-        soMoiTrang={soMoiTrang}
-        dangTai={isFetching}
-        thamSoLoc={thamSoLoc}
-        onDoiTrang={(page, limit) =>
-          setThamSoLoc((prev) => ({ ...prev, page, limit }))
-        }
-        onDoiLoc={handleDoiLoc}
-        onSua={handleMoDrawerSua}
-        onVoHieuHoa={(taiKhoan) => mutationVoHieu.mutate(taiKhoan.id)}
-        onKhoiPhuc={(taiKhoan) => mutationKhoiPhuc.mutate(taiKhoan.id)}
-      />
+      {activeTab === "customers" ? (
+        <>
+          <AccountStatCards
+            tongSo={tongSo}
+            soHoatDong={soHoatDong}
+            soVoHieuHoa={soVoHieuHoa}
+            currentStatus={thamSoLoc.status}
+            onFilterChange={(status) => handleDoiLoc({ status, page: 1 })}
+          />
 
-      {/* ============================================================
-          PHẦN 4: DRAWER FORM THÊM / SỬA
-          ============================================================ */}
-      <AccountFormDrawer
-        open={drawer.open}
-        mode={drawer.mode}
-        taiKhoan={drawer.taiKhoan}
+          <AccountsTable
+            danhSach={danhSach}
+            tongSo={tongSoList}
+            trang={trang}
+            soMoiTrang={soMoiTrang}
+            dangTai={isFetching}
+            thamSoLoc={thamSoLoc}
+            onDoiTrang={(page, limit) =>
+              setThamSoLoc((prev) => ({ ...prev, page, limit }))
+            }
+            onDoiLoc={handleDoiLoc}
+            onThem={handleMoModalThem}
+            onSua={handleMoModalSua}
+            onVoHieuHoa={(taiKhoan) => mutationVoHieu.mutate(taiKhoan.id)}
+            onKhoiPhuc={(taiKhoan) => mutationKhoiPhuc.mutate(taiKhoan.id)}
+          />
+        </>
+      ) : (
+        <AccountStaffTable />
+      )}
+
+      <AccountFormModal
+        open={accountModal.open}
+        mode={accountModal.mode}
+        taiKhoan={accountModal.taiKhoan}
         dangTai={dangLuuForm}
-        onClose={handleDongDrawer}
+        onClose={handleDongModal}
         onSubmit={handleSubmitForm}
       />
     </div>

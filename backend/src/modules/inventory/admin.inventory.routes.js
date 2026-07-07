@@ -11,6 +11,7 @@
  *   GET  /history                            → Lịch sử toàn kho (phân trang + lọc loại GD + tìm kiếm)
  *   GET  /products-with-variants             → Danh sách sản phẩm + biến thể (phục vụ trang nhập kho)
  *   GET  /suppliers                          → Danh sách nhà cung cấp (phục vụ trang nhập kho)
+ *   POST /suppliers                          → Tạo nhanh nhà cung cấp
  *   GET  /variants/:variantId                → Chi tiết biến thể
  *   GET  /variants/:variantId/pending-orders → Đơn hàng chờ xuất phôi
  *   GET  /variants/:variantId/history        → Lịch sử biến động theo biến thể
@@ -22,6 +23,8 @@ const { verifyToken, requireAdmin } = require("../../common/middlewares/auth.mid
 const validate = require("../../common/middlewares/validate.middleware");
 const {
   createInventoryTransactionSchema,
+  getDanhSachTonKhoSchema,
+  createSupplierSchema,
 } = require("./inventory.validation");
 const {
   getThongKeKho,
@@ -33,6 +36,7 @@ const {
   ghiGiaoDich,
   getDanhSachSanPhamVaBienThe,
   getDanhSachNhaCungCap,
+  createNhaCungCap,
 } = require("./admin.inventory.controller");
 
 // Áp dụng xác thực JWT + quyền Admin cho toàn bộ routes này
@@ -46,12 +50,13 @@ router.get("/products-with-variants", getDanhSachSanPhamVaBienThe);
 
 // ─── Danh sách nhà cung cấp (phục vụ trang nhập kho) ──────────────────────
 router.get("/suppliers", getDanhSachNhaCungCap);
+router.post("/suppliers", validate(createSupplierSchema), createNhaCungCap);
 
 // ─── Lịch sử toàn kho (phân trang + lọc loại GD + tìm kiếm) ───────────
 router.get("/history", getLichSuKho);
 
 // ─── Danh sách tồn kho ────────────────────────────────────────────────────
-router.get("/", getDanhSachTonKho);
+router.get("/", validate(getDanhSachTonKhoSchema), getDanhSachTonKho);
 
 // ─── Chi tiết biến thể ───────────────────────────────────────────────────
 router.get("/variants/:variantId", getChiTietBienThe);

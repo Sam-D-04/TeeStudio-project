@@ -9,6 +9,7 @@
  */
 
 import apiClient from "@/lib/apiClient";
+import { downloadExcelReport } from "@/lib/downloadExcelReport";
 import type { PaymentStatus } from "@/components/admin/payment/PaymentStatusBadge";
 import type { PaymentType } from "@/components/admin/payment/PaymentTable";
 
@@ -25,24 +26,20 @@ export type ThongKeThanhToan = {
   thatBai: number;
 };
 
-/** Số lượng giao dịch cho các tab pill */
-export type TabCounts = {
-  tat_ca: number;
-  cho_thanh_toan: number;
-  da_thanh_toan: number;
-  that_bai: number;
-  can_doi_soat: number;
-};
-
 /** Một giao dịch trong danh sách */
 export type GiaoDich = {
+  remainingAmountVnd?: number;
+  codAmountVnd?: number;
+  codReconciliationPaymentId?: number | null;
   id: number;
   payCode: string;
   orderCode: string;
   customerName: string;
   amountVnd: number;
   paymentType: PaymentType;
-  method: "VNPAY" | "COD";
+  orderPaymentType: "FULL" | "DEPOSIT";
+  orderPaymentStatus: "PENDING" | "PARTIALLY_PAID" | "PAID";
+  method: "VNPAY" | "MOMO" | "COD";
   status: PaymentStatus;
   gatewayCode: string;
   paidAt?: string;
@@ -68,7 +65,6 @@ export type KetQuaDanhSachGiaoDich = {
   trang: number;
   soMoiTrang: number;
   tongSoTrang: number;
-  tabCounts: TabCounts;
 };
 
 /** Tham số lọc khi lấy danh sách */
@@ -78,7 +74,9 @@ export type ThamSoLocGiaoDich = {
   trangThai?: string;
   phuongThuc?: string;
   tuKhoa?: string;
-  tab?: string;
+  tuNgay?: string;
+  denNgay?: string;
+  kieuNgay?: "ngay_tao" | "ngay_thanh_toan";
 };
 
 // =====================================================================
@@ -110,7 +108,9 @@ export async function layDanhSachGiaoDich(
   if (thamSo.trangThai && thamSo.trangThai !== "tat_ca") params.trangThai = thamSo.trangThai;
   if (thamSo.phuongThuc && thamSo.phuongThuc !== "tat_ca") params.phuongThuc = thamSo.phuongThuc;
   if (thamSo.tuKhoa && thamSo.tuKhoa.trim()) params.tuKhoa = thamSo.tuKhoa.trim();
-  if (thamSo.tab && thamSo.tab !== "tat_ca") params.tab = thamSo.tab;
+  if (thamSo.tuNgay) params.tuNgay = thamSo.tuNgay;
+  if (thamSo.denNgay) params.denNgay = thamSo.denNgay;
+  if (thamSo.kieuNgay) params.kieuNgay = thamSo.kieuNgay;
 
   const res = await apiClient.get<{ success: boolean; data: KetQuaDanhSachGiaoDich }>(
     "/admin/payments",
@@ -144,34 +144,6 @@ export async function xacNhanThuCod(id: number): Promise<{ id: number; trangThai
 }
 
 /**
- * Đồng bộ lại trạng thái từ VNPAY.
- * POST /api/admin/payments/:id/sync-vnpay
- */
-export async function dongBoLaiVnpay(
-  id: number
-): Promise<{ id: number; trangThai: string; dbStatus: string; transactionId: string; thongBao: string }> {
-  const res = await apiClient.post<{
-    success: boolean;
-    message: string;
-    data: { id: number; trangThai: string; dbStatus: string; transactionId: string; thongBao: string };
-  }>(`/admin/payments/${id}/sync-vnpay`);
-  return res.data.data;
-}
-
-/**
- * Hoàn tiền giao dịch.
- * POST /api/admin/payments/:id/refund
- */
-export async function hoanTienGiaoDich(id: number): Promise<{ id: number; trangThai: string }> {
-  const res = await apiClient.post<{
-    success: boolean;
-    message: string;
-    data: { id: number; trangThai: string };
-  }>(`/admin/payments/${id}/refund`);
-  return res.data.data;
-}
-
-/**
  * Lưu ghi chú kế toán.
  * PATCH /api/admin/payments/:id/note
  */
@@ -185,4 +157,14 @@ export async function luuGhiChu(
     data: { id: number; note: string };
   }>(`/admin/payments/${id}/note`, { note });
   return res.data.data;
+}
+
+export async function xuatBaoCaoThanhToan(
+  thamSo: ThamSoLocGiaoDich = {}
+): Promise<string> {
+  return downloadExcelReport(
+    "/admin/payments/xuat-bao-cao",
+    thamSo,
+    `bao-cao-thanh-toan-${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
 }

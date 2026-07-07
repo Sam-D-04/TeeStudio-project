@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import Link from "next/link";
+import type { MouseEventHandler, ReactNode } from "react";
 
 /**
  * DesignStatCard – Thẻ thống kê KPI ở đầu trang Thiết kế & In ấn.
@@ -31,6 +32,9 @@ type DesignStatCardProps = {
   nhanBadge?: string;     // Nhãn badge nhỏ góc phải, ví dụ "CẦN XỬ LÝ"
   mauNenBadge?: string;   // Màu nền badge
   mauChuBadge?: string;   // Màu chữ badge
+  href: string;
+  isActive?: boolean;
+  onClick?: MouseEventHandler<HTMLAnchorElement>;
 };
 
 export default function DesignStatCard({
@@ -42,28 +46,39 @@ export default function DesignStatCard({
   nhanBadge,
   mauNenBadge,
   mauChuBadge,
+  href,
+  isActive = false,
+  onClick,
 }: DesignStatCardProps) {
   return (
     // Card nền trắng, bo góc 20px theo DESIGN.md
     // Hover: đổi màu viền sang xanh nhạt bae6fd
-    <div
+    <Link
+      href={href}
+      onClick={onClick}
+      aria-label={`${nhan}: ${String(giaTri)}. Bấm để lọc danh sách`}
+      aria-current={isActive ? "page" : undefined}
       style={{
         background: "#ffffff",
         borderRadius: 20,
         padding: 20,
-        border: "1px solid #e2e8f0",
+        border: `1px solid ${isActive ? "#0ea5e9" : "#e2e8f0"}`,
         boxShadow: "0px 1px 4px rgba(0, 0, 0, 0.05)",
         display: "flex",
         flexDirection: "column",
         gap: 12,
-        transition: "border-color 0.2s ease",
-        cursor: "default",
+        transition: "border-color 0.2s ease, transform 0.2s ease",
+        cursor: "pointer",
+        outline: "none",
+        textDecoration: "none",
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = "#bae6fd";
+        e.currentTarget.style.borderColor = "#76a1b6";
+        e.currentTarget.style.transform = "translateY(-2px)";
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = "#e2e8f0";
+        e.currentTarget.style.borderColor = isActive ? "#0ea5e9" : "#e2e8f0";
+        e.currentTarget.style.transform = "translateY(0)";
       }}
     >
       {/* Hàng trên: icon + badge trạng thái */}
@@ -131,6 +146,6 @@ export default function DesignStatCard({
           {nhan}
         </p>
       </div>
-    </div>
+    </Link>
   );
 }

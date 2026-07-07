@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 /**
@@ -26,6 +27,9 @@ type InventoryStatCardProps = {
   // "accent"   → tím     (icon tím, border hover tím)
   // "default"  → xám     (icon xám, border hover xám)
   colorScheme?: "success" | "warning" | "accent" | "default";
+  href?: string;
+  onClick?: () => void;
+  isActive?: boolean;
 };
 
 // Ánh xạ colorScheme sang class Tailwind cho icon và viền hover
@@ -63,16 +67,21 @@ export default function InventoryStatCard({
   valueSuffix,
   badge,
   colorScheme = "default",
+  href,
+  onClick,
+  isActive = false,
 }: InventoryStatCardProps) {
   // Lấy class màu theo colorScheme được truyền vào
   const colors = colorMap[colorScheme];
 
-  return (
-    // Card nền trắng, bo góc 16px, viền 1px xám nhạt, shadow rất nhẹ
-    // Hover: dịch lên 2px, đổi màu viền theo colorScheme
-    <div
-      className={`rounded-[16px] border border-border bg-surface p-6 shadow-[0_1px_4px_rgba(0,0,0,0.05)] transition-all duration-200 hover:-translate-y-0.5 ${colors.hoverBorder}`}
-    >
+  const cardClassName = `block w-full rounded-[16px] border bg-surface p-6 text-left shadow-[0_1px_4px_rgba(0,0,0,0.05)] outline-none transition-all duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-primary-container/30 ${colors.hoverBorder} ${
+    isActive
+      ? "border-primary-container ring-1 ring-primary-container/20"
+      : "border-border"
+  }`;
+
+  const content = (
+    <>
       {/* Hàng trên: icon + badge */}
       <div className="mb-4 flex items-center justify-between">
         {/* Vòng tròn chứa icon, màu theo colorScheme */}
@@ -101,6 +110,32 @@ export default function InventoryStatCard({
           <span className="ml-1 text-sm font-normal text-text-secondary">{valueSuffix}</span>
         )}
       </p>
-    </div>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        onClick={onClick}
+        aria-label={`${title}: ${value}. Bấm để lọc danh sách kho`}
+        aria-current={isActive ? "page" : undefined}
+        className={cardClassName}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`${title}: ${value}. Bấm để xóa toàn bộ bộ lọc`}
+      aria-pressed={isActive}
+      className={cardClassName}
+    >
+      {content}
+    </button>
   );
 }

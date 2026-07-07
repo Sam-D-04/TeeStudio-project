@@ -6,29 +6,33 @@
  * Bao gồm:
  *  - Ô tìm kiếm theo mã TK hoặc tên khách
  *  - Dropdown lọc theo trạng thái (Tất cả / Chờ kiểm tra / Cần chỉnh sửa / Đã duyệt)
- *  - Dropdown lọc theo vị trí in (Tất cả / Ngực trái / Sau lưng / v.v.)
- *  - Nút lọc theo ngày (chức năng cơ bản)
+ *  - Dropdown lọc theo vị trí in (Mặt trước / Mặt sau / In 2 mặt)
+ *  - Bộ lọc khoảng ngày gửi thiết kế
  *
  * Props:
  *  - boDuc: object chứa các giá trị lọc hiện tại
  *  - onThayDoi: hàm gọi khi người dùng thay đổi bất kỳ bộ lọc nào
  */
 
-import { SearchOutlined, CalendarOutlined } from "@ant-design/icons";
+import { SearchOutlined, SyncOutlined } from "@ant-design/icons";
+import DateRangeFilter from "@/components/admin/common/DateRangeFilter";
 
 // Kiểu dữ liệu cho bộ lọc – dùng chung giữa DesignFilterBar và DesignPage
 export type BoDucThietKe = {
   tuKhoa: string;       // Từ khóa tìm kiếm theo mã TK hoặc tên khách
-  trangThai: string;    // Trạng thái: "" = tất cả | "cho_kiem_tra" | "can_chinh_sua" | "da_duyet"
-  viTriIn: string;      // Vị trí in: "" = tất cả | "nguc_trai" | "sau_lung" | ...
+  trangThai: string;    // Trạng thái: "" = tất cả | "can_xu_ly" | "cho_kiem_tra" | "can_chinh_sua" | "da_duyet"
+  viTriIn: string;      // Vị trí in: "" = tất cả | "mat_truoc" | "mat_sau" | "in_2_mat"
+  tuNgay: string;       // Ngày gửi từ (YYYY-MM-DD)
+  denNgay: string;      // Ngày gửi đến (YYYY-MM-DD)
 };
 
 type DesignFilterBarProps = {
   boDuc: BoDucThietKe;
   onThayDoi: (boDucMoi: BoDucThietKe) => void;
+  onDatLai: () => void;
 };
 
-export default function DesignFilterBar({ boDuc, onThayDoi }: DesignFilterBarProps) {
+export default function DesignFilterBar({ boDuc, onThayDoi, onDatLai }: DesignFilterBarProps) {
   // Hàm tiện ích: cập nhật 1 trường trong bộ lọc, giữ nguyên các trường khác
   function capNhatBoDuc(truong: keyof BoDucThietKe, giaTri: string) {
     onThayDoi({ ...boDuc, [truong]: giaTri });
@@ -63,7 +67,14 @@ export default function DesignFilterBar({ boDuc, onThayDoi }: DesignFilterBarPro
           type="text"
           placeholder="Tìm mã TK, tên khách..."
           value={boDuc.tuKhoa}
-          onChange={(e) => capNhatBoDuc("tuKhoa", e.target.value)}
+          onChange={(e) => {
+            const tuKhoaMoi = e.target.value;
+            onThayDoi({
+              ...boDuc,
+              tuKhoa: tuKhoaMoi,
+              trangThai: tuKhoaMoi.trim() ? "" : boDuc.trangThai,
+            });
+          }}
           style={{
             width: "100%",
             height: 40,
@@ -112,6 +123,7 @@ export default function DesignFilterBar({ boDuc, onThayDoi }: DesignFilterBarPro
         }}
       >
         <option value="">Tất cả trạng thái</option>
+        <option value="can_xu_ly">Chờ kiểm tra &amp; Cần chỉnh sửa</option>
         <option value="cho_kiem_tra">Chờ kiểm tra</option>
         <option value="can_chinh_sua">Cần chỉnh sửa</option>
         <option value="da_duyet">Đã duyệt</option>
@@ -142,43 +154,35 @@ export default function DesignFilterBar({ boDuc, onThayDoi }: DesignFilterBarPro
         }}
       >
         <option value="">Mọi vị trí in</option>
-        <option value="nguc_trai">Ngực trái</option>
-        <option value="nguc_phai">Ngực phải</option>
-        <option value="sau_lung">Sau lưng</option>
-        <option value="tay_trai">Tay trái</option>
-        <option value="tay_phai">Tay phải</option>
+        <option value="mat_truoc">Mặt trước</option>
+        <option value="mat_sau">Mặt sau</option>
+        <option value="in_2_mat">In 2 mặt</option>
       </select>
 
-      {/* ── Nút lọc theo ngày ── */}
+      {/* ── Lọc theo ngày gửi thiết kế ── */}
+      <DateRangeFilter
+        key={`${boDuc.tuNgay}-${boDuc.denNgay}`}
+        initialPreset={boDuc.tuNgay && boDuc.denNgay ? "custom" : "all"}
+        initialStartDate={boDuc.tuNgay}
+        initialEndDate={boDuc.denNgay}
+        allowClear
+        onChange={(tuNgay, denNgay) =>
+          onThayDoi({ ...boDuc, tuNgay, denNgay })
+        }
+        onClear={() =>
+          onThayDoi({ ...boDuc, tuNgay: "", denNgay: "" })
+        }
+        className="w-full lg:w-auto"
+        selectClassName="h-10"
+        rangePickerClassName="h-10 min-w-[240px] sm:w-[280px]"
+      />
+
       <button
-        title="Lọc theo ngày gửi thiết kế"
-        onClick={() => alert("Tính năng lọc theo ngày sẽ được tích hợp sau")}
-        style={{
-          width: 40,
-          height: 40,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#f8fafc",
-          border: "1px solid #e2e8f0",
-          borderRadius: 8,
-          color: "#475569",
-          cursor: "pointer",
-          flexShrink: 0,
-          transition: "all 0.15s ease",
-        }}
-        onMouseEnter={(e) => {
-          const btn = e.currentTarget as HTMLButtonElement;
-          btn.style.borderColor = "#0ea5e9";
-          btn.style.color = "#0ea5e9";
-        }}
-        onMouseLeave={(e) => {
-          const btn = e.currentTarget as HTMLButtonElement;
-          btn.style.borderColor = "#e2e8f0";
-          btn.style.color = "#475569";
-        }}
+        type="button"
+        onClick={onDatLai}
+        className="flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[#e2e8f0] bg-white px-3 text-sm font-medium text-[#475569] transition-colors hover:bg-[#f8fafc] hover:text-[#0f172a]"
       >
-        <CalendarOutlined style={{ fontSize: 16 }} />
+        <SyncOutlined /> Đặt lại
       </button>
     </div>
   );

@@ -77,6 +77,22 @@ const listPromotionsSchema = {
     },
     tuNgay: { label: "Từ ngày", type: "string", pattern: /^\d{4}-\d{2}-\d{2}$/ },
     denNgay: { label: "Đến ngày", type: "string", pattern: /^\d{4}-\d{2}-\d{2}$/ },
+    hetHanTrongNgay: {
+      label: "Số ngày sắp hết hạn",
+      type: "integer",
+      min: 1,
+      max: 365,
+    },
+    kySuDung: {
+      label: "Kỳ sử dụng",
+      type: "string",
+      enum: ["THIS_MONTH"],
+    },
+    kyGiamGia: {
+      label: "Kỳ giảm giá",
+      type: "string",
+      enum: ["THIS_MONTH"],
+    },
   },
 };
 
@@ -158,13 +174,6 @@ const updateSurchargeSchema = {
 
 const updatePricingFormulaSchema = {
   body: {
-    roundingUnit: {
-      label: "Đơn vị làm tròn",
-      required: true,
-      type: "integer",
-      min: 1,
-      max: 1000000,
-    },
     defaultShippingFee: {
       label: "Phí vận chuyển mặc định",
       required: true,

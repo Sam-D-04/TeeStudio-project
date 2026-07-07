@@ -10,7 +10,6 @@ import {
 } from "@/lib/authorization";
 import useAuthStore from "@/store/useAuthStore";
 import AdminSidebar from "./AdminSidebar";
-import AdminTopbar from "./AdminTopbar";
 
 type AdminShellProps = {
   children: ReactNode;
@@ -82,8 +81,8 @@ export default function AdminShell({ children }: AdminShellProps) {
         mobileOpen={mobileSidebarOpen}
         onClose={() => setMobileSidebarOpen(false)}
         onToggleCollapse={() => setSidebarCollapsed((current) => !current)}
+        onOpenMobile={() => setMobileSidebarOpen(true)}
       />
-      <AdminTopbar onMenuClick={() => setMobileSidebarOpen(true)} />
 
       <div className="admin-content-area">
         <main className="admin-main">{children}</main>

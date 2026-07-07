@@ -2,7 +2,6 @@
  * PromotionTable – Bảng danh sách mã khuyến mãi.
  *
  * Mỗi hàng hiển thị:
- *  - Checkbox chọn
  *  - Mã khuyến mãi (in đậm)
  *  - Loại giảm
  *  - Giá trị giảm
@@ -44,9 +43,6 @@ export type MaKhuyenMai = {
 
 type PromotionTableProps = {
   danhSach: MaKhuyenMai[];              // Danh sách mã khuyến mãi để hiển thị
-  dsIDDaChon: number[];                  // Danh sách ID đang được chọn (checkbox)
-  onChonTatCa: (chonHet: boolean) => void; // Callback khi click checkbox "chọn tất cả"
-  onChonMot: (id: number) => void;       // Callback khi click checkbox từng hàng
   onXem: (id: number) => void;           // Callback nút xem chi tiết
   onSua: (id: number) => void;           // Callback nút sửa (mở drawer)
   onXoa: (id: number) => void;           // Callback nút xóa
@@ -100,17 +96,10 @@ function hienThiThoiGian(
 
 export default function PromotionTable({
   danhSach,
-  dsIDDaChon,
-  onChonTatCa,
-  onChonMot,
   onXem,
   onSua,
   onXoa,
 }: PromotionTableProps) {
-  // Kiểm tra trạng thái "chọn tất cả": true khi tất cả hàng đều được chọn
-  const tatCaDaChon =
-    danhSach.length > 0 && dsIDDaChon.length === danhSach.length;
-
   return (
     <div style={{ overflowX: "auto" }}>
       <table
@@ -129,16 +118,6 @@ export default function PromotionTable({
               borderBottom: "1px solid #e2e8f0",
             }}
           >
-            {/* Cột checkbox "chọn tất cả" */}
-            <th style={{ padding: "12px 16px", width: 40 }}>
-              <input
-                type="checkbox"
-                checked={tatCaDaChon}
-                onChange={(e) => onChonTatCa(e.target.checked)}
-                style={{ cursor: "pointer", accentColor: "#0ea5e9" }}
-              />
-            </th>
-
             {/* Các cột tiêu đề – chữ nhỏ, đậm, in hoa */}
             {[
               "Mã",
@@ -176,7 +155,7 @@ export default function PromotionTable({
             // Hiển thị khi không có dữ liệu
             <tr>
               <td
-                colSpan={9}
+                colSpan={8}
                 style={{
                   padding: "48px 16px",
                   textAlign: "center",
@@ -188,39 +167,24 @@ export default function PromotionTable({
               </td>
             </tr>
           ) : (
-            danhSach.map((ma) => {
-              const dangDuocChon = dsIDDaChon.includes(ma.id);
-
-              return (
-                <tr
-                  key={ma.id}
-                  style={{
-                    borderBottom: "1px solid #e2e8f0",
-                    backgroundColor: dangDuocChon ? "#f0f9ff" : "transparent",
-                    transition: "background-color 0.15s ease",
-                  }}
-                  // Hover: nền xanh rất nhạt
-                  onMouseEnter={(e) => {
-                    if (!dangDuocChon) {
-                      (e.currentTarget as HTMLTableRowElement).style.backgroundColor =
-                        "#f8fafc";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLTableRowElement).style.backgroundColor =
-                      dangDuocChon ? "#f0f9ff" : "transparent";
-                  }}
-                >
-                  {/* Checkbox chọn hàng */}
-                  <td style={{ padding: "12px 16px" }}>
-                    <input
-                      type="checkbox"
-                      checked={dangDuocChon}
-                      onChange={() => onChonMot(ma.id)}
-                      style={{ cursor: "pointer", accentColor: "#0ea5e9" }}
-                    />
-                  </td>
-
+            danhSach.map((ma) => (
+              <tr
+                key={ma.id}
+                style={{
+                  borderBottom: "1px solid #e2e8f0",
+                  backgroundColor: "transparent",
+                  transition: "background-color 0.15s ease",
+                }}
+                // Hover: nền xanh rất nhạt
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLTableRowElement).style.backgroundColor =
+                    "#f8fafc";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLTableRowElement).style.backgroundColor =
+                    "transparent";
+                }}
+              >
                   {/* Mã code – in đậm */}
                   <td style={{ padding: "12px 16px" }}>
                     <span
@@ -381,9 +345,8 @@ export default function PromotionTable({
                       </button>
                     </div>
                   </td>
-                </tr>
-              );
-            })
+              </tr>
+            ))
           )}
         </tbody>
       </table>

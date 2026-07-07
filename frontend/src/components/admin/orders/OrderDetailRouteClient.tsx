@@ -15,14 +15,12 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
-  AutoComplete,
   Button,
   Descriptions,
   Drawer,
   Input,
   Modal,
   QRCode,
-  Select,
   Skeleton,
   Space,
   Tag,
@@ -34,6 +32,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
 import type { ChiTietDonHang } from "@/services/admin/orderService";
+import {
+  getOrderPaymentState,
+  getOrderPaymentMethodLabel,
+} from "@/lib/paymentDisplay";
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   cho_xac_nhan: { label: "Chờ xác nhận", color: "gold" },
@@ -222,19 +224,28 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
 }
 
 /** Nút "Hiển thị mã QR" → modal popup. Ẩn khi đơn PAID hoặc CANCELLED. */
-function VnpayQrButton({ order }: { order: ChiTietDonHang }) {
+function OnlinePaymentQrButton({ order }: { order: ChiTietDonHang }) {
   const queryClient = useQueryClient();
   const [messageApi, messageContextHolder] = message.useMessage();
   const [isQrOpen, setIsQrOpen] = useState(false);
   const [now, setNow] = useState<number | null>(null);
   const payment = order.thanhToan;
+  const gatewayName = payment.phuongThuc === "MOMO" ? "MoMo" : "VNPAY";
   const expiresAtMs = Date.parse(payment.expiresAt || "");
   const isCancelled = order.trangThai === "da_huy";
   const isPaid = payment.status === "COMPLETED";
   const isPending = payment.status === "PENDING";
+  const isFailed = payment.status === "FAILED";
+  const isLegacyMomoPayment =
+    payment.phuongThuc === "MOMO" && payment.requestType !== "payWithMethod";
+  const qrCodeContent =
+    payment.phuongThuc === "MOMO"
+      ? payment.paymentUrl
+      : payment.qrCodeValue || payment.paymentUrl;
   const hasValidExpiry = Number.isFinite(expiresAtMs);
   const isExpired =
     now !== null && isPending && (!hasValidExpiry || now >= expiresAtMs);
+  const shouldRecreate = isFailed || isExpired || isLegacyMomoPayment;
   const isActive =
     now !== null &&
     isPending &&
@@ -255,9 +266,9 @@ function VnpayQrButton({ order }: { order: ChiTietDonHang }) {
   }, [isCancelled, isPending, payment.expiresAt]);
 
   const recreateMutation = useMutation({
-    mutationFn: () => orderService.taoLaiMaThanhToanVnpay(order.id),
+    mutationFn: () => orderService.taoLaiMaThanhToanOnline(order.id),
     onSuccess: async () => {
-      messageApi.success("Đã tạo lại mã thanh toán VNPAY");
+      messageApi.success(`Đã tạo lại mã thanh toán ${gatewayName}`);
       await queryClient.invalidateQueries({
         queryKey: ["admin-order-detail", order.id],
       });
@@ -272,7 +283,7 @@ function VnpayQrButton({ order }: { order: ChiTietDonHang }) {
 
     try {
       await navigator.clipboard.writeText(payment.paymentUrl);
-      messageApi.success("Đã sao chép link thanh toán VNPAY");
+      messageApi.success(`Đã sao chép link thanh toán ${gatewayName}`);
     } catch {
       messageApi.error("Không thể sao chép tự động");
     }
@@ -295,20 +306,30 @@ function VnpayQrButton({ order }: { order: ChiTietDonHang }) {
 
       <Modal
         open={isQrOpen}
-        title="Mã QR thanh toán VNPAY"
+        title={`Mã QR thanh toán ${gatewayName}`}
         footer={null}
         width={340}
         centered
         onCancel={() => setIsQrOpen(false)}
       >
         <div className="flex flex-col items-center gap-4 py-2">
-          {isExpired ? (
+          {shouldRecreate ? (
             <div className="w-full space-y-3">
               <Alert
                 showIcon
                 type="error"
-                title="Mã thanh toán đã hết hạn"
-                description="Hãy tạo lại mã mới trước khi gửi cho khách hàng."
+                title={
+                  isLegacyMomoPayment
+                    ? "Mã MoMo cũ chỉ hỗ trợ Ví MoMo"
+                    : isFailed
+                      ? "Giao dịch trước đó không thành công"
+                      : "Mã thanh toán đã hết hạn"
+                }
+                description={
+                  isLegacyMomoPayment
+                    ? "Hãy tạo lại mã Collection Link để khách chọn Ví MoMo, ATM hoặc thẻ."
+                    : "Hãy tạo lại mã mới trước khi gửi cho khách hàng."
+                }
               />
               <Button
                 type="primary"
@@ -324,7 +345,10 @@ function VnpayQrButton({ order }: { order: ChiTietDonHang }) {
           ) : isActive && payment.paymentUrl ? (
             <>
               <div className="rounded-xl border border-border bg-white p-3">
-                <QRCode value={payment.paymentUrl} size={200} />
+                <QRCode
+                  value={qrCodeContent || payment.paymentUrl}
+                  size={200}
+                />
               </div>
               <div className="text-center">
                 <Tag color="processing" className="rounded-full px-3 py-0.5 font-bold">
@@ -347,7 +371,9 @@ function VnpayQrButton({ order }: { order: ChiTietDonHang }) {
                   Sao chép link thanh toán
                 </Button>
                 <Button block href={payment.paymentUrl} target="_blank">
-                  Mở link VNPAY
+                  {payment.phuongThuc === "MOMO"
+                    ? "Mở trang chọn phương thức"
+                    : `Mở link ${gatewayName}`}
                 </Button>
               </div>
             </>
@@ -419,8 +445,14 @@ function OrderHistoryDrawer({ order }: { order: ChiTietDonHang }) {
 }
 
 function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
-  const isVnpay = order.thanhToan.phuongThuc === "VNPAY";
-  const isPaid = order.thanhToan.status === "COMPLETED";
+  const isOnlinePayment = ["VNPAY", "MOMO"].includes(
+    order.thanhToan.phuongThuc
+  );
+  const isPaid = order.thanhToan.status === "PAID";
+  const paymentState = getOrderPaymentState({
+    paymentType: order.thanhToan.loai,
+    status: order.thanhToan.status,
+  });
 
   return (
     <section className="rounded-xl border border-border bg-surface shadow-admin-card">
@@ -454,18 +486,24 @@ function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
           </Descriptions.Item>
           <Descriptions.Item label="Thanh toán">
             <div className="flex flex-wrap items-center gap-1">
-              <span>{order.thanhToan.phuongThuc}</span>
+              <span>
+                {getOrderPaymentMethodLabel({
+                  method: order.thanhToan.phuongThuc,
+                  paymentType: order.thanhToan.loai,
+                })}
+              </span>
               <span className="text-text-muted">·</span>
-              <span>{order.thanhToan.loai || "FULL"}</span>
-              <span className="text-text-muted">·</span>
-              <span>{order.thanhToan.daThanh ? "Đã thanh toán" : "Chờ thanh toán"}</span>
-              {isVnpay && !isPaid && order.trangThai !== "da_huy" ? (
-                <VnpayQrButton order={order} />
+              <span className={paymentState.className}>{paymentState.label}</span>
+              {isOnlinePayment &&
+              order.thanhToan.transactionStatus === "PENDING" &&
+              !isPaid &&
+              order.trangThai !== "da_huy" ? (
+                <OnlinePaymentQrButton order={order} />
               ) : null}
               {isPaid ? (
                 <Tag color="green" className="m-0 text-xs">
                   <CheckCircleFilled className="mr-1" />
-                  Đã thanh toán lúc {formatDateTime(order.thanhToan.paidAt)}
+                  Ghi nhận lúc {formatDateTime(order.thanhToan.paidAt)}
                 </Tag>
               ) : null}
             </div>
@@ -558,7 +596,6 @@ export default function OrderDetailRouteClient() {
   const params = useParams<{ id: string }>();
   const orderId = Number(params.id);
   const [messageApi, messageContextHolder] = message.useMessage();
-  const [modal, modalContextHolder] = Modal.useModal();
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
@@ -578,8 +615,10 @@ export default function OrderDetailRouteClient() {
     refetchInterval: (query) => {
       const currentOrder = query.state.data;
       const shouldPoll =
-        currentOrder?.thanhToan.phuongThuc === "VNPAY" &&
-        currentOrder?.thanhToan.status === "PENDING" &&
+        ["VNPAY", "MOMO"].includes(
+          currentOrder?.thanhToan.phuongThuc || ""
+        ) &&
+        currentOrder?.thanhToan.transactionStatus === "PENDING" &&
         currentOrder?.trangThai !== "da_huy";
 
       return shouldPoll ? 3000 : false;
@@ -646,7 +685,6 @@ export default function OrderDetailRouteClient() {
   return (
     <div>
       {messageContextHolder}
-      {modalContextHolder}
       <section className="mb-4 flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
         <div>
           <Button

@@ -8,11 +8,12 @@ import {
   WalletOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
+import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
 import AdminSearchInput from "../common/AdminSearchInput";
-import OrderFilterBar, { type DateRange } from "./OrderFilterBar";
+import OrderFilterBar from "./OrderFilterBar";
 import OrderPagination from "./OrderPagination";
 import OrderStatCard from "./OrderStatCard";
 import OrderTable, { type Order } from "./OrderTable";
@@ -24,34 +25,6 @@ import UpdateOrderStatusModal from "./UpdateOrderStatusModal";
  * Dùng React Query để tự động quản lý cache, loading, error.
  * Không còn mock data – tất cả dữ liệu lấy từ Backend qua orderService.
  */
-
-// Cấu hình icon cho 4 thẻ KPI (phần style/icon không thay đổi)
-const KPI_CONFIG = [
-  {
-    key: "donMoi" as const,
-    label: "Đơn mới",
-    iconWrapperClassName: "bg-[#cce5ff] text-[#0284c7]",
-    icon: <ShoppingCartOutlined />,
-  },
-  {
-    key: "dangXuLyIn" as const,
-    label: "Đang xử lý in",
-    iconWrapperClassName: "bg-[#cce5ff] text-[#0284c7]",
-    icon: <SyncOutlined spin />,
-  },
-  {
-    key: "choThanhToan" as const,
-    label: "Chờ thanh toán",
-    iconWrapperClassName: "bg-[#ffdad6] text-[#ea580c]",
-    icon: <WalletOutlined />,
-  },
-  {
-    key: "hoanTatHomNay" as const,
-    label: "Hoàn tất hôm nay",
-    iconWrapperClassName: "bg-[#dcfce7] text-[#059669]",
-    icon: <CheckCircleOutlined />,
-  },
-];
 
 // Hàm chuyển đổi dữ liệu từ service sang kiểu Order của OrderTable
 function chuyenDoiSangOrder(don: orderService.DonHang): Order {
@@ -75,6 +48,7 @@ function chuyenDoiSangOrder(don: orderService.DonHang): Order {
       type: don.thanhToan.loai,
       amountVnd: don.thanhToan.soTienVnd,
       isPaid: don.thanhToan.daThanh,
+      status: don.thanhToan.status,
     },
     status: don.trangThai as Order["status"],
   };
@@ -82,16 +56,41 @@ function chuyenDoiSangOrder(don: orderService.DonHang): Order {
 
 const SO_MOI_TRANG = 10;
 
-export default function OrdersPage() {
+export type OrdersInitialFilters = {
+  status?: string;
+  payment?: string;
+  startDate?: string;
+  endDate?: string;
+  dateField?: "created" | "completed";
+  hour?: string;
+};
+
+type OrdersPageProps = {
+  initialFilters?: OrdersInitialFilters;
+};
+
+export default function OrdersPage({ initialFilters }: OrdersPageProps) {
   const router = useRouter();
 
   // ---- State bộ lọc ----
-  const [activeTab, setActiveTab] = useState("tat_ca");
-  const [paymentFilter, setPaymentFilter] = useState("tat_ca");
-  const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  const [activeTab, setActiveTab] = useState(initialFilters?.status ?? "tat_ca");
+  const [paymentFilter, setPaymentFilter] = useState(
+    initialFilters?.payment ?? "tat_ca"
+  );
+  const [tuNgay, setTuNgay] = useState(initialFilters?.startDate ?? "");
+  const [denNgay, setDenNgay] = useState(initialFilters?.endDate ?? "");
+  const [dateField, setDateField] = useState(
+    initialFilters?.dateField ?? "created"
+  );
+  const [completionHour, setCompletionHour] = useState(
+    initialFilters?.hour ?? ""
+  );
   const [typeFilter, setTypeFilter] = useState("tat_ca");
   const [tuKhoa, setTuKhoa] = useState("");
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ---- State reset filter ----
+  const [resetKey, setResetKey] = useState(0);
 
   // ---- State phân trang ----
   const [currentPage, setCurrentPage] = useState(1);
@@ -99,9 +98,6 @@ export default function OrdersPage() {
   // ---- State modal cập nhật trạng thái ----
   const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-
-  const tuNgay = dateRange?.[0].format("YYYY-MM-DD") ?? "";
-  const denNgay = dateRange?.[1].format("YYYY-MM-DD") ?? "";
 
   // ======================================================
   // REACT QUERY: Lấy thống kê KPI
@@ -133,6 +129,8 @@ export default function OrdersPage() {
       paymentFilter,
       tuNgay,
       denNgay,
+      dateField,
+      completionHour,
       typeFilter,
       tuKhoa,
     ],
@@ -144,13 +142,14 @@ export default function OrdersPage() {
         thanhToan: paymentFilter,
         tuNgay,
         denNgay,
+        kieuNgay: dateField === "completed" ? "ngay_hoan_tat" : "ngay_tao",
+        gio: completionHour,
         loai: typeFilter,
         tuKhoa,
       }),
   });
 
-  // Mỗi đơn chỉ có một trang chi tiết chính thức theo ID.
-  function handleRowClick(order: Order) {
+  function handleViewDetail(order: Order) {
     router.push(`/admin/don-hang/${order.id}`);
   }
 
@@ -165,50 +164,133 @@ export default function OrdersPage() {
   // Hàm xử lý khi filter thay đổi → reset về trang 1
   function handleTabChange(key: string) {
     setActiveTab(key);
+    if (key !== "hoan_tat") {
+      setDateField("created");
+      setCompletionHour("");
+    }
     setCurrentPage(1);
+    if (key === "tat_ca") {
+      router.push("/admin/don-hang");
+    }
   }
   function handlePaymentChange(v: string) { setPaymentFilter(v); setCurrentPage(1); }
-  function handleDateRangeChange(v: DateRange | null) { setDateRange(v); setCurrentPage(1); }
+  function handleDateChange(startDate: string, endDate: string) {
+    setTuNgay(startDate);
+    setDenNgay(endDate);
+    setCompletionHour("");
+    setCurrentPage(1);
+  }
+  function handleDateClear() {
+    setTuNgay("");
+    setDenNgay("");
+    setCompletionHour("");
+    setCurrentPage(1);
+  }
   function handleTypeChange(v: string) { setTypeFilter(v); setCurrentPage(1); }
+
+  function handleResetFilters() {
+    setActiveTab("tat_ca");
+    setPaymentFilter("tat_ca");
+    setTypeFilter("tat_ca");
+    setTuKhoa("");
+    setTuNgay("");
+    setDenNgay("");
+    setCompletionHour("");
+    setCurrentPage(1);
+    setResetKey((prev) => prev + 1);
+    router.push("/admin/don-hang");
+  }
 
   // Chuyển đổi dữ liệu từ API sang kiểu FE
   const danhSachOrder: Order[] = (ketQuaDanhSach?.danhSach ?? []).map(chuyenDoiSangOrder);
   const tongSo = ketQuaDanhSach?.tongSo ?? 0;
   const tongSoTrang = ketQuaDanhSach?.tongSoTrang ?? 1;
+  const today = dayjs().format("YYYY-MM-DD");
+  const kpiConfig = [
+    {
+      key: "donMoi" as const,
+      label: "Đơn mới",
+      href: "/admin/don-hang?status=PENDING",
+      isActive:
+        activeTab === "cho_xac_nhan" &&
+        paymentFilter === "tat_ca" &&
+        !tuNgay &&
+        !denNgay,
+      iconWrapperClassName: "bg-[#cce5ff] text-[#0284c7]",
+      icon: <ShoppingCartOutlined />,
+    },
+    {
+      key: "dangXuLyIn" as const,
+      label: "Đang xử lý in",
+      href: "/admin/don-hang?status=PROCESSING%2CPRINTING",
+      isActive:
+        activeTab === "dang_xu_ly_in" &&
+        paymentFilter === "tat_ca" &&
+        !tuNgay &&
+        !denNgay,
+      iconWrapperClassName: "bg-[#cce5ff] text-[#0284c7]",
+      icon: <SyncOutlined spin />,
+    },
+    {
+      key: "choThanhToan" as const,
+      label: "Chờ thanh toán",
+      href: "/admin/don-hang?payment=PENDING",
+      isActive:
+        activeTab === "tat_ca" &&
+        paymentFilter === "cho_thanh_toan" &&
+        !tuNgay &&
+        !denNgay,
+      iconWrapperClassName: "bg-[#ffdad6] text-[#ea580c]",
+      icon: <WalletOutlined />,
+    },
+    {
+      key: "hoanTatHomNay" as const,
+      label: "Hoàn tất hôm nay",
+      href: `/admin/don-hang?status=COMPLETED&date=${today}&dateField=completed`,
+      isActive:
+        activeTab === "hoan_tat" &&
+        paymentFilter === "tat_ca" &&
+        tuNgay === today &&
+        denNgay === today &&
+        dateField === "completed",
+      iconWrapperClassName: "bg-[#dcfce7] text-[#059669]",
+      icon: <CheckCircleOutlined />,
+    },
+  ];
 
   return (
     <div>
       {/* ======== Tiêu đề trang + nút hành động ======== */}
-      <section className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
-        <div>
+      <section className="mb-8 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-baseline gap-4">
           <h2 className="font-extrabold text-headline-lg-mobile text-text-main md:text-headline-lg">
             Quản lý đơn hàng
           </h2>
-          <p className="mt-1 text-body-md text-text-secondary">
-            Theo dõi đơn áo tùy chỉnh, thanh toán, sản xuất và giao hàng
+          <p className="text-body-md text-text-secondary">
+            (Theo dõi đơn áo tùy chỉnh, thanh toán, sản xuất và giao hàng)
           </p>
         </div>
 
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => router.push("/admin/don-hang/tao-moi")}
-            className="flex h-control-h items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-4 text-button-text font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7]"
-          >
-            <PlusOutlined />
-            Tạo đơn mới
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => router.push("/admin/don-hang/tao-moi")}
+          className="flex h-control-h shrink-0 items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-4 text-button-text font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7]"
+        >
+          <PlusOutlined />
+          Tạo đơn mới
+        </button>
       </section>
 
       {/* ======== 4 thẻ KPI thống kê ======== */}
-      <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {KPI_CONFIG.map((kpi) => (
+      <section className="mb-6 grid grid-cols-4 gap-3">
+        {kpiConfig.map((kpi) => (
           <OrderStatCard
             key={kpi.key}
             label={kpi.label}
             // Hiển thị "--" khi đang tải, hoặc số thực từ API
             value={isLoadingThongKe ? "--" : (thongKe?.[kpi.key] ?? 0)}
+            href={kpi.href}
+            isActive={kpi.isActive}
             icon={kpi.icon}
             iconWrapperClassName={kpi.iconWrapperClassName}
           />
@@ -218,36 +300,38 @@ export default function OrdersPage() {
       {/* ======== Bảng đơn hàng chính ======== */}
       <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
 
-        {/* Thanh tìm kiếm */}
-        <div className="flex items-center gap-4 border-b border-border px-4 py-3">
-          <AdminSearchInput
-            placeholder="Tìm mã đơn hàng, tên khách hàng..."
-            className="max-w-sm"
-            // Gọi search sau 500ms người dùng ngừng gõ (debounce đơn giản)
-            onChange={(e) => {
-              const val = (e.target as HTMLInputElement).value;
-              // Tạm dùng setTimeout đơn giản để debounce
-              if (searchTimeoutRef.current) {
-                clearTimeout(searchTimeoutRef.current);
-              }
-              searchTimeoutRef.current = setTimeout(() => {
-                setTuKhoa(val);
-                setCurrentPage(1);
-              }, 500);
-            }}
-          />
-        </div>
-
         {/* Thanh filter */}
         <OrderFilterBar
+          key={resetKey}
           activeTab={activeTab}
           onTabChange={handleTabChange}
           paymentFilter={paymentFilter}
           onPaymentFilterChange={handlePaymentChange}
-          dateRange={dateRange}
-          onDateRangeChange={handleDateRangeChange}
+          onDateChange={handleDateChange}
+          onDateClear={handleDateClear}
+          initialStartDate={tuNgay || undefined}
+          initialEndDate={denNgay || undefined}
           typeFilter={typeFilter}
           onTypeFilterChange={handleTypeChange}
+          onResetFilters={handleResetFilters}
+          searchSlot={(
+            <AdminSearchInput
+              placeholder="Tìm mã đơn hàng, tên khách hàng..."
+              className="w-full shrink-0 sm:w-[280px]"
+              // Gọi search sau 500ms người dùng ngừng gõ (debounce đơn giản)
+              onChange={(e) => {
+                const val = (e.target as HTMLInputElement).value;
+                // Tạm dùng setTimeout đơn giản để debounce
+                if (searchTimeoutRef.current) {
+                  clearTimeout(searchTimeoutRef.current);
+                }
+                searchTimeoutRef.current = setTimeout(() => {
+                  setTuKhoa(val);
+                  setCurrentPage(1);
+                }, 500);
+              }}
+            />
+          )}
         />
 
         {/* Trạng thái lỗi */}
@@ -271,7 +355,7 @@ export default function OrdersPage() {
             )}
             <OrderTable
               orders={danhSachOrder}
-              onRowClick={handleRowClick}
+              onViewDetail={handleViewDetail}
               onEditStatus={handleEditStatus}
             />
           </div>

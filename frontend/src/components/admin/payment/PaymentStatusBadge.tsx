@@ -7,18 +7,23 @@
 
 // Danh sách tất cả trạng thái giao dịch thanh toán có thể có
 export type PaymentStatus =
+  | "da_dat_coc"
   | "da_thanh_toan"    // Đã thanh toán thành công
   | "cho_thanh_toan"   // Chờ người dùng thanh toán
   | "that_bai"         // Thanh toán thất bại / lỗi cổng
-  | "hoan_tien"        // Đã hoàn tiền cho khách
-  | "can_doi_soat";    // Cần đối soát thủ công với VNPAY
+  | "can_doi_soat";    // Cần đối soát thủ công với COD
 
 type PaymentStatusBadgeProps = {
   status: PaymentStatus;
+  paymentType?: string;
 };
 
 // Cấu hình nhãn tiếng Việt và lớp CSS màu sắc cho từng trạng thái
 const statusConfig: Record<PaymentStatus, { label: string; className: string }> = {
+  da_dat_coc: {
+    label: "Đã đặt cọc (50%)",
+    className: "bg-[#dcfce7] text-[#15803d] border border-[#86efac]",
+  },
   da_thanh_toan: {
     label: "Đã thanh toán",
     // Nền xanh lá nhạt, chữ xanh lá đậm
@@ -34,11 +39,6 @@ const statusConfig: Record<PaymentStatus, { label: string; className: string }> 
     // Nền đỏ nhạt, viền đỏ nhạt, chữ đỏ đậm
     className: "bg-[#fee2e2] text-[#b91c1c] border border-[#fca5a5]",
   },
-  hoan_tien: {
-    label: "Hoàn tiền",
-    // Nền xám nhạt, chữ xám trung tính – trạng thái trung lập
-    className: "bg-[#f1f5f9] text-[#475569] border border-[#e2e8f0]",
-  },
   can_doi_soat: {
     label: "Cần đối soát",
     // Nền vàng đậm hơn, chữ nâu vàng – trạng thái cần chú ý
@@ -46,8 +46,18 @@ const statusConfig: Record<PaymentStatus, { label: string; className: string }> 
   },
 };
 
-export default function PaymentStatusBadge({ status }: PaymentStatusBadgeProps) {
-  const config = statusConfig[status];
+export default function PaymentStatusBadge({
+  status,
+  paymentType,
+}: PaymentStatusBadgeProps) {
+  const config =
+    paymentType === "DEPOSIT" &&
+    ["da_thanh_toan", "da_dat_coc"].includes(status)
+      ? {
+          label: "Đã đặt cọc (50%)",
+          className: "bg-[#dcfce7] text-[#15803d] border border-[#86efac]",
+        }
+      : statusConfig[status];
 
   return (
     <span

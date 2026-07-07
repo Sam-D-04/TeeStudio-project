@@ -44,11 +44,45 @@ function createSecureHash(signData, hashSecret) {
     .digest("hex");
 }
 
+function hashesMatch(receivedHash, expectedHash) {
+  const received = String(receivedHash || "").toLowerCase();
+  return Boolean(received) &&
+    received.length === expectedHash.length &&
+    crypto.timingSafeEqual(Buffer.from(received), Buffer.from(expectedHash));
+}
+
 function buildSignedQuery(params, hashSecret) {
   const signData = buildSignData(params);
   const secureHash = createSecureHash(signData, hashSecret);
 
   return `${signData}&vnp_SecureHash=${secureHash}`;
+}
+
+function formatVnpayConnectionError(cause) {
+  const rootCause = cause?.cause || cause;
+  const code = String(rootCause?.code || "");
+
+  if (
+    code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" ||
+    code === "UNABLE_TO_GET_ISSUER_CERT_LOCALLY" ||
+    code === "SELF_SIGNED_CERT_IN_CHAIN"
+  ) {
+    return `Node.js không xác thực được chứng chỉ bảo mật của máy chủ VNPAY. Đây là lỗi kết nối, không phải thông báo giao dịch đã hết hạn. Vì chưa nhận được phản hồi từ VNPAY, hệ thống chưa thể xác định giao dịch đã thanh toán, thất bại hay hết hạn. Hãy thử khởi động Node.js với --use-system-ca hoặc kiểm tra chuỗi chứng chỉ của VNPAY. Mã kỹ thuật: ${code}`;
+  }
+
+  if (code === "ERR_TLS_CERT_ALTNAME_INVALID") {
+    return `Chứng chỉ bảo mật mà máy chủ trả về không khớp với tên miền VNPAY. Mã kỹ thuật: ${code}`;
+  }
+
+  if (code === "CERT_HAS_EXPIRED") {
+    return `Chứng chỉ bảo mật của máy chủ VNPAY đã hết hạn. Mã kỹ thuật: ${code}`;
+  }
+
+  if (cause?.name === "TimeoutError" || code === "UND_ERR_CONNECT_TIMEOUT") {
+    return "Kết nối tới máy chủ VNPAY bị quá thời gian chờ";
+  }
+
+  return rootCause?.message || cause?.message || "Lỗi kết nối không xác định";
 }
 
 function taoMaGiaoDichVnpayMoi(orderCode) {
@@ -94,7 +128,100 @@ function taoLinkThanhToanVnpay({ orderCode, amount, ipAddress, transactionRef })
     paymentUrl: `${config.paymentUrl}?${buildSignedQuery(params, config.hashSecret)}`,
     expiresAt: expiresAt.toISOString(),
     transactionRef: normalizedTransactionRef,
+    transactionDate: params.vnp_CreateDate,
   };
+}
+
+function verifyQueryDrResponse(data, config) {
+  const signData = [
+    data.vnp_ResponseId,
+    data.vnp_Command,
+    data.vnp_ResponseCode,
+    data.vnp_Message,
+    data.vnp_TmnCode,
+    data.vnp_TxnRef,
+    data.vnp_Amount,
+    data.vnp_BankCode,
+    data.vnp_PayDate,
+    data.vnp_TransactionNo,
+    data.vnp_TransactionType,
+    data.vnp_TransactionStatus,
+    data.vnp_OrderInfo,
+    data.vnp_PromotionCode,
+    data.vnp_PromotionAmount,
+  ].map((value) => value ?? "").join("|");
+
+  return data.vnp_TmnCode === config.tmnCode && hashesMatch(
+    data.vnp_SecureHash,
+    createSecureHash(signData, config.hashSecret)
+  );
+}
+
+async function truyVanGiaoDichVnpay({ transactionRef, transactionDate }) {
+  const config = getVnpayConfig();
+  const createdDate = formatVnpayDate(new Date());
+  const orderInfo = `Truy van giao dich ${transactionRef}`;
+  const body = {
+    vnp_RequestId: `${Date.now()}${crypto.randomBytes(6).toString("hex")}`,
+    vnp_Version: "2.1.0",
+    vnp_Command: "querydr",
+    vnp_TmnCode: config.tmnCode,
+    vnp_TxnRef: String(transactionRef),
+    vnp_OrderInfo: orderInfo,
+    vnp_TransactionDate: /^\d{14}$/.test(String(transactionDate || ""))
+      ? String(transactionDate)
+      : formatVnpayDate(transactionDate),
+    vnp_CreateDate: createdDate,
+    vnp_IpAddr: config.apiIp,
+  };
+  const signData = [
+    body.vnp_RequestId,
+    body.vnp_Version,
+    body.vnp_Command,
+    body.vnp_TmnCode,
+    body.vnp_TxnRef,
+    body.vnp_TransactionDate,
+    body.vnp_CreateDate,
+    body.vnp_IpAddr,
+    body.vnp_OrderInfo,
+  ].join("|");
+  body.vnp_SecureHash = createSecureHash(signData, config.hashSecret);
+
+  let response;
+  try {
+    response = await fetch(config.apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (cause) {
+    const error = new Error(
+      `Không thể kết nối tới API truy vấn VNPAY: ${formatVnpayConnectionError(cause)}`
+    );
+    error.cause = cause;
+    throw error;
+  }
+  if (!response.ok) {
+    throw new Error(`VNPAY QueryDR trả về HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  if (!data.vnp_SecureHash) {
+    const responseCode = String(data.vnp_ResponseCode || "N/A");
+    const message = responseCode === "94"
+      ? "Yêu cầu QueryDR bị trùng trong vòng 5 phút; sẽ thử lại ở chu kỳ sau"
+      : String(data.vnp_Message || "Phản hồi không có checksum");
+    throw new Error(`VNPAY QueryDR trả về mã ${responseCode}: ${message}`);
+  }
+  if (data.vnp_TmnCode !== config.tmnCode) {
+    throw new Error("Mã website trong phản hồi QueryDR không khớp cấu hình");
+  }
+  if (!verifyQueryDrResponse(data, config)) {
+    throw new Error("Checksum QueryDR từ VNPAY không hợp lệ");
+  }
+
+  return data;
 }
 
 function xacThucPhanHoiVnpay(query) {
@@ -119,14 +246,12 @@ function xacThucPhanHoiVnpay(query) {
     return false;
   }
 
-  return crypto.timingSafeEqual(
-    Buffer.from(receivedHash, "utf-8"),
-    Buffer.from(expectedHash, "utf-8")
-  );
+  return hashesMatch(receivedHash, expectedHash);
 }
 
 module.exports = {
   taoMaGiaoDichVnpayMoi,
   taoLinkThanhToanVnpay,
+  truyVanGiaoDichVnpay,
   xacThucPhanHoiVnpay,
 };

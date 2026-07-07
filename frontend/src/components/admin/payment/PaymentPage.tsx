@@ -3,6 +3,9 @@
 import { useState, useCallback } from "react";
 import type { MouseEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { message, Modal } from "antd";
+import dayjs from "dayjs";
 import PaymentDetailDrawer, { type PaymentDetail } from "./PaymentDetailDrawer";
 import PaymentFilterBar from "./PaymentFilterBar";
 import PaymentPagination from "./PaymentPagination";
@@ -13,9 +16,8 @@ import {
   layDanhSachGiaoDich,
   layChiTietGiaoDich,
   xacNhanThuCod,
-  dongBoLaiVnpay,
-  hoanTienGiaoDich,
   luuGhiChu,
+  xuatBaoCaoThanhToan,
   type ThamSoLocGiaoDich,
 } from "@/services/admin/paymentService";
 import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
@@ -32,15 +34,38 @@ import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
  * Dữ liệu được lấy từ API backend thông qua paymentService.
  */
 
-export default function PaymentPage() {
+export type PaymentInitialFilters = {
+  status?: string;
+  method?: string;
+  startDate?: string;
+  endDate?: string;
+  dateField?: "created" | "paid";
+};
+
+type PaymentPageProps = {
+  initialFilters?: PaymentInitialFilters;
+};
+
+export default function PaymentPage({ initialFilters }: PaymentPageProps) {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const [messageApi, messageContextHolder] = message.useMessage();
+  const [modalApi, modalContextHolder] = Modal.useModal();
 
   // ===== STATE BỘ LỌC =====
   const [searchValue, setSearchValue] = useState("");
-  const [activeTab, setActiveTab] = useState("tat_ca");
-  const [statusFilter, setStatusFilter] = useState("tat_ca");
-  const [methodFilter, setMethodFilter] = useState("tat_ca");
-  const [timeFilter, setTimeFilter] = useState("Hôm nay");
+  const [statusFilter, setStatusFilter] = useState(
+    initialFilters?.status ?? "tat_ca"
+  );
+  const [methodFilter, setMethodFilter] = useState(
+    initialFilters?.method ?? "tat_ca"
+  );
+  const [tuNgay, setTuNgay] = useState(initialFilters?.startDate ?? "");
+  const [denNgay, setDenNgay] = useState(initialFilters?.endDate ?? "");
+  const [dateField, setDateField] = useState(
+    initialFilters?.dateField ?? "created"
+  );
+  const [dateFilterKey, setDateFilterKey] = useState(0);
 
   // State phân trang
   const [currentPage, setCurrentPage] = useState(1);
@@ -49,6 +74,7 @@ export default function PaymentPage() {
   // State chi tiết giao dịch
   const [selectedPaymentId, setSelectedPaymentId] = useState<number | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // ===== QUERY: THỐNG KÊ KPI =====
   const statsQuery = useQuery({
@@ -65,9 +91,19 @@ export default function PaymentPage() {
       trangThai: statusFilter !== "tat_ca" ? statusFilter : undefined,
       phuongThuc: methodFilter !== "tat_ca" ? methodFilter : undefined,
       tuKhoa: searchValue || undefined,
-      tab: activeTab !== "tat_ca" ? activeTab : undefined,
+      tuNgay: tuNgay || undefined,
+      denNgay: denNgay || undefined,
+      kieuNgay: dateField === "paid" ? "ngay_thanh_toan" : "ngay_tao",
     };
-  }, [currentPage, statusFilter, methodFilter, searchValue, activeTab]);
+  }, [
+    currentPage,
+    statusFilter,
+    methodFilter,
+    searchValue,
+    tuNgay,
+    denNgay,
+    dateField,
+  ]);
 
   const listQuery = useQuery({
     queryKey: ["admin-payments", buildFilterParams()],
@@ -85,6 +121,12 @@ export default function PaymentPage() {
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["admin-payments"] });
     queryClient.invalidateQueries({ queryKey: ["admin-payments-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-order-stats"] });
+    queryClient.invalidateQueries({
+      predicate: (query) =>
+        String(query.queryKey[0] || "").startsWith("dashboard/"),
+    });
     if (selectedPaymentId) {
       queryClient.invalidateQueries({ queryKey: ["admin-payment-detail", selectedPaymentId] });
     }
@@ -94,31 +136,13 @@ export default function PaymentPage() {
     mutationFn: xacNhanThuCod,
     onSuccess: () => {
       invalidateAll();
+      messageApi.success("Đã xác nhận thu COD. Doanh thu đơn hàng đã được ghi nhận.");
       setActionLoading(false);
     },
-    onError: () => {
-      setActionLoading(false);
-    },
-  });
-
-  const syncVnpayMutation = useMutation({
-    mutationFn: dongBoLaiVnpay,
-    onSuccess: () => {
-      invalidateAll();
-      setActionLoading(false);
-    },
-    onError: () => {
-      setActionLoading(false);
-    },
-  });
-
-  const refundMutation = useMutation({
-    mutationFn: hoanTienGiaoDich,
-    onSuccess: () => {
-      invalidateAll();
-      setActionLoading(false);
-    },
-    onError: () => {
+    onError: (error) => {
+      messageApi.error(
+        getApiErrorMessage(error, "Không thể xác nhận thu COD.")
+      );
       setActionLoading(false);
     },
   });
@@ -149,26 +173,32 @@ export default function PaymentPage() {
     setSelectedPaymentId(payment.id);
   }
 
-  // Icon ✅ Xác nhận thu COD / Đồng bộ lại VNPAY
-  function handleConfirmAction(payment: Payment, e: MouseEvent) {
+  // Icon ✅ Xác nhận thu COD
+  function handleConfirmCod(payment: Payment, e: MouseEvent) {
     e.stopPropagation();
-    if (payment.method === "COD") {
-      confirmCodMutation.mutate(payment.id);
-    } else {
-      syncVnpayMutation.mutate(payment.id);
+    const codPaymentId =
+      payment.method === "COD" && payment.status === "can_doi_soat"
+        ? payment.id
+        : payment.codReconciliationPaymentId;
+
+    if (!codPaymentId) {
+      messageApi.warning("Khoản COD của đơn hàng chưa sẵn sàng để đối soát.");
+      return;
     }
-  }
 
-  // Hoàn tiền từ Drawer
-  function handleRefund(id: number) {
-    setActionLoading(true);
-    refundMutation.mutate(id);
-  }
+    const codAmount =
+      payment.paymentType === "DEPOSIT"
+        ? payment.codAmountVnd ?? payment.remainingAmountVnd ?? 0
+        : payment.amountVnd;
 
-  // Đồng bộ VNPAY từ Drawer
-  function handleSyncVnpay(id: number) {
-    setActionLoading(true);
-    syncVnpayMutation.mutate(id);
+    modalApi.confirm({
+      title: "Xác nhận đã nhận tiền COD?",
+      content: `Khoản COD ${formatVnd(codAmount)} của đơn ${payment.orderCode} sẽ được ghi nhận vào doanh thu.`,
+      okText: "Xác nhận thu COD",
+      cancelText: "Hủy",
+      okButtonProps: { loading: confirmCodMutation.isPending },
+      onOk: () => confirmCodMutation.mutateAsync(codPaymentId),
+    });
   }
 
   // Lưu ghi chú từ Drawer
@@ -177,10 +207,19 @@ export default function PaymentPage() {
     saveNoteMutation.mutate({ id, note });
   }
 
-  // Nút "Lọc"
-  function handleFilter() {
+  function handleSearchChange(val: string) {
+    setSearchValue(val);
     setCurrentPage(1);
-    // Query sẽ tự refetch do queryKey thay đổi
+  }
+
+  function handleStatusChange(val: string) {
+    setStatusFilter(val);
+    setCurrentPage(1);
+  }
+
+  function handleMethodChange(val: string) {
+    setMethodFilter(val);
+    setCurrentPage(1);
   }
 
   // Nút "Đặt lại"
@@ -188,15 +227,48 @@ export default function PaymentPage() {
     setSearchValue("");
     setStatusFilter("tat_ca");
     setMethodFilter("tat_ca");
-    setTimeFilter("Hôm nay");
-    setActiveTab("tat_ca");
+    setDateField("created");
+    setTuNgay("");
+    setDenNgay("");
+    setCurrentPage(1);
+    setDateFilterKey((current) => current + 1);
+    router.push("/admin/thanh-toan");
+  }
+
+  function handleDateChange(startDate: string, endDate: string) {
+    setTuNgay(startDate);
+    setDenNgay(endDate);
     setCurrentPage(1);
   }
 
-  // Khi chuyển tab → reset trang về 1
-  function handleTabChange(tab: string) {
-    setActiveTab(tab);
+  function handleDateClear() {
+    setTuNgay("");
+    setDenNgay("");
     setCurrentPage(1);
+  }
+
+  async function handleExportReport() {
+    if (isExporting) return;
+    setIsExporting(true);
+
+    try {
+      const currentFilters = buildFilterParams();
+      await xuatBaoCaoThanhToan({
+        trangThai: currentFilters.trangThai,
+        phuongThuc: currentFilters.phuongThuc,
+        tuKhoa: currentFilters.tuKhoa,
+        tuNgay: currentFilters.tuNgay,
+        denNgay: currentFilters.denNgay,
+        kieuNgay: currentFilters.kieuNgay,
+      });
+      messageApi.success("Đã xuất báo cáo thanh toán thành công.");
+    } catch (error) {
+      messageApi.error(
+        getApiErrorMessage(error, "Không thể xuất báo cáo thanh toán.")
+      );
+    } finally {
+      setIsExporting(false);
+    }
   }
 
   // ===== DỮ LIỆU TỪ QUERY =====
@@ -204,7 +276,6 @@ export default function PaymentPage() {
   const payments = listQuery.data?.danhSach ?? [];
   const totalItems = listQuery.data?.tongSo ?? 0;
   const totalPages = listQuery.data?.tongSoTrang ?? 1;
-  const tabCounts = listQuery.data?.tabCounts;
 
   // Xây dựng PaymentDetail từ detailQuery
   const selectedPayment: PaymentDetail | null = detailQuery.data
@@ -224,9 +295,14 @@ export default function PaymentPage() {
   const errorMessage = listQuery.error
     ? getApiErrorMessage(listQuery.error, "Không thể tải danh sách giao dịch")
     : null;
+  const today = dayjs().format("YYYY-MM-DD");
+  const hasNoSecondaryFilters =
+    searchValue === "" && statusFilter === "tat_ca";
 
   return (
     <div>
+      {messageContextHolder}
+      {modalContextHolder}
 
       {/* ======== Tiêu đề trang + nút hành động ======== */}
       <section className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
@@ -235,44 +311,31 @@ export default function PaymentPage() {
             Thanh toán
           </h2>
           <p className="mt-1 text-sm text-text-secondary">
-            Theo dõi giao dịch, kiểm tra VNPAY, xử lý lỗi thanh toán và đối soát doanh thu đơn hàng.
+            Theo dõi giao dịch, xử lý lỗi thanh toán và đối soát doanh thu đơn hàng.
           </p>
         </div>
 
         {/* Các nút hành động đầu trang */}
         <div className="flex flex-wrap items-center gap-3">
-
-
-
           {/* Nút phụ: Xuất báo cáo */}
           <button
             type="button"
-            className="flex h-control-h items-center gap-2 rounded-[10px] border border-border bg-surface px-4 text-sm font-semibold text-text-secondary transition-colors hover:bg-surface-alt"
+            disabled={isExporting}
+            onClick={handleExportReport}
+            className="flex h-control-h items-center gap-2 rounded-[10px] border border-border bg-surface px-4 text-sm font-semibold text-text-secondary transition-colors hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-60"
           >
             {/* Icon download */}
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Xuất báo cáo
+            {isExporting ? "Đang xuất..." : "Xuất báo cáo"}
           </button>
 
-          {/* Nút chính: Kiểm tra VNPAY */}
-          <button
-            type="button"
-            className="flex h-control-h items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7]"
-          >
-            {/* Icon sync */}
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path d="M4 12v.01M4 12a8 8 0 018-8 8 8 0 015.657 2.343M20 12a8 8 0 01-8 8 8 8 0 01-5.657-2.343" strokeLinecap="round" />
-              <path d="M20 4v4h-4M4 20v-4h4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Kiểm tra VNPAY
-          </button>
         </div>
       </section>
 
-      {/* ======== 3 thẻ KPI thống kê ======== */}
-      <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+      {/* ======== 4 thẻ KPI thống kê ======== */}
+      <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
 
         {/* KPI 1: Tổng tiền đã thanh toán hôm nay – có badge % */}
         <PaymentStatCard
@@ -284,6 +347,15 @@ export default function PaymentPage() {
               <rect x="2" y="5" width="20" height="14" rx="2" />
               <path d="M2 10h20" strokeLinecap="round" />
             </svg>
+          }
+          href={`/admin/thanh-toan?status=COMPLETED&date=${today}&dateField=paid`}
+          isActive={
+            statusFilter === "da_thanh_toan" &&
+            methodFilter === "tat_ca" &&
+            tuNgay === today &&
+            denNgay === today &&
+            dateField === "paid" &&
+            hasNoSecondaryFilters
           }
           badge={
             stats && stats.phanTramThayDoi !== 0 ? (
@@ -301,7 +373,8 @@ export default function PaymentPage() {
                     <path d="M22 17l-10-10L7 12l-5-5" strokeLinecap="round" strokeLinejoin="round" />
                   )}
                 </svg>
-                {Math.abs(stats.phanTramThayDoi)}%
+                {stats.phanTramThayDoi > 0 ? "+" : "-"}
+                {Math.abs(stats.phanTramThayDoi)}% vs hôm qua
               </span>
             ) : undefined
           }
@@ -323,9 +396,43 @@ export default function PaymentPage() {
               <path d="M12 6v6l4 2" strokeLinecap="round" />
             </svg>
           }
+          href="/admin/thanh-toan?status=PENDING"
+          isActive={
+            statusFilter === "cho_thanh_toan" &&
+            methodFilter === "tat_ca" &&
+            tuNgay === "" &&
+            denNgay === "" &&
+            hasNoSecondaryFilters
+          }
         />
 
-        {/* KPI 3: Giao dịch thất bại – dạng alert (viền đỏ bên phải) */}
+        {/* KPI 3: Giao dịch COD cần kế toán đối soát */}
+        <PaymentStatCard
+          label="Giao dịch cần đối soát"
+          value={
+            <>
+              {stats?.canDoiSoat ?? "—"}{" "}
+              <span className="text-base font-normal text-text-muted">đơn</span>
+            </>
+          }
+          iconWrapperClassName="border border-[#fde047] bg-[#fef9c3] text-[#854d0e]"
+          icon={
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="12" cy="12" r="9" />
+            </svg>
+          }
+          href="/admin/thanh-toan?status=PENDING_RECONCILIATION&method=COD"
+          isActive={
+            statusFilter === "can_doi_soat" &&
+            methodFilter === "cod" &&
+            tuNgay === "" &&
+            denNgay === "" &&
+            hasNoSecondaryFilters
+          }
+        />
+
+        {/* KPI 4: Giao dịch thất bại – dạng alert (viền đỏ bên phải) */}
         <PaymentStatCard
           label="Giao dịch thất bại"
           value={
@@ -344,6 +451,14 @@ export default function PaymentPage() {
             </svg>
           }
           isAlert={true}
+          href="/admin/thanh-toan?status=FAILED%2CCANCELLED"
+          isActive={
+            statusFilter === "that_bai" &&
+            methodFilter === "tat_ca" &&
+            tuNgay === "" &&
+            denNgay === "" &&
+            hasNoSecondaryFilters
+          }
         />
 
 
@@ -354,18 +469,18 @@ export default function PaymentPage() {
         {/* Thanh lọc giao dịch */}
         <PaymentFilterBar
           searchValue={searchValue}
-          onSearchChange={setSearchValue}
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
+          onSearchChange={handleSearchChange}
           statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
+          onStatusFilterChange={handleStatusChange}
           methodFilter={methodFilter}
-          onMethodFilterChange={setMethodFilter}
-          timeFilter={timeFilter}
-          onTimeFilterChange={setTimeFilter}
-          onFilter={handleFilter}
+          onMethodFilterChange={handleMethodChange}
+          dateFilterKey={dateFilterKey}
+          initialDatePreset={tuNgay && denNgay ? "custom" : "all"}
+          initialStartDate={tuNgay || undefined}
+          initialEndDate={denNgay || undefined}
+          onDateChange={handleDateChange}
+          onDateClear={handleDateClear}
           onReset={handleReset}
-          tabCounts={tabCounts}
         />
 
         {/* Bảng giao dịch + Phân trang */}
@@ -415,7 +530,12 @@ export default function PaymentPage() {
                 payments={payments}
                 onRowClick={handleRowClick}
                 onViewDetail={handleViewDetail}
-                onConfirmAction={handleConfirmAction}
+                onConfirmCod={handleConfirmCod}
+                confirmingCodId={
+                  confirmCodMutation.isPending
+                    ? confirmCodMutation.variables
+                    : null
+                }
               />
               <PaymentPagination
                 currentPage={currentPage}
@@ -434,8 +554,6 @@ export default function PaymentPage() {
         payment={selectedPayment}
         onClose={() => setSelectedPaymentId(null)}
         isLoading={detailQuery.isLoading && selectedPaymentId !== null}
-        onRefund={handleRefund}
-        onSyncVnpay={handleSyncVnpay}
         onSaveNote={handleSaveNote}
         isActionLoading={actionLoading}
       />

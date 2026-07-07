@@ -7,20 +7,24 @@
  * đang chờ được gửi đến xưởng in hoặc đang trong quá trình in.
  *
  * Dữ liệu lấy từ API GET /api/admin/designs/don-can-in.
- * Hành động "Gửi xưởng" gọi PATCH /api/admin/designs/don-can-in/:id/gui-xuong.
+ * Nhân viên xưởng cập nhật tuần tự: Chờ gửi xưởng → Đang in → Đã in xong.
  */
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Modal, Select, message } from "antd";
 import {
-  SendOutlined,
+  EditOutlined,
   EyeOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   LoadingOutlined,
   WarningOutlined,
+  SyncOutlined,
+  SearchOutlined,
 } from "@ant-design/icons";
 import DesignPreview from "./DesignPreview";
+import DateRangeFilter from "@/components/admin/common/DateRangeFilter";
 
 import * as designService from "@/services/admin/designService";
 import type { DonCanIn } from "@/services/admin/designService";
@@ -52,13 +56,30 @@ const CAU_HINH_TRANG_THAI: Record<
   },
 };
 
-export default function PrintOrderTab() {
-  const queryClient = useQueryClient();
+type PrintOrderTabProps = {
+  statusFilter: string;
+  onStatusFilterChange: (status: string) => void;
+  dateRange: { tuNgay: string; denNgay: string };
+  onDateRangeChange: (dateRange: { tuNgay: string; denNgay: string }) => void;
+  onResetFilters: () => void;
+};
 
-  // ── State lọc theo trạng thái ──
-  const [locTrangThai, setLocTrangThai] = useState("");
+export default function PrintOrderTab({
+  statusFilter,
+  onStatusFilterChange,
+  dateRange,
+  onDateRangeChange,
+  onResetFilters,
+}: PrintOrderTabProps) {
+  const queryClient = useQueryClient();
+  const [messageApi, messageContextHolder] = message.useMessage();
+  const [confirmModal, confirmModalContextHolder] = Modal.useModal();
+
   // ── State phân trang ──
   const [trang, setTrang] = useState(1);
+  const [tuKhoa, setTuKhoa] = useState("");
+  const [donDangChinhSua, setDonDangChinhSua] = useState<DonCanIn | null>(null);
+  const [trangThaiMoi, setTrangThaiMoi] = useState<"dang_in" | "da_in_xong" | "">("");
 
   // ─── Fetch danh sách đơn cần in ─────────────────────────────────────────
   const {
@@ -66,34 +87,54 @@ export default function PrintOrderTab() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["don-can-in", trang, locTrangThai],
+    queryKey: ["don-can-in", trang, tuKhoa, statusFilter, dateRange],
     queryFn: () =>
       designService.layDanhSachDonCanIn({
         page: trang,
         limit: 10,
-        trang_thai: locTrangThai || undefined,
+        tu_khoa: tuKhoa || undefined,
+        trang_thai: statusFilter || undefined,
+        tu_ngay: dateRange.tuNgay || undefined,
+        den_ngay: dateRange.denNgay || undefined,
       }),
     staleTime: 15_000,
   });
 
-  // ─── Mutation: Gửi xưởng ─────────────────────────────────────────────────
-  const mutationGuiXuong = useMutation({
-    mutationFn: (id: number) => designService.guiDonXuongIn(id),
-    onSuccess: () => {
-      // Reload danh sách và KPI
+  // ─── Mutation: Cập nhật một bước tiến độ in ──────────────────────────────
+  const mutationTrangThai = useMutation({
+    mutationFn: ({ id, trangThai }: {
+      id: number;
+      trangThai: "dang_in" | "da_in_xong";
+    }) => designService.capNhatTrangThaiDonIn(id, trangThai),
+    onSuccess: (_data, variables) => {
+      messageApi.success(
+        variables.trangThai === "dang_in"
+          ? "Đã chuyển sản phẩm sang trạng thái Đang in"
+          : "Đã xác nhận in xong, sản phẩm sẵn sàng giao"
+      );
       queryClient.invalidateQueries({ queryKey: ["don-can-in"] });
       queryClient.invalidateQueries({ queryKey: ["thiet-ke-thong-ke"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-order-detail"] });
+      setDonDangChinhSua(null);
+      setTrangThaiMoi("");
     },
     onError: (err: Error) => {
-      alert(`Lỗi khi gửi xưởng: ${err.message}`);
+      messageApi.error(`Không thể cập nhật tiến độ in: ${err.message}`);
     },
   });
 
-  function xuLyGuiXuong(id: number) {
-    if (window.confirm("Xác nhận gửi đơn này đến xưởng in?")) {
-      mutationGuiXuong.mutate(id);
-    }
+  function moModalCapNhatTrangThai(don: DonCanIn) {
+    if (don.trangThai === "da_in_xong") return;
+    setDonDangChinhSua(don);
+    setTrangThaiMoi("");
   }
+
+  const tuyChonTrangThai = donDangChinhSua?.trangThai === "cho_gui_xuong"
+    ? [{ value: "dang_in", label: "Đang in" }]
+    : donDangChinhSua?.trangThai === "dang_in"
+      ? [{ value: "da_in_xong", label: "Đã in xong (Sẵn sàng giao)" }]
+      : [];
 
   const danhSach = ketQua?.danhSach ?? [];
   const tongSo = ketQua?.tongSo ?? 0;
@@ -102,9 +143,92 @@ export default function PrintOrderTab() {
   // Thống kê nhanh từ dữ liệu đang hiển thị
   const soChoGuiXuong = danhSach.filter((d) => d.trangThai === "cho_gui_xuong").length;
   const soDangIn = danhSach.filter((d) => d.trangThai === "dang_in").length;
+  const soDaInXong = danhSach.filter((d) => d.trangThai === "da_in_xong").length;
 
   return (
-    <div style={{ padding: 24 }}>
+    <>
+      {messageContextHolder}
+      {confirmModalContextHolder}
+      <Modal
+        open={Boolean(donDangChinhSua)}
+        title="Cập nhật trạng thái đơn cần in"
+        okText="Cập nhật"
+        cancelText="Hủy"
+        centered
+        confirmLoading={mutationTrangThai.isPending}
+        okButtonProps={{ disabled: !trangThaiMoi || mutationTrangThai.isPending }}
+        onCancel={() => {
+          if (mutationTrangThai.isPending) return;
+          setDonDangChinhSua(null);
+          setTrangThaiMoi("");
+        }}
+        onOk={() => {
+          if (!donDangChinhSua || !trangThaiMoi) return;
+          const nhanTrangThaiMoi = trangThaiMoi === "dang_in"
+            ? "Đang in"
+            : "Đã in xong (Sẵn sàng giao)";
+
+          confirmModal.confirm({
+            title: "Xác nhận chuyển trạng thái",
+            content: (
+              <span>
+                Bạn có chắc muốn chuyển đơn <strong>{donDangChinhSua.maDon}</strong> sang trạng thái{" "}
+                <strong>{nhanTrangThaiMoi}</strong>? Thao tác này không thể hoàn tác.
+              </span>
+            ),
+            okText: "Xác nhận",
+            cancelText: "Quay lại",
+            centered: true,
+            okButtonProps: {
+              type: "primary",
+              danger: trangThaiMoi === "da_in_xong",
+            },
+            onOk: () => mutationTrangThai.mutateAsync({
+              id: donDangChinhSua.id,
+              trangThai: trangThaiMoi,
+            }),
+          });
+        }}
+      >
+        <div style={{ display: "grid", gap: 16, paddingTop: 8 }}>
+          <div
+            style={{
+              padding: "12px 14px",
+              borderRadius: 8,
+              background: "#f8fafc",
+              color: "#475569",
+              fontSize: 13,
+            }}
+          >
+            Đơn hàng: <strong style={{ color: "#0f172a" }}>{donDangChinhSua?.maDon}</strong>
+            <br />
+            Trạng thái hiện tại:{" "}
+            <strong style={{ color: "#0f172a" }}>
+              {donDangChinhSua
+                ? CAU_HINH_TRANG_THAI[donDangChinhSua.trangThai].nhan
+                : ""}
+            </strong>
+          </div>
+          <div>
+            <label
+              htmlFor="trang-thai-don-in"
+              style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 600 }}
+            >
+              Chuyển sang trạng thái
+            </label>
+            <Select
+              id="trang-thai-don-in"
+              value={trangThaiMoi || undefined}
+              placeholder="Chọn trạng thái được phép chuyển"
+              options={tuyChonTrangThai}
+              disabled={mutationTrangThai.isPending}
+              style={{ width: "100%" }}
+              onChange={setTrangThaiMoi}
+            />
+          </div>
+        </div>
+      </Modal>
+      <div style={{ padding: 24 }}>
       {/* ── Thanh lọc + Thống kê nhanh ── */}
       <div
         style={{
@@ -150,30 +274,118 @@ export default function PrintOrderTab() {
             <CheckCircleOutlined />
             {soDangIn} đơn đang in tại xưởng
           </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 16px",
+              background: "#f1f5f9",
+              borderRadius: 8,
+              fontSize: 13,
+              color: "#64748b",
+              fontWeight: 600,
+            }}
+          >
+            <CheckCircleOutlined />
+            {soDaInXong} đơn đã in xong
+          </div>
         </div>
 
-        {/* Dropdown lọc trạng thái */}
-        <select
-          value={locTrangThai}
-          onChange={(e) => { setLocTrangThai(e.target.value); setTrang(1); }}
-          style={{
-            height: 36,
-            padding: "0 12px",
-            background: "#f8fafc",
-            border: "1px solid #e2e8f0",
-            borderRadius: 8,
-            fontSize: 13,
-            color: locTrangThai ? "#0f172a" : "#94a3b8",
-            outline: "none",
-            cursor: "pointer",
-            minWidth: 160,
-          }}
-        >
-          <option value="">Tất cả trạng thái</option>
-          <option value="cho_gui_xuong">Chờ gửi xưởng</option>
-          <option value="dang_in">Đang in</option>
-          <option value="da_in_xong">Đã in xong</option>
-        </select>
+        {/* Bộ lọc ngày và trạng thái */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ position: "relative", minWidth: 220, width: 260 }}>
+            <SearchOutlined
+              style={{
+                position: "absolute",
+                left: 10,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "#94a3b8",
+                fontSize: 14,
+                pointerEvents: "none",
+              }}
+            />
+            <input
+              type="search"
+              placeholder="Tìm mã TK, mã đơn, tên khách..."
+              value={tuKhoa}
+              onChange={(e) => {
+                const giaTriMoi = e.target.value;
+                setTuKhoa(giaTriMoi);
+                if (giaTriMoi.trim()) {
+                  onStatusFilterChange("");
+                }
+                setTrang(1);
+              }}
+              style={{
+                width: "100%",
+                height: 36,
+                padding: "0 12px 0 34px",
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: 8,
+                fontSize: 13,
+                color: "#0f172a",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+          <DateRangeFilter
+            key={`${dateRange.tuNgay}-${dateRange.denNgay}`}
+            initialPreset={dateRange.tuNgay && dateRange.denNgay ? "custom" : "all"}
+            initialStartDate={dateRange.tuNgay}
+            initialEndDate={dateRange.denNgay}
+            allowClear
+            onChange={(tuNgay, denNgay) => {
+              onDateRangeChange({ tuNgay, denNgay });
+              setTrang(1);
+            }}
+            onClear={() => {
+              onDateRangeChange({ tuNgay: "", denNgay: "" });
+              setTrang(1);
+            }}
+            className="w-full sm:w-auto"
+            selectClassName="h-9"
+            rangePickerClassName="h-9 min-w-[240px] sm:w-[280px]"
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              onStatusFilterChange(e.target.value);
+              setTrang(1);
+            }}
+            style={{
+              height: 36,
+              padding: "0 12px",
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              fontSize: 13,
+              color: statusFilter ? "#0f172a" : "#94a3b8",
+              outline: "none",
+              cursor: "pointer",
+              minWidth: 160,
+            }}
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="cho_gui_xuong">Chờ gửi xưởng</option>
+            <option value="dang_in">Đang in</option>
+            <option value="da_in_xong">Đã in xong</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              setTrang(1);
+              setTuKhoa("");
+              onResetFilters();
+            }}
+            className="flex h-9 shrink-0 items-center gap-2 rounded-lg border border-[#e2e8f0] bg-white px-3 text-sm font-medium text-[#475569] transition-colors hover:bg-[#f8fafc] hover:text-[#0f172a]"
+          >
+            <SyncOutlined /> Đặt lại
+          </button>
+        </div>
       </div>
 
       {/* ── Bảng danh sách đơn cần in ── */}
@@ -214,7 +426,7 @@ export default function PrintOrderTab() {
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
               <thead>
                 <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                  {["MÃ ĐƠN", "THIẾT KẾ", "KHÁCH HÀNG", "SỐ LƯỢNG", "VỊ TRÍ IN", "TRẠNG THÁI", "NGÀY TẠO", "THAO TÁC"].map(
+                  {["MÃ ĐƠN", "THIẾT KẾ", "KHÁCH HÀNG", "SỐ LƯỢNG", "VỊ TRÍ IN", "TRẠNG THÁI", "NGÀY ĐẶT ĐƠN", "THAO TÁC"].map(
                     (tieuDe, viTri) => (
                       <th
                         key={tieuDe}
@@ -237,8 +449,6 @@ export default function PrintOrderTab() {
               <tbody>
                 {danhSach.map((don) => {
                   const cauHinh = CAU_HINH_TRANG_THAI[don.trangThai] ?? CAU_HINH_TRANG_THAI.cho_gui_xuong;
-                  const dangGuiXuong =
-                    mutationGuiXuong.isPending && mutationGuiXuong.variables === don.id;
                   return (
                     <tr
                       key={don.id}
@@ -312,9 +522,9 @@ export default function PrintOrderTab() {
                         </span>
                       </td>
 
-                      {/* Ngày tạo */}
+                      {/* Ngày khách đặt đơn (CustomerOrder.createdAt) */}
                       <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                        <span style={{ fontSize: 13, color: "#475569" }}>{don.ngayTao}</span>
+                        <span style={{ fontSize: 13, color: "#475569" }}>{don.ngayDatDon}</span>
                       </td>
 
                       {/* Thao tác */}
@@ -350,46 +560,30 @@ export default function PrintOrderTab() {
                             <EyeOutlined />
                           </button>
 
-                          {/* Nút Gửi xưởng – chỉ hiện khi "Chờ gửi xưởng" */}
-                          {don.trangThai === "cho_gui_xuong" && (
-                            <button
-                              title="Gửi đến xưởng in"
-                              onClick={() => xuLyGuiXuong(don.id)}
-                              disabled={mutationGuiXuong.isPending}
-                              style={{
-                                height: 32,
-                                padding: "0 12px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 6,
-                                borderRadius: 6,
-                                border: "none",
-                                background: dangGuiXuong ? "#7dd3fc" : "#0ea5e9",
-                                color: "#ffffff",
-                                cursor: mutationGuiXuong.isPending ? "not-allowed" : "pointer",
-                                fontSize: 13,
-                                fontWeight: 600,
-                                transition: "background-color 0.15s ease",
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!mutationGuiXuong.isPending) {
-                                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0284c7";
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!mutationGuiXuong.isPending) {
-                                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0ea5e9";
-                                }
-                              }}
-                            >
-                              {dangGuiXuong ? (
-                                <LoadingOutlined style={{ fontSize: 13 }} />
-                              ) : (
-                                <SendOutlined style={{ fontSize: 13 }} />
-                              )}
-                              {dangGuiXuong ? "Đang gửi..." : "Gửi xưởng"}
-                            </button>
-                          )}
+                          <button
+                            title={don.trangThai === "da_in_xong"
+                              ? "Đơn in đã hoàn tất"
+                              : "Cập nhật trạng thái"}
+                            aria-label={`Cập nhật trạng thái ${don.maDon}`}
+                            onClick={() => moModalCapNhatTrangThai(don)}
+                            disabled={don.trangThai === "da_in_xong" || mutationTrangThai.isPending}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: 6,
+                              border: "1px solid #e2e8f0",
+                              background: "#f8fafc",
+                              color: don.trangThai === "da_in_xong" ? "#cbd5e1" : "#0ea5e9",
+                              cursor: don.trangThai === "da_in_xong" ? "not-allowed" : "pointer",
+                              fontSize: 14,
+                              transition: "all 0.15s ease",
+                            }}
+                          >
+                            <EditOutlined />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -459,6 +653,7 @@ export default function PrintOrderTab() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
