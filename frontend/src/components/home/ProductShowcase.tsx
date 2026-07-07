@@ -22,7 +22,7 @@ async function getFeaturedProducts(): Promise<ProductShowcaseItemFromDB[]> {
   try {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api"}/public/products/colors`,
-      { next: { revalidate: 60 } }
+      { cache: "no-store" }
     );
     if (!res.ok) return [];
     const json = await res.json();

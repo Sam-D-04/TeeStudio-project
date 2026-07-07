@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type Konva from "konva";
 
@@ -25,12 +25,16 @@ import FloatingToolbar from "./FloatingToolbar";
 import StaticTextToolbar from "./StaticTextToolbar";
 import SaveDesignModal from "./SaveDesignModal";
 import MyDesignsModal from "./MyDesignsModal";
+import AddToCartModal from "./AddToCartModal";
+import CartDrawer from "./CartDrawer";
 
 import "../../app/design-studio/design-studio.css";
 
 /* ─── Kích thước logic của container áo (px, trước khi zoom) ─── */
 const CONTAINER_W = 500;
 const CONTAINER_H = 600;
+
+const SHIRT_TO_PRODUCT_ID: Record<string, number> = { tshirt: 1, polo: 4, hoodie: 3 };
 
 export default function DesignStudioApp() {
   const stageRef         = useRef<Konva.Stage | null>(null);
@@ -39,9 +43,8 @@ export default function DesignStudioApp() {
 
   const {
     shirtType, shirtColor, shirtView,
-    addElement, removeElement, selectedId,
+    addElement, removeElement,
     undo, redo,
-    saveToLocal, loadFromLocal,
     setSelectedId, setShirtType, setShirtColor, setShirtView,
     currentDesignId, setCurrentDesignId,
   } = useDesignStore();
@@ -71,26 +74,33 @@ export default function DesignStudioApp() {
     setDesignFeeInfo(calcDesignFee(elements));
   }, [elements]);
 
+  /* ── Cart modal — productId và tên màu từ URL ── */
+  const [urlProductId, setUrlProductId] = useState<number | null>(null);
+  const [colorName, setColorName] = useState<string>("");
+
   /* ── Zoom ── */
   const [zoom, setZoom] = useState(1.75);
   const displayW = Math.round(CONTAINER_W * zoom);
   const displayH = Math.round(CONTAINER_H * zoom);
 
-  /* ── Init: load design + parse URL params ── */
+  /* ── Init: parse URL params (không tự load thiết kế cũ) ── */
   useEffect(() => {
-    loadFromLocal();
     const shirt = searchParams.get("shirt");
     const color = searchParams.get("color");
     const view  = searchParams.get("view");
+    const pid   = searchParams.get("productId");
 
     if (shirt === "tshirt" || shirt === "polo" || shirt === "hoodie") setShirtType(shirt);
     if (color) {
+      setColorName(color);
       const map: Record<string, string> = {
         Black: "#000000", White: "#ffffff", Navy: "#1d4ed8",
+        Grey: "#9ca3af", Brown: "#8b4513", Beige: "#d6b89a",
       };
       setShirtColor(map[color] ?? color);
     }
     if (view === "front" || view === "back") setShirtView(view);
+    if (pid) setUrlProductId(parseInt(pid, 10));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -113,7 +123,7 @@ export default function DesignStudioApp() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undo, redo, saveToLocal, removeElement, showToast, setSelectedId]);
+  }, [undo, redo, removeElement, showToast, setSelectedId]);
 
   /* ── Upload ── */
   const handleUploadImages = useCallback((files: FileList) => {
@@ -156,6 +166,8 @@ export default function DesignStudioApp() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isMyDesignsOpen, setIsMyDesignsOpen] = useState(false);
+  const [isCartModalOpen, setIsCartModalOpen] = useState(false);
+  const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
 
   const handleSaveClick = useCallback(() => {
     if (!isAuthenticated || !accessToken) {
@@ -165,20 +177,54 @@ export default function DesignStudioApp() {
     setIsSaveModalOpen(true);
   }, [isAuthenticated, accessToken]);
 
+  /* Tạo thiết kế mới hoàn toàn – reset canvas và ID */
+  const handleNewDesign = useCallback(() => {
+    const currentElements = useDesignStore.getState().elements;
+    const doNew = () => {
+      useDesignStore.getState().clearDesign();
+      showToast("Thiết kế mới đã được tạo");
+    };
+    if (currentElements.length > 0) {
+      Modal.confirm({
+        title: "Tạo thiết kế mới?",
+        content: "Nội dung hiện tại sẽ bị xóa. Hãy lưu lại trước nếu bạn muốn giữ bản thiết kế này.",
+        okText: "Tạo mới",
+        cancelText: "Huỷ",
+        onOk: doNew,
+      });
+    } else {
+      doNew();
+    }
+  }, [showToast]);
+
   const handleConfirmSave = useCallback(async (name: string) => {
     if (!accessToken) return;
     try {
       setIsSaving(true);
-      
-      // Update store name
+
+      // Cập nhật tên thiết kế trong store
       useDesignStore.getState().setDesignName(name);
 
-      // Capture canvas as base64
+      // Chụp lại canvas thành ảnh base64 để làm ảnh xem trước (preview)
       let previewUrl = "";
-      if (stageRef.current) {
+      if (shirtContainerRef.current) {
         setSelectedId(null);
-        await new Promise((r) => setTimeout(r, 50));
-        previewUrl = stageRef.current.toDataURL({ pixelRatio: 1 });
+        
+        // Ẩn khung đứt nét của vùng in
+        const boundaries = shirtContainerRef.current.querySelectorAll('.ds-print-boundary');
+        boundaries.forEach((el: any) => el.style.display = 'none');
+
+        await new Promise((r) => setTimeout(r, 100));
+        
+        const canvas = await html2canvas(shirtContainerRef.current, {
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: null,
+        });
+        previewUrl = canvas.toDataURL("image/png");
+
+        // Hiển thị lại khung đứt nét
+        boundaries.forEach((el: any) => el.style.display = '');
       }
 
       const payload = {
@@ -211,16 +257,19 @@ export default function DesignStudioApp() {
   const handleLoadDesign = useCallback((design: SavedDesign) => {
     const doLoad = () => {
       const state = useDesignStore.getState();
-      state.clearDesign(); // Clear everything (and push to history)
-      
+      state.clearDesign(); // Xoá sạch canvas hiện tại (có lưu vào lịch sử undo)
+
       const elements = design.canvasData?.elements || [];
       const view = design.canvasData?.shirtView || "front";
-      
-      // Set the values individually without causing infinite renders
+
+      // Gán trực tiếp từng field vào store (không qua các action riêng lẻ)
+      // để tránh việc mỗi lần gọi action lại kích hoạt render/pushHistory thừa
       useDesignStore.setState({
         elements,
         shirtView: view,
-        shirtType: design.productId === 1 ? "tshirt" : (design.productId === 2 ? "polo" : "hoodie"), // Fallback if no exact product ID map
+        // productId không khớp 1-1 với shirtType nên phải suy ra thủ công;
+        // nếu không phải tshirt/polo thì mặc định coi là hoodie
+        shirtType: design.productId === 1 ? "tshirt" : design.productId === 2 ? "polo" : "hoodie",
         shirtColor: design.baseColor,
         currentDesignId: design.id,
         designName: design.name,
@@ -306,8 +355,14 @@ export default function DesignStudioApp() {
       const b = parseInt(hex.slice(4,6),16);
       return (r * 0.299 + g * 0.587 + b * 0.114) > 180;
     })();
-  const borderColor   = isLightShirt ? "rgba(0,0,0,0.55)"     : "rgba(234, 179, 8, 0.75)";
-  const labelColor    = isLightShirt ? "rgba(0,0,0,0.6)"       : "rgba(234,179,8,0.8)";
+  // Nếu áo màu sáng thì viền đậm (đen xám), màu tối thì viền sáng (vàng)
+  let borderColor   = isLightShirt ? "rgba(0,0,0,0.55)"     : "rgba(234, 179, 8, 0.75)";
+  let labelColor    = isLightShirt ? "rgba(0,0,0,0.6)"       : "rgba(234,179,8,0.8)";
+
+  if (shirtType === "hoodie" && shirtColor.toLowerCase() === "#8b4513") {
+    borderColor = "rgba(0,0,0,0.65)";
+    labelColor = "rgba(0,0,0,0.8)";
+  }
 
   /* ── Zoom controls ── */
   const zoomIn    = () => setZoom((z) => Math.min(+(z + 0.25).toFixed(2), 3));
@@ -316,11 +371,14 @@ export default function DesignStudioApp() {
 
   return (
     <div className="ds-root">
-      <Toolbar 
-        onSave={handleSaveClick} 
-        onDownloadImage={handleDownloadImage} 
-        onShowToast={showToast} 
+      <Toolbar
+        onSave={handleSaveClick}
+        onDownloadImage={handleDownloadImage}
+        onShowToast={showToast}
         onOpenMyDesigns={() => setIsMyDesignsOpen(true)}
+        onNewDesign={handleNewDesign}
+        onAddToCart={() => setIsCartModalOpen(true)}
+        onViewCart={() => setIsCartDrawerOpen(true)}
         isSaving={isSaving}
       />
 
@@ -332,152 +390,171 @@ export default function DesignStudioApp() {
           onAddImageToCanvas={handleAddImageToCanvas}
         />
 
-        {/* ─── Workspace ─── */}
-        <div className="ds-workspace-container" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+        {/* ─── Khu vực làm việc chính (áo + canvas thiết kế) ─── */}
+        <div
+          className="ds-workspace-container"
+          style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}
+        >
           <StaticTextToolbar />
-          
-          <div className="ds-workspace" style={{ flex: 1, position: 'relative' }}>
+
+          <div className="ds-workspace" style={{ flex: 1, position: "relative" }}>
             {/*
-              ──────────────────────────────────────────────────
-              DOM LAYERING (từ dưới lên):
+              ─────────────────────────────────────────────
+              Các lớp DOM chồng lên nhau (từ dưới lên trên):
                 L1: <img> ảnh áo (pointer-events: none)
-                L2: Konva Stage (phủ toàn bộ L1, clip nội bộ)
-                L3: Viền nét đứt vùng in (pointer-events: none)
-              ──────────────────────────────────────────────────
+                L2: Konva Stage (phủ toàn bộ L1, tự clip nội dung bên trong)
+                L3: Viền nét đứt đánh dấu vùng in (pointer-events: none)
+              ─────────────────────────────────────────────
             */}
             <div
               id="print_body-image"
-            ref={shirtContainerRef}
-            style={{
-              position:   "relative",
-              width:      displayW,
-              height:     displayH,
-              flexShrink: 0,
-            }}
-          >
-            {/* L1: Ảnh áo thật */}
-            <ShirtMockupImage
-              type={shirtType} view={shirtView} color={shirtColor}
-              width={displayW}  height={displayH}
-            />
+              ref={shirtContainerRef}
+              style={{
+                position: "relative",
+                width: displayW,
+                height: displayH,
+                flexShrink: 0,
+              }}
+            >
+              {/* L1: Ảnh áo thật (theo loại áo / mặt / màu đang chọn) */}
+              <ShirtMockupImage
+                type={shirtType}
+                view={shirtView}
+                color={shirtColor}
+                width={displayW}
+                height={displayH}
+              />
 
-            {/*
-              L2: Konva Stage – phủ toàn bộ kích thước áo.
-              Stage dùng scaleX/Y = zoom để element vẫn dùng
-              tọa độ logic (0..CONTAINER_W, 0..CONTAINER_H).
-              Clip ảnh/chữ được xử lý BÊN TRONG bởi Group clipX/Y
-              → Transformer KHÔNG bị cắt.
-            */}
-            <CanvasEditor
-              stageRef={stageRef}
-              printArea={printAreaForCanvas}
-              containerW={CONTAINER_W}
-              containerH={CONTAINER_H}
-              zoom={zoom}
-              clipPoints={polygonPoints}
-            />
+              {/*
+                L2: Konva Stage – phủ toàn bộ kích thước áo.
+                Stage dùng scaleX/Y = zoom để các phần tử vẫn giữ nguyên
+                tọa độ logic (0..CONTAINER_W, 0..CONTAINER_H) bất kể zoom.
+                Việc clip ảnh/chữ theo vùng in được xử lý BÊN TRONG bởi
+                Group clipX/Y để Transformer (khung xoay/resize) không bị cắt theo.
+              */}
+              <CanvasEditor
+                stageRef={stageRef}
+                printArea={printAreaForCanvas}
+                containerW={CONTAINER_W}
+                containerH={CONTAINER_H}
+                zoom={zoom}
+                clipPoints={polygonPoints}
+              />
 
-            {/* L3: Viền nét đứt vùng in */}
-            {usePolygon && polygonPoints ? (
-              /* SVG polygon — vẽ chính xác hình khoét cổ cho polo */
-              <svg
-                className="ds-print-boundary"
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: displayW,
-                  height: displayH,
-                  pointerEvents: "none",
-                  zIndex: 3,
-                  overflow: "visible",
-                }}
-              >
-                {/* Nhãn "VÙNG IN" */}
-                <text
-                  x={polygonPoints[0][0] * zoom}
-                  y={polygonPoints[0][1] * zoom - 5}
-                  fontSize="10"
-                  fontWeight="600"
-                  fill={labelColor}
-                  letterSpacing="0.05em"
-                  style={{ userSelect: "none" }}
+              {/* L3: Viền nét đứt đánh dấu vùng in được phép thiết kế */}
+              {usePolygon && polygonPoints ? (
+                /* Áo polo mặt trước có khoét cổ → vẽ viền bằng SVG polygon cho chính xác */
+                <svg
+                  className="ds-print-boundary"
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: displayW,
+                    height: displayH,
+                    pointerEvents: "none",
+                    zIndex: 3,
+                    overflow: "visible",
+                  }}
                 >
-                  VÙNG IN
-                </text>
-                {/* Path polygon */}
-                <polygon
-                  points={polygonPoints
-                    .map(([x, y]) => `${x * zoom},${y * zoom}`)
-                    .join(" ")}
-                  fill="none"
-                  stroke={borderColor}
-                  strokeWidth="1.5"
-                  strokeDasharray="6 4"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            ) : (
-              /* Rectangle — tất cả loại áo khác */
-              <div 
-                className="ds-print-boundary"
-                style={{
-                  position:  "absolute",
-                  top:       pa.top   * zoom,
-                  left:      pa.left  * zoom,
-                  width:     pa.width * zoom,
-                  height:    pa.height * zoom,
-                  border:    `1.5px dashed ${borderColor}`,
-                  borderRadius: 4,
-                  pointerEvents: "none",
-                  zIndex:    3,
-                  boxSizing: "border-box",
-                }}
-              >
-                <span style={{
-                  position: "absolute",
-                  top: -18,
-                  left: 0,
-                  fontSize: 10,
-                  color: labelColor,
-                  fontWeight: 600,
-                  letterSpacing: "0.05em",
-                  pointerEvents: "none",
-                  userSelect: "none",
-                  whiteSpace: "nowrap",
-                }}>VÙNG IN</span>
-              </div>
-            )}
+                  {/* Nhãn "VÙNG IN" */}
+                  <text
+                    x={polygonPoints[0][0] * zoom}
+                    y={polygonPoints[0][1] * zoom - 5}
+                    fontSize="10"
+                    fontWeight="600"
+                    fill={labelColor}
+                    letterSpacing="0.05em"
+                    style={{ userSelect: "none" }}
+                  >
+                    VÙNG IN
+                  </text>
+                  {/* Đường viền nét đứt theo hình khoét cổ */}
+                  <polygon
+                    points={polygonPoints
+                      .map(([x, y]) => `${x * zoom},${y * zoom}`)
+                      .join(" ")}
+                    fill="none"
+                    stroke={borderColor}
+                    strokeWidth="1.5"
+                    strokeDasharray="6 4"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ) : (
+                /* Các loại áo/mặt còn lại → vùng in là hình chữ nhật đơn giản */
+                <div
+                  className="ds-print-boundary"
+                  style={{
+                    position: "absolute",
+                    top: pa.top * zoom,
+                    left: pa.left * zoom,
+                    width: pa.width * zoom,
+                    height: pa.height * zoom,
+                    border: `1.5px dashed ${borderColor}`,
+                    borderRadius: 4,
+                    pointerEvents: "none",
+                    zIndex: 3,
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: -18,
+                      left: 0,
+                      fontSize: 10,
+                      color: labelColor,
+                      fontWeight: 600,
+                      letterSpacing: "0.05em",
+                      pointerEvents: "none",
+                      userSelect: "none",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    VÙNG IN
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Zoom controls */}
+          {/* Nút điều khiển zoom */}
           <div className="ds-zoom-controls">
             <button className="ds-zoom-btn" onClick={zoomOut} title="Thu nhỏ">−</button>
             <button className="ds-zoom-label" onClick={zoomReset} title="Reset về 100%">
-              {Math.round(zoom / 1.75 * 100)}%
+              {Math.round((zoom / 1.75) * 100)}%
             </button>
-            <button className="ds-zoom-btn" onClick={zoomIn}  title="Phóng to">+</button>
+            <button className="ds-zoom-btn" onClick={zoomIn} title="Phóng to">+</button>
           </div>
 
-          {/* ── Phụ phí thiết kế real-time ── */}
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            padding: "6px 16px",
-            background: "rgba(0,0,0,0.35)",
-            borderRadius: 8,
-            marginTop: 8,
-            fontSize: 13,
-            color: "#f1f5f9",
-          }}>
+          {/* Hiển thị phụ phí thiết kế theo thời gian thực, cập nhật mỗi khi elements thay đổi */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              padding: "6px 16px",
+              background: "rgba(0,0,0,0.35)",
+              borderRadius: 8,
+              marginTop: 8,
+              fontSize: 13,
+              color: "#f1f5f9",
+            }}
+          >
             <span style={{ opacity: 0.65 }}>Phụ phí thiết kế:</span>
-            <span style={{
-              fontWeight: 700,
-              color: designFeeInfo.fee === 0 ? "#4ade80" : designFeeInfo.fee === 30000 ? "#facc15" : "#f87171",
-            }}>
+            <span
+              style={{
+                fontWeight: 700,
+                color:
+                  designFeeInfo.fee === 0
+                    ? "#4ade80"
+                    : designFeeInfo.fee === 30000
+                    ? "#facc15"
+                    : "#f87171",
+              }}
+            >
               {designFeeInfo.fee === 0 ? "Miễn phí" : `+${designFeeInfo.fee.toLocaleString("vi-VN")}đ`}
             </span>
             <span style={{ opacity: 0.45, fontSize: 11 }}>
@@ -485,29 +562,28 @@ export default function DesignStudioApp() {
             </span>
           </div>
 
-            {/* Shortcut hints */}
-            <div className="ds-shortcut-hint">
-              <span><kbd>Ctrl+Z</kbd> Hoàn tác</span>
-              <span><kbd>Ctrl+S</kbd> Lưu</span>
-              <span><kbd>Del</kbd> Xóa</span>
-            </div>
-          </div>
-
-          {/* Right rail: Layers + Properties stacked */}
-          <div className="ds-right-rail">
-            <LayersPanel />
-            <PropertiesPanel />
+          {/* Gợi ý phím tắt */}
+          <div className="ds-shortcut-hint">
+            <span><kbd>Ctrl+Z</kbd> Hoàn tác</span>
+            <span><kbd>Ctrl+S</kbd> Lưu</span>
+            <span><kbd>Del</kbd> Xóa</span>
           </div>
         </div>
 
-      {/* Floating Toolbars for element properties */}
+        {/* Cột bên phải: bảng lớp (layers) và bảng thuộc tính (properties) */}
+        <div className="ds-right-rail">
+          <LayersPanel />
+          <PropertiesPanel />
+        </div>
+      </div>
+
+      {/* Thanh công cụ nổi hiện khi chọn phần tử (đổi màu, cỡ chữ, xoay...) */}
       <FloatingToolbar
         shirtContainerRef={shirtContainerRef}
         zoom={zoom}
       />
-      <StaticTextToolbar />
 
-      {/* Modals */}
+      {/* Các modal / drawer */}
       <SaveDesignModal
         open={isSaveModalOpen}
         initialName={useDesignStore.getState().designName}
@@ -520,6 +596,19 @@ export default function DesignStudioApp() {
         open={isMyDesignsOpen}
         onCancel={() => setIsMyDesignsOpen(false)}
         onSelectDesign={handleLoadDesign}
+      />
+
+      <AddToCartModal
+        open={isCartModalOpen}
+        onClose={() => setIsCartModalOpen(false)}
+        productId={urlProductId ?? SHIRT_TO_PRODUCT_ID[shirtType] ?? 1}
+        shirtColor={colorName || shirtColor}
+        designId={currentDesignId ?? undefined}
+      />
+
+      <CartDrawer
+        open={isCartDrawerOpen}
+        onClose={() => setIsCartDrawerOpen(false)}
       />
 
       <div className={`ds-toast ${toast ? "ds-toast--visible" : ""}`}>{toast}</div>

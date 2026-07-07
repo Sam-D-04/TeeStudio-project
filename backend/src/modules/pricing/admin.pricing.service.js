@@ -144,8 +144,9 @@ const calculateDesignQuote = async ({
  *   - Đối chiếu với 3 bậc giá để trả về designFee.
  *
  * Bậc giá:
- *   - Mức 1: Bao phủ <= 100 cm²  → 0đ       (Cụm logo/chữ nhỏ)
- *   - Mức 2: Bao phủ <= 600 cm²  → 30.000đ  (Hình in cỡ A4)
+ *   - Không in gì: 0đ
+ *   - Mức 1: Bao phủ <= 100 cm²  → 20.000đ  (Logo nhỏ)
+ *   - Mức 2: Bao phủ <= 600 cm²  → 40.000đ  (Hình tầm trung)
  *   - Mức 3: Bao phủ >  600 cm²  → 60.000đ  (Hình in tràn áo)
  *
  * @param {object|string} canvasData - Dữ liệu JSON của canvas (có thể là object hoặc string)
@@ -154,10 +155,17 @@ const calculateDesignQuote = async ({
 const PIXELS_PER_CM = 4.67;
 
 const FEE_TIERS = [
-  { maxAreaCm2: 100, fee: 0 },
-  { maxAreaCm2: 600, fee: 30000 },
+  { maxAreaCm2: 100, fee: 20000 },
+  { maxAreaCm2: 600, fee: 40000 },
 ];
 const FEE_MAX = 60000;
+
+const getFeeForArea = (areaCm2) => {
+  for (const tier of FEE_TIERS) {
+    if (areaCm2 <= tier.maxAreaCm2) return tier.fee;
+  }
+  return FEE_MAX;
+};
 
 const calculateBoundingBoxAreaFee = (canvasData) => {
   try {
@@ -195,16 +203,27 @@ const calculateBoundingBoxAreaFee = (canvasData) => {
       if (y2 > maxY) maxY = y2;
     });
 
-    // Tính Bounding Box (px) và đổi sang cm²
+    // Cách 1: Tính diện tích Bounding Box (px) và đổi sang cm²
     const boundingWidthCm  = Math.max(0, maxX - minX) / PIXELS_PER_CM;
     const boundingHeightCm = Math.max(0, maxY - minY) / PIXELS_PER_CM;
-    const totalAreaCm2     = boundingWidthCm * boundingHeightCm;
+    const bboxAreaCm2      = boundingWidthCm * boundingHeightCm;
+    const bboxFee          = getFeeForArea(bboxAreaCm2);
 
-    // Đối chiếu bậc giá
-    for (const tier of FEE_TIERS) {
-      if (totalAreaCm2 <= tier.maxAreaCm2) return tier.fee;
-    }
-    return FEE_MAX;
+    // Cách 2: Tính tổng diện tích rời rạc của từng item
+    let sumOfIndividualAreasCm2 = 0;
+    items.forEach((item) => {
+      const scaleX = item.scaleX ?? 1;
+      const scaleY = item.scaleY ?? 1;
+      const w      = (item.width  ?? item.w ?? 0) * scaleX;
+      const h      = (item.height ?? item.h ?? 0) * scaleY;
+      
+      const areaCm2 = (w / PIXELS_PER_CM) * (h / PIXELS_PER_CM);
+      sumOfIndividualAreasCm2 += areaCm2;
+    });
+    const individualSumFee = getFeeForArea(sumOfIndividualAreasCm2);
+
+    // Lấy mức giá rẻ hơn cho khách hàng
+    return Math.min(bboxFee, individualSumFee);
 
   } catch (err) {
     console.error('[pricing] calculateBoundingBoxAreaFee error:', err.message);

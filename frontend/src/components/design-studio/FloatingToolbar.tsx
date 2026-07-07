@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useDesignStore } from "@/store/useDesignStore";
 
-/* ─── Icons ─── */
+/* ─── Các icon dùng trong toolbar ─── */
 const DuplicateIcon = () => (
   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <rect x="9" y="9" width="13" height="13" rx="2" />
@@ -31,7 +31,7 @@ const DeleteIcon = () => (
   </svg>
 );
 
-/* ─── Button style ─── */
+/* ─── Nút bấm dùng chung trong toolbar ─── */
 function ToolBtn({
   title, onClick, danger, active, children,
 }: {
@@ -75,7 +75,7 @@ const Divider = () => (
   <div style={{ width: 1, height: 18, background: "#334155", flexShrink: 0 }} />
 );
 
-/* ─── FloatingToolbar ─── */
+/* ─── Component chính: FloatingToolbar ─── */
 interface Props {
   /** ref của div bao quanh ảnh áo (id="print_body-image") */
   shirtContainerRef: React.RefObject<HTMLDivElement | null>;
@@ -85,17 +85,28 @@ interface Props {
 
 interface ToolbarPos { x: number; y: number; }
 
-const TOOLBAR_W = 112;
+const TOOLBAR_W = 180;
 const TOOLBAR_H = 36;
 const MARGIN    = 10;
 
+/* ─── Icon lật ngang / lật dọc (chỉ dùng cho ảnh) ─── */
+const FlipHIcon = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18M7 7l-4 4 4 4M17 7l4 4-4 4" />
+  </svg>
+);
+const FlipVIcon = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h18M7 7l4-4 4 4M7 17l4 4 4-4" />
+  </svg>
+);
+
 export default function FloatingToolbar({ shirtContainerRef, zoom }: Props) {
-  const { selectedId, elements, duplicateElement, removeElement, toggleLock } =
+  const { selectedId, elements, duplicateElement, removeElement, toggleLock, updateElement, pushHistory } =
     useDesignStore();
 
   const el = elements.find((e) => e.id === selectedId) ?? null;
   const [pos, setPos] = useState<ToolbarPos | null>(null);
-  const rafRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (!el) { setPos(null); return; }
@@ -132,7 +143,6 @@ export default function FloatingToolbar({ shirtContainerRef, zoom }: Props) {
     return () => {
       window.removeEventListener("resize", compute);
       window.removeEventListener("scroll", compute, true);
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [el, zoom, shirtContainerRef]);
 
@@ -167,6 +177,27 @@ export default function FloatingToolbar({ shirtContainerRef, zoom }: Props) {
       </ToolBtn>
 
       <Divider />
+
+      {/* Flip — chỉ cho image */}
+      {el.type === "image" && (
+        <>
+          <ToolBtn
+            title="Lật ngang"
+            active={el.flipH}
+            onClick={() => { pushHistory(); updateElement(el.id, { flipH: !(el.flipH ?? false) }); }}
+          >
+            <FlipHIcon />
+          </ToolBtn>
+          <ToolBtn
+            title="Lật dọc"
+            active={el.flipV}
+            onClick={() => { pushHistory(); updateElement(el.id, { flipV: !(el.flipV ?? false) }); }}
+          >
+            <FlipVIcon />
+          </ToolBtn>
+          <Divider />
+        </>
+      )}
 
       <ToolBtn
         title={el.locked ? "Mở khoá" : "Khoá vật thể"}

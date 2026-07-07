@@ -9,21 +9,30 @@ const db = require("../../database/mysql");
 // SERVICE 1: Lấy danh sách phôi áo (theo form: tshirt, polo, hoodie)
 // Dùng cho section "Tạo thiết kế mới" ở trang chủ (ProductCategories)
 // =====================================================================
-async function layDanhSachSanPhamCongKhai() {
-  const [rows] = await db.pool.query(`
-    SELECT
-      p.id,
-      p.name,
-      p.form,
-      p.basePrice,
-      p.material,
-      c.name AS categoryName,
-      (SELECT imageUrl FROM ProductImage pi WHERE pi.productId = p.id AND pi.isPrimary = 1 LIMIT 1) AS imageUrl
-    FROM Product p
-    LEFT JOIN Category c ON c.id = p.categoryId
-    WHERE p.status = 'ACTIVE'
-    ORDER BY p.id ASC
-  `);
+async function layDanhSachSanPhamCongKhai(search) {
+  const params = [];
+  let whereExtra = "";
+  if (search && search.trim()) {
+    whereExtra = " AND (p.name LIKE ? OR p.material LIKE ? OR c.name LIKE ?)";
+    const like = `%${search.trim()}%`;
+    params.push(like, like, like);
+  }
+
+  const [rows] = await db.pool.query(
+    `SELECT
+       p.id,
+       p.name,
+       p.form,
+       p.basePrice,
+       p.material,
+       c.name AS categoryName,
+       (SELECT imageUrl FROM ProductImage pi WHERE pi.productId = p.id AND pi.isPrimary = 1 LIMIT 1) AS imageUrl
+     FROM Product p
+     LEFT JOIN Category c ON c.id = p.categoryId
+     WHERE p.status = 'ACTIVE'${whereExtra}
+     ORDER BY p.id ASC`,
+    params
+  );
   return rows;
 }
 

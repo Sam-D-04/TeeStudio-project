@@ -184,23 +184,6 @@ export default function ProductCategoriesClient({ products }: Props) {
                     position:       "relative",
                   }}
                 >
-                  {/* Badge */}
-                  <span
-                    style={{
-                      position:     "absolute",
-                      top:          14,
-                      left:         14,
-                      background:   ui.badgeBg,
-                      color:        ui.badgeColor,
-                      fontSize:     11,
-                      fontWeight:   700,
-                      borderRadius: 20,
-                      padding:      "3px 10px",
-                      letterSpacing:"0.3px",
-                    }}
-                  >
-                    {ui.badge}
-                  </span>
 
                   {/* Vector shirt or real mockup */}
                   <div style={{ width: product.imageUrl ? "100%" : (ui.mockupImg ? "70%" : "80%"), maxWidth: product.imageUrl ? 180 : (ui.mockupImg ? 150 : 130), animation: "float 3.5s ease-in-out infinite" }}>
