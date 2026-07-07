@@ -365,6 +365,99 @@ async function layChiTietThietKe(id) {
 }
 
 // =====================================================================
+// SERVICE 2.2: Lấy dữ liệu nguồn của thiết kế cho workspace admin
+// GET /api/admin/designs/:id/editor
+//
+// Endpoint này chỉ đọc dữ liệu. canvasData được giữ trung lập để không ràng
+// buộc module admin vào schema đang được phía Design Studio khách hàng bảo trì.
+// =====================================================================
+async function layDuLieuEditorThietKe(id) {
+  const [rows] = await db.pool.query(
+    `SELECT
+       cd.id,
+       cd.userId,
+       cd.name,
+       cd.productId,
+       cd.variantId,
+       cd.baseColor,
+       cd.canvasData,
+       cd.previewUrl,
+       cd.designFee,
+       cd.status,
+       cd.adminNote,
+       cd.createdAt,
+       cd.updatedAt,
+       a.fullName AS customerName,
+       a.email AS customerEmail,
+       a.phone AS customerPhone,
+       p.name AS productName,
+       p.slug AS productSlug,
+       p.form AS productForm,
+       pv.color AS variantColor,
+       pv.size AS variantSize,
+       pv.sku AS variantSku
+     FROM CustomDesign cd
+     JOIN Account a ON a.id = cd.userId
+     JOIN Product p ON p.id = cd.productId
+     LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
+     WHERE cd.id = ?
+     LIMIT 1`,
+    [id]
+  );
+
+  if (!rows.length) {
+    throw taoLoi("Không tìm thấy thiết kế", 404);
+  }
+
+  const row = rows[0];
+  let canvasData = row.canvasData ?? null;
+  let canvasDataState = canvasData === null ? "EMPTY" : "VALID";
+
+  if (typeof canvasData === "string") {
+    try {
+      canvasData = JSON.parse(canvasData);
+    } catch {
+      canvasDataState = "INVALID_JSON";
+    }
+  }
+
+  return {
+    id: row.id,
+    designCode: `TK-${String(row.id).padStart(4, "0")}`,
+    name: row.name || "Thiết kế chưa đặt tên",
+    owner: {
+      id: row.userId,
+      fullName: row.customerName || "Khách hàng",
+      email: row.customerEmail || null,
+      phone: row.customerPhone || null,
+    },
+    product: {
+      id: row.productId,
+      name: row.productName,
+      slug: row.productSlug || null,
+      form: row.productForm || null,
+    },
+    variant: row.variantId
+      ? {
+          id: row.variantId,
+          color: row.variantColor || null,
+          size: row.variantSize || null,
+          sku: row.variantSku || null,
+        }
+      : null,
+    baseColor: row.baseColor || null,
+    canvasData,
+    canvasDataState,
+    previewUrl: row.previewUrl || null,
+    designFee: Number(row.designFee || 0),
+    status: row.status,
+    adminNote: row.adminNote || null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+// =====================================================================
 // SERVICE 3: Duyệt thiết kế
 // PATCH /api/admin/designs/:id/duyet
 // =====================================================================
@@ -760,6 +853,7 @@ module.exports = {
   layThongKe,
   layDanhSachThietKe,
   layChiTietThietKe,
+  layDuLieuEditorThietKe,
   duyetThietKe,
   yeuCauChinhSua,
   layDanhSachDonCanIn,

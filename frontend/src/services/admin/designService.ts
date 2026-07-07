@@ -36,6 +36,42 @@ export type ChiTietThietKe = ThietKe & {
   ghiChu: string | null;
 };
 
+export type TrangThaiDuLieuCanvas = "VALID" | "EMPTY" | "INVALID_JSON";
+
+/** Dữ liệu nguồn chỉ đọc, chuẩn bị cho workspace thiết kế phía admin. */
+export type DuLieuEditorThietKe = {
+  id: number;
+  designCode: string;
+  name: string;
+  owner: {
+    id: number;
+    fullName: string;
+    email: string | null;
+    phone: string | null;
+  };
+  product: {
+    id: number;
+    name: string;
+    slug: string | null;
+    form: string | null;
+  };
+  variant: {
+    id: number;
+    color: string | null;
+    size: string | null;
+    sku: string | null;
+  } | null;
+  baseColor: string | null;
+  canvasData: unknown;
+  canvasDataState: TrangThaiDuLieuCanvas;
+  previewUrl: string | null;
+  designFee: number;
+  status: string;
+  adminNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /** Kết quả danh sách thiết kế có phân trang */
 export type KetQuaThietKe = {
   danhSach: ThietKe[];
@@ -146,6 +182,17 @@ export async function layChiTietThietKe(id: number): Promise<ChiTietThietKe> {
   const res = await apiClient.get<{ success: boolean; data: ChiTietThietKe }>(
     `/admin/designs/${id}`
   );
+  return res.data.data;
+}
+
+/** Lấy dữ liệu nguồn chỉ đọc cho workspace admin; không làm thay đổi thiết kế. */
+export async function layDuLieuEditorThietKe(
+  id: number
+): Promise<DuLieuEditorThietKe> {
+  const res = await apiClient.get<{
+    success: boolean;
+    data: DuLieuEditorThietKe;
+  }>(`/admin/designs/${id}/editor`);
   return res.data.data;
 }
 

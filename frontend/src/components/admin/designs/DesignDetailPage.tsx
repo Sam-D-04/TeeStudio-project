@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, CodeOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
@@ -40,7 +40,17 @@ export default function DesignDetailPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Thiết kế khách hàng</p>
               <h2 className="mt-1 text-2xl font-extrabold text-text-main">{data.maThietKe}</h2>
             </div>
-            <DesignStatusBadge trangThai={data.trangThai} />
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => router.push(`/admin/thiet-ke/${id}/du-lieu`)}
+                className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold text-text-main transition-colors hover:border-primary-container hover:text-primary-container"
+              >
+                <CodeOutlined />
+                Kiểm tra dữ liệu thiết kế
+              </button>
+              <DesignStatusBadge trangThai={data.trangThai} />
+            </div>
           </header>
 
           <div className="grid gap-6 p-6 md:grid-cols-[220px_1fr]">
