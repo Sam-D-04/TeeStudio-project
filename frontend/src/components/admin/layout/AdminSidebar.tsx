@@ -2,6 +2,7 @@
 
 import {
   AppstoreOutlined,
+  BarChartOutlined,
   BgColorsOutlined,
   CloseOutlined,
   CreditCardOutlined,
@@ -34,6 +35,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { label: "Tổng quan", icon: <DashboardOutlined />, href: "/admin", allowedRoles: ["ADMIN"] },
+  { label: "Thống kê", icon: <BarChartOutlined />, href: "/admin/thong-ke", allowedRoles: ["ADMIN"] },
   { label: "Đơn hàng", icon: <ShoppingCartOutlined />, href: "/admin/don-hang", allowedRoles: ["ADMIN", "PRODUCTION"] },
   { label: "Sản phẩm / Phôi áo", icon: <SkinOutlined />, href: "/admin/san-pham-phoi-ao", allowedRoles: ["ADMIN", "WAREHOUSE"] },
   { label: "Thiết kế & In ấn", icon: <BgColorsOutlined />, href: "/admin/thiet-ke", allowedRoles: ["ADMIN", "PRODUCTION"] },
