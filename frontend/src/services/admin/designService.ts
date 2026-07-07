@@ -196,35 +196,6 @@ export async function layDuLieuEditorThietKe(
   return res.data.data;
 }
 
-/**
- * Duyệt thiết kế (chuyển sang "Đã duyệt").
- * PATCH /api/admin/designs/:id/duyet
- */
-export async function duyetThietKe(
-  id: number
-): Promise<{ id: number; maThietKe: string; trangThai: string }> {
-  const res = await apiClient.patch<{
-    success: boolean;
-    data: { id: number; maThietKe: string; trangThai: string };
-  }>(`/admin/designs/${id}/duyet`);
-  return res.data.data;
-}
-
-/**
- * Yêu cầu khách chỉnh sửa thiết kế.
- * PATCH /api/admin/designs/:id/yeu-cau-chinh-sua
- */
-export async function yeuCauChinhSua(
-  id: number,
-  ghiChu?: string
-): Promise<{ id: number; trangThai: string }> {
-  const res = await apiClient.patch<{
-    success: boolean;
-    data: { id: number; trangThai: string };
-  }>(`/admin/designs/${id}/yeu-cau-chinh-sua`, { ghiChu: ghiChu || "" });
-  return res.data.data;
-}
-
 // ─── ĐƠN CẦN IN ────────────────────────────────────────────────────────────
 
 /**

@@ -712,6 +712,8 @@ async function layChiTietDonHang(id) {
        pi_img.imageUrl AS anhUrl,
        cd.previewUrl AS anhXemTruocThietKe,
        cd.baseColor,
+       cd.status AS designStatus,
+       cd.adminNote AS designAdminNote,
        (
          SELECT GROUP_CONCAT(DISTINCT pp2.name ORDER BY pp2.name SEPARATOR ', ')
          FROM DesignPrintPosition dpp2
@@ -753,6 +755,8 @@ async function layChiTietDonHang(id) {
     productId: item.productId,
     variantId: item.variantId,
     designId: item.designId || null,
+    designStatus: item.designStatus || null,
+    designAdminNote: item.designAdminNote || null,
     productionStatus: item.productionStatus || null,
     tenSanPham: item.tenSanPham || "Sản phẩm",
     mauSac: item.color || "",
@@ -926,19 +930,61 @@ async function capNhatTrangThai(id, trangThaiFE, actor, shippingInfo = {}) {
     }
 
     if (trangThaiDB === "CONFIRMED") {
-      const [rowsThietKeChuaDuyet] = await conn.query(
-        `SELECT COUNT(*) AS soLuong
+      // Xác nhận đơn cũng chính là thao tác duyệt thiết kế. Khóa các thiết kế
+      // thuộc đơn để trạng thái đơn, thiết kế và hàng chờ in luôn đồng bộ.
+      const [rowsThietKe] = await conn.query(
+        `SELECT oi.id AS orderItemId, oi.designId, cd.previewUrl
          FROM OrderItem oi
          LEFT JOIN CustomDesign cd ON cd.id = oi.designId
-         WHERE oi.orderId = ?
-           AND oi.designId IS NOT NULL
-           AND (cd.id IS NULL OR cd.status <> 'APPROVED')`,
+         WHERE oi.orderId = ? AND oi.designId IS NOT NULL
+         FOR UPDATE`,
         [id]
       );
-      if (Number(rowsThietKeChuaDuyet[0].soLuong) > 0) {
+
+      const thietKeKhongHopLe = rowsThietKe.find(
+        (row) => !row.designId || !row.previewUrl
+      );
+      if (thietKeKhongHopLe) {
         throw taoLoiCoStatus(
-          "Chỉ có thể xác nhận đơn hàng sau khi tất cả thiết kế đã được duyệt",
+          "Không thể xác nhận đơn vì có thiết kế không tồn tại hoặc chưa có ảnh preview",
           400
+        );
+      }
+
+      const designIds = [...new Set(rowsThietKe.map((row) => row.designId))];
+      if (designIds.length > 0) {
+        await conn.query(
+          `UPDATE CustomDesign
+           SET status = 'APPROVED', adminNote = NULL
+           WHERE id IN (?)`,
+          [designIds]
+        );
+
+        await conn.query(
+          `UPDATE OrderItem
+           SET productionStatus = 'READY_TO_PRINT'
+           WHERE orderId = ? AND designId IS NOT NULL`,
+          [id]
+        );
+
+        await conn.query(
+          `INSERT INTO OrderProduction (orderItemId, designId, status, approvedAt)
+           SELECT oi.id, oi.designId, 'APPROVED', NOW()
+           FROM OrderItem oi
+           WHERE oi.orderId = ?
+             AND oi.designId IS NOT NULL
+             AND NOT EXISTS (
+               SELECT 1 FROM OrderProduction op WHERE op.orderItemId = oi.id
+             )`,
+          [id]
+        );
+
+        await conn.query(
+          `UPDATE OrderProduction op
+           JOIN OrderItem oi ON oi.id = op.orderItemId
+           SET op.status = 'APPROVED', op.approvedAt = COALESCE(op.approvedAt, NOW())
+           WHERE oi.orderId = ?`,
+          [id]
         );
       }
     }
@@ -1071,6 +1117,88 @@ async function capNhatTrangThai(id, trangThaiFE, actor, shippingInfo = {}) {
   }
 
   return { id: Number(id), trangThai: trangThaiFE };
+}
+
+// =====================================================================
+// SERVICE 4.1: Yêu cầu chỉnh sửa thiết kế của đơn đang chờ xác nhận
+// =====================================================================
+async function yeuCauChinhSuaThietKeDonHang(id, ghiChu, actor) {
+  const noiDung = String(ghiChu || "").trim();
+  if (noiDung.length < 5) {
+    throw taoLoiCoStatus("Ghi chú yêu cầu chỉnh sửa phải có ít nhất 5 ký tự", 400);
+  }
+
+  return db.transaction(async (conn) => {
+    const [rowsDonHang] = await conn.query(
+      `SELECT id, status
+       FROM CustomerOrder
+       WHERE id = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [id]
+    );
+    if (rowsDonHang.length === 0) {
+      throw taoLoiCoStatus("Không tìm thấy đơn hàng", 404);
+    }
+    if (rowsDonHang[0].status !== "PENDING") {
+      throw taoLoiCoStatus(
+        "Chỉ có thể yêu cầu chỉnh sửa thiết kế khi đơn đang ở trạng thái Chờ xác nhận",
+        400
+      );
+    }
+
+    const [rowsThietKe] = await conn.query(
+      `SELECT cd.id
+       FROM OrderItem oi
+       JOIN CustomDesign cd ON cd.id = oi.designId
+       WHERE oi.orderId = ?
+       FOR UPDATE`,
+      [id]
+    );
+    if (rowsThietKe.length === 0) {
+      throw taoLoiCoStatus("Đơn hàng không có thiết kế để yêu cầu chỉnh sửa", 400);
+    }
+
+    const designIds = [...new Set(rowsThietKe.map((row) => row.id))];
+    await conn.query(
+      `UPDATE CustomDesign
+       SET status = 'NEEDS_REVISION', adminNote = ?
+       WHERE id IN (?)`,
+      [noiDung, designIds]
+    );
+    await conn.query(
+      `UPDATE OrderItem
+       SET productionStatus = 'WAITING_DESIGN_APPROVAL'
+       WHERE orderId = ? AND designId IS NOT NULL`,
+      [id]
+    );
+    // Dữ liệu cũ có thể đã tạo hàng chờ in sớm. Loại bỏ để đơn PENDING
+    // không xuất hiện trong danh sách sản xuất.
+    await conn.query(
+      `DELETE op
+       FROM OrderProduction op
+       JOIN OrderItem oi ON oi.id = op.orderItemId
+       WHERE oi.orderId = ?`,
+      [id]
+    );
+
+    await ghiOrderHistory(conn, {
+      orderId: Number(id),
+      fromStatus: "PENDING",
+      toStatus: "PENDING",
+      action: "DESIGN_REVISION_REQUESTED",
+      actor,
+      note: `Yêu cầu khách chỉnh sửa thiết kế: ${noiDung}`,
+    });
+
+    return {
+      id: Number(id),
+      trangThai: "cho_xac_nhan",
+      designIds,
+      designStatus: "NEEDS_REVISION",
+      ghiChu: noiDung,
+    };
+  });
 }
 
 // =====================================================================
@@ -1400,6 +1528,7 @@ module.exports = {
   layDanhSachDonHang,
   layChiTietDonHang,
   capNhatTrangThai,
+  yeuCauChinhSuaThietKeDonHang,
   huyDonHang,
   capNhatDiaChiGiaoHang,
   taoLaiMaThanhToanOnline,
@@ -1555,8 +1684,8 @@ async function timKiemSanPham(keyword) {
 // GET /api/admin/orders/search/designs?userId=<id>&q=<keyword>
 // =====================================================================
 /**
- * Lấy danh sách CustomDesign đã APPROVED của khách hàng.
- * Admin chỉ có thể gán thiết kế đã được duyệt vào đơn mới.
+ * Lấy danh sách CustomDesign có thể gán vào đơn của khách hàng.
+ * Thiết kế nháp sẽ chuyển sang PENDING_REVIEW sau khi tạo đơn.
  */
 async function timKiemThietKe(userId, keyword) {
   const params = [userId];
@@ -1578,7 +1707,7 @@ async function timKiemThietKe(userId, keyword) {
      LEFT JOIN ProductImage pi ON pi.productId = p.id AND pi.isPrimary = 1
      LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
      WHERE cd.userId = ?
-       AND cd.status = 'APPROVED'
+       AND cd.status IN ('DRAFT', 'PENDING_REVIEW', 'NEEDS_REVISION', 'APPROVED')
        AND p.status = 'ACTIVE'
        AND (cd.variantId IS NULL OR pv.status IS NULL OR pv.status = 'ACTIVE')
        ${extraCondition}
@@ -1810,7 +1939,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
 
     const [rowsDesign] = await db.pool.query(
       `SELECT cd.id, cd.userId AS designUserId, cd.productId, cd.variantId,
-              cd.baseColor, cd.designFee, cd.status,
+              cd.baseColor, cd.designFee, cd.status, cd.previewUrl,
               pv.color AS designColor
        FROM CustomDesign cd
        LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
@@ -1833,11 +1962,21 @@ async function taoMoiDonHang(data, actor, ipAddress) {
       throw err;
     }
 
-    // Thiết kế phải đã được APPROVED
-    if (design.status !== "APPROVED") {
+    const designStatusesChoPhep = [
+      "DRAFT",
+      "PENDING_REVIEW",
+      "NEEDS_REVISION",
+      "APPROVED",
+    ];
+    if (!designStatusesChoPhep.includes(design.status)) {
       const err = new Error(
-        `Thiết kế ID=${enriched.designId} chưa được duyệt (trạng thái: ${design.status}). Chỉ thiết kế APPROVED mới được gán vào đơn`
+        `Thiết kế ID=${enriched.designId} không thể gán vào đơn ở trạng thái ${design.status}`
       );
+      err.statusCode = 400;
+      throw err;
+    }
+    if (!design.previewUrl) {
+      const err = new Error(`Thiết kế ID=${enriched.designId} chưa có ảnh preview`);
       err.statusCode = 400;
       throw err;
     }
@@ -1865,6 +2004,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
 
     // Gán designFee từ DB
     enriched.designFee = Number(design.designFee);
+    enriched.designStatus = design.status;
   }
 
   const hasCustomDesign = itemsEnriched.some((item) => Boolean(item.designId));
@@ -2081,7 +2221,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
         (item.unitPrice * item.quantity + item.designFee) * 100
       ) / 100;
 
-      const [resultItem] = await conn.query(
+      await conn.query(
         `INSERT INTO OrderItem
            (orderId, variantId, designId, quantity,
             unitPrice, designFee, lineTotal, productionStatus)
@@ -2094,17 +2234,18 @@ async function taoMoiDonHang(data, actor, ipAddress) {
           item.unitPrice,
           item.designFee,
           lineTotal,
-          item.designId ? "READY_TO_PRINT" : "WAITING_DESIGN_APPROVAL",
+          "WAITING_DESIGN_APPROVAL",
         ]
       );
-      const orderItemId = resultItem.insertId;
 
-      // Thiết kế đã được kiểm tra là APPROVED ở trên nên mặt hàng có thể vào hàng chờ xưởng ngay.
-      if (item.designId) {
+      // Thiết kế chỉ được đưa xuống xưởng sau khi admin xác nhận đơn.
+      // Ở thời điểm tạo đơn, mọi thiết kế đều đang chờ kiểm tra.
+      if (item.designId && item.designStatus !== "APPROVED") {
         await conn.query(
-          `INSERT INTO OrderProduction (orderItemId, designId, status)
-           VALUES (?, ?, 'APPROVED')`,
-          [orderItemId, item.designId]
+          `UPDATE CustomDesign
+           SET status = 'PENDING_REVIEW', adminNote = NULL
+           WHERE id = ?`,
+          [item.designId]
         );
       }
 

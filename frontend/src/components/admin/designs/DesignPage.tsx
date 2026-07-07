@@ -19,7 +19,7 @@
 
 import { useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   HighlightOutlined,
   PrinterOutlined,
@@ -67,7 +67,6 @@ type DesignPageProps = {
 // Component chính
 // ─────────────────────────────────────────────────────────────────────────────
 export default function DesignPage({ initialFilters }: DesignPageProps) {
-  const queryClient = useQueryClient();
   const router = useRouter();
 
   // ── State điều hướng tab ──
@@ -122,32 +121,6 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
     staleTime: 15_000,
   });
 
-  // ─── Mutation: Duyệt thiết kế ───────────────────────────────────────────
-  const mutationDuyet = useMutation({
-    mutationFn: (id: number) => designService.duyetThietKe(id),
-    onSuccess: () => {
-      // Reload lại cả danh sách và KPI
-      queryClient.invalidateQueries({ queryKey: ["thiet-ke-danh-sach"] });
-      queryClient.invalidateQueries({ queryKey: ["thiet-ke-thong-ke"] });
-    },
-    onError: (err: Error) => {
-      alert(`Lỗi khi duyệt thiết kế: ${err.message}`);
-    },
-  });
-
-  // ─── Mutation: Yêu cầu chỉnh sửa ────────────────────────────────────────
-  const mutationChinhSua = useMutation({
-    mutationFn: ({ id, ghiChu }: { id: number; ghiChu?: string }) =>
-      designService.yeuCauChinhSua(id, ghiChu),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["thiet-ke-danh-sach"] });
-      queryClient.invalidateQueries({ queryKey: ["thiet-ke-thong-ke"] });
-    },
-    onError: (err: Error) => {
-      alert(`Lỗi khi gửi yêu cầu chỉnh sửa: ${err.message}`);
-    },
-  });
-
   // ─── Xử lý thay đổi bộ lọc: reset về trang 1 ──────────────────────────
   function xuLyThayDoiBoDuc(boDucMoi: BoDucThietKe) {
     setBoDuc(boDucMoi);
@@ -190,25 +163,6 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
     setTabDangChon(tab);
     if (tab === "don_can_in" && !locTrangThaiDonIn) {
       setLocTrangThaiDonIn("cho_gui_xuong");
-    }
-  }
-
-  // ─── Xử lý duyệt thiết kế ──────────────────────────────────────────────
-  function xuLyDuyetThietKe(id: number) {
-    if (window.confirm("Bạn có chắc muốn duyệt thiết kế này?\nSau khi duyệt, đơn in sẽ được tạo tự động.")) {
-      mutationDuyet.mutate(id);
-    }
-  }
-
-  // ─── Xử lý yêu cầu chỉnh sửa ──────────────────────────────────────────
-  function xuLyYeuCauChinhSua(id: number) {
-    const ghiChu = window.prompt(
-      "Nhập ghi chú cho khách hàng (lý do cần chỉnh sửa):",
-      ""
-    );
-    if (ghiChu !== null) {
-      // null = nhấn Cancel; chuỗi rỗng = không nhập ghi chú nhưng vẫn gửi
-      mutationChinhSua.mutate({ id, ghiChu: ghiChu || undefined });
     }
   }
 
@@ -535,9 +489,6 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
               <DesignTable
                 danhSach={danhSachThietKe}
                 onXem={xuLyXemChiTiet}
-                onYeuCauChinhSua={xuLyYeuCauChinhSua}
-                onDuyet={xuLyDuyetThietKe}
-                dangXuLy={mutationDuyet.isPending || mutationChinhSua.isPending}
               />
             )}
 

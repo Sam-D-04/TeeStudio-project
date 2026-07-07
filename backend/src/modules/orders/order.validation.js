@@ -47,6 +47,24 @@ const updateStatusSchema = {
   },
 };
 
+const requestDesignRevisionSchema = {
+  params: {
+    id: {
+      required: true,
+      type: "integer",
+      min: 1,
+    },
+  },
+  body: {
+    ghiChu: {
+      required: true,
+      type: "string",
+      minLength: 5,
+      maxLength: 1000,
+    },
+  },
+};
+
 /**
  * Schema hủy đơn hàng.
  * PATCH /api/admin/orders/:id/cancel
@@ -228,6 +246,7 @@ const createOrderSchema = {
 module.exports = {
   // Admin schemas
   updateStatusSchema,
+  requestDesignRevisionSchema,
   cancelOrderSchema,
   createOrderSchema,
   updateShippingAddressSchema,

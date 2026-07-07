@@ -1,4 +1,4 @@
-import { Alert, AutoComplete, Input, Modal, Select, message } from "antd";
+import { Alert, AutoComplete, Button, Input, Modal, Select, message } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { isAxiosError } from "axios";
@@ -139,6 +139,8 @@ export default function UpdateOrderStatusModal({
   const [newStatus, setNewStatus] = useState("");
   const [shippingCarrier, setShippingCarrier] = useState<string | undefined>(undefined);
   const [trackingCode, setTrackingCode] = useState("");
+  const [showRevisionInput, setShowRevisionInput] = useState(false);
+  const [revisionNote, setRevisionNote] = useState("");
 
   const { data: order, isLoading } = useQuery({
     queryKey: ["admin-order-detail", orderId],
@@ -151,6 +153,8 @@ export default function UpdateOrderStatusModal({
     status: order?.thanhToan.status,
   });
   const productionStatusBlockReason = getProductionStatusBlockReason(order);
+  const canRequestDesignRevision =
+    order?.trangThai === "cho_xac_nhan" && hasCustomDesignOrder(order);
 
   const updateStatusMutation = useMutation({
     mutationFn: (payload: { trangThai: string; shippingCarrier?: string; trackingCode?: string }) =>
@@ -183,6 +187,26 @@ export default function UpdateOrderStatusModal({
     },
   });
 
+  const requestRevisionMutation = useMutation({
+    mutationFn: () =>
+      orderService.yeuCauChinhSuaThietKeDonHang(orderId!, revisionNote.trim()),
+    onSuccess: async () => {
+      setRevisionNote("");
+      setShowRevisionInput(false);
+      messageApi.success("Đã gửi yêu cầu khách chỉnh sửa thiết kế");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-order-detail", orderId] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["thiet-ke-danh-sach"] }),
+        queryClient.invalidateQueries({ queryKey: ["thiet-ke-thong-ke"] }),
+      ]);
+      onClose();
+    },
+    onError: (mutationError) => {
+      messageApi.error(getApiErrorMessage(mutationError));
+    },
+  });
+
   return (
     <>
       {messageContextHolder}
@@ -193,12 +217,14 @@ export default function UpdateOrderStatusModal({
         okText="Xác nhận"
         cancelText="Đóng"
         confirmLoading={updateStatusMutation.isPending || isLoading}
-        okButtonProps={{ disabled: !newStatus || isLoading || isStateLocked }}
+        okButtonProps={{ disabled: !newStatus || isLoading || isStateLocked || showRevisionInput }}
         mask={{ closable: true }}
         onCancel={() => {
           setNewStatus("");
           setShippingCarrier(undefined);
           setTrackingCode("");
+          setShowRevisionInput(false);
+          setRevisionNote("");
           onClose();
         }}
         onOk={() => {
@@ -278,6 +304,57 @@ export default function UpdateOrderStatusModal({
                 title="Chưa đủ điều kiện chuyển trạng thái"
                 description={productionStatusBlockReason}
               />
+            ) : null}
+            {canRequestDesignRevision ? (
+              <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 p-4">
+                <Alert
+                  className="mb-3"
+                  type="info"
+                  showIcon
+                  title="Đơn hàng có thiết kế khách hàng"
+                  description="Khi chuyển đơn sang Đã xác nhận, hệ thống sẽ tự duyệt thiết kế và đưa sản phẩm vào hàng chờ in. Nếu mẫu chưa đạt, hãy yêu cầu khách chỉnh sửa trước."
+                />
+                {!showRevisionInput ? (
+                  <Button danger onClick={() => setShowRevisionInput(true)}>
+                    Yêu cầu chỉnh sửa thiết kế
+                  </Button>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="mb-1 text-sm font-semibold text-text-main">
+                        Ghi chú cho khách hàng <span className="text-red-500">*</span>
+                      </p>
+                      <Input.TextArea
+                        value={revisionNote}
+                        rows={4}
+                        maxLength={1000}
+                        showCount
+                        placeholder="Mô tả cụ thể nội dung khách hàng cần chỉnh sửa..."
+                        onChange={(event) => setRevisionNote(event.target.value)}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        onClick={() => {
+                          setShowRevisionInput(false);
+                          setRevisionNote("");
+                        }}
+                      >
+                        Hủy
+                      </Button>
+                      <Button
+                        danger
+                        type="primary"
+                        loading={requestRevisionMutation.isPending}
+                        disabled={revisionNote.trim().length < 5}
+                        onClick={() => requestRevisionMutation.mutate()}
+                      >
+                        Gửi yêu cầu
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : null}
             <p className="mb-2 text-sm font-semibold text-text-main">Trạng thái mới</p>
             <Select

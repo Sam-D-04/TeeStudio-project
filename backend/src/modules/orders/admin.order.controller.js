@@ -64,6 +64,24 @@ const capNhatTrangThai = async (req, res, next) => {
   }
 };
 
+const yeuCauChinhSuaThietKe = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    const data = await orderService.yeuCauChinhSuaThietKeDonHang(
+      id,
+      req.body.ghiChu,
+      req.user
+    );
+    res.json({
+      success: true,
+      message: "Đã gửi yêu cầu chỉnh sửa thiết kế",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /**
  * PATCH /api/admin/orders/:id/cancel
  * Hủy đơn hàng kèm lý do.
@@ -162,7 +180,7 @@ const timSanPham = async (req, res, next) => {
 
 /**
  * GET /api/admin/orders/search/designs?userId=<id>&q=<keyword>
- * Tìm kiếm thiết kế APPROVED của khách hàng.
+ * Tìm kiếm thiết kế có thể gán vào đơn của khách hàng.
  */
 const timThietKe = async (req, res, next) => {
   try {
@@ -214,6 +232,7 @@ module.exports = {
   getDanhSachDonHang,
   getChiTietDonHang,
   capNhatTrangThai,
+  yeuCauChinhSuaThietKe,
   huyDonHang,
   capNhatDiaChiGiaoHang,
   taoLaiMaThanhToanOnline,

@@ -481,33 +481,8 @@ async function duyetThietKe(id) {
       [id]
     );
 
-    // OrderItem.productionStatus là nguồn dữ liệu chính của tiến độ sản xuất.
-    await conn.query(
-      `UPDATE OrderItem
-       SET productionStatus = 'READY_TO_PRINT'
-       WHERE designId = ?
-         AND productionStatus IN ('WAITING_DESIGN_APPROVAL', 'APPROVED', 'PROCESSING')`,
-      [id]
-    );
-
-    // Tạo bản ghi tiến độ còn thiếu và đồng bộ bảng cũ để không làm hỏng dữ liệu hiện hữu.
-    await conn.query(
-      `INSERT INTO OrderProduction (orderItemId, designId, status, approvedAt)
-       SELECT oi.id, oi.designId, 'APPROVED', NOW()
-       FROM OrderItem oi
-       WHERE oi.designId = ?
-         AND NOT EXISTS (
-           SELECT 1 FROM OrderProduction op WHERE op.orderItemId = oi.id
-         )`,
-      [id]
-    );
-    await conn.query(
-      `UPDATE OrderProduction op
-       JOIN OrderItem oi ON oi.id = op.orderItemId
-       SET op.status = 'APPROVED', op.approvedAt = COALESCE(op.approvedAt, NOW())
-       WHERE oi.designId = ? AND op.status = 'WAITING_DESIGN_APPROVAL'`,
-      [id]
-    );
+    // Không đưa thiết kế xuống xưởng tại đây. Hàng chờ in chỉ được tạo
+    // trong transaction xác nhận đơn hàng để tránh đơn PENDING đã đi sản xuất.
 
     return {
       id: Number(id),
