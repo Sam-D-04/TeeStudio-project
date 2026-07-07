@@ -6,6 +6,7 @@
  */
 
 const designService = require("./admin.design.service");
+const uploadService = require("../uploads/upload.service");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KPI THỐNG KÊ
@@ -171,24 +172,24 @@ const getDanhSachSticker = async (req, res, next) => {
  * POST /api/admin/designs/stickers
  * Thêm sticker mới.
  *
- * Body: { ten, urlAnh, loai }
- * (Upload file lên Cloudinary được xử lý bởi FE hoặc middleware upload riêng;
- *  controller chỉ nhận URL đã được upload)
+ * Multipart body: { ten, loai, anh }
+ * Ảnh được upload lên Cloudinary trước khi URL được lưu vào database.
  */
 const themSticker = async (req, res, next) => {
   try {
-    const { ten, urlAnh, loai } = req.body;
+    const { ten, loai } = req.body;
 
-    if (!ten) {
+    if (!ten || !ten.trim()) {
       return res.status(400).json({ success: false, message: "Vui lòng nhập tên sticker" });
     }
-    if (!urlAnh) {
-      return res.status(400).json({ success: false, message: "Vui lòng cung cấp URL ảnh sticker" });
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "Vui lòng chọn ảnh sticker" });
     }
-    if (!loai) {
-      return res.status(400).json({ success: false, message: "Vui lòng chọn loại sticker" });
+    if (!["logo", "hinh_ve", "chu_viet"].includes(loai)) {
+      return res.status(400).json({ success: false, message: "Loại sticker không hợp lệ" });
     }
 
+    const urlAnh = await uploadService.uploadImageBuffer(req.file.buffer, "stickers");
     const data = await designService.themSticker({ ten, urlAnh, loai });
     res.status(201).json({
       success: true,

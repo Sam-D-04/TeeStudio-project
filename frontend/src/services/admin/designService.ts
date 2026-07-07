@@ -235,17 +235,23 @@ export async function layDanhSachSticker(): Promise<Sticker[]> {
 }
 
 /**
- * Thêm sticker mới (nhận URL đã upload Cloudinary).
+ * Thêm sticker mới. Backend sẽ upload file ảnh lên Cloudinary.
  * POST /api/admin/designs/stickers
  */
 export async function themSticker(payload: {
   ten: string;
-  urlAnh: string;
+  anh: File;
   loai: "logo" | "hinh_ve" | "chu_viet";
 }): Promise<Sticker> {
+  const formData = new FormData();
+  formData.append("ten", payload.ten);
+  formData.append("loai", payload.loai);
+  formData.append("anh", payload.anh);
+
   const res = await apiClient.post<{ success: boolean; data: Sticker }>(
     "/admin/designs/stickers",
-    payload
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } }
   );
   return res.data.data;
 }

@@ -26,6 +26,39 @@ const uploadBase64Image = async (base64String, folder = 'previews') => {
   }
 };
 
+/**
+ * Uploads an image buffer (typically supplied by multer memoryStorage) to
+ * Cloudinary without writing a temporary file to disk.
+ *
+ * @param {Buffer} buffer
+ * @param {string} folder
+ * @returns {Promise<string>} secure Cloudinary URL
+ */
+const uploadImageBuffer = (buffer, folder = 'previews') => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: `teestudio/${folder}`,
+        resource_type: 'image',
+      },
+      (error, result) => {
+        if (error || !result?.secure_url) {
+          console.error('Cloudinary Upload Error:', error);
+          const uploadError = new Error('Không thể tải ảnh lên Cloudinary');
+          uploadError.statusCode = 502;
+          reject(uploadError);
+          return;
+        }
+
+        resolve(result.secure_url);
+      }
+    );
+
+    stream.end(buffer);
+  });
+};
+
 module.exports = {
   uploadBase64Image,
+  uploadImageBuffer,
 };

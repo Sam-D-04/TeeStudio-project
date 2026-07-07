@@ -6,11 +6,46 @@
  */
 
 const router = require("express").Router();
+const multer = require("multer");
 const controller = require("./admin.design.controller");
 const { verifyToken, requireRoles } = require("../../common/middlewares/auth.middleware");
 const { ROLES } = require("../../common/constants/roles");
 
 const requireAdmin = requireRoles(ROLES.ADMIN, ROLES.PRODUCTION);
+
+const stickerUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, callback) => {
+    const acceptedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+      "image/svg+xml",
+    ];
+
+    if (!acceptedTypes.includes(file.mimetype)) {
+      const error = new Error("Ảnh sticker phải là JPG, PNG, WEBP, GIF hoặc SVG");
+      error.statusCode = 400;
+      return callback(error);
+    }
+
+    callback(null, true);
+  },
+}).single("anh");
+
+const uploadSticker = (req, res, next) => {
+  stickerUpload(req, res, (error) => {
+    if (!error) return next();
+
+    if (error.code === "LIMIT_FILE_SIZE") {
+      error.message = "Ảnh sticker không được vượt quá 5 MB";
+    }
+    error.statusCode = error.statusCode || 400;
+    next(error);
+  });
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTES DÀNH CHO ADMIN – Yêu cầu xác thực
@@ -26,7 +61,7 @@ router.patch("/don-can-in/:id/trang-thai", verifyToken, requireAdmin, controller
 
 // Sticker
 router.get("/stickers", verifyToken, requireAdmin, controller.getDanhSachSticker);
-router.post("/stickers", verifyToken, requireAdmin, controller.themSticker);
+router.post("/stickers", verifyToken, requireAdmin, uploadSticker, controller.themSticker);
 router.delete("/stickers/:id", verifyToken, requireAdmin, controller.xoaSticker);
 
 // Danh sách thiết kế khách hàng
