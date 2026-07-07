@@ -170,7 +170,7 @@ async function layThongKe() {
 // GET /api/admin/designs
 // =====================================================================
 async function layDanhSachThietKe({
-  page, limit, tu_khoa, trang_thai, vi_tri_in, tu_ngay, den_ngay,
+  page, limit, design_id, tu_khoa, trang_thai, vi_tri_in, tu_ngay, den_ngay,
 }) {
   const trangHienTai = parseInt(page) || 1;
   const soMoi = parseInt(limit) || 10;
@@ -185,6 +185,14 @@ async function layDanhSachThietKe({
   const thamSo = [];
 
   kiemTraKhoangNgay(tu_ngay, den_ngay);
+  if (design_id !== undefined && design_id !== "") {
+    const designId = Number(design_id);
+    if (!Number.isInteger(designId) || designId <= 0) {
+      throw taoLoi("ID thiết kế không hợp lệ.");
+    }
+    dieuKien.push("cd.id = ?");
+    thamSo.push(designId);
+  }
   if (tu_ngay) {
     dieuKien.push("cd.createdAt >= ?");
     thamSo.push(`${tu_ngay} 00:00:00`);
@@ -361,99 +369,6 @@ async function layChiTietThietKe(id) {
     trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[row.status] || "cho_kiem_tra",
     ngayGui: formatNgay(row.ngayGui),
     ghiChu: row.ghiChu || null,
-  };
-}
-
-// =====================================================================
-// SERVICE 2.2: Lấy dữ liệu nguồn của thiết kế cho workspace admin
-// GET /api/admin/designs/:id/editor
-//
-// Endpoint này chỉ đọc dữ liệu. canvasData được giữ trung lập để không ràng
-// buộc module admin vào schema đang được phía Design Studio khách hàng bảo trì.
-// =====================================================================
-async function layDuLieuEditorThietKe(id) {
-  const [rows] = await db.pool.query(
-    `SELECT
-       cd.id,
-       cd.userId,
-       cd.name,
-       cd.productId,
-       cd.variantId,
-       cd.baseColor,
-       cd.canvasData,
-       cd.previewUrl,
-       cd.designFee,
-       cd.status,
-       cd.adminNote,
-       cd.createdAt,
-       cd.updatedAt,
-       a.fullName AS customerName,
-       a.email AS customerEmail,
-       a.phone AS customerPhone,
-       p.name AS productName,
-       p.slug AS productSlug,
-       p.form AS productForm,
-       pv.color AS variantColor,
-       pv.size AS variantSize,
-       pv.sku AS variantSku
-     FROM CustomDesign cd
-     JOIN Account a ON a.id = cd.userId
-     JOIN Product p ON p.id = cd.productId
-     LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
-     WHERE cd.id = ?
-     LIMIT 1`,
-    [id]
-  );
-
-  if (!rows.length) {
-    throw taoLoi("Không tìm thấy thiết kế", 404);
-  }
-
-  const row = rows[0];
-  let canvasData = row.canvasData ?? null;
-  let canvasDataState = canvasData === null ? "EMPTY" : "VALID";
-
-  if (typeof canvasData === "string") {
-    try {
-      canvasData = JSON.parse(canvasData);
-    } catch {
-      canvasDataState = "INVALID_JSON";
-    }
-  }
-
-  return {
-    id: row.id,
-    designCode: `TK-${String(row.id).padStart(4, "0")}`,
-    name: row.name || "Thiết kế chưa đặt tên",
-    owner: {
-      id: row.userId,
-      fullName: row.customerName || "Khách hàng",
-      email: row.customerEmail || null,
-      phone: row.customerPhone || null,
-    },
-    product: {
-      id: row.productId,
-      name: row.productName,
-      slug: row.productSlug || null,
-      form: row.productForm || null,
-    },
-    variant: row.variantId
-      ? {
-          id: row.variantId,
-          color: row.variantColor || null,
-          size: row.variantSize || null,
-          sku: row.variantSku || null,
-        }
-      : null,
-    baseColor: row.baseColor || null,
-    canvasData,
-    canvasDataState,
-    previewUrl: row.previewUrl || null,
-    designFee: Number(row.designFee || 0),
-    status: row.status,
-    adminNote: row.adminNote || null,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
   };
 }
 
@@ -828,7 +743,6 @@ module.exports = {
   layThongKe,
   layDanhSachThietKe,
   layChiTietThietKe,
-  layDuLieuEditorThietKe,
   duyetThietKe,
   yeuCauChinhSua,
   layDanhSachDonCanIn,

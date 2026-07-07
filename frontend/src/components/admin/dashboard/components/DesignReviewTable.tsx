@@ -21,7 +21,7 @@ export default function DesignReviewTable({ orders }: DesignReviewTableProps) {
   const router = useRouter();
 
   function moChiTiet(order: DesignOrder) {
-    router.push(`/admin/thiet-ke/${order.designId}`);
+    router.push(`/admin/thiet-ke?designId=${order.designId}`);
   }
 
   return (
@@ -50,7 +50,7 @@ export default function DesignReviewTable({ orders }: DesignReviewTableProps) {
                 key={order.designId}
                 role="link"
                 tabIndex={0}
-                aria-label={`Xem chi tiết thiết kế ${order.code}`}
+                aria-label={`Mở danh sách và lọc thiết kế ${order.code}`}
                 className="cursor-pointer transition-colors hover:bg-surface-alt/70 focus-visible:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-container"
                 onClick={() => moChiTiet(order)}
                 onKeyDown={(event) => {

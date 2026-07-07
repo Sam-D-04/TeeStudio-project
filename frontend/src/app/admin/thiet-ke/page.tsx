@@ -31,12 +31,17 @@ export default async function ThietKePage({
   const params = await searchParams;
   const tabParam = layGiaTriDauTien(params.tab).toUpperCase();
   const statusParam = layGiaTriDauTien(params.status).toUpperCase();
+  const designIdParam = Number(layGiaTriDauTien(params.designId));
+  const designId = Number.isInteger(designIdParam) && designIdParam > 0
+    ? designIdParam
+    : null;
   const laTabDonIn = tabParam === "PRINT_ORDERS";
 
   const initialFilters = {
     tab: laTabDonIn
       ? ("don_can_in" as const)
       : ("thiet_ke_khach_hang" as const),
+    designId,
     designStatus:
       statusParam === "ACTION_REQUIRED"
         ? "can_xu_ly"

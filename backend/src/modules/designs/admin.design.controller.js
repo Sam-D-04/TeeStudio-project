@@ -33,7 +33,7 @@ const getThongKe = async (req, res, next) => {
  * GET /api/admin/designs
  * Danh sách thiết kế với lọc và phân trang.
  *
- * Query params: page, limit, tu_khoa, trang_thai, vi_tri_in, tu_ngay, den_ngay
+ * Query params: page, limit, design_id, tu_khoa, trang_thai, vi_tri_in, tu_ngay, den_ngay
  */
 const getDanhSachThietKe = async (req, res, next) => {
   try {
@@ -53,21 +53,6 @@ const getChiTietThietKe = async (req, res, next) => {
     }
 
     const data = await designService.layChiTietThietKe(id);
-    res.json({ success: true, data });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/** GET /api/admin/designs/:id/editor - Dữ liệu nguồn chỉ đọc cho workspace admin. */
-const getDuLieuEditorThietKe = async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (!id || id <= 0) {
-      return res.status(400).json({ success: false, message: "ID thiết kế không hợp lệ" });
-    }
-
-    const data = await designService.layDuLieuEditorThietKe(id);
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -255,7 +240,6 @@ module.exports = {
   getThongKe,
   getDanhSachThietKe,
   getChiTietThietKe,
-  getDuLieuEditorThietKe,
   duyetThietKe,
   yeuCauChinhSua,
   getDanhSachDonCanIn,

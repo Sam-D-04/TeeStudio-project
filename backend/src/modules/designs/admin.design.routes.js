@@ -68,7 +68,6 @@ router.delete("/stickers/:id", verifyToken, requireAdmin, controller.xoaSticker)
 router.get("/", verifyToken, requireAdmin, controller.getDanhSachThietKe);
 
 // Hành động trên từng thiết kế
-router.get("/:id/editor", verifyToken, requireAdmin, controller.getDuLieuEditorThietKe);
 router.get("/:id", verifyToken, requireAdmin, controller.getChiTietThietKe);
 
 module.exports = router;

@@ -39,6 +39,7 @@ import * as designService from "@/services/admin/designService";
 import DesignStatCard from "./DesignStatCard";
 import DesignFilterBar, { type BoDucThietKe } from "./DesignFilterBar";
 import DesignTable from "./DesignTable";
+import DesignDetailModal from "./DesignDetailModal";
 import PrintOrderTab from "./PrintOrderTab";
 import DesignResourceTab from "./DesignResourceTab";
 
@@ -57,6 +58,7 @@ export type DesignInitialFilters = {
   tab?: TenTab;
   designStatus?: string;
   printStatus?: string;
+  designId?: number | null;
 };
 
 type DesignPageProps = {
@@ -68,6 +70,9 @@ type DesignPageProps = {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function DesignPage({ initialFilters }: DesignPageProps) {
   const router = useRouter();
+
+  // Thiết kế đang được mở trong modal chi tiết
+  const [idThietKeDangXem, setIdThietKeDangXem] = useState<number | null>(null);
 
   // ── State điều hướng tab ──
   const [tabDangChon, setTabDangChon] = useState<TenTab>(
@@ -81,11 +86,16 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
 
   // ── State phân trang bảng thiết kế ──
   const [trangHienTai, setTrangHienTai] = useState(1);
+  const [idThietKeDangLoc, setIdThietKeDangLoc] = useState<number | null>(
+    initialFilters?.designId ?? null
+  );
 
   // ── State bộ lọc bảng thiết kế ──
   const [boDuc, setBoDuc] = useState<BoDucThietKe>({
-    tuKhoa: "",
-    trangThai: initialFilters?.designStatus ?? "",
+    tuKhoa: initialFilters?.designId
+      ? `TK-${String(initialFilters.designId).padStart(4, "0")}`
+      : "",
+    trangThai: initialFilters?.designId ? "" : initialFilters?.designStatus ?? "",
     viTriIn: "",
     tuNgay: "",
     denNgay: "",
@@ -107,11 +117,12 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
     isLoading: dangTaiThietKe,
     isError: loiThietKe,
   } = useQuery({
-    queryKey: ["thiet-ke-danh-sach", trangHienTai, boDuc],
+    queryKey: ["thiet-ke-danh-sach", trangHienTai, boDuc, idThietKeDangLoc],
     queryFn: () =>
       designService.layDanhSachThietKe({
         page: trangHienTai,
         limit: 10,
+        design_id: idThietKeDangLoc ?? undefined,
         tu_khoa: boDuc.tuKhoa,
         trang_thai: boDuc.trangThai,
         vi_tri_in: boDuc.viTriIn,
@@ -123,11 +134,13 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
 
   // ─── Xử lý thay đổi bộ lọc: reset về trang 1 ──────────────────────────
   function xuLyThayDoiBoDuc(boDucMoi: BoDucThietKe) {
+    setIdThietKeDangLoc(null);
     setBoDuc(boDucMoi);
     setTrangHienTai(1);
   }
 
   function datLaiTatCaBoLoc() {
+    setIdThietKeDangLoc(null);
     setBoDuc({
       tuKhoa: "",
       trangThai: "",
@@ -168,7 +181,7 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
 
   // ─── Xử lý xem chi tiết ────────────────────────────────────────────────
   function xuLyXemChiTiet(id: number) {
-    alert(`Chức năng xem chi tiết thiết kế #${id} sẽ mở drawer trong phiên bản tiếp theo.`);
+    setIdThietKeDangXem(id);
   }
 
   // ─── Dữ liệu hiển thị ──────────────────────────────────────────────────
@@ -184,6 +197,12 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+
+      <DesignDetailModal
+        designId={idThietKeDangXem}
+        open={idThietKeDangXem !== null}
+        onClose={() => setIdThietKeDangXem(null)}
+      />
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* PHẦN 1: Tiêu đề trang + nhóm nút hành động                   */}

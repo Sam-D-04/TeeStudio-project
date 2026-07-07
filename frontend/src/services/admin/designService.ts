@@ -36,42 +36,6 @@ export type ChiTietThietKe = ThietKe & {
   ghiChu: string | null;
 };
 
-export type TrangThaiDuLieuCanvas = "VALID" | "EMPTY" | "INVALID_JSON";
-
-/** Dữ liệu nguồn chỉ đọc, chuẩn bị cho workspace thiết kế phía admin. */
-export type DuLieuEditorThietKe = {
-  id: number;
-  designCode: string;
-  name: string;
-  owner: {
-    id: number;
-    fullName: string;
-    email: string | null;
-    phone: string | null;
-  };
-  product: {
-    id: number;
-    name: string;
-    slug: string | null;
-    form: string | null;
-  };
-  variant: {
-    id: number;
-    color: string | null;
-    size: string | null;
-    sku: string | null;
-  } | null;
-  baseColor: string | null;
-  canvasData: unknown;
-  canvasDataState: TrangThaiDuLieuCanvas;
-  previewUrl: string | null;
-  designFee: number;
-  status: string;
-  adminNote: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
 /** Kết quả danh sách thiết kế có phân trang */
 export type KetQuaThietKe = {
   danhSach: ThietKe[];
@@ -85,6 +49,7 @@ export type KetQuaThietKe = {
 export type ThamSoLocThietKe = {
   page?: number;
   limit?: number;
+  design_id?: number;
   tu_khoa?: string;
   trang_thai?: string;
   vi_tri_in?: string;
@@ -164,6 +129,7 @@ export async function layDanhSachThietKe(
   const params: Record<string, string | number> = {};
   if (thamSo.page) params.page = thamSo.page;
   if (thamSo.limit) params.limit = thamSo.limit;
+  if (thamSo.design_id) params.design_id = thamSo.design_id;
   if (thamSo.trang_thai) params.trang_thai = thamSo.trang_thai;
   if (thamSo.vi_tri_in) params.vi_tri_in = thamSo.vi_tri_in;
   if (thamSo.tu_khoa?.trim()) params.tu_khoa = thamSo.tu_khoa.trim();
@@ -182,17 +148,6 @@ export async function layChiTietThietKe(id: number): Promise<ChiTietThietKe> {
   const res = await apiClient.get<{ success: boolean; data: ChiTietThietKe }>(
     `/admin/designs/${id}`
   );
-  return res.data.data;
-}
-
-/** Lấy dữ liệu nguồn chỉ đọc cho workspace admin; không làm thay đổi thiết kế. */
-export async function layDuLieuEditorThietKe(
-  id: number
-): Promise<DuLieuEditorThietKe> {
-  const res = await apiClient.get<{
-    success: boolean;
-    data: DuLieuEditorThietKe;
-  }>(`/admin/designs/${id}/editor`);
   return res.data.data;
 }
 
