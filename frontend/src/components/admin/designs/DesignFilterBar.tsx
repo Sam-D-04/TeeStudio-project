@@ -127,6 +127,7 @@ export default function DesignFilterBar({ boDuc, onThayDoi, onDatLai }: DesignFi
         <option value="cho_kiem_tra">Chờ kiểm tra</option>
         <option value="can_chinh_sua">Cần chỉnh sửa</option>
         <option value="da_duyet">Đã duyệt</option>
+        <option value="nhap">Bản nháp (DRAFT)</option>
       </select>
 
       {/* ── Dropdown lọc vị trí in ── */}

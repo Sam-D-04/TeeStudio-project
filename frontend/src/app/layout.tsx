@@ -70,8 +70,8 @@ export default function RootLayout({
       >
         <QueryProvider>
           <AntdRegistry>
-            <ConfigProvider theme={{ ...antdTheme, cssVar: false }} locale={viVN}>
-              <App component={false}>{children}</App>
+            <ConfigProvider theme={antdTheme} locale={viVN}>
+              <App className="flex-1 flex flex-col">{children}</App>
             </ConfigProvider>
           </AntdRegistry>
         </QueryProvider>

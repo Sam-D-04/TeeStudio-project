@@ -16,7 +16,7 @@ import type { DesignElement, ShirtType, ShirtView } from "@/store/useDesignStore
 // =====================================================================
 
 /** Trạng thái thiết kế khách hàng */
-export type TrangThaiThietKe = "cho_kiem_tra" | "can_chinh_sua" | "da_duyet";
+export type TrangThaiThietKe = "cho_kiem_tra" | "can_chinh_sua" | "da_duyet" | "nhap";
 
 /** Một thiết kế trong bảng danh sách */
 export type ThietKe = {
@@ -35,6 +35,35 @@ export type ThietKe = {
 
 export type ChiTietThietKe = ThietKe & {
   ghiChu: string | null;
+};
+
+/** Dữ liệu canvas trả về khi Admin mở Editor sửa thiết kế */
+export type CanvasDataThietKe = {
+  id: number;
+  maThietKe: string;
+  tenThietKe: string;
+  mauAo: string;
+  tenSanPham: string;
+  trangThai: TrangThaiThietKe;
+  canvasData: {
+    version: number;
+    shirtType: ShirtType;
+    shirtView: ShirtView;
+    logicalCanvas: { width: number; height: number };
+    elements: DesignElement[];
+  } | null;
+};
+
+/** Input cho API sửa thiết kế */
+export type SuaThietKeInput = {
+  canvasData: {
+    version: number;
+    shirtType: ShirtType;
+    shirtView: ShirtView;
+    logicalCanvas: { width: number; height: number };
+    elements: DesignElement[];
+  };
+  previewUrl: string;
 };
 
 /** Kết quả danh sách thiết kế có phân trang */
@@ -167,6 +196,17 @@ export async function layChiTietThietKe(id: number): Promise<ChiTietThietKe> {
   return res.data.data;
 }
 
+/**
+ * Lấy canvasData của thiết kế để load vào Editor khi Admin bấm "Sửa".
+ * GET /api/admin/designs/:id/canvas
+ */
+export async function layCanvasDataThietKe(id: number): Promise<CanvasDataThietKe> {
+  const res = await apiClient.get<{ success: boolean; data: CanvasDataThietKe }>(
+    `/admin/designs/${id}/canvas`
+  );
+  return res.data.data;
+}
+
 /** Tạo một thiết kế DRAFT và gắn trực tiếp vào tài khoản khách hàng. */
 export async function taoThietKeChoKhach(
   payload: TaoThietKeChoKhachInput
@@ -175,6 +215,21 @@ export async function taoThietKeChoKhach(
     success: boolean;
     data: { id: number; userId: number; name: string; status: "DRAFT"; previewUrl: string };
   }>("/admin/designs/customer-drafts", payload);
+  return res.data.data;
+}
+
+/**
+ * Admin sửa thiết kế của khách: ghi đè canvasData + previewUrl, tự chuyển APPROVED.
+ * PUT /api/admin/designs/:id/sua
+ */
+export async function suaThietKeChoKhach(
+  id: number,
+  payload: SuaThietKeInput
+): Promise<{ id: number; maThietKe: string; trangThai: TrangThaiThietKe }> {
+  const res = await apiClient.put<{
+    success: boolean;
+    data: { id: number; maThietKe: string; trangThai: TrangThaiThietKe };
+  }>(`/admin/designs/${id}/sua`, payload);
   return res.data.data;
 }
 

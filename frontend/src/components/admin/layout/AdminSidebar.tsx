@@ -120,11 +120,11 @@ function SidebarContent({
       >
         {collapsed ? null : (
           <>
-            <div className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-primary text-on-primary">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-[#0f172a] text-white">
               <AppstoreOutlined className="text-[22px]" />
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-[20px] font-black leading-tight text-primary">
+              <h1 className="text-[20px] font-black leading-tight text-slate-900">
                 TeeStudio
               </h1>
               <p className="text-body-sm text-text-secondary">Quản trị sản xuất</p>
@@ -162,8 +162,8 @@ function SidebarContent({
                 ? pathname === "/admin"
                 : pathname.startsWith(item.href);
             const itemClass = isActive
-              ? "bg-secondary-fixed text-on-secondary-fixed-variant"
-              : "text-text-secondary hover:bg-surface-alt hover:text-primary";
+              ? "bg-[#f1f5f9]"
+              : "text-text-secondary hover:bg-surface-alt";
 
             return (
               <li key={item.href}>
@@ -175,6 +175,7 @@ function SidebarContent({
                   className={`mx-2 flex h-11 items-center rounded-[8px] py-2 text-sidebar-item font-semibold transition-colors ${
                     collapsed ? "justify-center px-0" : "min-w-0 gap-3 px-4"
                   } ${itemClass}`}
+                  style={{ color: isActive ? "#0f172a" : undefined }}
                 >
                   <span className="flex shrink-0 text-[22px] leading-none">{item.icon}</span>
                   <span className={collapsed ? "sr-only" : "truncate"}>{item.label}</span>
@@ -208,7 +209,7 @@ function SidebarContent({
             {collapsed ? null : (
               <>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold text-text-primary">
+                  <span className="block truncate font-semibold text-slate-900">
                     {user?.fullName || "Tài khoản"}
                   </span>
                   <span className="block truncate text-xs text-text-secondary">

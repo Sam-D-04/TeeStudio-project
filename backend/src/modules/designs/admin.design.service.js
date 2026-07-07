@@ -23,6 +23,7 @@ const MAP_TRANG_THAI_THIET_KE_DB_FE = {
   PENDING_REVIEW: "cho_kiem_tra",
   NEEDS_REVISION: "can_chinh_sua",
   APPROVED: "da_duyet",
+  DRAFT: "nhap",
 };
 
 /** FE trangThai → DB status (dùng khi nhận request cập nhật) */
@@ -30,6 +31,7 @@ const MAP_TRANG_THAI_THIET_KE_FE_DB = {
   cho_kiem_tra: "PENDING_REVIEW",
   can_chinh_sua: "NEEDS_REVISION",
   da_duyet: "APPROVED",
+  nhap: "DRAFT",
 };
 
 /** OrderProduction.status → FE (đơn cần in) */
@@ -222,15 +224,13 @@ async function layDanhSachThietKe({
   const soMoi = parseInt(limit) || 10;
   const offset = (trangHienTai - 1) * soMoi;
 
-  // Xây dựng điều kiện WHERE động
-  // Trang Admin chỉ quản lý các thiết kế khách đã gửi hoặc đã được xử lý.
-  // DRAFT là bản khách còn đang soạn nên không được hiển thị hay tính là "Chờ kiểm tra".
-  const dieuKien = [
-    "cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION', 'APPROVED')",
-  ];
+  const dieuKien = [];
   const thamSo = [];
 
   kiemTraKhoangNgay(tu_ngay, den_ngay);
+
+  let coTuKhoaHayId = false;
+
   if (design_id !== undefined && design_id !== "") {
     const designId = Number(design_id);
     if (!Number.isInteger(designId) || designId <= 0) {
@@ -238,6 +238,7 @@ async function layDanhSachThietKe({
     }
     dieuKien.push("cd.id = ?");
     thamSo.push(designId);
+    coTuKhoaHayId = true;
   }
   if (tu_ngay) {
     dieuKien.push("cd.createdAt >= ?");
@@ -248,20 +249,24 @@ async function layDanhSachThietKe({
     thamSo.push(`${den_ngay} 00:00:00`);
   }
 
-  // Khi có từ khóa, tìm trên toàn bộ trạng thái thiết kế.
-  if (trang_thai && !(tu_khoa && tu_khoa.trim())) {
-    if (trang_thai === "can_xu_ly") {
-      dieuKien.push("cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION')");
-    } else {
-      const statusDB = MAP_TRANG_THAI_THIET_KE_FE_DB[trang_thai];
-      if (statusDB) {
-        dieuKien.push("cd.status = ?");
-        thamSo.push(statusDB);
-      }
-    }
+  const hasTuKhoa = tu_khoa && tu_khoa.trim();
+  if (hasTuKhoa) {
+    coTuKhoaHayId = true;
   }
 
-  // Lọc theo một vị trí hoặc yêu cầu thiết kế có đồng thời cả hai mặt.
+  if (coTuKhoaHayId) {
+    dieuKien.push("cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION', 'APPROVED', 'DRAFT')");
+  } else if (trang_thai === "nhap") {
+    dieuKien.push("cd.status = 'DRAFT'");
+  } else if (trang_thai === "can_xu_ly") {
+    dieuKien.push("cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION')");
+  } else if (trang_thai && MAP_TRANG_THAI_THIET_KE_FE_DB[trang_thai]) {
+    dieuKien.push("cd.status = ?");
+    thamSo.push(MAP_TRANG_THAI_THIET_KE_FE_DB[trang_thai]);
+  } else {
+    dieuKien.push("cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION', 'APPROVED')");
+  }
+
   if (vi_tri_in) {
     if (vi_tri_in === "in_2_mat") {
       dieuKien.push(`EXISTS (
@@ -283,8 +288,7 @@ async function layDanhSachThietKe({
     }
   }
 
-  // Tìm kiếm theo từ khóa (mã TK hoặc tên khách)
-  if (tu_khoa && tu_khoa.trim()) {
+  if (hasTuKhoa) {
     const tk = tu_khoa.trim();
     dieuKien.push(`(
       CONCAT('TK-', LPAD(cd.id, 4, '0')) LIKE ?
@@ -393,7 +397,7 @@ async function layChiTietThietKe(id) {
      JOIN Product p ON p.id = cd.productId
      LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
      WHERE cd.id = ?
-       AND cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION', 'APPROVED')`,
+       AND cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION', 'APPROVED', 'DRAFT')`,
     [id]
   );
 
@@ -415,6 +419,106 @@ async function layChiTietThietKe(id) {
     trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[row.status] || "cho_kiem_tra",
     ngayGui: formatNgay(row.ngayGui),
     ghiChu: row.ghiChu || null,
+  };
+}
+
+// =====================================================================
+// SERVICE 2.3: Lấy canvasData của một thiết kế (chỉ dùng khi mở Editor)
+// GET /api/admin/designs/:id/canvas
+//
+// Tách riêng khỏi layChiTietThietKe để tránh trả JSON lớn ở mọi nơi.
+// =====================================================================
+async function layCanvasDataThietKe(id) {
+  const [rows] = await db.pool.query(
+    `SELECT
+       cd.id,
+       cd.canvasData,
+       cd.baseColor AS mauAo,
+       cd.status,
+       cd.name      AS tenThietKe,
+       cd.productId,
+       p.name       AS tenSanPham
+     FROM CustomDesign cd
+     JOIN Product p ON p.id = cd.productId
+     WHERE cd.id = ?
+       AND cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION', 'APPROVED', 'DRAFT')`,
+    [id]
+  );
+
+  if (!rows.length) {
+    throw taoLoi("Không tìm thấy thiết kế", 404);
+  }
+
+  const row = rows[0];
+
+  // Parse canvasData từ chuỗi JSON → object (trả về null nếu lỗi)
+  let canvasData = null;
+  if (row.canvasData) {
+    try {
+      canvasData = typeof row.canvasData === "string"
+        ? JSON.parse(row.canvasData)
+        : row.canvasData;
+    } catch {
+      canvasData = null;
+    }
+  }
+
+  return {
+    id: row.id,
+    maThietKe: `TK-${String(row.id).padStart(4, "0")}`,
+    tenThietKe: row.tenThietKe || "Thiết kế chưa đặt tên",
+    mauAo: row.mauAo || "#ffffff",
+    tenSanPham: row.tenSanPham || "Sản phẩm",
+    trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[row.status] || "cho_kiem_tra",
+    canvasData, // object đã parse, hoặc null
+  };
+}
+
+// =====================================================================
+// SERVICE 2.4: Admin sửa thiết kế cho khách (ghi đè + tự duyệt)
+// PUT /api/admin/designs/:id/sua
+//
+// Lưu đè đồng thời canvasData MỚI + previewUrl MỚI, và tự động
+// chuyển status → APPROVED vì admin đã kiểm duyệt khi sửa trực tiếp.
+// =====================================================================
+async function suaThietKeChoKhach(id, { canvasData, previewUrl }) {
+  // Kiểm tra thiết kế tồn tại
+  const [rows] = await db.pool.query(
+    "SELECT id, status FROM CustomDesign WHERE id = ?",
+    [id]
+  );
+  if (!rows || rows.length === 0) {
+    throw taoLoi("Không tìm thấy thiết kế", 404);
+  }
+
+  // Validate và chuẩn hóa canvasData
+  let dataObj = canvasData;
+  if (typeof dataObj === "string") {
+    try {
+      dataObj = JSON.parse(dataObj);
+    } catch {
+      throw taoLoi("Dữ liệu thiết kế không phải JSON hợp lệ", 400);
+    }
+  }
+  if (!dataObj || !Array.isArray(dataObj.elements)) {
+    throw taoLoi("Dữ liệu thiết kế phải chứa danh sách elements", 400);
+  }
+
+  const dataStr = JSON.stringify(dataObj);
+  const designFee = calculateBoundingBoxAreaFee({ layers: dataObj.elements });
+
+  // Ghi đè canvasData + previewUrl + đổi status APPROVED + cập nhật phí
+  await db.pool.query(
+    `UPDATE CustomDesign
+     SET canvasData = ?, previewUrl = ?, status = 'APPROVED', designFee = ?
+     WHERE id = ?`,
+    [dataStr, previewUrl || "", designFee, id]
+  );
+
+  return {
+    id: Number(id),
+    maThietKe: `TK-${String(id).padStart(4, "0")}`,
+    trangThai: "da_duyet",
   };
 }
 
@@ -842,6 +946,8 @@ module.exports = {
   layThongKe,
   layDanhSachThietKe,
   layChiTietThietKe,
+  layCanvasDataThietKe,
+  suaThietKeChoKhach,
   taoThietKeChoKhach,
   duyetThietKe,
   yeuCauChinhSua,

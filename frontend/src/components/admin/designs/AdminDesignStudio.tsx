@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { App, Button, Input, Select, Spin } from "antd";
+import { App, Button, Input, Select, Spin, ConfigProvider, theme } from "antd";
 import {
   ArrowLeftOutlined,
   DeleteOutlined,
@@ -245,34 +245,47 @@ export default function AdminDesignStudio() {
 
   return (
     <div className="ds-root" style={{ height: "100vh", minHeight: 700 }}>
-      <header className="ds-toolbar" style={{ height: "auto", minHeight: 64, flexWrap: "wrap", gap: 10, paddingBlock: 8 }}>
-        <div className="ds-toolbar-left">
-          <Button icon={<ArrowLeftOutlined />} onClick={() => router.push("/admin/thiet-ke")}>Quay lại</Button>
-          <strong style={{ color: "#f8fafc" }}>Tạo thiết kế cho khách</strong>
-        </div>
+      <ConfigProvider
+        theme={{
+          algorithm: theme.darkAlgorithm,
+          token: {
+            colorBgContainer: "#0f172a",
+            colorBorder: "#334155",
+            colorTextPlaceholder: "#64748b",
+            colorText: "#f8fafc",
+            colorPrimary: "#0ea5e9",
+            colorBgElevated: "#1e293b",
+          },
+        }}
+      >
+        <header className="ds-toolbar" style={{ height: "auto", minHeight: 64, flexWrap: "wrap", gap: 10, paddingBlock: 8 }}>
+          <div className="ds-toolbar-left">
+            <Button icon={<ArrowLeftOutlined />} onClick={() => router.push("/admin/thiet-ke")}>Quay lại</Button>
+            <strong style={{ color: "#f8fafc" }}>Tạo thiết kế cho khách</strong>
+          </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "center", flexWrap: "wrap" }}>
           <Select
-            showSearch
-            loading={loadingCustomers}
-            value={customerId}
-            onChange={setCustomerId}
-            placeholder="Chọn khách hàng"
-            optionFilterProp="label"
-            style={{ width: 260 }}
-            options={customers.map((customer) => ({
-              value: customer.id,
-              label: `${customer.fullName} — ${customer.phone || customer.email}`,
-            }))}
-            notFoundContent={loadingCustomers ? <Spin size="small" /> : "Không có khách hàng"}
-          />
-          <Input
-            value={designName}
-            onChange={(event) => setDesignName(event.target.value)}
-            placeholder="Tên thiết kế"
-            maxLength={100}
-            style={{ width: 240 }}
-          />
+              showSearch
+              loading={loadingCustomers}
+              value={customerId}
+              onChange={setCustomerId}
+              placeholder="Chọn khách hàng"
+              optionFilterProp="label"
+              style={{ width: 260 }}
+              options={customers.map((customer) => ({
+                value: customer.id,
+                label: `${customer.fullName} — ${customer.phone || customer.email}`,
+              }))}
+              notFoundContent={loadingCustomers ? <Spin size="small" /> : "Không có khách hàng"}
+            />
+            <Input
+              value={designName}
+              onChange={(event) => setDesignName(event.target.value)}
+              placeholder="Tên thiết kế"
+              maxLength={100}
+              style={{ width: 240 }}
+            />
         </div>
 
         <div className="ds-toolbar-right">
@@ -284,6 +297,7 @@ export default function AdminDesignStudio() {
           </Button>
         </div>
       </header>
+    </ConfigProvider>
 
       <div className="ds-body">
         <Sidebar

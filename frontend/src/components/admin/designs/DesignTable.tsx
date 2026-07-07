@@ -10,15 +10,17 @@
  *  4. Sản phẩm/Màu  – tên áo + chấm màu + nhãn màu
  *  5. Vị trí in      – ví dụ "Ngực trái"
  *  6. Trạng thái     – badge màu (component DesignStatusBadge)
- *  7. Thao tác       – nút Xem
+ *  7. Thao tác       – nút Xem + nút Sửa
  *
  * Props:
  *  - danhSach: danh sách thiết kế cần hiển thị
  *  - onXem: hàm gọi khi click "Xem"
+ *  - onSua: hàm gọi khi click "Sửa" (điều hướng sang trang Editor)
  */
 
 import {
   EyeOutlined,
+  EditOutlined,
 } from "@ant-design/icons";
 import DesignStatusBadge, { type TrangThaiThietKe } from "./DesignStatusBadge";
 import DesignPreview from "./DesignPreview";
@@ -42,12 +44,14 @@ export type ThietKe = {
 type DesignTableProps = {
   danhSach: ThietKe[];
   onXem: (id: number) => void;
+  onSua: (id: number) => void;
   dangXuLy?: boolean;  // true khi đang có mutation chạy → disable nút
 };
 
 export default function DesignTable({
   danhSach,
   onXem,
+  onSua,
   dangXuLy = false,
 }: DesignTableProps) {
   // Trường hợp không có dữ liệu
@@ -115,6 +119,7 @@ export default function DesignTable({
               key={tk.id}
               thietKe={tk}
               onXem={onXem}
+              onSua={onSua}
               dangXuLy={dangXuLy}
             />
           ))}
@@ -131,10 +136,12 @@ export default function DesignTable({
 function HangThietKe({
   thietKe,
   onXem,
+  onSua,
   dangXuLy = false,
 }: {
   thietKe: ThietKe;
   onXem: (id: number) => void;
+  onSua: (id: number) => void;
   dangXuLy?: boolean;
 }) {
   return (
@@ -231,6 +238,14 @@ function HangThietKe({
             disabled={dangXuLy}
           />
 
+          {/* Nút Sửa – điều hướng Admin sang trang Editor để sửa thiết kế */}
+          <NutThaoTac
+            icon={<EditOutlined />}
+            title="Sửa thiết kế cho khách"
+            onClick={() => onSua(thietKe.id)}
+            disabled={dangXuLy}
+            mauHover="#f59e0b"
+          />
         </div>
       </td>
     </tr>

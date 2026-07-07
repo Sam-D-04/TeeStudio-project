@@ -164,6 +164,24 @@
 }
 
 /* =========================================
+   ANT DESIGN APP WRAPPER OVERRIDES
+   ========================================= */
+@layer base {
+  .ant-app {
+    background-color: transparent !important;
+    color: inherit !important;
+    font-family: inherit !important;
+  }
+  .ant-app a {
+    color: inherit;
+    text-decoration: inherit;
+  }
+  .ant-app a:hover {
+    color: inherit;
+  }
+}
+
+/* =========================================
    UTILITY CLASSES
    ========================================= */
 

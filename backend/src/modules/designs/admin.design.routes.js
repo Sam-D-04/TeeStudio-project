@@ -90,6 +90,7 @@ router.get("/stickers", verifyToken, requireAdmin, controller.getDanhSachSticker
 router.post("/stickers", verifyToken, requireAdmin, uploadSticker, controller.themSticker);
 router.delete("/stickers/:id", verifyToken, requireAdmin, controller.xoaSticker);
 
+// Upload ảnh canvas asset & tạo thiết kế mới cho khách
 router.post("/assets", verifyToken, requireDesignCreator, uploadDesignAsset, controller.taiAnhThietKe);
 router.post("/customer-drafts", verifyToken, requireDesignCreator, controller.taoThietKeChoKhach);
 
@@ -97,6 +98,9 @@ router.post("/customer-drafts", verifyToken, requireDesignCreator, controller.ta
 router.get("/", verifyToken, requireAdmin, controller.getDanhSachThietKe);
 
 // Hành động trên từng thiết kế
+// Lưu ý: /:id/canvas và /:id/sua phải khai báo TRƯỚC /:id để tránh conflict routing
+router.get("/:id/canvas", verifyToken, requireDesignCreator, controller.getCanvasDataThietKe);
+router.put("/:id/sua", verifyToken, requireDesignCreator, controller.suaThietKeChoKhach);
 router.get("/:id", verifyToken, requireAdmin, controller.getChiTietThietKe);
 
 module.exports = router;

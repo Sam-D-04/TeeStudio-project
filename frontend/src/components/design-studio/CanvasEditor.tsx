@@ -407,7 +407,7 @@ export default function CanvasEditor({
                 clipHeight: printArea.h,
               })}
         >
-          {elements.map((el) => {
+          {elements.map((el, index) => {
             const commonProps = {
               el,
               onSelect:  (e: Konva.KonvaEventObject<Event>) => {
@@ -418,8 +418,8 @@ export default function CanvasEditor({
               onDragStateChange: handleDragChange,
               onNodeReady: handleNodeReady,
             };
-            if (el.type === "image") return <ImageShape key={el.id} {...commonProps} />;
-            if (el.type === "text")  return <TextShape  key={el.id} {...commonProps} />;
+            if (el.type === "image") return <ImageShape key={el.id || index} {...commonProps} />;
+            if (el.type === "text")  return <TextShape  key={el.id || index} {...commonProps} />;
             return null;
           })}
         </Group>

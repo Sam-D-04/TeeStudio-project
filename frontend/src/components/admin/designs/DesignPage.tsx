@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 /**
  * DesignPage – Trang chính "Thiết kế & In ấn" (Orchestrator).
@@ -185,6 +185,11 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
   // ─── Xử lý xem chi tiết ────────────────────────────────────────────────
   function xuLyXemChiTiet(id: number) {
     setIdThietKeDangXem(id);
+  }
+
+  // ─── Điều hướng sang trang Editor để Admin sửa thiết kế ─────────────────
+  function xuLySuaThietKe(id: number) {
+    router.push(`/admin/thiet-ke/${id}/edit`);
   }
 
   // ─── Dữ liệu hiển thị ──────────────────────────────────────────────────
@@ -534,6 +539,7 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
               <DesignTable
                 danhSach={danhSachThietKe}
                 onXem={xuLyXemChiTiet}
+                onSua={xuLySuaThietKe}
               />
             )}
 

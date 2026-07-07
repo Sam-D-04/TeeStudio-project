@@ -92,11 +92,11 @@ export default function LayersPanel() {
         {layers.length === 0 ? (
           <div className="ds-layers-empty">Chưa có lớp nào</div>
         ) : (
-          layers.map((el) => {
+          layers.map((el, index) => {
             const isSelected = el.id === selectedId;
             return (
               <div
-                key={el.id}
+                key={el.id || index}
                 className={`ds-layer-item ${isSelected ? "ds-layer-item--selected" : ""}`}
                 onClick={() => setSelectedId(el.id)}
               >

@@ -59,6 +59,59 @@ const getChiTietThietKe = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/admin/designs/:id/canvas
+ * Lấy canvasData để load vào Editor (chỉ dùng khi Admin mở trang sửa thiết kế).
+ * Tách riêng khỏi getChiTietThietKe vì canvasData là JSON lớn, không cần ở mọi nơi.
+ */
+const getCanvasDataThietKe = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id || id <= 0) {
+      return res.status(400).json({ success: false, message: "ID thiết kế không hợp lệ" });
+    }
+
+    const data = await designService.layCanvasDataThietKe(id);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PUT /api/admin/designs/:id/sua
+ * Admin sửa thiết kế của khách: ghi đè canvasData + previewUrl, tự chuyển status APPROVED.
+ *
+ * Body: { canvasData: object|string, previewUrl: string (base64 hoặc URL Cloudinary) }
+ */
+const suaThietKeChoKhach = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id || id <= 0) {
+      return res.status(400).json({ success: false, message: "ID thiết kế không hợp lệ" });
+    }
+
+    const payload = { ...req.body };
+
+    // Nếu previewUrl là base64 → upload lên Cloudinary để lấy URL bền vững
+    if (payload.previewUrl?.startsWith("data:image")) {
+      payload.previewUrl = await uploadService.uploadBase64Image(
+        payload.previewUrl,
+        "user-designs"
+      );
+    }
+
+    const data = await designService.suaThietKeChoKhach(id, payload);
+    res.json({
+      success: true,
+      message: `Đã lưu thiết kế ${data.maThietKe} và duyệt thành công`,
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /** POST /api/admin/designs/customer-drafts - Admin tạo bản nháp cho một khách hàng. */
 const taoThietKeChoKhach = async (req, res, next) => {
   try {
@@ -275,6 +328,8 @@ module.exports = {
   getThongKe,
   getDanhSachThietKe,
   getChiTietThietKe,
+  getCanvasDataThietKe,
+  suaThietKeChoKhach,
   taoThietKeChoKhach,
   taiAnhThietKe,
   duyetThietKe,
