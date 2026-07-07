@@ -24,6 +24,14 @@ const COLOR_HEX_MAP: Record<string, string> = {
   // Hoodie
   "Dark Gray":  "#374151",
   Khaki:        "#c5b28a",
+  Grey:         "#9ca3af",
+  Brown:        "#8b4513",
+};
+
+const FORM_COLORS: Record<string, string[]> = {
+  tshirt: ["White", "Black", "Navy"],
+  polo:   ["Beige", "Navy", "White"],
+  hoodie: ["Grey", "Brown"],
 };
 
 function getHex(colorName: string): string {
@@ -87,7 +95,7 @@ const FORM_LABEL: Record<string, string> = {
   hoodie: "Áo Hoodie",
 };
 
-const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ";
+const fmt = (n: any) => Number(n).toLocaleString("vi-VN") + "đ";
 
 /* ─── Client Component ──────────────────────────────────────────────────── */
 interface Props {
@@ -182,7 +190,8 @@ export default function ProductShowcaseClient({ products }: Props) {
           className="template-grid"
         >
           {filtered.map((v, idx) => {
-            const colorList = v.colors ? v.colors.split(",") : [];
+            const dbColors = v.colors ? v.colors.split(",") : [];
+            const colorList = FORM_COLORS[v.form] || dbColors;
             const firstColor = colorList[0] || "White";
             const hex = getHex(firstColor);
             const isLight = ["#ffffff", "#d6b89a", "#c5b28a", "#eab308"].includes(hex);
@@ -218,9 +227,7 @@ export default function ProductShowcaseClient({ products }: Props) {
                 {/* ─ Preview area ─ */}
                 <div
                   style={{
-                    background:     isLight
-                      ? "linear-gradient(145deg, #f8fafc, #f1f5f9)"
-                      : `linear-gradient(145deg, ${hex}33, ${hex}66)`,
+                    background:     "#ffffff",
                     height:         168,
                     display:        "flex",
                     alignItems:     "center",
@@ -256,7 +263,7 @@ export default function ProductShowcaseClient({ products }: Props) {
                           width: "100%",
                           height: "100%",
                           objectFit: "contain",
-                          mixBlendMode: "multiply",
+                          filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.12))",
                           borderRadius: 8,
                         }}
                         draggable={false}
@@ -272,7 +279,19 @@ export default function ProductShowcaseClient({ products }: Props) {
                             : "/images/mockups/Polo-White-Front.png"
                         }
                         alt={`${v.productName} ${firstColor}`}
-                        style={{ width: "100%", objectFit: "contain", filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.15))" }}
+                        style={{ width: "100%", objectFit: "contain", filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.12))" }}
+                        draggable={false}
+                      />
+                    ) : v.form === "hoodie" ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={
+                          firstColor === "Brown"
+                            ? "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209409/Hoodie-Brown-Front_ab4bha.png"
+                            : "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209405/Hoodie-Grey-Front_boebdz.png"
+                        }
+                        alt={`${v.productName} ${firstColor}`}
+                        style={{ width: "100%", objectFit: "contain", filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.12))" }}
                         draggable={false}
                       />
                     ) : (

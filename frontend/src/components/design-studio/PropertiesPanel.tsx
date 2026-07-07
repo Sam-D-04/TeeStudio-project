@@ -1,9 +1,12 @@
 "use client";
 
-import React from "react";
 import { useDesignStore } from "@/store/useDesignStore";
+import { getPrintAreaBoundary } from "./ShirtMockupImage";
 
-/* ─── SVG Icons ─── */
+const CANVAS_W = 500;
+const CANVAS_H = 600;
+
+/* ─── Các icon SVG dùng trong panel ─── */
 const CopyIcon = () => (
   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
@@ -50,10 +53,44 @@ const TypeIcon = () => (
   </svg>
 );
 
+/* ─── Icon căn chỉnh vị trí (căn trái/phải/giữa...) ─── */
+const AlignLeftIcon = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M3 12h10M3 18h14M3 3v18" />
+  </svg>
+);
+const AlignCenterHIcon = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18M3 9h18M5 15h14" />
+  </svg>
+);
+const AlignRightIcon = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M11 12h10M7 18h14M21 3v18" />
+  </svg>
+);
+const AlignTopIcon = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 3h12M9 3v18M15 3v10M3 3h18" />
+  </svg>
+);
+const AlignCenterVIcon = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h18M9 3v18M15 5v14" />
+  </svg>
+);
+const AlignBottomIcon = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 21h12M9 3v18M15 11v10M3 21h18" />
+  </svg>
+);
+
 export default function PropertiesPanel() {
   const {
     selectedId,
     elements,
+    shirtType,
+    shirtView,
     updateElement,
     removeElement,
     duplicateElement,
@@ -82,12 +119,30 @@ export default function PropertiesPanel() {
     updateElement(el.id, { [key]: value });
   };
 
+  const align = (axis: "x" | "y", position: "start" | "center" | "end") => {
+    const pa = getPrintAreaBoundary(shirtType, shirtView, CANVAS_W, CANVAS_H);
+    pushHistory();
+    if (axis === "x") {
+      const x =
+        position === "start"  ? pa.left :
+        position === "center" ? pa.left + (pa.width  - el.width)  / 2 :
+                                pa.left + pa.width  - el.width;
+      updateElement(el.id, { x });
+    } else {
+      const y =
+        position === "start"  ? pa.top :
+        position === "center" ? pa.top  + (pa.height - el.height) / 2 :
+                                pa.top  + pa.height - el.height;
+      updateElement(el.id, { y });
+    }
+  };
+
   const isImage = el.type === "image";
 
   return (
     <aside className="ds-properties">
 
-      {/* ── Type badge ── */}
+      {/* ── Nhãn loại phần tử (ảnh / văn bản) + trạng thái khoá ── */}
       <div className="ds-prop-type-badge-row">
         <span className={`ds-prop-type-badge ${isImage ? "ds-prop-type-badge--image" : "ds-prop-type-badge--text"}`}>
           {isImage ? <ImageIcon /> : <TypeIcon />}
@@ -102,7 +157,7 @@ export default function PropertiesPanel() {
 
       <div className="ds-prop-divider" />
 
-      {/* ── Position & Size compact grid ── */}
+      {/* ── Lưới nhập nhanh vị trí (X, Y) và kích thước (W, H, góc xoay) ── */}
       <div className="ds-prop-grid">
         <div className="ds-prop-field">
           <label className="ds-prop-field-label">X</label>
@@ -166,7 +221,59 @@ export default function PropertiesPanel() {
 
       <div className="ds-prop-divider" />
 
-      {/* ── Quick actions row ── */}
+      {/* ── Căn chỉnh vị trí theo vùng in ── */}
+      {!el.locked && (
+        <>
+          <div className="ds-prop-section-label">Căn chỉnh theo vùng in</div>
+          <div className="ds-prop-align-row">
+            <button
+              className="ds-prop-align-btn"
+              title="Căn trái"
+              onClick={() => align("x", "start")}
+            >
+              <AlignLeftIcon />
+            </button>
+            <button
+              className="ds-prop-align-btn"
+              title="Căn giữa ngang"
+              onClick={() => align("x", "center")}
+            >
+              <AlignCenterHIcon />
+            </button>
+            <button
+              className="ds-prop-align-btn"
+              title="Căn phải"
+              onClick={() => align("x", "end")}
+            >
+              <AlignRightIcon />
+            </button>
+            <button
+              className="ds-prop-align-btn"
+              title="Căn trên"
+              onClick={() => align("y", "start")}
+            >
+              <AlignTopIcon />
+            </button>
+            <button
+              className="ds-prop-align-btn"
+              title="Căn giữa dọc"
+              onClick={() => align("y", "center")}
+            >
+              <AlignCenterVIcon />
+            </button>
+            <button
+              className="ds-prop-align-btn"
+              title="Căn dưới"
+              onClick={() => align("y", "end")}
+            >
+              <AlignBottomIcon />
+            </button>
+          </div>
+          <div className="ds-prop-divider" />
+        </>
+      )}
+
+      {/* ── Hàng thao tác nhanh: nhân đôi / khoá / đổi thứ tự lớp ── */}
       <div className="ds-prop-actions-row">
         <button
           className="ds-prop-icon-btn"
@@ -204,7 +311,7 @@ export default function PropertiesPanel() {
 
       <div className="ds-prop-divider" />
 
-      {/* ── Delete ── */}
+      {/* ── Nút xoá phần tử ── */}
       <button
         className="ds-prop-delete-btn"
         onClick={() => removeElement(el.id)}

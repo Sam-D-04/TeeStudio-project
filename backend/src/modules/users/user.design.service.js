@@ -1,5 +1,5 @@
 const db = require("../../database/mysql");
-const { calculateBoundingBoxAreaFee } = require("../pricing/pricing.service");
+const { calculateBoundingBoxAreaFee } = require("../pricing/admin.pricing.service");
 
 /**
  * Maps frontend shirtType to a database product ID.

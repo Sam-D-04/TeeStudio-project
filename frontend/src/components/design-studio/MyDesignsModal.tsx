@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal, Card, Col, Row, Typography, Spin, Empty, Button, message, Popconfirm } from "antd";
 import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { userDesignService, SavedDesign } from "@/services/userDesignService";

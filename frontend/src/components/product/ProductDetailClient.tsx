@@ -3,9 +3,10 @@
 import { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Button, Tag } from "antd";
+import { Button, Tag, message } from "antd";
+import { useCartStore } from "@/store/useCartStore";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Kiểu dữ liệu ───────────────────────────────────────────────────────────
 export interface ProductVariant {
   id: number;
   color: string;
@@ -34,7 +35,7 @@ export interface ProductDetail {
   images: ProductImage[];
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Hằng số ────────────────────────────────────────────────────────────────
 // Hỗ trợ cả tên tiếng Anh và tiếng Việt (theo dữ liệu thực tế trong DB)
 const COLOR_HEX_MAP: Record<string, string> = {
   // Tiếng Anh
@@ -44,6 +45,7 @@ const COLOR_HEX_MAP: Record<string, string> = {
   Red:             "#dc2626",
   "Light Blue":    "#7dd3fc",
   Gray:            "#94a3b8",
+  Grey:            "#9ca3af",
   "Dark Gray":     "#374151",
   Green:           "#16a34a",
   Yellow:          "#eab308",
@@ -51,6 +53,7 @@ const COLOR_HEX_MAP: Record<string, string> = {
   Orange:          "#f97316",
   Purple:          "#9333ea",
   Beige:           "#d6b89a",
+  Brown:           "#8b4513",
   Khaki:           "#c5b28a",
   // Tiếng Việt (từ DB)
   "Trắng":         "#ffffff",
@@ -72,22 +75,45 @@ const COLOR_HEX_MAP: Record<string, string> = {
   "Nâu":           "#92400e",
 };
 
+// Màu cố định cho từng loại phôi áo (hiển thị trên trang Detail)
+const FORM_COLORS: Record<string, string[]> = {
+  tshirt: ["White", "Black", "Navy"],
+  polo:   ["Beige", "Navy", "White"],
+  hoodie: ["Grey", "Brown"],
+};
+
+const VI_TO_EN: Record<string, string> = {
+  "Trắng": "White", "trắng": "White",
+  "Đen": "Black", "đen": "Black",
+  "Xám": "Gray", "xám": "Gray",
+  "Xanh navy": "Navy",
+  "Xanh dương": "Light Blue",
+  "Xanh lá": "Green",
+  "Vàng": "Yellow",
+  "Hồng": "Pink",
+  "Cam": "Orange",
+  "Tím": "Purple",
+  "Be": "Beige",
+  "Khaki": "Khaki",
+  "Nâu": "Brown",
+};
+
+const isSameColor = (c1: string, c2: string) => {
+  const e1 = VI_TO_EN[c1] || c1;
+  const e2 = VI_TO_EN[c2] || c2;
+  return e1 === e2;
+};
+
 // Trả về tên hiển thị – nếu tên đã là tiếng Việt thì dùng luôn
 const getColorLabel = (color: string): string => {
   const EN_TO_VI: Record<string, string> = {
     White: "Trắng", Black: "Đen", Navy: "Xanh Navy", Red: "Đỏ",
     "Light Blue": "Xanh nhạt", Gray: "Xám", "Dark Gray": "Xám đậm",
     Green: "Xanh lá", Yellow: "Vàng", Pink: "Hồng", Orange: "Cam",
-    Purple: "Tím", Beige: "Be", Khaki: "Khaki",
+    Purple: "Tím", Beige: "Be", Khaki: "Khaki", Brown: "Nâu", Grey: "Xám"
   };
   return EN_TO_VI[color] ?? color; // nếu không có trong map thì dùng nguyên tên
 };
-
-/** @deprecated dùng getColorLabel() thay thế */
-const COLOR_VI = { White: "Trắng", Black: "Đen", Navy: "Xanh Navy", Red: "Đỏ",
-  "Light Blue": "Xanh nhạt", Gray: "Xám", "Dark Gray": "Xám đậm",
-  Green: "Xanh lá", Yellow: "Vàng", Pink: "Hồng", Orange: "Cam",
-  Purple: "Tím", Beige: "Be", Khaki: "Khaki" } as Record<string, string>;
 
 const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 
@@ -106,11 +132,16 @@ const MOCKUP_MAP: Record<string, Record<string, { front?: string; back?: string 
     Navy:  { front: "/images/mockups/TShirt-Navy-Front.png",  back: "/images/mockups/TShirt-Navy-Back.png" },
     White: { front: "/images/mockups/TShirt-White-Front.png", back: "/images/mockups/TShirt-White-Back.png" },
   },
+  hoodie: {
+    Brown: { front: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209409/Hoodie-Brown-Front_ab4bha.png", back: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209411/Hoodie-Brown-Back_echgn5.png" },
+    Gray:  { front: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209405/Hoodie-Grey-Front_boebdz.png",  back: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209405/Hoodie-Grey-Back_ntgcoc.png" },
+    Grey:  { front: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209405/Hoodie-Grey-Front_boebdz.png",  back: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209405/Hoodie-Grey-Back_ntgcoc.png" },
+  },
 };
 
 const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ";
 
-// ─── SVG Silhouettes ──────────────────────────────────────────────────────────
+// ─── Hình minh hoạ áo bằng SVG (dùng khi không có ảnh mockup thật) ───────────
 function ShirtSVG({ form, fillColor }: { form: string; fillColor: string }) {
   const isLight = ["#ffffff", "#d6b89a", "#c5b28a", "#eab308", "#f472b6", "#7dd3fc"].includes(fillColor);
   const strokeColor = isLight ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.4)";
@@ -132,14 +163,14 @@ function ShirtSVG({ form, fillColor }: { form: string; fillColor: string }) {
           strokeWidth="3"
           strokeLinecap="round"
         />
-        {/* pocket */}
+        {/* túi áo */}
         <path
           d="M70 148Q70 168 100 168Q130 168 130 148L130 132H70Z"
           fill={isLight ? "rgba(0,0,0,0.07)" : "rgba(255,255,255,0.15)"}
           stroke={strokeColor}
           strokeWidth="2"
         />
-        {/* zipper */}
+        {/* dây kéo */}
         <path d="M100 100v32" stroke={strokeColor} strokeWidth="2.5" strokeLinecap="round" strokeDasharray="5 4" />
       </svg>
     );
@@ -155,9 +186,9 @@ function ShirtSVG({ form, fillColor }: { form: string; fillColor: string }) {
           strokeWidth="3"
           strokeLinejoin="round"
         />
-        {/* collar */}
+        {/* cổ áo */}
         <path d="M80 72L100 92L120 72" fill="none" stroke={strokeColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        {/* button row */}
+        {/* hàng nút áo */}
         <line x1="100" y1="92" x2="100" y2="140" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" />
         {[106, 116, 126, 136].map(y => (
           <circle key={y} cx="100" cy={y} r="2.5" fill={strokeColor} />
@@ -176,9 +207,9 @@ function ShirtSVG({ form, fillColor }: { form: string; fillColor: string }) {
         strokeWidth="3"
         strokeLinejoin="round"
       />
-      {/* collar */}
+      {/* cổ áo */}
       <path d="M76 52C80 66 120 66 124 52" fill="none" stroke={strokeColor} strokeWidth="2.5" strokeLinecap="round" />
-      {/* print area dashed */}
+      {/* khung nét đứt minh hoạ vùng in */}
       <rect x="76" y="104" width="48" height="52" rx="6"
         fill={isLight ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.18)"}
         stroke={strokeColor}
@@ -190,7 +221,7 @@ function ShirtSVG({ form, fillColor }: { form: string; fillColor: string }) {
   );
 }
 
-// ─── Main Client Component ─────────────────────────────────────────────────────
+// ─── Component chính (client component) ──────────────────────────────────────
 interface Props {
   product: ProductDetail;
 }
@@ -199,13 +230,13 @@ export default function ProductDetailClient({ product }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Derive unique colors + sizes
+  // Dùng bộ màu cố định cho từng loại áo thay vì đọc từ variants
   const uniqueColors = useMemo(
-    () => Array.from(new Set(product.variants.map(v => v.color))),
-    [product.variants]
+    () => FORM_COLORS[product.form] ?? Array.from(new Set(product.variants.map(v => v.color))),
+    [product.form, product.variants]
   );
 
-  // Pre-select color from URL query param (?color=Navy)
+  // Chọn sẵn màu từ query param trên URL (?color=Navy) nếu có
   const initialColor = useMemo(() => {
     const qColor = searchParams.get("color");
     if (qColor && uniqueColors.includes(qColor)) return qColor;
@@ -220,7 +251,7 @@ export default function ProductDetailClient({ product }: Props) {
   // Chỉ lấy size có trong màu đang chọn
   const sizesForColor = useMemo(() => {
     const available = product.variants
-      .filter(v => v.color === selectedColor)
+      .filter(v => isSameColor(v.color, selectedColor))
       .map(v => v.size);
     const unique = Array.from(new Set(available));
     return unique.sort((a, b) => {
@@ -234,7 +265,7 @@ export default function ProductDetailClient({ product }: Props) {
   const handleColorChange = (color: string) => {
     setSelectedColor(color);
     const firstAvailable = product.variants
-      .filter(v => v.color === color && v.stockQty > 0)
+      .filter(v => isSameColor(v.color, color) && v.stockQty > 0)
       .sort((a, b) => {
         const ia = SIZE_ORDER.indexOf(a.size);
         const ib = SIZE_ORDER.indexOf(b.size);
@@ -246,57 +277,81 @@ export default function ProductDetailClient({ product }: Props) {
   const colorHex = COLOR_HEX_MAP[selectedColor] ?? "#94a3b8";
   const isLightColor = ["#ffffff", "#d6b89a", "#c5b28a", "#eab308", "#f472b6", "#7dd3fc"].includes(colorHex);
 
-  // Stock of selected color+size combination
+  // Tồn kho của tổ hợp màu + size đang chọn
   const getStock = (color: string, size: string) =>
-    product.variants.find(v => v.color === color && v.size === size)?.stockQty ?? 0;
+    product.variants.find(v => isSameColor(v.color, color) && v.size === size)?.stockQty ?? 0;
 
   const totalStockForColor = product.variants
-    .filter(v => v.color === selectedColor)
+    .filter(v => isSameColor(v.color, selectedColor))
     .reduce((s, v) => s + v.stockQty, 0);
 
-  const VI_TO_EN: Record<string, string> = {
-    "Trắng": "White", "trắng": "White",
-    "Đen": "Black", "đen": "Black",
-    "Xám": "Gray", "xám": "Gray",
-    "Xanh navy": "Navy",
-    "Xanh dương": "Light Blue",
-    "Xanh lá": "Green",
-    "Vàng": "Yellow",
-    "Hồng": "Pink",
-    "Cam": "Orange",
-    "Tím": "Purple",
-    "Be": "Beige",
-    "Khaki": "Khaki",
-  };
   const englishColor = VI_TO_EN[selectedColor] || selectedColor;
 
-  // Tìm ảnh từ DB theo altText (kiểm tra cả tiếng Anh và tiếng Việt)
-  const expectedAltEn = `${englishColor}-${previewTab}`;
-  const expectedAltVi = `${selectedColor}-${previewTab}`;
-  let dbImage = product.images?.find((img) => img.altText === expectedAltEn || img.altText === expectedAltVi)?.url;
+  // Tìm ảnh từ DB theo altText (nhiều format: Color-front, color-front, v.v.)
+  const findDbImage = (color: string, view: string): string | undefined => {
+    const enColor = VI_TO_EN[color] || color;
+    const candidates = [
+      `${enColor}-${view}`,          // e.g. "Grey-front"
+      `${color}-${view}`,            // e.g. "Xám-front"
+      `${enColor}-${view}`.toLowerCase(), // e.g. "grey-front"
+      `${view}`,                     // fallback nếu chỉ có 1 màu
+    ];
+    return product.images?.find((img) =>
+      candidates.some(c => img.altText?.toLowerCase() === c.toLowerCase())
+    )?.url;
+  };
 
-  // Mockup image: ưu tiên ảnh từ DB, nếu không có thì fallback về ảnh tĩnh
-  const mockupUrl = dbImage || MOCKUP_MAP[product.form]?.[englishColor]?.[previewTab];
+  const dbImageFront = findDbImage(selectedColor, "front");
+  const dbImageBack  = findDbImage(selectedColor, "back");
+
+  // Mockup image: ưu tiên ảnh từ DB, fallback về MOCKUP_MAP (Cloudinary hoặc local)
+  const mockupUrl = (previewTab === "front" ? dbImageFront : dbImageBack)
+    || MOCKUP_MAP[product.form]?.[englishColor]?.[previewTab];
   const hasMockup = !!mockupUrl;
 
-  // Check if Front/Back tabs are available
-  const hasDbBack = !!product.images?.find((img) => img.altText === `${englishColor}-back` || img.altText === `${selectedColor}-back`);
-  const hasBackView = hasDbBack || !!MOCKUP_MAP[product.form]?.[englishColor]?.back;
+  const addItem = useCartStore((s) => s.addItem);
 
   const handleDesignNow = () => {
     const params = new URLSearchParams({
       shirt: product.form,
       color: selectedColor,
       view: previewTab,
+      productId: String(product.id),
     });
     router.push(`/design-studio?${params.toString()}`);
+  };
+
+  const handleAddToCart = () => {
+    if (!selectedSize) {
+      void message.warning("Vui lòng chọn size trước khi thêm vào giỏ hàng");
+      return;
+    }
+    const variant = product.variants.find(
+      (v) => isSameColor(v.color, selectedColor) && v.size === selectedSize
+    );
+    if (!variant || variant.stockQty === 0) {
+      void message.error("Sản phẩm này hiện không còn hàng");
+      return;
+    }
+    addItem({
+      productId: product.id,
+      variantId: variant.id,
+      name: product.name,
+      image: product.images.find((i) => i.isPrimary)?.url ?? product.images[0]?.url ?? "",
+      size: selectedSize,
+      color: selectedColor,
+      colorLabel: getColorLabel(selectedColor),
+      price: product.basePrice,
+      quantity: 1,
+    });
+    void message.success(`Đã thêm ${product.name} (${selectedSize}) vào giỏ hàng!`);
   };
 
   return (
     <main style={{ minHeight: "100vh", background: "#f1f5f9" }}>
       <div style={{ paddingTop: 64 }}>
 
-        {/* ── Breadcrumb ── */}
+        {/* ── Đường dẫn điều hướng (breadcrumb) ── */}
         <div className="container-main" style={{ padding: "20px 24px 0" }}>
           <nav style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#94a3b8" }}>
             <Link href="/" style={{ color: "#94a3b8", textDecoration: "none", transition: "color 0.15s" }}
@@ -312,7 +367,7 @@ export default function ProductDetailClient({ product }: Props) {
           </nav>
         </div>
 
-        {/* ── Hero Section ── */}
+        {/* ── Khu vực chính: ảnh xem trước + thông tin sản phẩm ── */}
         <div className="container-main" style={{ padding: "24px 24px 0" }}>
           <div
             style={{
@@ -323,7 +378,7 @@ export default function ProductDetailClient({ product }: Props) {
             }}
             className="product-detail-grid"
           >
-            {/* ── LEFT: Preview ── */}
+            {/* ── Bên trái: Ảnh xem trước sản phẩm ── */}
             <div
               style={{
                 background: "#ffffff",
@@ -335,49 +390,42 @@ export default function ProductDetailClient({ product }: Props) {
                 top: 80,
               }}
             >
-              {/* Tab Front/Back */}
-              {(hasMockup || product.form !== "hoodie") && (
-                <div
-                  style={{
-                    display: "flex",
-                    borderBottom: "1px solid #f1f5f9",
-                    background: "#f8fafc",
-                  }}
-                >
-                  {(["front", "back"] as const).filter(tab => {
-                    if (tab === "back") return hasBackView || !hasMockup;
-                    return true;
-                  }).map(tab => (
-                    <button
-                      key={tab}
-                      onClick={() => setPreviewTab(tab)}
-                      style={{
-                        flex: 1,
-                        padding: "12px 0",
-                        background: "none",
-                        border: "none",
-                        borderBottom: previewTab === tab ? "2px solid #0ea5e9" : "2px solid transparent",
-                        color: previewTab === tab ? "#0ea5e9" : "#94a3b8",
-                        fontWeight: previewTab === tab ? 700 : 500,
-                        fontSize: 13,
-                        cursor: "pointer",
-                        transition: "all 0.15s",
-                        fontFamily: "inherit",
-                        letterSpacing: "0.3px",
-                      }}
-                    >
-                      {tab === "front" ? "Mặt trước" : "Mặt sau"}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Preview area */}
+              {/* Tab Front/Back – luôn hiển thị cả 2 tab */}
               <div
                 style={{
-                  background: isLightColor
-                    ? "linear-gradient(145deg, #f8fafc, #f1f5f9)"
-                    : `linear-gradient(145deg, ${colorHex}22, ${colorHex}44)`,
+                  display: "flex",
+                  borderBottom: "1px solid #f1f5f9",
+                  background: "#f8fafc",
+                }}
+              >
+                {(["front", "back"] as const).map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setPreviewTab(tab)}
+                    style={{
+                      flex: 1,
+                      padding: "12px 0",
+                      background: "none",
+                      border: "none",
+                      borderBottom: previewTab === tab ? "2px solid #0ea5e9" : "2px solid transparent",
+                      color: previewTab === tab ? "#0ea5e9" : "#94a3b8",
+                      fontWeight: previewTab === tab ? 700 : 500,
+                      fontSize: 13,
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                      fontFamily: "inherit",
+                      letterSpacing: "0.3px",
+                    }}
+                  >
+                    {tab === "front" ? "Mặt trước" : "Mặt sau"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Khu vực hiển thị ảnh áo */}
+              <div
+                style={{
+                  background: "#ffffff",
                   minHeight: 420,
                   display: "flex",
                   alignItems: "center",
@@ -387,7 +435,7 @@ export default function ProductDetailClient({ product }: Props) {
                   transition: "background 0.3s ease",
                 }}
               >
-                {/* Stock badge */}
+                {/* Nhãn tình trạng tồn kho */}
                 <div
                   style={{
                     position: "absolute",
@@ -409,7 +457,7 @@ export default function ProductDetailClient({ product }: Props) {
                     : "Còn hàng"}
                 </div>
 
-                {/* Color name badge */}
+                {/* Nhãn tên màu đang chọn */}
                 {selectedColor && (
                   <div
                     style={{
@@ -438,16 +486,16 @@ export default function ProductDetailClient({ product }: Props) {
                       }}
                     />
                     <span style={{ fontSize: 11, fontWeight: 600, color: "#475569" }}>
-                      {COLOR_VI[selectedColor] ?? selectedColor}
+                      {getColorLabel(selectedColor)}
                     </span>
                   </div>
                 )}
 
-                {/* Actual image or SVG */}
+                {/* Ảnh mockup thật (nếu có), fallback về hình SVG minh hoạ */}
                 <div
                   style={{
                     width: "100%",
-                    maxWidth: 280,
+                    maxWidth: 420,
                     filter: hasMockup
                       ? "drop-shadow(0 12px 32px rgba(0,0,0,0.18))"
                       : isLightColor
@@ -461,7 +509,7 @@ export default function ProductDetailClient({ product }: Props) {
                     <img
                       src={mockupUrl}
                       alt={`${product.name} ${selectedColor} ${previewTab}`}
-                      style={{ width: "100%", objectFit: "contain", display: "block", mixBlendMode: "multiply" }}
+                      style={{ width: "100%", objectFit: "contain", display: "block" }}
                       draggable={false}
                     />
                   ) : (
@@ -470,49 +518,13 @@ export default function ProductDetailClient({ product }: Props) {
                 </div>
               </div>
 
-              {/* Color quick-select at bottom of preview */}
-              <div
-                style={{
-                  padding: "16px 20px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  flexWrap: "wrap",
-                  borderTop: "1px solid #f1f5f9",
-                }}
-              >
-                <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600, marginRight: 4 }}>MÀU:</span>
-                {uniqueColors.map(color => {
-                  const hex = COLOR_HEX_MAP[color] ?? "#94a3b8";
-                  const isSelected = color === selectedColor;
-                  return (
-                    <button
-                      key={color}
-                      title={COLOR_VI[color] ?? color}
-                      onClick={() => setSelectedColor(color)}
-                      style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: "50%",
-                        background: hex,
-                        border: isSelected ? `3px solid #0ea5e9` : "2px solid #e2e8f0",
-                        cursor: "pointer",
-                        transform: isSelected ? "scale(1.25)" : "scale(1)",
-                        transition: "all 0.18s ease",
-                        boxShadow: isSelected ? "0 0 0 2px white, 0 0 0 4px #0ea5e9" : "none",
-                        padding: 0,
-                        outline: "none",
-                      }}
-                    />
-                  );
-                })}
-              </div>
+
             </div>
 
-            {/* ── RIGHT: Info + Controls ── */}
+            {/* ── Bên phải: Thông tin sản phẩm + các lựa chọn ── */}
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
-              {/* Product header */}
+              {/* Tiêu đề sản phẩm: nhãn loại/danh mục, tên, giá */}
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                   <Tag
@@ -566,10 +578,10 @@ export default function ProductDetailClient({ product }: Props) {
                 </div>
               </div>
 
-              {/* Divider */}
+              {/* Đường kẻ phân cách */}
               <div style={{ height: 1, background: "#f1f5f9" }} />
 
-              {/* Color Selector */}
+              {/* Chọn màu */}
               <div>
                 <div
                   style={{
@@ -600,7 +612,7 @@ export default function ProductDetailClient({ product }: Props) {
                         border: "1px solid rgba(0,0,0,0.1)",
                       }}
                     />
-                    {COLOR_VI[selectedColor] ?? selectedColor}
+                    {getColorLabel(selectedColor)}
                   </span>
                 </div>
 
@@ -609,7 +621,7 @@ export default function ProductDetailClient({ product }: Props) {
                     const hex = COLOR_HEX_MAP[color] ?? "#94a3b8";
                     const isSelected = color === selectedColor;
                     const totalStock = product.variants
-                      .filter(v => v.color === color)
+                      .filter(v => isSameColor(v.color, color))
                       .reduce((s, v) => s + v.stockQty, 0);
                     const isOutOfStock = totalStock === 0;
 
@@ -617,14 +629,14 @@ export default function ProductDetailClient({ product }: Props) {
                       <button
                         key={color}
                         title={`${getColorLabel(color)}${isOutOfStock ? " – Hết hàng" : ""}`}
-                        onClick={() => !isOutOfStock && handleColorChange(color)}
+                        onClick={() => handleColorChange(color)}
                         style={{
                           width: 36,
                           height: 36,
                           borderRadius: "50%",
                           background: hex,
                           border: isSelected ? "3px solid #0ea5e9" : "2px solid #e2e8f0",
-                          cursor: isOutOfStock ? "not-allowed" : "pointer",
+                          cursor: "pointer",
                           transform: isSelected ? "scale(1.15)" : "scale(1)",
                           transition: "all 0.18s ease",
                           boxShadow: isSelected
@@ -641,7 +653,7 @@ export default function ProductDetailClient({ product }: Props) {
                 </div>
               </div>
 
-              {/* Size Selector */}
+              {/* Chọn size */}
               <div>
                 <div
                   style={{
@@ -756,7 +768,7 @@ export default function ProductDetailClient({ product }: Props) {
                 )}
               </div>
 
-              {/* Quick Info */}
+              {/* Thông tin nhanh: chất liệu, xuất xứ, cách in, thời gian giao hàng */}
               <div
                 style={{
                   background: "#f8fafc",
@@ -788,7 +800,7 @@ export default function ProductDetailClient({ product }: Props) {
                 ))}
               </div>
 
-              {/* CTA Buttons */}
+              {/* Các nút hành động chính: thiết kế ngay / thêm vào giỏ / đặt số lượng lớn */}
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <Button
                   type="primary"
@@ -817,7 +829,36 @@ export default function ProductDetailClient({ product }: Props) {
                     (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 16px rgba(14,165,233,0.35)";
                   }}
                 >
-                  Thiết kế ngay
+                  🎨 Thiết kế ngay
+                </Button>
+
+                <Button
+                  size="large"
+                  onClick={handleAddToCart}
+                  style={{
+                    height: 52,
+                    borderRadius: 14,
+                    border: "2px solid #0ea5e9",
+                    fontWeight: 700,
+                    fontSize: 15,
+                    color: "#0ea5e9",
+                    background: selectedSize ? "#f0f9ff" : "#ffffff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "#e0f2fe";
+                    (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = selectedSize ? "#f0f9ff" : "#ffffff";
+                    (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+                  }}
+                >
+                  🛒 {selectedSize ? `Thêm vào giỏ hàng (${selectedSize})` : "Thêm vào giỏ hàng"}
                 </Button>
 
                 <Button
@@ -852,7 +893,7 @@ export default function ProductDetailClient({ product }: Props) {
                 </Button>
               </div>
 
-              {/* Trust badges */}
+              {/* Các cam kết tạo niềm tin (đổi trả, in đúng màu, ship toàn quốc) */}
               <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
                 {[
                   { icon: "🔄", text: "Đổi trả 7 ngày" },
@@ -879,7 +920,7 @@ export default function ProductDetailClient({ product }: Props) {
           </div>
         </div>
 
-        {/* ── Detail Tabs Section ── */}
+        {/* ── Khu vực tab: thông tin chi tiết / bảng size ── */}
         <div className="container-main" style={{ padding: "40px 24px 0" }}>
           <div
             style={{
@@ -890,7 +931,7 @@ export default function ProductDetailClient({ product }: Props) {
               boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
             }}
           >
-            {/* Tab headers */}
+            {/* Tiêu đề các tab */}
             <div style={{ display: "flex", borderBottom: "1px solid #f1f5f9" }}>
               {(["detail", "size"] as const).map(tab => (
                 <button
@@ -914,11 +955,11 @@ export default function ProductDetailClient({ product }: Props) {
               ))}
             </div>
 
-            {/* Tab content */}
+            {/* Nội dung của tab đang chọn */}
             <div style={{ padding: "28px 32px" }}>
               {activeTab === "detail" ? (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40 }} className="detail-tab-grid">
-                  {/* Left: description */}
+                  {/* Cột trái: mô tả sản phẩm */}
                   <div>
                     <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>
                       Mô tả sản phẩm
@@ -944,7 +985,7 @@ export default function ProductDetailClient({ product }: Props) {
                     </div>
                   </div>
 
-                  {/* Right: specs */}
+                  {/* Cột phải: thông số kỹ thuật */}
                   <div>
                     <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>
                       Thông số kỹ thuật
@@ -979,7 +1020,7 @@ export default function ProductDetailClient({ product }: Props) {
                   </div>
                 </div>
               ) : (
-                /* Size guide table */
+                /* Bảng hướng dẫn chọn size */
                 <div>
                   <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>
                     Bảng hướng dẫn chọn size
@@ -1064,7 +1105,7 @@ export default function ProductDetailClient({ product }: Props) {
           </div>
         </div>
 
-        {/* ── Bottom CTA Banner ── */}
+        {/* ── Banner kêu gọi hành động ở cuối trang ── */}
         <div className="container-main" style={{ padding: "32px 24px 64px" }}>
           <div
             style={{

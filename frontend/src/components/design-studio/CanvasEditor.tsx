@@ -13,12 +13,12 @@ import {
 import type Konva from "konva";
 import { useDesignStore, DesignElement } from "@/store/useDesignStore";
 
-/* ─── Types ─── */
+/* ─── Kiểu dữ liệu ─── */
 export type PrintArea = { x: number; y: number; w: number; h: number };
 
-/* ─── Custom hook: load ảnh từ src ─── */
+/* ─── Hook tự viết: tải ảnh từ đường dẫn (src) ─── */
 function useLoadImage(src: string | undefined) {
-  const [image, setImage] = React.useState<HTMLImageElement | null>(null);
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
   useEffect(() => {
     if (!src) { setImage(null); return; }
     const img = new window.Image();
@@ -31,7 +31,7 @@ function useLoadImage(src: string | undefined) {
   return image;
 }
 
-/* ─── Snap guide lines ─── */
+/* ─── Đường gióng (snap guide) hiện ra khi kéo phần tử gần tâm/mép vùng in ─── */
 function SnapGuides({
   printArea, nodeX, nodeY, nodeW, nodeH, visible,
 }: {
@@ -64,7 +64,7 @@ function SnapGuides({
   return <>{guides}</>;
 }
 
-/* ─── Custom Rotate Icon Hook ─── */
+/* ─── Hook tự viết: tải icon xoay (rotate) dùng cho tay cầm của Transformer ─── */
 function useRotateIcon() {
   const [img, setImg] = useState<HTMLImageElement | undefined>();
   useEffect(() => {
@@ -157,13 +157,21 @@ function ExternalTransformer({
         if (!node) return;
 
         if (el.type === "image") {
-          const scaleX = node.scaleX();
-          const scaleY = node.scaleY();
-          node.scaleX(1);
-          node.scaleY(1);
-          const newW = Math.max(10, (node as Konva.Image).width() * scaleX);
-          const newH = Math.max(10, (node as Konva.Image).height() * scaleY);
-          updateElement(el.id, { x: node.x(), y: node.y(), width: newW, height: newH, rotation: node.rotation() });
+          const flipH = el.flipH ?? false;
+          const flipV = el.flipV ?? false;
+          const rawScaleX = node.scaleX();
+          const rawScaleY = node.scaleY();
+          /* Magnitude của resize (luôn dương), giữ nguyên hướng flip */
+          const resScaleX = Math.abs(rawScaleX);
+          const resScaleY = Math.abs(rawScaleY);
+          node.scaleX(flipH ? -1 : 1);
+          node.scaleY(flipV ? -1 : 1);
+          const newW = Math.max(10, (node as Konva.Image).width() * resScaleX);
+          const newH = Math.max(10, (node as Konva.Image).height() * resScaleY);
+          /* node.x() = storeX + (flipH ? newW : 0) → giải ngược về storeX */
+          const storeX = node.x() - (flipH ? newW : 0);
+          const storeY = node.y() - (flipV ? newH : 0);
+          updateElement(el.id, { x: storeX, y: storeY, width: newW, height: newH, rotation: node.rotation() });
         } else if (el.type === "text") {
           const textNode = node as Konva.Text;
           const scaleX   = textNode.scaleX();
@@ -191,12 +199,11 @@ function ExternalTransformer({
   );
 }
 
-/* ─── Image shape ─── */
+/* ─── Phần tử hình ảnh trên canvas ─── */
 function ImageShape({
-  el, isSelected, onSelect, shapeRefs, onDragStateChange, onNodeReady,
+  el, onSelect, shapeRefs, onDragStateChange, onNodeReady,
 }: {
   el: DesignElement;
-  isSelected: boolean;
   onSelect: (e: Konva.KonvaEventObject<Event>) => void;
   shapeRefs: React.RefObject<Map<string, Konva.Node>>;
   onDragStateChange: (active: boolean, x: number, y: number, w: number, h: number) => void;
@@ -217,36 +224,53 @@ function ImageShape({
   }, [el.id, image]);
 
   if (!image) return null;
-  const elW = el.width  ?? 100;
-  const elH = el.height ?? 100;
+  const elW   = el.width  ?? 100;
+  const elH   = el.height ?? 100;
+  const flipH = el.flipH  ?? false;
+  const flipV = el.flipV  ?? false;
+
+  /* Khi flipH=true: dịch x sang phải bằng width, scaleX=-1 → ảnh vẫn nằm đúng chỗ */
+  const konvaX = el.x + (flipH ? elW : 0);
+  const konvaY = el.y + (flipV ? elH : 0);
+
+  /* Chuyển Konva x/y về store x/y (bỏ offset flip) */
+  const toStoreX = (kx: number) => kx - (flipH ? elW : 0);
+  const toStoreY = (ky: number) => ky - (flipV ? elH : 0);
 
   return (
     <KonvaImage
       ref={shapeRef}
       image={image}
-      x={el.x} y={el.y}
+      x={konvaX} y={konvaY}
       width={elW} height={elH}
+      scaleX={flipH ? -1 : 1}
+      scaleY={flipV ? -1 : 1}
       rotation={el.rotation}
       draggable={!el.locked}
       onClick={onSelect}
       onTap={onSelect}
       onDragStart={() => { pushHistory(); onDragStateChange(true, el.x, el.y, elW, elH); }}
-      onDragMove={(e) => onDragStateChange(true, e.target.x(), e.target.y(), elW, elH)}
+      onDragMove={(e) => {
+        const sx = toStoreX(e.target.x());
+        const sy = toStoreY(e.target.y());
+        onDragStateChange(true, sx, sy, elW, elH);
+      }}
       onDragEnd={(e) => {
-        onDragStateChange(false, e.target.x(), e.target.y(), elW, elH);
-        updateElement(el.id, { x: e.target.x(), y: e.target.y() });
+        const sx = toStoreX(e.target.x());
+        const sy = toStoreY(e.target.y());
+        onDragStateChange(false, sx, sy, elW, elH);
+        updateElement(el.id, { x: sx, y: sy });
       }}
       perfectDrawEnabled={false}
     />
   );
 }
 
-/* ─── Text shape ─── */
+/* ─── Phần tử chữ (text) trên canvas ─── */
 function TextShape({
-  el, isSelected, onSelect, shapeRefs, onDragStateChange, onNodeReady,
+  el, onSelect, shapeRefs, onDragStateChange, onNodeReady,
 }: {
   el: DesignElement;
-  isSelected: boolean;
   onSelect: (e: Konva.KonvaEventObject<Event>) => void;
   shapeRefs: React.RefObject<Map<string, Konva.Node>>;
   onDragStateChange: (active: boolean, x: number, y: number, w: number, h: number) => void;
@@ -297,15 +321,15 @@ function TextShape({
   );
 }
 
-/* ─── Main CanvasEditor ─── */
+/* ─── Component chính: CanvasEditor ─── */
 export interface CanvasEditorProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   printArea: PrintArea;
   containerW: number;
   containerH: number;
   zoom: number;
-  /** Optional polygon clip points (absolute px, logical coords).
-   *  When provided, replaces the rectangular clip with a polygon clip. */
+  /** Danh sách điểm đa giác dùng để clip vùng in (toạ độ logic, đơn vị px).
+   *  Nếu có giá trị, vùng in sẽ được clip theo đa giác này thay vì hình chữ nhật. */
   clipPoints?: [number, number][];
 }
 
@@ -386,7 +410,6 @@ export default function CanvasEditor({
           {elements.map((el) => {
             const commonProps = {
               el,
-              isSelected: el.id === selectedId,
               onSelect:  (e: Konva.KonvaEventObject<Event>) => {
                 e.cancelBubble = true;
                 if (!el.locked) setSelectedId(el.id);

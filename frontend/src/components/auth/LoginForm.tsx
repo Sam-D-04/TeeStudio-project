@@ -9,7 +9,9 @@ import {
 } from "@/lib/authorization";
 import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import { authService } from "@/services/authService";
+import { syncCart } from "@/services/cartService";
 import useAuthStore from "@/store/useAuthStore";
+import { useCartStore } from "@/store/useCartStore";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -27,6 +29,13 @@ export default function LoginForm() {
     try {
       const session = await authService.login({ email, password });
       setSession(session);
+      if (session.user.role === "CUSTOMER") {
+        try {
+          const cartState = useCartStore.getState();
+          const synced = await syncCart(session.accessToken, cartState.toSyncPayload());
+          cartState.loadFromBackend(synced);
+        } catch { /* sync lỗi không block đăng nhập */ }
+      }
 
       const requestedPath = new URLSearchParams(window.location.search).get("redirect");
       let destination = getDefaultRouteForRole(session.user.role);

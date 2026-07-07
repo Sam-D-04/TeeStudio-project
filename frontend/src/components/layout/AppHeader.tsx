@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Input, Badge, Drawer } from "antd";
 import HeaderAuthActions from "@/components/auth/HeaderAuthActions";
+import { useCartStore } from "@/store/useCartStore";
 
 const navItems = [
   { key: "/explore",      label: "Khám phá" },
@@ -17,7 +18,15 @@ export default function AppHeader() {
   const [scrolled,    setScrolled]    = useState(false);
   const [drawerOpen,  setDrawerOpen]  = useState(false);
   const pathname      = usePathname();
+  const router        = useRouter();
   const [searchValue, setSearchValue] = useState("");
+
+  const handleSearch = (value: string) => {
+    const q = value.trim();
+    if (q) router.push(`/explore?q=${encodeURIComponent(q)}`);
+    else   router.push("/explore");
+  };
+  const totalItems    = useCartStore((s) => s.totalItems());
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 8);
@@ -142,10 +151,13 @@ export default function AppHeader() {
 
           {/* ── Search ── */}
           <div style={{ flex: 1, maxWidth: 380 }} className="hidden md:block">
-            <Input
-              placeholder="Tìm kiếm mẫu thiết kế, loại áo..."
+            <Input.Search
+              placeholder="Tìm kiếm loại áo, chất liệu..."
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
+              onSearch={handleSearch}
+              allowClear
+              onClear={() => { setSearchValue(""); router.push("/explore"); }}
               prefix={
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                   <circle cx="7" cy="7" r="5.5" stroke="#94a3b8" strokeWidth="1.5" />
@@ -157,7 +169,6 @@ export default function AppHeader() {
                 border:       "1px solid #e2e8f0",
                 borderRadius: 10,
                 fontSize:     14,
-                height:       40,
               }}
             />
           </div>
@@ -175,29 +186,31 @@ export default function AppHeader() {
             <HeaderAuthActions />
 
             {/* Cart */}
-            <Badge count={0} showZero={false}>
-              <button
-                style={{
-                  width:        40,
-                  height:       40,
-                  borderRadius: 8,
-                  background:   "#f1f5f9",
-                  border:       "1px solid #e2e8f0",
-                  display:      "flex",
-                  alignItems:   "center",
-                  justifyContent:"center",
-                  cursor:       "pointer",
-                }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"
-                    stroke="#475569" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-                  />
-                  <path d="M3 6h18M16 10a4 4 0 01-8 0" stroke="#475569" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </Badge>
+            <Link href="/cart" style={{ textDecoration: "none" }}>
+              <Badge count={totalItems} showZero={false} size="small" color="#0ea5e9">
+                <button
+                  style={{
+                    width:        40,
+                    height:       40,
+                    borderRadius: 8,
+                    background:   "#f1f5f9",
+                    border:       "1px solid #e2e8f0",
+                    display:      "flex",
+                    alignItems:   "center",
+                    justifyContent:"center",
+                    cursor:       "pointer",
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"
+                      stroke="#475569" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+                    />
+                    <path d="M3 6h18M16 10a4 4 0 01-8 0" stroke="#475569" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </Badge>
+            </Link>
 
             {/* Mobile menu */}
             <button
@@ -236,14 +249,10 @@ export default function AppHeader() {
       >
         {/* Mobile search */}
         <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9" }}>
-          <Input
+          <Input.Search
             placeholder="Tìm kiếm..."
-            prefix={
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                <circle cx="7" cy="7" r="5.5" stroke="#94a3b8" strokeWidth="1.5" />
-                <path d="M11 11l3 3" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            }
+            allowClear
+            onSearch={(v) => { setDrawerOpen(false); handleSearch(v); }}
             style={{ borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0" }}
           />
         </div>

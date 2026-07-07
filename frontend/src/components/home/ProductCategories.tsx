@@ -22,7 +22,7 @@ async function getProducts(): Promise<ProductFromDB[]> {
   try {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api"}/public/products`,
-      { next: { revalidate: 60 } } // ISR: cache 60 giây
+      { cache: "no-store" } // Bỏ cache để luôn cập nhật tên/giá mới nhất từ DB
     );
     if (!res.ok) return [];
     const json = await res.json();
@@ -56,7 +56,7 @@ export const SHIRT_UI_MAP = {
     accentBg:    "linear-gradient(140deg, #ede9fe 0%, #c7d2fe 100%)",
     accentColor: "#6366f1",
     svgColor:    "#a5b4fc",
-    mockupImg:   null as string | null,
+    mockupImg:   "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209405/Hoodie-Grey-Front_boebdz.png",
     badge:       "Mới về",
     badgeBg:     "#fef9c3",
     badgeColor:  "#ca8a04",
