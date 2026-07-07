@@ -49,6 +49,7 @@ interface SidebarProps {
   onUploadImages: (files: FileList) => void;
   onRemoveUploadedImage: (idx: number) => void;
   onAddImageToCanvas: (src: string) => void;
+  showMyDesigns?: boolean;
 }
 
 export default function Sidebar({
@@ -56,6 +57,7 @@ export default function Sidebar({
   onUploadImages,
   onRemoveUploadedImage,
   onAddImageToCanvas,
+  showMyDesigns = true,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = React.useState<TabId>("images");
   const [stickers, setStickers] = React.useState<any[]>([]);
@@ -118,7 +120,7 @@ export default function Sidebar({
     <aside className="ds-sidebar">
       {/* Thanh chọn tab */}
       <div className="ds-sidebar-tabs">
-        {tabs.map((tab) => (
+        {tabs.filter((tab) => showMyDesigns || tab.id !== "my-designs").map((tab) => (
           <button
             key={tab.id}
             className={`ds-sidebar-tab ${activeTab === tab.id ? "ds-sidebar-tab--active" : ""}`}

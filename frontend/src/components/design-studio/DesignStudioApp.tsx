@@ -232,8 +232,11 @@ export default function DesignStudioApp() {
         shirtType,
         shirtColor,
         canvasData: {
+          version: 1,
           elements: useDesignStore.getState().elements,
+          shirtType: useDesignStore.getState().shirtType,
           shirtView: useDesignStore.getState().shirtView,
+          logicalCanvas: { width: CONTAINER_W, height: CONTAINER_H },
         },
         previewUrl
       };
@@ -269,7 +272,8 @@ export default function DesignStudioApp() {
         shirtView: view,
         // productId không khớp 1-1 với shirtType nên phải suy ra thủ công;
         // nếu không phải tshirt/polo thì mặc định coi là hoodie
-        shirtType: design.productId === 1 ? "tshirt" : design.productId === 2 ? "polo" : "hoodie",
+        shirtType: design.canvasData?.shirtType
+          || (design.productId === 1 ? "tshirt" : design.productId === 2 ? "polo" : "hoodie"),
         shirtColor: design.baseColor,
         currentDesignId: design.id,
         designName: design.name,

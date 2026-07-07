@@ -30,7 +30,9 @@ import {
   PictureOutlined,
   LoadingOutlined,
   WarningOutlined,
+  PlusOutlined,
 } from "@ant-design/icons";
+import useAuthStore from "@/store/useAuthStore";
 
 // Service gọi API
 import * as designService from "@/services/admin/designService";
@@ -70,6 +72,7 @@ type DesignPageProps = {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function DesignPage({ initialFilters }: DesignPageProps) {
   const router = useRouter();
+  const currentUser = useAuthStore((state) => state.user);
 
   // Thiết kế đang được mở trong modal chi tiết
   const [idThietKeDangXem, setIdThietKeDangXem] = useState<number | null>(null);
@@ -244,6 +247,29 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
 
         {/* Nhóm nút hành động */}
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+          {currentUser?.role === "ADMIN" && (
+            <button
+              onClick={() => router.push("/admin/thiet-ke/tao-moi")}
+              style={{
+                height: 40,
+                padding: "0 18px",
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                background: "#0f172a",
+                border: "none",
+                borderRadius: 10,
+                fontSize: 14,
+                fontWeight: 700,
+                color: "#ffffff",
+                cursor: "pointer",
+                boxShadow: "0 1px 4px rgba(15,23,42,0.25)",
+              }}
+            >
+              <PlusOutlined />
+              Tạo thiết kế cho khách
+            </button>
+          )}
           {/* Nút phụ 1: Thêm sticker */}
           <button
             onClick={() => setTabDangChon("tai_nguyen")}

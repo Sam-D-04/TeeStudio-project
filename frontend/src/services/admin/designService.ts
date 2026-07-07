@@ -9,6 +9,7 @@
  */
 
 import apiClient from "@/lib/apiClient";
+import type { DesignElement, ShirtType, ShirtView } from "@/store/useDesignStore";
 
 // =====================================================================
 // KIỂU DỮ LIỆU (Types) – khớp với response từ Backend
@@ -99,6 +100,21 @@ export type ThongKeThietKe = {
   soDangIn: number;
 };
 
+export type TaoThietKeChoKhachInput = {
+  userId: number;
+  name: string;
+  shirtType: ShirtType;
+  shirtColor: string;
+  canvasData: {
+    version: number;
+    shirtType: ShirtType;
+    shirtView: ShirtView;
+    logicalCanvas: { width: number; height: number };
+    elements: DesignElement[];
+  };
+  previewUrl: string;
+};
+
 // =====================================================================
 // CÁC HÀM GỌI API
 // =====================================================================
@@ -149,6 +165,29 @@ export async function layChiTietThietKe(id: number): Promise<ChiTietThietKe> {
     `/admin/designs/${id}`
   );
   return res.data.data;
+}
+
+/** Tạo một thiết kế DRAFT và gắn trực tiếp vào tài khoản khách hàng. */
+export async function taoThietKeChoKhach(
+  payload: TaoThietKeChoKhachInput
+): Promise<{ id: number; userId: number; name: string; status: "DRAFT"; previewUrl: string }> {
+  const res = await apiClient.post<{
+    success: boolean;
+    data: { id: number; userId: number; name: string; status: "DRAFT"; previewUrl: string };
+  }>("/admin/designs/customer-drafts", payload);
+  return res.data.data;
+}
+
+/** Upload ảnh trước khi đưa vào canvas để JSON không chứa blob URL tạm thời. */
+export async function taiAnhThietKe(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("image", file);
+  const res = await apiClient.post<{ success: boolean; data: { url: string } }>(
+    "/admin/designs/assets",
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+  return res.data.data.url;
 }
 
 // ─── ĐƠN CẦN IN ────────────────────────────────────────────────────────────

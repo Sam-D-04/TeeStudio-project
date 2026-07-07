@@ -12,6 +12,7 @@ const { verifyToken, requireRoles } = require("../../common/middlewares/auth.mid
 const { ROLES } = require("../../common/constants/roles");
 
 const requireAdmin = requireRoles(ROLES.ADMIN, ROLES.PRODUCTION);
+const requireDesignCreator = requireRoles(ROLES.ADMIN);
 
 const stickerUpload = multer({
   storage: multer.memoryStorage(),
@@ -47,6 +48,31 @@ const uploadSticker = (req, res, next) => {
   });
 };
 
+const designAssetUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, callback) => {
+    const acceptedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
+    if (!acceptedTypes.includes(file.mimetype)) {
+      const error = new Error("Ảnh thiết kế phải là JPG, PNG, WEBP, GIF hoặc SVG");
+      error.statusCode = 400;
+      return callback(error);
+    }
+    callback(null, true);
+  },
+}).single("image");
+
+const uploadDesignAsset = (req, res, next) => {
+  designAssetUpload(req, res, (error) => {
+    if (!error) return next();
+    if (error.code === "LIMIT_FILE_SIZE") {
+      error.message = "Ảnh thiết kế không được vượt quá 5 MB";
+    }
+    error.statusCode = error.statusCode || 400;
+    next(error);
+  });
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTES DÀNH CHO ADMIN – Yêu cầu xác thực
 // Prefix: /api/admin/designs
@@ -63,6 +89,9 @@ router.patch("/don-can-in/:id/trang-thai", verifyToken, requireAdmin, controller
 router.get("/stickers", verifyToken, requireAdmin, controller.getDanhSachSticker);
 router.post("/stickers", verifyToken, requireAdmin, uploadSticker, controller.themSticker);
 router.delete("/stickers/:id", verifyToken, requireAdmin, controller.xoaSticker);
+
+router.post("/assets", verifyToken, requireDesignCreator, uploadDesignAsset, controller.taiAnhThietKe);
+router.post("/customer-drafts", verifyToken, requireDesignCreator, controller.taoThietKeChoKhach);
 
 // Danh sách thiết kế khách hàng
 router.get("/", verifyToken, requireAdmin, controller.getDanhSachThietKe);

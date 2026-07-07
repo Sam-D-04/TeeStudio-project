@@ -12,6 +12,7 @@
  */
 
 const db = require("../../database/mysql");
+const { calculateBoundingBoxAreaFee } = require("../pricing/admin.pricing.service");
 
 // =====================================================================
 // MAP TRẠNG THÁI: DB → Frontend (snake_case tiếng Việt)
@@ -66,6 +67,51 @@ const BIEU_THUC_TRANG_THAI_DON_IN = `(CASE
 END)`;
 
 const DIEU_KIEN_CHO_GUI_XUONG = `${BIEU_THUC_TRANG_THAI_DON_IN} = 'READY_TO_PRINT'`;
+
+const LOAI_AO_HOP_LE = new Set(["tshirt", "polo", "hoodie"]);
+
+function chuanHoaCanvasData(canvasData, shirtType) {
+  let data = canvasData;
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      throw taoLoi("Dữ liệu thiết kế không phải JSON hợp lệ", 400);
+    }
+  }
+
+  if (!data || typeof data !== "object" || !Array.isArray(data.elements)) {
+    throw taoLoi("Dữ liệu thiết kế phải chứa danh sách elements", 400);
+  }
+  if (data.elements.length > 200) {
+    throw taoLoi("Thiết kế không được vượt quá 200 phần tử", 400);
+  }
+
+  return {
+    ...data,
+    version: Number(data.version) || 1,
+    shirtType,
+    shirtView: data.shirtView === "back" ? "back" : "front",
+    logicalCanvas: { width: 500, height: 600 },
+  };
+}
+
+async function timSanPhamTheoLoaiAo(shirtType) {
+  const tenGanDung = {
+    tshirt: "%Áo Thun%",
+    polo: "%Polo%",
+    hoodie: "%Hoodie%",
+  }[shirtType];
+
+  const [rows] = await db.pool.query(
+    "SELECT id FROM Product WHERE name LIKE ? ORDER BY id LIMIT 1",
+    [tenGanDung]
+  );
+  if (!rows.length) {
+    throw taoLoi("Không tìm thấy phôi áo phù hợp với loại áo đã chọn", 400);
+  }
+  return rows[0].id;
+}
 
 /** Hai vị trí in cố định được hỗ trợ trên giao diện thiết kế. */
 const MAP_VI_TRI_IN_FE_DB = {
@@ -369,6 +415,59 @@ async function layChiTietThietKe(id) {
     trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[row.status] || "cho_kiem_tra",
     ngayGui: formatNgay(row.ngayGui),
     ghiChu: row.ghiChu || null,
+  };
+}
+
+// =====================================================================
+// SERVICE 2.2: Admin tạo thiết kế nháp và gắn vào tài khoản khách hàng
+// POST /api/admin/designs/customer-drafts
+// =====================================================================
+async function taoThietKeChoKhach({ userId, name, shirtType, shirtColor, canvasData, previewUrl }) {
+  const customerId = Number(userId);
+  if (!Number.isInteger(customerId) || customerId <= 0) {
+    throw taoLoi("Vui lòng chọn khách hàng", 400);
+  }
+  if (!name || !String(name).trim()) {
+    throw taoLoi("Vui lòng nhập tên thiết kế", 400);
+  }
+  if (!LOAI_AO_HOP_LE.has(shirtType)) {
+    throw taoLoi("Loại áo không hợp lệ", 400);
+  }
+
+  const [accounts] = await db.pool.query(
+    "SELECT id FROM Account WHERE id = ? AND role = 'CUSTOMER' AND status = 'ACTIVE' LIMIT 1",
+    [customerId]
+  );
+  if (!accounts.length) {
+    throw taoLoi("Không tìm thấy tài khoản khách hàng đang hoạt động", 404);
+  }
+
+  const productId = await timSanPhamTheoLoaiAo(shirtType);
+  const normalizedCanvas = chuanHoaCanvasData(canvasData, shirtType);
+  const dataStr = JSON.stringify(normalizedCanvas);
+  const designFee = calculateBoundingBoxAreaFee({ layers: normalizedCanvas.elements });
+
+  const [result] = await db.pool.query(
+    `INSERT INTO CustomDesign
+       (userId, name, productId, baseColor, canvasData, previewUrl, status, designFee)
+     VALUES (?, ?, ?, ?, ?, ?, 'DRAFT', ?)`,
+    [
+      customerId,
+      String(name).trim().slice(0, 100),
+      productId,
+      shirtColor || "#ffffff",
+      dataStr,
+      previewUrl || "",
+      designFee,
+    ]
+  );
+
+  return {
+    id: result.insertId,
+    userId: customerId,
+    name: String(name).trim().slice(0, 100),
+    status: "DRAFT",
+    previewUrl: previewUrl || "",
   };
 }
 
@@ -743,6 +842,7 @@ module.exports = {
   layThongKe,
   layDanhSachThietKe,
   layChiTietThietKe,
+  taoThietKeChoKhach,
   duyetThietKe,
   yeuCauChinhSua,
   layDanhSachDonCanIn,

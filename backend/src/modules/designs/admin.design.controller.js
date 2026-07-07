@@ -59,6 +59,41 @@ const getChiTietThietKe = async (req, res, next) => {
   }
 };
 
+/** POST /api/admin/designs/customer-drafts - Admin tạo bản nháp cho một khách hàng. */
+const taoThietKeChoKhach = async (req, res, next) => {
+  try {
+    const payload = { ...req.body };
+    if (payload.previewUrl?.startsWith("data:image")) {
+      payload.previewUrl = await uploadService.uploadBase64Image(
+        payload.previewUrl,
+        "user-designs"
+      );
+    }
+
+    const data = await designService.taoThietKeChoKhach(payload);
+    res.status(201).json({
+      success: true,
+      message: "Đã tạo thiết kế và gắn vào tài khoản khách hàng",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** POST /api/admin/designs/assets - Upload ảnh dùng trong canvas, trả URL bền vững. */
+const taiAnhThietKe = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "Vui lòng chọn ảnh" });
+    }
+    const url = await uploadService.uploadImageBuffer(req.file.buffer, "design-assets");
+    res.status(201).json({ success: true, data: { url } });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /**
  * PATCH /api/admin/designs/:id/duyet
  * Duyệt thiết kế (chuyển sang trạng thái "Đã duyệt").
@@ -240,6 +275,8 @@ module.exports = {
   getThongKe,
   getDanhSachThietKe,
   getChiTietThietKe,
+  taoThietKeChoKhach,
+  taiAnhThietKe,
   duyetThietKe,
   yeuCauChinhSua,
   getDanhSachDonCanIn,
