@@ -134,6 +134,7 @@ export type TaoThietKeChoKhachInput = {
   name: string;
   shirtType: ShirtType;
   shirtColor: string;
+  variantId: number;
   canvasData: {
     version: number;
     shirtType: ShirtType;
@@ -142,6 +143,20 @@ export type TaoThietKeChoKhachInput = {
     elements: DesignElement[];
   };
   previewUrl: string;
+};
+
+export type BienTheTaoThietKe = {
+  id: number;
+  size: string;
+  color: string;
+  colorHex: string;
+  stockQty: number;
+};
+
+export type TuyChonBienTheTaoThietKe = {
+  productId: number;
+  productName: string;
+  variants: BienTheTaoThietKe[];
 };
 
 // =====================================================================
@@ -192,6 +207,41 @@ export async function layDanhSachThietKe(
 export async function layChiTietThietKe(id: number): Promise<ChiTietThietKe> {
   const res = await apiClient.get<{ success: boolean; data: ChiTietThietKe }>(
     `/admin/designs/${id}`
+  );
+  return res.data.data;
+}
+
+/** Duyệt thiết kế sau khi Admin đã kiểm tra bản xem trước. */
+export async function duyetThietKe(
+  id: number
+): Promise<{ id: number; maThietKe: string; trangThai: "da_duyet" }> {
+  const res = await apiClient.patch<{
+    success: boolean;
+    data: { id: number; maThietKe: string; trangThai: "da_duyet" };
+  }>(`/admin/designs/${id}/duyet`);
+  return res.data.data;
+}
+
+/** Yêu cầu khách chỉnh sửa thiết kế và lưu ghi chú phản hồi của Admin. */
+export async function yeuCauChinhSuaThietKe(
+  id: number,
+  ghiChu: string
+): Promise<{ id: number; trangThai: "can_chinh_sua" }> {
+  const res = await apiClient.patch<{
+    success: boolean;
+    data: { id: number; trangThai: "can_chinh_sua" };
+  }>(`/admin/designs/${id}/yeu-cau-chinh-sua`, { ghiChu });
+  return res.data.data;
+}
+
+/** Lấy các size đúng với loại áo và màu đang chọn trong Admin Design Studio. */
+export async function layBienTheTaoThietKe(
+  shirtType: ShirtType,
+  shirtColor: string
+): Promise<TuyChonBienTheTaoThietKe> {
+  const res = await apiClient.get<{ success: boolean; data: TuyChonBienTheTaoThietKe }>(
+    "/admin/designs/customer-draft-variants",
+    { params: { shirtType, shirtColor } }
   );
   return res.data.data;
 }

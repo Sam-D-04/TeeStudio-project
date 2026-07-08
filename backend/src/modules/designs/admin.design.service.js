@@ -106,13 +106,49 @@ async function timSanPhamTheoLoaiAo(shirtType) {
   }[shirtType];
 
   const [rows] = await db.pool.query(
-    "SELECT id FROM Product WHERE name LIKE ? ORDER BY id LIMIT 1",
+    "SELECT id FROM Product WHERE name LIKE ? AND status = 'ACTIVE' ORDER BY id LIMIT 1",
     [tenGanDung]
   );
   if (!rows.length) {
     throw taoLoi("Không tìm thấy phôi áo phù hợp với loại áo đã chọn", 400);
   }
   return rows[0].id;
+}
+
+async function layBienTheTaoThietKe(shirtType, shirtColor) {
+  if (!LOAI_AO_HOP_LE.has(shirtType)) {
+    throw taoLoi("Loại áo không hợp lệ", 400);
+  }
+  if (!shirtColor || !String(shirtColor).trim()) {
+    throw taoLoi("Màu áo không hợp lệ", 400);
+  }
+
+  const productId = await timSanPhamTheoLoaiAo(shirtType);
+  const [products] = await db.pool.query(
+    "SELECT name FROM Product WHERE id = ? LIMIT 1",
+    [productId]
+  );
+  const [variants] = await db.pool.query(
+    `SELECT id, color, colorHex, size, stockQty
+     FROM ProductVariant
+     WHERE productId = ?
+       AND LOWER(colorHex) = LOWER(?)
+       AND (status IS NULL OR status = 'ACTIVE')
+     ORDER BY FIELD(size, 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'), size, id`,
+    [productId, String(shirtColor).trim()]
+  );
+
+  return {
+    productId,
+    productName: products[0]?.name || "",
+    variants: variants.map((variant) => ({
+      id: Number(variant.id),
+      size: variant.size,
+      color: variant.color,
+      colorHex: variant.colorHex,
+      stockQty: Number(variant.stockQty),
+    })),
+  };
 }
 
 /** Hai vị trí in cố định được hỗ trợ trên giao diện thiết kế. */
@@ -526,7 +562,7 @@ async function suaThietKeChoKhach(id, { canvasData, previewUrl }) {
 // SERVICE 2.2: Admin tạo thiết kế nháp và gắn vào tài khoản khách hàng
 // POST /api/admin/designs/customer-drafts
 // =====================================================================
-async function taoThietKeChoKhach({ userId, name, shirtType, shirtColor, canvasData, previewUrl }) {
+async function taoThietKeChoKhach({ userId, name, shirtType, shirtColor, variantId, canvasData, previewUrl }) {
   const customerId = Number(userId);
   if (!Number.isInteger(customerId) || customerId <= 0) {
     throw taoLoi("Vui lòng chọn khách hàng", 400);
@@ -547,18 +583,41 @@ async function taoThietKeChoKhach({ userId, name, shirtType, shirtColor, canvasD
   }
 
   const productId = await timSanPhamTheoLoaiAo(shirtType);
+  const selectedVariantId = Number(variantId);
+  if (!Number.isInteger(selectedVariantId) || selectedVariantId <= 0) {
+    throw taoLoi("Vui lòng chọn size áo", 400);
+  }
+
+  const [variants] = await db.pool.query(
+    `SELECT id, colorHex, size
+     FROM ProductVariant
+     WHERE id = ? AND productId = ? AND (status IS NULL OR status = 'ACTIVE')
+     LIMIT 1`,
+    [selectedVariantId, productId]
+  );
+  if (!variants.length) {
+    throw taoLoi("Size đã chọn không thuộc loại áo này hoặc không còn hoạt động", 400);
+  }
+  if (
+    String(variants[0].colorHex || "").trim().toLowerCase() !==
+    String(shirtColor || "").trim().toLowerCase()
+  ) {
+    throw taoLoi("Size đã chọn không phù hợp với màu áo", 400);
+  }
+
   const normalizedCanvas = chuanHoaCanvasData(canvasData, shirtType);
   const dataStr = JSON.stringify(normalizedCanvas);
   const designFee = calculateBoundingBoxAreaFee({ layers: normalizedCanvas.elements });
 
   const [result] = await db.pool.query(
     `INSERT INTO CustomDesign
-       (userId, name, productId, baseColor, canvasData, previewUrl, status, designFee)
-     VALUES (?, ?, ?, ?, ?, ?, 'DRAFT', ?)`,
+       (userId, name, productId, variantId, baseColor, canvasData, previewUrl, status, designFee)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?)`,
     [
       customerId,
       String(name).trim().slice(0, 100),
       productId,
+      selectedVariantId,
       shirtColor || "#ffffff",
       dataStr,
       previewUrl || "",
@@ -948,6 +1007,7 @@ module.exports = {
   layChiTietThietKe,
   layCanvasDataThietKe,
   suaThietKeChoKhach,
+  layBienTheTaoThietKe,
   taoThietKeChoKhach,
   duyetThietKe,
   yeuCauChinhSua,

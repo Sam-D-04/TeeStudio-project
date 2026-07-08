@@ -546,11 +546,11 @@ async function layDanhSachDonHang({
       p.paymentType    AS transactionPaymentType,
       p.status         AS transactionPaymentStatus,
       p.paidAt,
-      -- Lấy sản phẩm đầu tiên trong đơn (đơn thường chỉ có 1 loại áo)
+      -- Ưu tiên sản phẩm có thiết kế tùy chỉnh làm dòng đại diện của đơn
       prFirst.name          AS tenSanPham,
       pvFirst.color         AS mauSac,
       pvFirst.size          AS kichCo,
-      pi_img.imageUrl  AS anhUrl,
+      COALESCE(NULLIF(TRIM(cdFirst.previewUrl), ''), pi_img.imageUrl) AS anhUrl,
       oiFirst.designId,
       -- Kiểm tra đơn có nhiều size không
       (
@@ -588,11 +588,12 @@ async function layDanhSachDonHang({
       SELECT oi2.id
       FROM OrderItem oi2
       WHERE oi2.orderId = co.id
-      ORDER BY oi2.id ASC
+      ORDER BY (oi2.designId IS NULL) ASC, oi2.id ASC
       LIMIT 1
     )
     LEFT JOIN ProductVariant pvFirst ON pvFirst.id = oiFirst.variantId
     LEFT JOIN Product prFirst ON prFirst.id = pvFirst.productId
+    LEFT JOIN CustomDesign cdFirst ON cdFirst.id = oiFirst.designId
     LEFT JOIN ProductImage pi_img ON pi_img.productId = prFirst.id AND pi_img.isPrimary = 1
     ${menh_de_where}
     ORDER BY co.createdAt DESC

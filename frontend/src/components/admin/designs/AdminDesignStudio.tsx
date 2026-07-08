@@ -39,6 +39,11 @@ export default function AdminDesignStudio() {
   const shirtContainerRef = useRef<HTMLDivElement>(null);
   const [customers, setCustomers] = useState<accountService.TaiKhoanKhachHang[]>([]);
   const [customerId, setCustomerId] = useState<number>();
+  const [variantSelection, setVariantSelection] = useState<{ id: number; key: string }>();
+  const [sizeResult, setSizeResult] = useState<{
+    key: string;
+    variants: designService.BienTheTaoThietKe[];
+  }>({ key: "", variants: [] });
   const [designName, setDesignName] = useState("");
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(true);
@@ -59,6 +64,11 @@ export default function AdminDesignStudio() {
     undoStack,
     redoStack,
   } = useDesignStore();
+
+  const variantKey = `${shirtType}|${shirtColor.toLowerCase()}`;
+  const variantId = variantSelection?.key === variantKey ? variantSelection.id : undefined;
+  const sizeOptions = sizeResult.key === variantKey ? sizeResult.variants : [];
+  const loadingSizes = sizeResult.key !== variantKey;
 
   useEffect(() => {
     useDesignStore.setState({
@@ -89,6 +99,27 @@ export default function AdminDesignStudio() {
       });
     };
   }, [message]);
+
+  useEffect(() => {
+    let active = true;
+    const requestedKey = `${shirtType}|${shirtColor.toLowerCase()}`;
+
+    designService
+      .layBienTheTaoThietKe(shirtType, shirtColor)
+      .then((result) => {
+        if (active) setSizeResult({ key: requestedKey, variants: result.variants });
+      })
+      .catch(() => {
+        if (active) {
+          setSizeResult({ key: requestedKey, variants: [] });
+          message.error("Không thể tải danh sách size phù hợp");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [message, shirtColor, shirtType]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -177,6 +208,7 @@ export default function AdminDesignStudio() {
 
   const saveDesign = useCallback(async () => {
     if (!customerId) return message.warning("Vui lòng chọn khách hàng");
+    if (!variantId) return message.warning("Vui lòng chọn size áo");
     if (!designName.trim()) return message.warning("Vui lòng nhập tên thiết kế");
     if (!elements.length) return message.warning("Thiết kế cần có ít nhất một hình ảnh hoặc văn bản");
     if (!shirtContainerRef.current) return;
@@ -205,6 +237,7 @@ export default function AdminDesignStudio() {
         name: designName.trim(),
         shirtType,
         shirtColor,
+        variantId,
         canvasData: {
           version: 1,
           shirtType,
@@ -230,7 +263,7 @@ export default function AdminDesignStudio() {
     } finally {
       setSaving(false);
     }
-  }, [customerId, designName, elements.length, message, modal, router, setSelectedId, shirtColor, shirtType, shirtView]);
+  }, [customerId, designName, elements.length, message, modal, router, setSelectedId, shirtColor, shirtType, shirtView, variantId]);
 
   const area = getPrintAreaBoundary(shirtType, shirtView, CONTAINER_W, CONTAINER_H);
   const printArea = { x: area.left, y: area.top, w: area.width, h: area.height };
@@ -285,6 +318,19 @@ export default function AdminDesignStudio() {
               placeholder="Tên thiết kế"
               maxLength={100}
               style={{ width: 240 }}
+            />
+            <Select
+              loading={loadingSizes}
+              value={variantId}
+              onChange={(id) => setVariantSelection({ id, key: variantKey })}
+              placeholder="Chọn size"
+              style={{ width: 150 }}
+              options={sizeOptions.map((variant) => ({
+                value: variant.id,
+                label: `${variant.size}${variant.stockQty <= 0 ? " — Hết hàng" : ""}`,
+                disabled: variant.stockQty <= 0,
+              }))}
+              notFoundContent={loadingSizes ? <Spin size="small" /> : "Không có size phù hợp"}
             />
         </div>
 

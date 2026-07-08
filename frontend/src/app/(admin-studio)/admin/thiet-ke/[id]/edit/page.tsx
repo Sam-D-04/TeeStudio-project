@@ -3,12 +3,9 @@ import { notFound } from "next/navigation";
 import AdminEditDesignStudio from "@/components/admin/designs/AdminEditDesignStudio";
 
 /**
- * EditThietKePage – Server Component cho trang Admin Sửa thiết kế.
- *
- * Route: /admin/thiet-ke/[id]/edit
- *
- * - Parse và validate designId từ URL params
- * - Render <AdminEditDesignStudio /> – toàn bộ logic Editor chạy ở client
+ * Trang sửa thiết kế dùng layout admin-studio toàn màn hình.
+ * Route group `(admin-studio)` không xuất hiện trong URL, vì vậy đường dẫn
+ * vẫn là /admin/thiet-ke/[id]/edit nhưng không kế thừa AdminShell/menu.
  */
 export const metadata: Metadata = {
   title: "Sửa thiết kế - TeeStudio Quản trị",
@@ -19,9 +16,8 @@ type PageParams = Promise<{ id: string }>;
 
 export default async function EditThietKePage({ params }: { params: PageParams }) {
   const { id } = await params;
-  const designId = parseInt(id, 10);
+  const designId = Number.parseInt(id, 10);
 
-  // Nếu id không hợp lệ → 404
   if (!Number.isInteger(designId) || designId <= 0) {
     notFound();
   }

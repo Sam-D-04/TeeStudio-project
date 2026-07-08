@@ -28,9 +28,11 @@ const ImageIcon = () => (
   </svg>
 );
 
-const TSHIRT_COLORS = ["#ffffff", "#000000", "#1d4ed8"];
-const POLO_COLORS   = ["#ffffff", "#f5f5dc", "#1d4ed8"];
-const HOODIE_COLORS = ["#9ca3af", "#8b4513"]; // Xám, Nâu
+// Các màu phải khớp colorHex của ProductVariant để thiết kế luôn gắn được
+// với một biến thể màu + size hợp lệ khi đưa vào đơn hàng.
+const TSHIRT_COLORS = ["#ffffff", "#000000"];
+const POLO_COLORS   = ["#ffffff", "#0066cc"];
+const HOODIE_COLORS = ["#000000", "#003153"];
 
 const StickerIcon = () => (
   <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -40,6 +42,7 @@ const StickerIcon = () => (
 );
 
 type TabId = "images" | "stickers" | "text" | "shirt" | "my-designs";
+type Sticker = { id?: number; ten: string; urlAnh: string; loai?: string };
 
 import FontSelectorPanel from "./FontSelectorPanel";
 import MyDesignsTab from "./MyDesignsTab";
@@ -60,7 +63,7 @@ export default function Sidebar({
   showMyDesigns = true,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = React.useState<TabId>("images");
-  const [stickers, setStickers] = React.useState<any[]>([]);
+  const [stickers, setStickers] = React.useState<Sticker[]>([]);
   const [hasFetchedStickers, setHasFetchedStickers] = React.useState<boolean>(false);
   const [activeCategorySticker, setActiveCategorySticker] = React.useState<string>("Tất cả");
   const [searchStickerQuery, setSearchStickerQuery] = React.useState<string>("");

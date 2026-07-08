@@ -1,5 +1,7 @@
+import { EyeOutlined } from "@ant-design/icons";
 import { Alert, AutoComplete, Button, Input, Modal, Select, message } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { isAxiosError } from "axios";
 import { isOrderStatusLockedByPayment } from "@/lib/paymentDisplay";
@@ -132,6 +134,7 @@ export default function UpdateOrderStatusModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [messageApi, messageContextHolder] = message.useMessage();
   const [modal, modalContextHolder] = Modal.useModal();
@@ -155,6 +158,8 @@ export default function UpdateOrderStatusModal({
   const productionStatusBlockReason = getProductionStatusBlockReason(order);
   const canRequestDesignRevision =
     order?.trangThai === "cho_xac_nhan" && hasCustomDesignOrder(order);
+  const designIdToReview =
+    order?.items?.find((item) => Boolean(item.designId))?.designId ?? null;
 
   const updateStatusMutation = useMutation({
     mutationFn: (payload: { trangThai: string; shippingCarrier?: string; trackingCode?: string }) =>
@@ -314,6 +319,18 @@ export default function UpdateOrderStatusModal({
                   title="Đơn hàng có thiết kế khách hàng"
                   description="Khi chuyển đơn sang Đã xác nhận, hệ thống sẽ tự duyệt thiết kế và đưa sản phẩm vào hàng chờ in. Nếu mẫu chưa đạt, hãy yêu cầu khách chỉnh sửa trước."
                 />
+                {designIdToReview ? (
+                  <Button
+                    className="mb-3"
+                    type="primary"
+                    icon={<EyeOutlined />}
+                    onClick={() =>
+                      router.push(`/admin/thiet-ke?designId=${designIdToReview}`)
+                    }
+                  >
+                    Xem thiết kế
+                  </Button>
+                ) : null}
                 {!showRevisionInput ? (
                   <Button danger onClick={() => setShowRevisionInput(true)}>
                     Yêu cầu chỉnh sửa thiết kế

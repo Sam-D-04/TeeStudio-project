@@ -112,6 +112,19 @@ const suaThietKeChoKhach = async (req, res, next) => {
   }
 };
 
+/** GET /api/admin/designs/customer-draft-variants - Các size hợp lệ theo loại áo và màu. */
+const getBienTheTaoThietKe = async (req, res, next) => {
+  try {
+    const data = await designService.layBienTheTaoThietKe(
+      req.query.shirtType,
+      req.query.shirtColor
+    );
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /** POST /api/admin/designs/customer-drafts - Admin tạo bản nháp cho một khách hàng. */
 const taoThietKeChoKhach = async (req, res, next) => {
   try {
@@ -330,6 +343,7 @@ module.exports = {
   getChiTietThietKe,
   getCanvasDataThietKe,
   suaThietKeChoKhach,
+  getBienTheTaoThietKe,
   taoThietKeChoKhach,
   taiAnhThietKe,
   duyetThietKe,

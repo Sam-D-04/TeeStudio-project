@@ -162,8 +162,8 @@ function SidebarContent({
                 ? pathname === "/admin"
                 : pathname.startsWith(item.href);
             const itemClass = isActive
-              ? "bg-[#f1f5f9]"
-              : "text-text-secondary hover:bg-surface-alt";
+              ? "border-border bg-[#f1f5f9] shadow-sm"
+              : "border-transparent hover:border-border hover:bg-surface-alt hover:shadow-sm";
 
             return (
               <li key={item.href}>
@@ -172,10 +172,9 @@ function SidebarContent({
                   onClick={onClose}
                   aria-label={item.label}
                   title={collapsed ? item.label : undefined}
-                  className={`mx-2 flex h-11 items-center rounded-[8px] py-2 text-sidebar-item font-semibold transition-colors ${
+                  className={`mx-2 flex h-11 items-center rounded-[8px] border py-2 text-sidebar-item font-semibold !text-[#0f172a] transition-all duration-200 hover:!text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                     collapsed ? "justify-center px-0" : "min-w-0 gap-3 px-4"
                   } ${itemClass}`}
-                  style={{ color: isActive ? "#0f172a" : undefined }}
                 >
                   <span className="flex shrink-0 text-[22px] leading-none">{item.icon}</span>
                   <span className={collapsed ? "sr-only" : "truncate"}>{item.label}</span>
