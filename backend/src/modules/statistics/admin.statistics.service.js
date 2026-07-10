@@ -153,6 +153,68 @@ async function _queryMetrics(batDau, ketThuc) {
   return { doanhThu, soDon, soSanPham, giaTriTB };
 }
 
+async function _queryDoiSoatBaoCao(batDau, ketThuc) {
+  const [rows] = await db.pool.query(
+    `SELECT
+       COUNT(*) AS tongSoDon,
+       COALESCE(SUM(co.totalAmount), 0) AS tongGiaTriDonHang,
+       COALESCE(SUM(COALESCE(paymentSummary.totalPaidAmount, 0)), 0) AS tienDaThu,
+       COALESCE(SUM(COALESCE(paymentSummary.pendingCodAmount, 0)), 0) AS codDangTreo,
+       COALESCE(SUM(
+         CASE
+           WHEN co.status = 'COMPLETED'
+            AND (
+              co.paymentStatus = 'PAID'
+              OR COALESCE(paymentSummary.totalPaidAmount, 0) >= co.totalAmount
+            )
+           THEN co.totalAmount
+           ELSE 0
+         END
+       ), 0) AS doanhThuGhiNhan,
+       SUM(CASE WHEN co.status = 'COMPLETED' THEN 1 ELSE 0 END) AS soDonHoanTat,
+       SUM(
+         CASE
+           WHEN co.paymentStatus = 'PAID'
+             OR COALESCE(paymentSummary.totalPaidAmount, 0) >= co.totalAmount
+           THEN 1
+           ELSE 0
+         END
+       ) AS soDonDaThanhToanDu,
+       SUM(
+         CASE
+           WHEN COALESCE(paymentSummary.pendingCodAmount, 0) > 0 THEN 1
+           ELSE 0
+         END
+       ) AS soDonChoDoiSoatCod,
+       SUM(CASE WHEN co.status = 'CANCELLED' THEN 1 ELSE 0 END) AS soDonDaHuy
+     FROM CustomerOrder co
+     LEFT JOIN (
+       SELECT orderId,
+              SUM(CASE WHEN status = 'COMPLETED' THEN amount ELSE 0 END) AS totalPaidAmount,
+              SUM(CASE WHEN status = 'PENDING_RECONCILIATION' AND paymentMethod = 'COD' THEN amount ELSE 0 END) AS pendingCodAmount
+       FROM Payment
+       GROUP BY orderId
+     ) paymentSummary ON paymentSummary.orderId = co.id
+     WHERE co.createdAt >= ? AND co.createdAt < DATE_ADD(?, INTERVAL 1 DAY)`,
+    [batDau, ketThuc]
+  );
+
+  const row = rows[0] || {};
+  const tongSoDon = Number(row.tongSoDon) || 0;
+  const soDonDaHuy = Number(row.soDonDaHuy) || 0;
+
+  return {
+    doanhThuGhiNhanVnd: Number(row.doanhThuGhiNhan) || 0,
+    tienDaThuTrongKyVnd: Number(row.tienDaThu) || 0,
+    dongTienCodDangTreoVnd: Number(row.codDangTreo) || 0,
+    tongGiaTriDonHangVnd: Number(row.tongGiaTriDonHang) || 0,
+    soDonHoanTat: Number(row.soDonHoanTat) || 0,
+    soDonDaThanhToanDu: Number(row.soDonDaThanhToanDu) || 0,
+    soDonChoDoiSoatCod: Number(row.soDonChoDoiSoatCod) || 0,
+    tyLeHuyDon: tongSoDon > 0 ? Math.round((soDonDaHuy / tongSoDon) * 10000) / 100 : 0,
+  };
+}
+
 /**
  * Lấy 4 thẻ chỉ số thống kê + tỷ lệ so sánh kỳ trước.
  * @param {string} tuNgay  - YYYY-MM-DD
@@ -162,9 +224,10 @@ async function layChiSoTongHop(tuNgay, denNgay) {
   const [batDau, ketThuc] = chuanHoaKhoangNgay(tuNgay, denNgay);
   const [kyTruocBatDau, kyTruocKetThuc] = tinhKyTruoc(batDau, ketThuc);
 
-  const [hienTai, kyTruoc] = await Promise.all([
+  const [hienTai, kyTruoc, doiSoatBaoCao] = await Promise.all([
     _queryMetrics(batDau, ketThuc),
     _queryMetrics(kyTruocBatDau, kyTruocKetThuc),
+    _queryDoiSoatBaoCao(batDau, ketThuc),
   ]);
 
   return {
@@ -178,6 +241,7 @@ async function layChiSoTongHop(tuNgay, denNgay) {
       soSanPhamPhanTram: tinhPhanTramThayDoi(hienTai.soSanPham, kyTruoc.soSanPham),
       giaTriTBDonPhanTram: tinhPhanTramThayDoi(hienTai.giaTriTB, kyTruoc.giaTriTB),
     },
+    doiSoatBaoCao,
     khoangThoiGian: { tuNgay: batDau, denNgay: ketThuc },
   };
 }

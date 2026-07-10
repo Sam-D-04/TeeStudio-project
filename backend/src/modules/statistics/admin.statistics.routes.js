@@ -67,4 +67,16 @@ router.get(
   statisticsController.getPhanBoTrangThai
 );
 
+// =====================================================================
+// GET /api/admin/statistics/xuat-bao-cao
+// Trả về file Excel thống kê theo khoảng thời gian.
+// Query params: tuNgay, denNgay
+// =====================================================================
+router.get(
+  "/xuat-bao-cao",
+  verifyToken,
+  requireAdmin,
+  statisticsController.exportBaoCaoThongKe
+);
+
 module.exports = router;

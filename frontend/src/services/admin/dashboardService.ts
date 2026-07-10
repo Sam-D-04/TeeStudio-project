@@ -9,7 +9,6 @@
  */
 
 import apiClient from "@/lib/apiClient";
-import { downloadExcelReport } from "@/lib/downloadExcelReport";
 
 // =====================================================================
 // KIỂU DỮ LIỆU (Types) – khớp với response từ Backend
@@ -186,17 +185,3 @@ export async function laySanPhamBanChay(
   return res.data.data;
 }
 
-/**
- * Xuất dữ liệu thô đơn hàng, chi tiết sản phẩm, tồn kho và thiết kế.
- * GET /api/admin/dashboard/xuat-bao-cao
- */
-export async function xuatBaoCaoDashboard(
-  tuNgay: string,
-  denNgay: string
-): Promise<string> {
-  return downloadExcelReport(
-    "/admin/dashboard/xuat-bao-cao",
-    { tuNgay, denNgay },
-    `bao-cao-dashboard-${tuNgay}-den-${denNgay}.xlsx`
-  );
-}

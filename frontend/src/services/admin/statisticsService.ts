@@ -12,6 +12,7 @@
  */
 
 import apiClient from "@/lib/apiClient";
+import { downloadExcelReport } from "@/lib/downloadExcelReport";
 
 // =====================================================================
 // KIỂU DỮ LIỆU – khớp với response từ Backend
@@ -38,6 +39,16 @@ export type ChiSoTongHop = {
   soSanPhamBanRa: number;
   giaTriTrungBinhDonVnd: number;
   soSanhKyTruoc: SoSanhKyTruoc;
+  doiSoatBaoCao?: {
+    doanhThuGhiNhanVnd: number;
+    tienDaThuTrongKyVnd: number;
+    dongTienCodDangTreoVnd: number;
+    tongGiaTriDonHangVnd: number;
+    soDonHoanTat: number;
+    soDonDaThanhToanDu: number;
+    soDonChoDoiSoatCod: number;
+    tyLeHuyDon: number;
+  };
   khoangThoiGian: KhoangThoiGian;
 };
 
@@ -163,4 +174,20 @@ export async function layPhanBoTrangThai(
     { params }
   );
   return res.data.data;
+}
+
+/**
+ * Xuất báo cáo tổng hợp theo khoảng thời gian đang xem ở trang Thống kê.
+ *
+ * GET /api/admin/statistics/xuat-bao-cao
+ */
+export async function xuatBaoCaoThongKe(
+  tuNgay: string,
+  denNgay: string
+): Promise<string> {
+  return downloadExcelReport(
+    "/admin/statistics/xuat-bao-cao",
+    { tuNgay, denNgay },
+    `bao-cao-thong-ke-${tuNgay}-den-${denNgay}.xlsx`
+  );
 }

@@ -220,6 +220,36 @@ function ChartSkeleton() {
   );
 }
 
+function formatTienVnd(amount: number): string {
+  return `${Math.round(amount).toLocaleString("vi-VN")}đ`;
+}
+
+function rutGonTienVnd(amount: number): string {
+  if (amount >= 1_000_000_000) {
+    return `${(amount / 1_000_000_000).toFixed(1).replace(".", ",")}tỷ`;
+  }
+  if (amount >= 1_000_000) {
+    return `${(amount / 1_000_000).toFixed(1).replace(".", ",")}tr`;
+  }
+  if (amount >= 1_000) {
+    return `${Math.round(amount / 1_000).toLocaleString("vi-VN")}nghìn`;
+  }
+  return `${Math.round(amount).toLocaleString("vi-VN")}đ`;
+}
+
+function taoTapChiSoNhan(soDiem: number): Set<number> {
+  if (soDiem <= 7) {
+    return new Set(Array.from({ length: soDiem }, (_, index) => index));
+  }
+
+  const soNhanToiDa = soDiem <= 16 ? 5 : 4;
+  return new Set(
+    Array.from({ length: soNhanToiDa }, (_, index) =>
+      Math.round((index * (soDiem - 1)) / (soNhanToiDa - 1))
+    )
+  );
+}
+
 export function RevenueChartPanel({
   data,
   loading = false,
@@ -238,32 +268,83 @@ export function RevenueChartPanel({
     );
   }
 
-  const maxValue = Math.max(...data.map((d) => d.value), 1);
+  const rawMaxValue = Math.max(...data.map((d) => d.value));
+  const maxValue = Math.max(rawMaxValue, 1);
+  const coDoanhThu = rawMaxValue > 0;
+  const nhanTrucX = taoTapChiSoNhan(data.length);
+  const chartMinWidth = Math.max(560, data.length * 56);
 
   return (
-    <div className="flex h-[280px] items-end gap-1.5 p-4 sm:gap-2.5 sm:p-5">
-      {data.map((item) => (
-        <div
-          key={item.label}
-          className="group relative flex h-full flex-1 flex-col items-center justify-end"
-        >
-          {/* Tooltip */}
-          <div className="absolute -top-10 left-1/2 hidden w-max -translate-x-1/2 rounded-md bg-surface-alt px-3 py-1.5 text-xs font-semibold text-text-main shadow-md group-hover:block">
-            {item.displayValue}
+    <div
+      aria-label="Khu vực biểu đồ doanh thu"
+      className="relative h-[280px] overflow-hidden bg-surface"
+    >
+      <div className="absolute inset-x-12 top-12 border-t border-dashed border-border" />
+      <div className="absolute inset-x-12 top-1/2 border-t border-dashed border-border" />
+      <div className="absolute inset-x-12 bottom-12 border-t border-dashed border-border" />
+
+      <div className="absolute bottom-10 left-3 top-10 flex w-10 flex-col justify-between text-right text-[10px] font-medium text-text-muted">
+        <span>{rutGonTienVnd(maxValue)}</span>
+        <span>{rutGonTienVnd(maxValue / 2)}</span>
+        <span>0đ</span>
+      </div>
+
+      <div className="absolute inset-y-0 left-14 right-0 overflow-x-auto overflow-y-hidden">
+        <div className="relative h-full min-w-full" style={{ minWidth: `${chartMinWidth}px` }}>
+          <div className="absolute bottom-12 left-4 right-5 top-12 flex items-end gap-2">
+            {data.map((item, index) => {
+              const heightPct =
+                coDoanhThu && item.value > 0
+                  ? Math.max(8, (item.value / maxValue) * 100)
+                  : 1;
+              const tooltipPosition =
+                index === 0
+                  ? "left-0"
+                  : index === data.length - 1
+                    ? "right-0"
+                    : "left-1/2 -translate-x-1/2";
+
+              return (
+                <div
+                  key={`${item.label}-${index}`}
+                  className="group relative flex h-full min-w-[14px] flex-1 items-end justify-center rounded-t-[6px]"
+                  title={`${item.label}: ${formatTienVnd(item.value)} | ${item.orderCount ?? 0} đơn`}
+                >
+                  <span
+                    className={`pointer-events-none absolute z-10 min-w-max rounded-[6px] bg-text-main px-2 py-1 text-[10px] font-semibold leading-4 text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100 ${tooltipPosition}`}
+                    style={{
+                      bottom: `min(calc(${heightPct}% + 0.4rem), calc(100% - 3.25rem))`,
+                    }}
+                  >
+                    <span className="block">{item.label}</span>
+                    <span className="block">{formatTienVnd(item.value)}</span>
+                    <span className="block font-medium opacity-85">{item.orderCount ?? 0} đơn</span>
+                  </span>
+                  <span
+                    className={`block w-full max-w-[34px] rounded-t-[6px] transition-all duration-300 ${
+                      item.value > 0
+                        ? "bg-primary-fixed group-hover:bg-primary"
+                        : "bg-border"
+                    }`}
+                    style={{ height: `${heightPct}%` }}
+                  />
+                </div>
+              );
+            })}
           </div>
 
-          {/* Cột */}
-          <div
-            className="w-full max-w-[40px] rounded-t-md bg-primary-fixed transition-all duration-300 group-hover:bg-primary"
-            style={{ height: `${(item.value / maxValue) * 100}%`, minHeight: "4px" }}
-          />
-
-          {/* Nhãn trục X */}
-          <div className="mt-3 max-w-full truncate text-center text-[9px] font-medium text-text-secondary sm:text-[11px]">
-            {item.label}
+          <div className="absolute bottom-4 left-4 right-5 flex items-center gap-2">
+            {data.map((item, index) => (
+              <span
+                key={`${item.label}-label-${index}`}
+                className="min-w-[44px] flex-1 whitespace-nowrap text-center text-[10px] font-medium text-text-muted"
+              >
+                {nhanTrucX.has(index) ? item.label : ""}
+              </span>
+            ))}
           </div>
         </div>
-      ))}
+      </div>
     </div>
   );
 }

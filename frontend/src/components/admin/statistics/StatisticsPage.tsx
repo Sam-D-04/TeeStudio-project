@@ -47,16 +47,16 @@ function formatTien(n: number): string {
   if (n >= 1_000_000_000)
     return `${(n / 1_000_000_000).toFixed(2).replace(/\.?0+$/, "")} tỷ đ`;
   if (n >= 1_000_000)
-    return `${(n / 1_000_000).toFixed(2).replace(/\.?0+$/, "")} triệu đ`;
+    return `${(n / 1_000_000).toFixed(2).replace(/\.?0+$/, "")} triệu đồng`;
   return n.toLocaleString("vi-VN") + "đ";
 }
 
 /** Định dạng giá trị biểu đồ ngắn gọn */
 function formatBieuDo(n: number): string {
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
-  return String(n);
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1).replace(".", ",")}tỷ`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(".", ",")}tr`;
+  if (n >= 1_000) return `${Math.round(n / 1_000).toLocaleString("vi-VN")}nghìn`;
+  return `${Math.round(n).toLocaleString("vi-VN")}đ`;
 }
 
 /** Định dạng nhãn % so kỳ trước */
@@ -68,6 +68,10 @@ function formatPct(pct: number): string | undefined {
 // ─────────────────────────────────────────────────────────────────────────────
 // Component lỗi nhỏ gọn
 // ─────────────────────────────────────────────────────────────────────────────
+
+function formatTiLe(pct: number): string {
+  return `${pct.toFixed(2).replace(/\.?0+$/, "")}%`;
+}
 
 function InlineError({ message }: { message: string }) {
   return (
@@ -187,12 +191,69 @@ export default function StatisticsPage() {
   }, [chiSo]);
 
   // ── Xây dựng dữ liệu biểu đồ ─────────────────────────────────────────────
+  const reconciliationMetrics = useMemo(() => {
+    const data = chiSo?.doiSoatBaoCao;
+    if (!data) return [];
+
+    return [
+      {
+        label: "Doanh thu ghi nhận",
+        value: formatTien(data.doanhThuGhiNhanVnd),
+        description: "Đơn COMPLETED và đã thanh toán đủ",
+        tone: "text-primary-container",
+      },
+      {
+        label: "Tiền đã thu trong kỳ",
+        value: formatTien(data.tienDaThuTrongKyVnd),
+        description: "Tổng tiền thực nhận từ các giao dịch đã hoàn tất",
+        tone: "text-success",
+      },
+      {
+        label: "Dòng tiền COD đang treo",
+        value: formatTien(data.dongTienCodDangTreoVnd),
+        description: "Tiền COD chưa được kế toán xác nhận đối soát",
+        tone: "text-warning",
+      },
+      {
+        label: "Tổng giá trị đơn hàng",
+        value: formatTien(data.tongGiaTriDonHangVnd),
+        description: "Tổng giá trị tất cả đơn phát sinh trong kỳ",
+        tone: "text-text-main",
+      },
+      {
+        label: "Đơn hoàn tất",
+        value: data.soDonHoanTat.toLocaleString("vi-VN"),
+        description: "Số đơn có trạng thái COMPLETED",
+        tone: "text-success",
+      },
+      {
+        label: "Đơn đã thanh toán đủ",
+        value: data.soDonDaThanhToanDu.toLocaleString("vi-VN"),
+        description: "Đơn có tổng tiền đã thu >= giá trị đơn",
+        tone: "text-primary-container",
+      },
+      {
+        label: "Đơn chờ đối soát COD",
+        value: data.soDonChoDoiSoatCod.toLocaleString("vi-VN"),
+        description: "Đơn còn khoản COD đang treo",
+        tone: "text-warning",
+      },
+      {
+        label: "Tỷ lệ hủy đơn",
+        value: formatTiLe(data.tyLeHuyDon),
+        description: "Đơn CANCELLED / tổng đơn phát sinh",
+        tone: data.tyLeHuyDon > 0 ? "text-red-600" : "text-success",
+      },
+    ];
+  }, [chiSo]);
+
   const chartData: ChartDataItem[] = useMemo(
     () =>
       (bieuDo?.danhSach ?? []).map((d) => ({
         label: d.nhan,
         value: d.doanhThuVnd,
         displayValue: formatBieuDo(d.doanhThuVnd),
+        orderCount: d.soDon,
       })),
     [bieuDo]
   );
@@ -265,14 +326,49 @@ export default function StatisticsPage() {
           ? [1, 2, 3, 4].map((i) => <StatisticsMetricCardSkeleton key={i} />)
           : errorChiSo
             ? [1, 2, 3, 4].map((i) => (
-                <article key={i} className="admin-card min-w-0 p-4 sm:p-5">
-                  <InlineError message="Không thể tải chỉ số." />
-                </article>
-              ))
+              <article key={i} className="admin-card min-w-0 p-4 sm:p-5">
+                <InlineError message="Không thể tải chỉ số." />
+              </article>
+            ))
             : reportMetrics.map((metric) => (
-                <StatisticsMetricCard key={metric.label} metric={metric} />
-              ))}
+              <StatisticsMetricCard key={metric.label} metric={metric} />
+            ))}
       </section>
+
+      <Panel
+        title="Tổng quan tài chính & đối soát"
+        description="Theo dõi doanh thu ghi nhận, tiền đã thu và các khoản COD cần đối soát trong kỳ."
+      >
+        {loadingChiSo ? (
+          <div className="grid animate-pulse grid-cols-1 divide-y divide-border sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <div key={index} className="space-y-3 p-4 sm:p-5">
+                <div className="h-3 w-28 rounded-md bg-surface-container" />
+                <div className="h-6 w-32 rounded-md bg-surface-container" />
+                <div className="h-3 w-40 rounded-md bg-surface-container" />
+              </div>
+            ))}
+          </div>
+        ) : errorChiSo ? (
+          <div className="p-4 sm:p-5">
+            <InlineError message="Không thể tải chỉ số đối chiếu báo cáo." />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 xl:grid-cols-4">
+            {reconciliationMetrics.map((metric) => (
+              <div key={metric.label} className="min-w-0 p-4 sm:p-5">
+                <p className="text-xs font-medium text-text-secondary">{metric.label}</p>
+                <p className={`mt-2 truncate text-xl font-extrabold ${metric.tone}`}>
+                  {metric.value}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-text-muted">
+                  {metric.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
 
       {/* Biểu đồ doanh thu & Top sản phẩm */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">

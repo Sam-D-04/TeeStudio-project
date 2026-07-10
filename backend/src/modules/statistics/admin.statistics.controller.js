@@ -12,6 +12,8 @@
 "use strict";
 
 const statisticsService = require("./admin.statistics.service");
+const statisticsReportService = require("./admin.statistics.report.service");
+const { guiBaoCaoExcel } = require("../../common/utils/excel-report");
 
 // =====================================================================
 // CONTROLLER 1: Chỉ số tổng hợp
@@ -97,6 +99,30 @@ const getPhanBoTrangThai = async (req, res, next) => {
 };
 
 // =====================================================================
+// CONTROLLER 5: Xuất báo cáo Excel
+// =====================================================================
+
+/**
+ * GET /api/admin/statistics/xuat-bao-cao
+ * Trả về file Excel dữ liệu thống kê theo khoảng thời gian.
+ * Query params: tuNgay (YYYY-MM-DD), denNgay (YYYY-MM-DD)
+ */
+const exportBaoCaoThongKe = async (req, res, next) => {
+  try {
+    const { tuNgay, denNgay } = req.query;
+    const report = await statisticsReportService.taoBaoCaoThongKe(
+      tuNgay,
+      denNgay,
+      req.user
+    );
+
+    return guiBaoCaoExcel(res, report);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// =====================================================================
 // EXPORTS
 // =====================================================================
 
@@ -105,4 +131,5 @@ module.exports = {
   getBieuDoDoanhThu,
   getTopSanPham,
   getPhanBoTrangThai,
+  exportBaoCaoThongKe,
 };

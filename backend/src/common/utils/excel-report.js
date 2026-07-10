@@ -5,6 +5,15 @@ const ExcelJS = require("exceljs");
 const XLSX_MIME_TYPE =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
+async function dongGoiWorkbookExcel(fileName, workbook) {
+  const rawBuffer = await workbook.xlsx.writeBuffer();
+  return {
+    buffer: Buffer.isBuffer(rawBuffer) ? rawBuffer : Buffer.from(rawBuffer),
+    fileName,
+    contentType: XLSX_MIME_TYPE,
+  };
+}
+
 async function taoBaoCaoExcel(fileName, sheets) {
   const workbook = new ExcelJS.Workbook();
 
@@ -14,12 +23,7 @@ async function taoBaoCaoExcel(fileName, sheets) {
     worksheet.addRows(rows);
   });
 
-  const rawBuffer = await workbook.xlsx.writeBuffer();
-  return {
-    buffer: Buffer.isBuffer(rawBuffer) ? rawBuffer : Buffer.from(rawBuffer),
-    fileName,
-    contentType: XLSX_MIME_TYPE,
-  };
+  return dongGoiWorkbookExcel(fileName, workbook);
 }
 
 function guiBaoCaoExcel(res, report) {
@@ -38,4 +42,4 @@ function guiBaoCaoExcel(res, report) {
   return res.status(200).send(report.buffer);
 }
 
-module.exports = { taoBaoCaoExcel, guiBaoCaoExcel };
+module.exports = { dongGoiWorkbookExcel, taoBaoCaoExcel, guiBaoCaoExcel };

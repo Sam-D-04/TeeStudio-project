@@ -25,6 +25,7 @@ export type ChartDataItem = {
   label: string;
   value: number;
   displayValue: string;
+  orderCount?: number;
 };
 
 export type StatisticsTableColumn = {
