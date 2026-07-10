@@ -138,6 +138,7 @@ export type ThamSoLocDonHang = {
   gio?: string;
   loai?: string;
   tuKhoa?: string;
+  excludeStatus?: string;
 };
 
 // =====================================================================
@@ -176,6 +177,7 @@ export async function layDanhSachDonHang(
   if (thamSo.gio) params.gio = thamSo.gio;
   if (thamSo.loai && thamSo.loai !== "tat_ca") params.loai = thamSo.loai;
   if (thamSo.tuKhoa && thamSo.tuKhoa.trim()) params.tuKhoa = thamSo.tuKhoa.trim();
+  if (thamSo.excludeStatus) params.excludeStatus = thamSo.excludeStatus;
 
   const res = await apiClient.get<{ success: boolean; data: KetQuaDanhSach }>(
     "/admin/orders",

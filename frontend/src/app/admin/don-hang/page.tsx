@@ -67,6 +67,7 @@ export default async function AdminOrdersPage({
   const from = layGiaTriDauTien(params.from);
   const to = layGiaTriDauTien(params.to);
   const hour = layGiaTriDauTien(params.hour);
+  const excludeStatus = layGiaTriDauTien(params.excludeStatus).toUpperCase();
   const initialFilters = {
     status: chuyenTrangThaiSangBoLoc(layGiaTriDauTien(params.status)),
     payment: chuyenThanhToanSangBoLoc(layGiaTriDauTien(params.payment)),
@@ -77,6 +78,7 @@ export default async function AdminOrdersPage({
         ? ("completed" as const)
         : ("created" as const),
     hour: /^(?:[01]\d|2[0-3])$/.test(hour) ? hour : "",
+    excludeStatus: excludeStatus === "CANCELLED" ? "CANCELLED" : "",
   };
   const filterKey = JSON.stringify(initialFilters);
 

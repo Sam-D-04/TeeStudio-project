@@ -420,6 +420,7 @@ async function layDanhSachDonHang({
   gio,
   loai,
   tuKhoa,
+  excludeStatus,
 }) {
   const trangHienTai = parseInt(trang) || 1;
   const soMoi = parseInt(soMoiTrang) || 10;
@@ -441,6 +442,10 @@ async function layDanhSachDonHang({
         thamSo.push(statusDB);
       }
     }
+  }
+
+  if (String(excludeStatus || "").trim().toUpperCase() === "CANCELLED") {
+    dieuKien.push("co.status <> 'CANCELLED'");
   }
 
   // Lọc theo thanh toán
@@ -482,11 +487,7 @@ async function layDanhSachDonHang({
     dieuKien.push("MONTH(co.createdAt) = MONTH(CURDATE()) AND YEAR(co.createdAt) = YEAR(CURDATE())");
   }
 
-  if (
-    kieuNgay === "ngay_hoan_tat" &&
-    typeof gio === "string" &&
-    /^(?:[01]\d|2[0-3])$/.test(gio)
-  ) {
+  if (typeof gio === "string" && /^(?:[01]\d|2[0-3])$/.test(gio)) {
     dieuKien.push(`DATE_FORMAT(${cotNgay}, '%H') = ?`);
     thamSo.push(gio);
   }

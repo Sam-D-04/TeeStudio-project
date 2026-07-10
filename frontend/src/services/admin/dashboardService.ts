@@ -24,6 +24,7 @@ export type KhoangThoiGian = {
 export type TongQuanChiSo = {
   doanhThuThangVnd: number;
   doanhThuThietKeVnd: number;
+  tongSoDonHang?: number;
   soDonMoi: number;
   soVariantTonKhoThap: number;
   giaTriTrungBinhDonVnd: number;
@@ -39,6 +40,7 @@ export type DiemBieuDo = {
   nhan: string;       // Nhãn hiển thị trên trục X
   doanhThuVnd: number;
   soDonHoanTat: number;
+  soDonDat: number;
 };
 
 export type DashboardGroupBy = "hour" | "day" | "month";
@@ -48,6 +50,7 @@ export type DuLieuBieuDo = {
   danhSach: DiemBieuDo[];
   tongDoanhThuVnd: number;
   tongDonHoanTat: number;
+  tongSoDonDat?: number;
   doanhThuLonNhatVnd: number;
   groupBy: DashboardGroupBy;
   khoangThoiGian: KhoangThoiGian;

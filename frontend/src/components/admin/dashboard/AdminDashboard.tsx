@@ -62,7 +62,7 @@ export default function AdminDashboard() {
     staleTime: 60_000,
   });
 
-  // ── Truy vấn 2: Biểu đồ doanh thu ──
+  // ── Truy vấn 2: Biểu đồ số đơn và doanh thu ──
   const {
     data: bieuDo,
     isLoading: isLoadingBieuDo,
@@ -131,6 +131,9 @@ export default function AdminDashboard() {
   const dateQuery = hasDateRange
     ? `&from=${encodeURIComponent(tuNgay)}&to=${encodeURIComponent(denNgay)}`
     : "";
+  const allOrdersHref = hasDateRange
+    ? `/admin/don-hang?from=${encodeURIComponent(tuNgay)}&to=${encodeURIComponent(denNgay)}`
+    : "/admin/don-hang";
   const completedOrdersHref =
     `/admin/don-hang?status=COMPLETED&payment=COMPLETED&dateField=completed${dateQuery}`;
 
@@ -151,9 +154,9 @@ export default function AdminDashboard() {
       iconClassName: "text-accent",
     },
     {
-      label: "Đơn hàng mới",
-      value: isLoadingChiSo ? "..." : String(chiSo?.soDonMoi ?? "—"),
-      href: `/admin/don-hang?status=PENDING${dateQuery}`,
+      label: "Tổng số đơn hàng",
+      value: isLoadingChiSo ? "..." : String(chiSo?.tongSoDonHang ?? chiSo?.soDonMoi ?? "—"),
+      href: allOrdersHref,
       icon: <ShoppingOutlined />,
       iconClassName: "text-primary-container",
     },
@@ -247,7 +250,7 @@ export default function AdminDashboard() {
             />
           ))}
         </div>
-        {/* Cột phải: Biểu đồ doanh thu tổng quan */}
+        {/* Cột phải: Biểu đồ số đơn và doanh thu */}
         <RevenueOverviewChart
           data={bieuDo?.danhSach ?? []}
           groupBy={bieuDo?.groupBy ?? "day"}
