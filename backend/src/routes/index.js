@@ -14,6 +14,7 @@ const adminProductRoutes = require("../modules/products/admin.product.routes");
 const adminInventoryRoutes = require("../modules/inventory/admin.inventory.routes");
 const adminPromotionRoutes = require("../modules/promotions/admin.promotion.routes");
 const adminDashboardRoutes = require("../modules/dashboard/admin.dashboard.routes");
+const adminStatisticsRoutes = require("../modules/statistics/admin.statistics.routes");
 
 // Import controller cho 2 public endpoints (vi-tri-in, stickers dành cho Design Studio)
 const designController = require("../modules/designs/admin.design.controller");
@@ -96,6 +97,9 @@ router.use("/admin/promotions", adminPromotionRoutes);
 
 // Tổng quan vận hành (Dashboard) – /api/admin/dashboard/...
 router.use("/admin/dashboard", adminDashboardRoutes);
+
+// Theo dõi & Thống kê – /api/admin/statistics/...
+router.use("/admin/statistics", adminStatisticsRoutes);
 
 // Quản lý thanh toán – /api/admin/payments/...
 router.use("/admin/payments", adminPaymentRoutes);

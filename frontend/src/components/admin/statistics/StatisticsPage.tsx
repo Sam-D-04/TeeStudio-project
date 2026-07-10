@@ -3,60 +3,249 @@
 import {
   BarChartOutlined,
   CalendarOutlined,
-  CheckCircleOutlined,
-  DatabaseOutlined,
+  DollarOutlined,
+  ExclamationCircleOutlined,
+  InboxOutlined,
+  LineChartOutlined,
+  ShoppingCartOutlined,
 } from "@ant-design/icons";
+import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useMemo, useState } from "react";
+import * as statisticsService from "@/services/admin/statisticsService";
 import StatisticsFilterBar from "./components/StatisticsFilterBar";
-import StatisticsMetricCard from "./components/StatisticsMetricCard";
+import StatisticsMetricCard, {
+  StatisticsMetricCardSkeleton,
+} from "./components/StatisticsMetricCard";
 import {
   DistributionPanel,
   Panel,
+  RevenueChartPanel,
   StatisticsTable,
 } from "./components/StatisticsPanels";
-import {
-  orderStatusDistribution,
-  paymentMethodRows,
-  paymentStatusDistribution,
-  productReportRows,
-  ratioMetrics,
-  reportMetrics,
-} from "./mockData";
+import type { ChartDataItem, MetricItem, StatisticsTableRow } from "./types";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hằng số
+// ─────────────────────────────────────────────────────────────────────────────
+
+const STALE_TIME = 3 * 60 * 1000; // 3 phút
 
 const productColumns = [
   { key: "product", label: "Sản phẩm" },
-  { key: "orderLines", label: "Dòng đơn", align: "right" as const },
-  { key: "quantity", label: "Số lượng", align: "right" as const },
-  { key: "lineValue", label: "Tổng giá trị dòng đơn", align: "right" as const },
+  { key: "bienThe", label: "Biến thể phổ biến" },
+  { key: "quantity", label: "Đã bán", align: "right" as const },
+  { key: "revenue", label: "Doanh thu", align: "right" as const },
 ];
 
-const paymentMethodColumns = [
-  { key: "method", label: "Phương thức" },
-  { key: "transactions", label: "Giao dịch", align: "right" as const },
-  { key: "completed", label: "Thành công", align: "right" as const },
-  { key: "collected", label: "Số tiền đã thu", align: "right" as const },
-];
+// ─────────────────────────────────────────────────────────────────────────────
+// Tiện ích định dạng
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Định dạng tiền VNĐ: 1.250.000 → "1,25 triệu đ" hoặc "1.250.000đ" */
+function formatTien(n: number): string {
+  if (n >= 1_000_000_000)
+    return `${(n / 1_000_000_000).toFixed(2).replace(/\.?0+$/, "")} tỷ đ`;
+  if (n >= 1_000_000)
+    return `${(n / 1_000_000).toFixed(2).replace(/\.?0+$/, "")} triệu đ`;
+  return n.toLocaleString("vi-VN") + "đ";
+}
+
+/** Định dạng giá trị biểu đồ ngắn gọn */
+function formatBieuDo(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return String(n);
+}
+
+/** Định dạng nhãn % so kỳ trước */
+function formatPct(pct: number): string | undefined {
+  if (pct === 0) return undefined;
+  return `${pct > 0 ? "+" : ""}${pct.toFixed(1)}% so với kỳ trước`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Component lỗi nhỏ gọn
+// ─────────────────────────────────────────────────────────────────────────────
+
+function InlineError({ message }: { message: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+      <ExclamationCircleOutlined />
+      <span>{message}</span>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// StatisticsPage
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function StatisticsPage() {
   const [dateRange, setDateRange] = useState({ startDate: "", endDate: "" });
 
+  // Chuyển chuỗi rỗng sang undefined để backend dùng giá trị mặc định
+  const tuNgay = dateRange.startDate || undefined;
+  const denNgay = dateRange.endDate || undefined;
+
+  // ── 4 query song song ──────────────────────────────────────────────────────
+  const {
+    data: chiSo,
+    isLoading: loadingChiSo,
+    isError: errorChiSo,
+  } = useQuery({
+    queryKey: ["statistics/chi-so", tuNgay, denNgay],
+    queryFn: () => statisticsService.layChiSo(tuNgay, denNgay),
+    staleTime: STALE_TIME,
+  });
+
+  const {
+    data: bieuDo,
+    isLoading: loadingBieuDo,
+    isError: errorBieuDo,
+  } = useQuery({
+    queryKey: ["statistics/bieu-do", tuNgay, denNgay],
+    queryFn: () => statisticsService.layBieuDo(tuNgay, denNgay),
+    staleTime: STALE_TIME,
+  });
+
+  const {
+    data: topSanPham,
+    isLoading: loadingTop,
+    isError: errorTop,
+  } = useQuery({
+    queryKey: ["statistics/top-san-pham", tuNgay, denNgay],
+    queryFn: () => statisticsService.layTopSanPham(tuNgay, denNgay, 5),
+    staleTime: STALE_TIME,
+  });
+
+  const {
+    data: phanBo,
+    isLoading: loadingPhanBo,
+    isError: errorPhanBo,
+  } = useQuery({
+    queryKey: ["statistics/phan-bo", tuNgay, denNgay],
+    queryFn: () => statisticsService.layPhanBoTrangThai(tuNgay, denNgay),
+    staleTime: STALE_TIME,
+  });
+
+  // ── Nhãn khoảng thời gian ─────────────────────────────────────────────────
   const rangeLabel = useMemo(() => {
-    if (!dateRange.startDate || !dateRange.endDate) return "Đang xác định khoảng thời gian";
-    return `${dayjs(dateRange.startDate).format("DD/MM/YYYY")} – ${dayjs(dateRange.endDate).format("DD/MM/YYYY")}`;
-  }, [dateRange]);
+    const start = chiSo?.khoangThoiGian?.tuNgay ?? dateRange.startDate;
+    const end = chiSo?.khoangThoiGian?.denNgay ?? dateRange.endDate;
+    if (!start || !end) return "Đang xác định khoảng thời gian";
+    return `${dayjs(start).format("DD/MM/YYYY")} – ${dayjs(end).format("DD/MM/YYYY")}`;
+  }, [chiSo, dateRange]);
+
+  // ── Xây dựng MetricItem từ dữ liệu API ───────────────────────────────────
+  const reportMetrics: MetricItem[] = useMemo(() => {
+    if (!chiSo) return [];
+    const { soSanhKyTruoc: ss } = chiSo;
+
+    const pctDir = (pct: number): "up" | "down" | undefined =>
+      pct > 0 ? "up" : pct < 0 ? "down" : undefined;
+
+    return [
+      {
+        label: "Doanh thu",
+        value: formatTien(chiSo.doanhThuVnd),
+        description: "Tổng doanh thu từ đơn đã hoàn tất",
+        icon: <DollarOutlined />,
+        tone: "primary",
+        direction: pctDir(ss.doanhThuPhanTram),
+        directionLabel: formatPct(ss.doanhThuPhanTram),
+      },
+      {
+        label: "Số đơn hàng",
+        value: chiSo.soDonHang.toLocaleString("vi-VN"),
+        description: "Tổng số đơn hàng phát sinh trong kỳ",
+        icon: <ShoppingCartOutlined />,
+        tone: "success",
+        direction: pctDir(ss.soDonPhanTram),
+        directionLabel: formatPct(ss.soDonPhanTram),
+      },
+      {
+        label: "Sản phẩm bán ra",
+        value: chiSo.soSanPhamBanRa.toLocaleString("vi-VN"),
+        description: "Tổng số lượng áo từ đơn đã hoàn tất",
+        icon: <InboxOutlined />,
+        tone: "accent",
+        direction: pctDir(ss.soSanPhamPhanTram),
+        directionLabel: formatPct(ss.soSanPhamPhanTram),
+      },
+      {
+        label: "Giá trị trung bình đơn",
+        value: formatTien(chiSo.giaTriTrungBinhDonVnd),
+        description: "Doanh thu ÷ Số đơn hoàn tất",
+        icon: <LineChartOutlined />,
+        tone: "warning",
+        direction: pctDir(ss.giaTriTBDonPhanTram),
+        directionLabel: formatPct(ss.giaTriTBDonPhanTram),
+      },
+    ];
+  }, [chiSo]);
+
+  // ── Xây dựng dữ liệu biểu đồ ─────────────────────────────────────────────
+  const chartData: ChartDataItem[] = useMemo(
+    () =>
+      (bieuDo?.danhSach ?? []).map((d) => ({
+        label: d.nhan,
+        value: d.doanhThuVnd,
+        displayValue: formatBieuDo(d.doanhThuVnd),
+      })),
+    [bieuDo]
+  );
+
+  // ── Xây dựng bảng top sản phẩm ───────────────────────────────────────────
+  const productRows: StatisticsTableRow[] = useMemo(
+    () =>
+      (topSanPham ?? []).map((sp) => ({
+        id: String(sp.productId),
+        product: (
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-surface-container">
+              {sp.imageUrl ? (
+                <img
+                  src={sp.imageUrl}
+                  alt={sp.name}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-text-muted">
+                  ÁO
+                </span>
+              )}
+            </div>
+            <p className="font-semibold text-text-main">{sp.name}</p>
+          </div>
+        ),
+        bienThe: sp.bienThePhoBien,
+        quantity: sp.tongSoLuong.toLocaleString("vi-VN"),
+        revenue: formatTien(sp.tongDoanhThu),
+      })),
+    [topSanPham]
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-5">
+      {/* Tiêu đề trang */}
       <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary-container">
             <BarChartOutlined />
-            <span>Báo cáo tổng hợp</span>
+            <span>Kết quả hoạt động kinh doanh</span>
           </div>
-          <h2 className="text-headline-lg-mobile font-extrabold text-text-main md:text-headline-lg">Thống kê</h2>
+          <h2 className="text-headline-lg-mobile font-extrabold text-text-main md:text-headline-lg">
+            Theo dõi &amp; Thống kê
+          </h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-text-secondary">
-            Tổng hợp dữ liệu theo khoảng thời gian để đối chiếu và lập báo cáo, không lặp lại các cảnh báo vận hành trên dashboard.
+            Tổng hợp dữ liệu doanh thu, đơn hàng và sản phẩm giúp ban quản trị nắm bắt chính
+            xác tình hình kinh doanh của shop.
           </p>
         </div>
         <div className="flex items-center gap-2 self-start rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text-secondary lg:self-auto">
@@ -65,77 +254,95 @@ export default function StatisticsPage() {
         </div>
       </header>
 
+      {/* Bộ lọc thời gian */}
       <StatisticsFilterBar
         onDateChange={(startDate, endDate) => setDateRange({ startDate, endDate })}
       />
 
+      {/* 4 thẻ chỉ số */}
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {reportMetrics.map((metric) => (
-          <StatisticsMetricCard key={metric.label} metric={metric} />
-        ))}
+        {loadingChiSo
+          ? [1, 2, 3, 4].map((i) => <StatisticsMetricCardSkeleton key={i} />)
+          : errorChiSo
+            ? [1, 2, 3, 4].map((i) => (
+                <article key={i} className="admin-card min-w-0 p-4 sm:p-5">
+                  <InlineError message="Không thể tải chỉ số." />
+                </article>
+              ))
+            : reportMetrics.map((metric) => (
+                <StatisticsMetricCard key={metric.label} metric={metric} />
+              ))}
       </section>
 
-      <section aria-labelledby="ratio-statistics-heading" className="space-y-3">
-        <div>
-          <h3 id="ratio-statistics-heading" className="text-card-title font-bold text-text-main">
-            Các tỷ lệ trong kỳ
-          </h3>
-          <p className="mt-1 text-xs leading-5 text-text-secondary">
-            Mũi tên thể hiện hướng quản trị mong muốn, không phải mức thay đổi so với kỳ trước.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {ratioMetrics.map((metric) => (
-            <StatisticsMetricCard key={metric.label} metric={metric} />
-          ))}
-        </div>
-      </section>
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      {/* Biểu đồ doanh thu & Top sản phẩm */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Panel
-          title="Cơ cấu trạng thái đơn hàng"
-          description="Nhóm và đếm CustomerOrder theo trạng thái hiện tại."
+          className="xl:col-span-2"
+          title="Biểu đồ doanh thu"
+          description="Biến động tổng doanh thu bán hàng theo thời gian."
         >
-          <DistributionPanel items={orderStatusDistribution} />
+          {errorBieuDo ? (
+            <div className="p-4">
+              <InlineError message="Không thể tải dữ liệu biểu đồ." />
+            </div>
+          ) : (
+            <RevenueChartPanel data={chartData} loading={loadingBieuDo} />
+          )}
         </Panel>
+
         <Panel
-          title="Cơ cấu trạng thái giao dịch"
-          description="Nhóm và đếm Payment theo trạng thái giao dịch."
+          className="xl:col-span-1"
+          title="Top sản phẩm bán chạy"
+          description="Các sản phẩm mang lại doanh thu cao nhất trong kỳ."
         >
-          <DistributionPanel items={paymentStatusDistribution} />
+          {errorTop ? (
+            <div className="p-4">
+              <InlineError message="Không thể tải danh sách sản phẩm." />
+            </div>
+          ) : (
+            <StatisticsTable
+              columns={productColumns}
+              rows={productRows}
+              loading={loadingTop}
+            />
+          )}
         </Panel>
       </div>
 
-      <Panel
-        title="Báo cáo theo sản phẩm"
-        description="Tổng hợp toàn bộ sản phẩm phát sinh trong OrderItem, không xếp hạng bán chạy và không tính đơn đã hủy."
-      >
-        <StatisticsTable columns={productColumns} rows={productReportRows} />
-      </Panel>
+      {/* Phân bổ trạng thái đơn hàng & thanh toán */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <Panel
+          title="Tỷ lệ trạng thái đơn hàng"
+          description="Phân bổ trạng thái của các đơn hàng phát sinh trong kỳ."
+        >
+          {errorPhanBo ? (
+            <div className="p-4">
+              <InlineError message="Không thể tải dữ liệu phân bổ." />
+            </div>
+          ) : (
+            <DistributionPanel
+              items={phanBo?.trangThaiDon ?? []}
+              loading={loadingPhanBo}
+            />
+          )}
+        </Panel>
 
-      <Panel
-        title="Báo cáo theo phương thức thanh toán"
-        description="Đếm giao dịch và cộng Payment.amount thành công theo từng paymentMethod."
-      >
-        <StatisticsTable columns={paymentMethodColumns} rows={paymentMethodRows} />
-      </Panel>
-
-      <aside className="flex flex-col gap-3 rounded-[12px] border border-primary-fixed bg-sky-50/70 p-4 text-sm text-text-secondary sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface text-primary-container shadow-sm">
-            <DatabaseOutlined />
-          </span>
-          <div>
-            <p className="font-bold text-text-main">Statistics dành cho báo cáo, Dashboard dành cho vận hành</p>
-            <p className="mt-0.5 text-xs leading-5">
-              Dữ liệu minh họa khớp Database_main.sql; mô tả từng mục là công thức gợi ý để backend nối API.
-            </p>
-          </div>
-        </div>
-        <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-success">
-          <CheckCircleOutlined /> Sẵn sàng tích hợp API
-        </span>
-      </aside>
+        <Panel
+          title="Tỷ lệ tình trạng thanh toán"
+          description="Tình trạng nhận tiền từ các đơn hàng trong kỳ."
+        >
+          {errorPhanBo ? (
+            <div className="p-4">
+              <InlineError message="Không thể tải dữ liệu phân bổ." />
+            </div>
+          ) : (
+            <DistributionPanel
+              items={phanBo?.trangThaiThanhToan ?? []}
+              loading={loadingPhanBo}
+            />
+          )}
+        </Panel>
+      </div>
     </div>
   );
 }

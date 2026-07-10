@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Kiểu dữ liệu dùng cho các UI component (MetricCard, Panels, Table)
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type MetricItem = {
   label: string;
   value: string;
@@ -17,6 +21,12 @@ export type DistributionItem = {
   color: string;
 };
 
+export type ChartDataItem = {
+  label: string;
+  value: number;
+  displayValue: string;
+};
+
 export type StatisticsTableColumn = {
   key: string;
   label: string;
@@ -25,5 +35,5 @@ export type StatisticsTableColumn = {
 
 export type StatisticsTableRow = {
   id: string;
-  [key: string]: string;
+  [key: string]: string | ReactNode;
 };
