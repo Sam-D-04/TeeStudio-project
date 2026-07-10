@@ -34,6 +34,35 @@ export type ThietKe = {
 };
 
 export type ChiTietThietKe = ThietKe & {
+  tenThietKe: string;
+  khachHangId: number;
+  emailKhachHang: string | null;
+  sanPhamId: number;
+  productId: number;
+  variantId: number | null;
+  sizeAo: string | null;
+  skuAo: string | null;
+  tonKhoBienThe: number | null;
+  phiViTriIn: number;
+  phiThietKe: number;
+  ngayCapNhat: string | null;
+  maDonHang: string | null;
+  donHangLienQuan: {
+    orderItemId: number;
+    orderId: number;
+    maDonHang: string;
+    trangThaiDonHang: string | null;
+    ngayDatDon: string | null;
+    soLuong: number;
+    donGia: number;
+    phiThietKe: number;
+    thanhTien: number;
+    trangThaiSanXuat: string | null;
+    sizeAo: string | null;
+    tenMauAo: string | null;
+    mauAo: string;
+    skuAo: string | null;
+  }[];
   ghiChu: string | null;
 };
 
@@ -43,11 +72,15 @@ export type CanvasDataThietKe = {
   maThietKe: string;
   tenThietKe: string;
   mauAo: string;
+  productId: number;
+  variantId: number | null;
+  sizeAo: string | null;
   tenSanPham: string;
   trangThai: TrangThaiThietKe;
   canvasData: {
     version: number;
     shirtType: ShirtType;
+    shirtColor?: string;
     shirtView: ShirtView;
     logicalCanvas: { width: number; height: number };
     elements: DesignElement[];
@@ -59,10 +92,14 @@ export type SuaThietKeInput = {
   canvasData: {
     version: number;
     shirtType: ShirtType;
+    shirtColor?: string;
     shirtView: ShirtView;
     logicalCanvas: { width: number; height: number };
     elements: DesignElement[];
   };
+  shirtType?: ShirtType;
+  shirtColor?: string;
+  variantId?: number;
   previewUrl: string;
 };
 
@@ -138,6 +175,7 @@ export type TaoThietKeChoKhachInput = {
   canvasData: {
     version: number;
     shirtType: ShirtType;
+    shirtColor?: string;
     shirtView: ShirtView;
     logicalCanvas: { width: number; height: number };
     elements: DesignElement[];

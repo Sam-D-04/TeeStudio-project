@@ -241,6 +241,7 @@ export default function AdminDesignStudio() {
         canvasData: {
           version: 1,
           shirtType,
+          shirtColor,
           shirtView,
           logicalCanvas: { width: CONTAINER_W, height: CONTAINER_H },
           elements: useDesignStore.getState().elements,

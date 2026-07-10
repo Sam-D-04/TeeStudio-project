@@ -72,6 +72,67 @@ const DIEU_KIEN_CHO_GUI_XUONG = `${BIEU_THUC_TRANG_THAI_DON_IN} = 'READY_TO_PRIN
 
 const LOAI_AO_HOP_LE = new Set(["tshirt", "polo", "hoodie"]);
 
+const MAU_AO_MAC_DINH = {
+  black: "#000000",
+  den: "#000000",
+  white: "#ffffff",
+  trang: "#ffffff",
+  navy: "#1d4ed8",
+  "xanh navy": "#1d4ed8",
+  blue: "#0066cc",
+  "xanh duong": "#0066cc",
+  gray: "#9ca3af",
+  grey: "#9ca3af",
+  xam: "#9ca3af",
+  brown: "#8b4513",
+  nau: "#8b4513",
+  beige: "#d6b89a",
+  be: "#d6b89a",
+};
+
+function laMaMauHex(value) {
+  return /^#[0-9a-f]{6}$/i.test(String(value || "").trim());
+}
+
+function chuanHoaMaMauHex(value) {
+  const hex = String(value || "").trim().toLowerCase();
+  if (["#1a1a1a", "#0a0a0a", "#111111", "#18181b"].includes(hex)) {
+    return "#000000";
+  }
+  return hex;
+}
+
+function chuanHoaKhoaMau(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\u0111/g, "d")
+    .replace(/\s+/g, " ");
+}
+
+function chuanHoaMauAo(...candidates) {
+  for (const candidate of candidates) {
+    const value = String(candidate || "").trim();
+    if (!value) continue;
+    if (laMaMauHex(value)) return chuanHoaMaMauHex(value);
+
+    const mapped = MAU_AO_MAC_DINH[chuanHoaKhoaMau(value)];
+    if (mapped) return mapped;
+  }
+  return "#ffffff";
+}
+
+function layMaMauTuongDuong(color) {
+  const normalized = chuanHoaMauAo(color);
+  const values = [String(color || "").trim().toLowerCase(), normalized];
+  if (normalized === "#000000") {
+    values.push("#1a1a1a", "#0a0a0a", "#111111", "#18181b");
+  }
+  return [...new Set(values.filter(Boolean))];
+}
+
 function chuanHoaCanvasData(canvasData, shirtType) {
   let data = canvasData;
   if (typeof data === "string") {
@@ -128,14 +189,15 @@ async function layBienTheTaoThietKe(shirtType, shirtColor) {
     "SELECT name FROM Product WHERE id = ? LIMIT 1",
     [productId]
   );
+  const colorCandidates = layMaMauTuongDuong(shirtColor);
   const [variants] = await db.pool.query(
     `SELECT id, color, colorHex, size, stockQty
      FROM ProductVariant
      WHERE productId = ?
-       AND LOWER(colorHex) = LOWER(?)
+       AND LOWER(colorHex) IN (?)
        AND (status IS NULL OR status = 'ACTIVE')
      ORDER BY FIELD(size, 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'), size, id`,
-    [productId, String(shirtColor).trim()]
+    [productId, colorCandidates]
   );
 
   return {
@@ -389,6 +451,7 @@ async function layDanhSachThietKe({
       a.phone              AS soDienThoai,
       p.name               AS tenSanPham,
       pv.color             AS tenMauAo,
+      pv.colorHex          AS mauAoHex,
       (
         SELECT GROUP_CONCAT(DISTINCT ppViTri.name ORDER BY ppViTri.id SEPARATOR ', ')
         FROM DesignPrintPosition dppViTri
@@ -412,7 +475,7 @@ async function layDanhSachThietKe({
     id: row.id,
     maThietKe: `TK-${String(row.id).padStart(4, "0")}`,
     urlPreview: row.urlPreview || null,
-    mauAo: row.mauAo || "#ffffff",
+    mauAo: chuanHoaMauAo(row.mauAoHex, row.mauAo, row.tenMauAo),
     tenKhachHang: row.tenKhachHang || "Khách hàng",
     soDienThoai: row.soDienThoai || null,
     tenSanPham: row.tenSanPham || "Sản phẩm",
@@ -439,21 +502,46 @@ async function layChiTietThietKe(id) {
   const [rows] = await db.pool.query(
     `SELECT
        cd.id,
+       cd.name AS tenThietKe,
+       cd.productId,
+       cd.variantId,
        cd.previewUrl AS urlPreview,
        cd.baseColor AS mauAo,
        cd.status,
        cd.createdAt AS ngayGui,
+       cd.updatedAt AS ngayCapNhat,
        cd.adminNote AS ghiChu,
+       cd.designFee AS phiThietKe,
+       a.id AS khachHangId,
        a.fullName AS tenKhachHang,
+       a.email AS emailKhachHang,
        a.phone AS soDienThoai,
+       p.id AS sanPhamId,
        p.name AS tenSanPham,
        pv.color AS tenMauAo,
+       pv.colorHex AS mauAoHex,
+       pv.size AS sizeAo,
+       pv.sku AS skuAo,
+       pv.stockQty AS tonKhoBienThe,
        (
          SELECT GROUP_CONCAT(DISTINCT pp.name ORDER BY pp.name SEPARATOR ', ')
          FROM DesignPrintPosition dpp
          JOIN PrintPosition pp ON pp.id = dpp.printPositionId
          WHERE dpp.designId = cd.id
-       ) AS viTriIn
+       ) AS viTriIn,
+       (
+         SELECT COALESCE(SUM(dpp.extraCost), 0)
+         FROM DesignPrintPosition dpp
+         WHERE dpp.designId = cd.id
+       ) AS phiViTriIn,
+       (
+         SELECT co.orderCode
+         FROM OrderItem oi
+         JOIN CustomerOrder co ON co.id = oi.orderId
+         WHERE oi.designId = cd.id
+         ORDER BY co.createdAt DESC, co.id DESC
+         LIMIT 1
+       ) AS maDonHang
      FROM CustomDesign cd
      JOIN Account a ON a.id = cd.userId
      JOIN Product p ON p.id = cd.productId
@@ -468,18 +556,73 @@ async function layChiTietThietKe(id) {
   }
 
   const row = rows[0];
+  const [rowsDonHang] = await db.pool.query(
+    `SELECT
+       oi.id AS orderItemId,
+       oi.orderId,
+       co.orderCode AS maDonHang,
+       co.status AS trangThaiDonHang,
+       co.createdAt AS ngayDatDon,
+       oi.quantity AS soLuong,
+       oi.unitPrice AS donGia,
+       oi.designFee AS phiThietKe,
+       oi.lineTotal AS thanhTien,
+       oi.productionStatus AS trangThaiSanXuat,
+       pv.size AS sizeAo,
+       pv.color AS tenMauAo,
+       pv.colorHex AS mauAoHex,
+       pv.sku AS skuAo
+     FROM OrderItem oi
+     JOIN CustomerOrder co ON co.id = oi.orderId
+     LEFT JOIN ProductVariant pv ON pv.id = oi.variantId
+     WHERE oi.designId = ?
+     ORDER BY co.createdAt DESC, oi.id DESC`,
+    [id]
+  );
+
   return {
     id: row.id,
     maThietKe: `TK-${String(row.id).padStart(4, "0")}`,
+    tenThietKe: row.tenThietKe || `Thiết kế ${row.id}`,
+    khachHangId: Number(row.khachHangId),
+    emailKhachHang: row.emailKhachHang || null,
+    sanPhamId: Number(row.sanPhamId),
+    productId: Number(row.productId),
+    variantId: row.variantId ? Number(row.variantId) : null,
     urlPreview: row.urlPreview || null,
-    mauAo: row.mauAo || "#ffffff",
+    mauAo: chuanHoaMauAo(row.mauAoHex, row.mauAo, row.tenMauAo),
     tenKhachHang: row.tenKhachHang || "Khách hàng",
     soDienThoai: row.soDienThoai || null,
     tenSanPham: row.tenSanPham || "Sản phẩm",
     tenMauAo: row.tenMauAo || "Không rõ",
+    sizeAo: row.sizeAo || null,
+    skuAo: row.skuAo || null,
+    tonKhoBienThe: row.tonKhoBienThe !== null && row.tonKhoBienThe !== undefined
+      ? Number(row.tonKhoBienThe)
+      : null,
     viTriIn: row.viTriIn || "Chưa xác định",
+    phiViTriIn: Number(row.phiViTriIn || 0),
+    phiThietKe: Number(row.phiThietKe || 0),
     trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[row.status] || "cho_kiem_tra",
     ngayGui: formatNgay(row.ngayGui),
+    ngayCapNhat: formatNgay(row.ngayCapNhat),
+    maDonHang: row.maDonHang || null,
+    donHangLienQuan: rowsDonHang.map((don) => ({
+      orderItemId: Number(don.orderItemId),
+      orderId: Number(don.orderId),
+      maDonHang: don.maDonHang,
+      trangThaiDonHang: don.trangThaiDonHang || null,
+      ngayDatDon: formatNgay(don.ngayDatDon),
+      soLuong: Number(don.soLuong || 0),
+      donGia: Number(don.donGia || 0),
+      phiThietKe: Number(don.phiThietKe || 0),
+      thanhTien: Number(don.thanhTien || 0),
+      trangThaiSanXuat: don.trangThaiSanXuat || null,
+      sizeAo: don.sizeAo || null,
+      tenMauAo: don.tenMauAo || null,
+      mauAo: chuanHoaMauAo(don.mauAoHex, don.tenMauAo),
+      skuAo: don.skuAo || null,
+    })),
     ghiChu: row.ghiChu || null,
   };
 }
@@ -499,9 +642,14 @@ async function layCanvasDataThietKe(id) {
        cd.status,
        cd.name      AS tenThietKe,
        cd.productId,
+       cd.variantId,
+       pv.colorHex  AS mauAoHex,
+       pv.color     AS tenMauAo,
+       pv.size      AS sizeAo,
        p.name       AS tenSanPham
      FROM CustomDesign cd
      JOIN Product p ON p.id = cd.productId
+     LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
      WHERE cd.id = ?
        AND cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION', 'APPROVED', 'DRAFT')`,
     [id]
@@ -525,11 +673,28 @@ async function layCanvasDataThietKe(id) {
     }
   }
 
+  const mauAo = chuanHoaMauAo(
+    canvasData?.shirtColor,
+    row.mauAo,
+    row.mauAoHex,
+    row.tenMauAo
+  );
+
+  if (canvasData && typeof canvasData === "object") {
+    canvasData = {
+      ...canvasData,
+      shirtColor: mauAo,
+    };
+  }
+
   return {
     id: row.id,
     maThietKe: `TK-${String(row.id).padStart(4, "0")}`,
     tenThietKe: row.tenThietKe || "Thiết kế chưa đặt tên",
-    mauAo: row.mauAo || "#ffffff",
+    mauAo,
+    productId: Number(row.productId),
+    variantId: row.variantId ? Number(row.variantId) : null,
+    sizeAo: row.sizeAo || null,
     tenSanPham: row.tenSanPham || "Sản phẩm",
     trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[row.status] || "cho_kiem_tra",
     canvasData, // object đã parse, hoặc null
@@ -543,7 +708,7 @@ async function layCanvasDataThietKe(id) {
 // Lưu đè đồng thời canvasData MỚI + previewUrl MỚI, và tự động
 // chuyển status → APPROVED vì admin đã kiểm duyệt khi sửa trực tiếp.
 // =====================================================================
-async function suaThietKeChoKhach(id, { canvasData, previewUrl }) {
+async function suaThietKeChoKhach(id, { canvasData, previewUrl, shirtType, shirtColor, variantId }) {
   let dataObj = canvasData;
   if (typeof dataObj === "string") {
     try {
@@ -556,28 +721,76 @@ async function suaThietKeChoKhach(id, { canvasData, previewUrl }) {
     throw taoLoi("Dữ liệu thiết kế phải chứa danh sách elements", 400);
   }
 
+  const requestedShirtType = LOAI_AO_HOP_LE.has(shirtType)
+    ? shirtType
+    : LOAI_AO_HOP_LE.has(dataObj.shirtType)
+      ? dataObj.shirtType
+      : null;
+  if (!requestedShirtType) {
+    throw taoLoi("Loại áo không hợp lệ", 400);
+  }
+
+  const productId = await timSanPhamTheoLoaiAo(requestedShirtType);
+  const selectedVariantId = Number(variantId);
+  if (!Number.isInteger(selectedVariantId) || selectedVariantId <= 0) {
+    throw taoLoi("Vui lòng chọn size áo", 400);
+  }
+
   dataObj = {
     ...dataObj,
+    shirtType: requestedShirtType,
     shirtView: dataObj.shirtView === "back" ? "back" : "front",
   };
-  const dataStr = JSON.stringify(dataObj);
-  const designFee = calculateBoundingBoxAreaFee({ layers: dataObj.elements });
 
   // Ghi đè canvasData + previewUrl + đổi status APPROVED + cập nhật phí
   await db.transaction(async (conn) => {
     const [rows] = await conn.query(
-      "SELECT id, status FROM CustomDesign WHERE id = ? FOR UPDATE",
+      `SELECT cd.id, cd.status, cd.baseColor, pv.colorHex, pv.color
+       FROM CustomDesign cd
+       LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
+       WHERE cd.id = ?
+       FOR UPDATE`,
       [id]
     );
     if (!rows || rows.length === 0) {
       throw taoLoi("Không tìm thấy thiết kế", 404);
     }
 
+    const [variants] = await conn.query(
+      `SELECT id, colorHex, color, size
+       FROM ProductVariant
+       WHERE id = ? AND productId = ? AND (status IS NULL OR status = 'ACTIVE')
+       LIMIT 1`,
+      [selectedVariantId, productId]
+    );
+    if (!variants.length) {
+      throw taoLoi("Size đã chọn không thuộc loại áo này hoặc không còn hoạt động", 400);
+    }
+
+    const normalizedColor = chuanHoaMauAo(
+      shirtColor,
+      dataObj.shirtColor,
+      variants[0].colorHex,
+      variants[0].color,
+      rows[0].baseColor
+    );
+    const variantColor = chuanHoaMauAo(variants[0].colorHex, variants[0].color);
+    if (variantColor !== normalizedColor) {
+      throw taoLoi("Size đã chọn không phù hợp với màu áo", 400);
+    }
+    dataObj = {
+      ...dataObj,
+      shirtColor: normalizedColor,
+    };
+
+    const dataStr = JSON.stringify(dataObj);
+    const designFee = calculateBoundingBoxAreaFee({ layers: dataObj.elements });
+
     await conn.query(
       `UPDATE CustomDesign
-       SET canvasData = ?, previewUrl = ?, status = 'APPROVED', designFee = ?
+       SET productId = ?, variantId = ?, canvasData = ?, previewUrl = ?, status = 'APPROVED', designFee = ?, baseColor = ?
        WHERE id = ?`,
-      [dataStr, previewUrl || "", designFee, id]
+      [productId, selectedVariantId, dataStr, previewUrl || "", designFee, normalizedColor, id]
     );
     await dongBoViTriInTheoMatAo(conn, id, dataObj.shirtView);
   });
@@ -636,7 +849,11 @@ async function taoThietKeChoKhach({ userId, name, shirtType, shirtColor, variant
     throw taoLoi("Size đã chọn không phù hợp với màu áo", 400);
   }
 
-  const normalizedCanvas = chuanHoaCanvasData(canvasData, shirtType);
+  const normalizedColor = chuanHoaMauAo(variants[0].colorHex, shirtColor);
+  const normalizedCanvas = {
+    ...chuanHoaCanvasData(canvasData, shirtType),
+    shirtColor: normalizedColor,
+  };
   const dataStr = JSON.stringify(normalizedCanvas);
   const designFee = calculateBoundingBoxAreaFee({ layers: normalizedCanvas.elements });
 
@@ -650,7 +867,7 @@ async function taoThietKeChoKhach({ userId, name, shirtType, shirtColor, variant
         String(name).trim().slice(0, 100),
         productId,
         selectedVariantId,
-        shirtColor || "#ffffff",
+        normalizedColor,
         dataStr,
         previewUrl || "",
         designFee,

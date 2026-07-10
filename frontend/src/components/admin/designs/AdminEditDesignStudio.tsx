@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { App, Button, Spin, ConfigProvider, theme } from "antd";
+import { App, Button, Select, Spin, ConfigProvider, theme } from "antd";
 import {
   ArrowLeftOutlined,
   DeleteOutlined,
@@ -61,6 +61,12 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
   const [zoom, setZoom] = useState(1);
   const [maThietKe, setMaThietKe] = useState("");
   const [tenThietKe, setTenThietKe] = useState("");
+  const [variantSelection, setVariantSelection] = useState<{ id: number; key: string }>();
+  const [preferredSize, setPreferredSize] = useState<string>();
+  const [sizeResult, setSizeResult] = useState<{
+    key: string;
+    variants: designService.BienTheTaoThietKe[];
+  }>({ key: "", variants: [] });
 
   const {
     elements,
@@ -75,6 +81,11 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     undoStack,
     redoStack,
   } = useDesignStore();
+
+  const variantKey = `${shirtType}|${shirtColor.toLowerCase()}`;
+  const variantId = variantSelection?.key === variantKey ? variantSelection.id : undefined;
+  const sizeOptions = sizeResult.key === variantKey ? sizeResult.variants : [];
+  const loadingSizes = sizeResult.key !== variantKey;
 
   // ─── Bước 1 & 2: Load canvasData từ API → tái tạo canvas ──────────────
   useEffect(() => {
@@ -118,13 +129,18 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
         });
 
         // Tái tạo toàn bộ trạng thái canvas từ JSON đã lưu
+        const loadedShirtType = cd.shirtType ?? "tshirt";
+        const loadedShirtColor = cd.shirtColor ?? data.mauAo ?? "#ffffff";
+        setPreferredSize(data.sizeAo ?? undefined);
+        setVariantSelection(undefined);
+
         useDesignStore.setState({
           elements: normalizedElements,
           selectedId: null,
           currentDesignId: designId,
           designName: data.tenThietKe,
-          shirtType: cd.shirtType ?? "tshirt",
-          shirtColor: data.mauAo ?? "#ffffff",
+          shirtType: loadedShirtType,
+          shirtColor: loadedShirtColor,
           shirtView: cd.shirtView ?? "front",
           undoStack: [],
           redoStack: [],
@@ -151,6 +167,35 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
       });
     };
   }, [designId]);
+
+  useEffect(() => {
+    let active = true;
+    const requestedKey = `${shirtType}|${shirtColor.toLowerCase()}`;
+
+    designService
+      .layBienTheTaoThietKe(shirtType, shirtColor)
+      .then((result) => {
+        if (active) setSizeResult({ key: requestedKey, variants: result.variants });
+      })
+      .catch(() => {
+        if (active) {
+          setSizeResult({ key: requestedKey, variants: [] });
+          message.error("Không thể tải danh sách size phù hợp");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [message, shirtColor, shirtType]);
+
+  useEffect(() => {
+    if (sizeResult.key !== variantKey || variantId || !preferredSize) return;
+    const matchingVariant = sizeOptions.find((variant) => variant.size === preferredSize && variant.stockQty > 0);
+    if (matchingVariant) {
+      setVariantSelection({ id: matchingVariant.id, key: variantKey });
+    }
+  }, [preferredSize, sizeOptions, sizeResult.key, variantId, variantKey]);
 
   // ─── Keyboard shortcuts ────────────────────────────────────────────────
   useEffect(() => {
@@ -244,6 +289,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
   // ─── Bước 3 & 4: Lưu thay đổi ────────────────────────────────────────
   const saveDesign = useCallback(async () => {
     if (!elements.length) return message.warning("Thiết kế cần có ít nhất một hình ảnh hoặc văn bản");
+    if (!variantId) return message.warning("Vui lòng chọn size áo");
     if (!shirtContainerRef.current) return;
 
     try {
@@ -270,9 +316,13 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
 
       // Gọi API ghi đè (canvasData JSON mới + previewUrl Base64)
       await designService.suaThietKeChoKhach(designId, {
+        shirtType,
+        shirtColor,
+        variantId,
         canvasData: {
           version: 1,
           shirtType,
+          shirtColor,
           shirtView,
           logicalCanvas: { width: CONTAINER_W, height: CONTAINER_H },
           elements: useDesignStore.getState().elements,
@@ -296,7 +346,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     } finally {
       setSaving(false);
     }
-  }, [designId, elements.length, maThietKe, message, modal, router, setSelectedId, shirtType, shirtView]);
+  }, [designId, elements.length, maThietKe, message, modal, router, setSelectedId, shirtColor, shirtType, shirtView, variantId]);
 
   // ─── Hủy bỏ – quay về danh sách không lưu gì ─────────────────────────
   const handleCancel = useCallback(() => {
@@ -403,6 +453,26 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
           </div>
 
           {/* Phải: Undo/Redo + Xóa + Lưu thay đổi */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "center", flexWrap: "wrap" }}>
+            <Select
+              loading={loadingSizes}
+              value={variantId}
+              onChange={(id) => {
+                const selectedVariant = sizeOptions.find((variant) => variant.id === id);
+                setPreferredSize(selectedVariant?.size);
+                setVariantSelection({ id, key: variantKey });
+              }}
+              placeholder="Chọn size"
+              style={{ width: 150 }}
+              options={sizeOptions.map((variant) => ({
+                value: variant.id,
+                label: `${variant.size}${variant.stockQty <= 0 ? " — Hết hàng" : ""}`,
+                disabled: variant.stockQty <= 0,
+              }))}
+              notFoundContent={loadingSizes ? <Spin size="small" /> : "Không có size phù hợp"}
+            />
+          </div>
+
           <div className="ds-toolbar-right">
             <Button icon={<UndoOutlined />} disabled={!undoStack.length} onClick={undo} />
             <Button icon={<RedoOutlined />} disabled={!redoStack.length} onClick={redo} />
