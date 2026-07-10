@@ -95,7 +95,7 @@ const FORM_LABEL: Record<string, string> = {
   hoodie: "Áo Hoodie",
 };
 
-const fmt = (n: any) => Number(n).toLocaleString("vi-VN") + "đ";
+const fmt = (n: any) => "từ " + Number(n).toLocaleString("vi-VN") + "đ";
 
 /* ─── Client Component ──────────────────────────────────────────────────── */
 interface Props {
