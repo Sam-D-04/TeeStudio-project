@@ -157,6 +157,11 @@ const MAP_VI_TRI_IN_FE_DB = {
   mat_sau: "MAT_SAU",
 };
 
+const MAP_SHIRT_VIEW_PRINT_POSITION_CODE = {
+  front: "MAT_TRUOC",
+  back: "MAT_SAU",
+};
+
 // =====================================================================
 // Hàm tiện ích
 // =====================================================================
@@ -180,6 +185,27 @@ function taoLoi(message, statusCode = 400) {
   const err = new Error(message);
   err.statusCode = statusCode;
   return err;
+}
+
+async function dongBoViTriInTheoMatAo(conn, designId, shirtView) {
+  const code = MAP_SHIRT_VIEW_PRINT_POSITION_CODE[shirtView === "back" ? "back" : "front"];
+  const [positions] = await conn.query(
+    "SELECT id, extraCost FROM PrintPosition WHERE code = ? AND isActive = 1 LIMIT 1",
+    [code]
+  );
+  if (!positions.length) {
+    throw taoLoi("Không tìm thấy vị trí in phù hợp với mặt áo đã chọn", 400);
+  }
+
+  await conn.query(
+    "DELETE FROM DesignPrintPosition WHERE designId = ?",
+    [designId]
+  );
+  await conn.query(
+    `INSERT INTO DesignPrintPosition (designId, printPositionId, extraCost)
+     VALUES (?, ?, ?)`,
+    [designId, positions[0].id, positions[0].extraCost || 0]
+  );
 }
 
 function kiemTraKhoangNgay(tuNgay, denNgay) {
@@ -290,7 +316,7 @@ async function layDanhSachThietKe({
     coTuKhoaHayId = true;
   }
 
-  if (coTuKhoaHayId) {
+  if (coTuKhoaHayId || trang_thai === "tat_ca") {
     dieuKien.push("cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION', 'APPROVED', 'DRAFT')");
   } else if (trang_thai === "nhap") {
     dieuKien.push("cd.status = 'DRAFT'");
@@ -518,16 +544,6 @@ async function layCanvasDataThietKe(id) {
 // chuyển status → APPROVED vì admin đã kiểm duyệt khi sửa trực tiếp.
 // =====================================================================
 async function suaThietKeChoKhach(id, { canvasData, previewUrl }) {
-  // Kiểm tra thiết kế tồn tại
-  const [rows] = await db.pool.query(
-    "SELECT id, status FROM CustomDesign WHERE id = ?",
-    [id]
-  );
-  if (!rows || rows.length === 0) {
-    throw taoLoi("Không tìm thấy thiết kế", 404);
-  }
-
-  // Validate và chuẩn hóa canvasData
   let dataObj = canvasData;
   if (typeof dataObj === "string") {
     try {
@@ -540,16 +556,31 @@ async function suaThietKeChoKhach(id, { canvasData, previewUrl }) {
     throw taoLoi("Dữ liệu thiết kế phải chứa danh sách elements", 400);
   }
 
+  dataObj = {
+    ...dataObj,
+    shirtView: dataObj.shirtView === "back" ? "back" : "front",
+  };
   const dataStr = JSON.stringify(dataObj);
   const designFee = calculateBoundingBoxAreaFee({ layers: dataObj.elements });
 
   // Ghi đè canvasData + previewUrl + đổi status APPROVED + cập nhật phí
-  await db.pool.query(
-    `UPDATE CustomDesign
-     SET canvasData = ?, previewUrl = ?, status = 'APPROVED', designFee = ?
-     WHERE id = ?`,
-    [dataStr, previewUrl || "", designFee, id]
-  );
+  await db.transaction(async (conn) => {
+    const [rows] = await conn.query(
+      "SELECT id, status FROM CustomDesign WHERE id = ? FOR UPDATE",
+      [id]
+    );
+    if (!rows || rows.length === 0) {
+      throw taoLoi("Không tìm thấy thiết kế", 404);
+    }
+
+    await conn.query(
+      `UPDATE CustomDesign
+       SET canvasData = ?, previewUrl = ?, status = 'APPROVED', designFee = ?
+       WHERE id = ?`,
+      [dataStr, previewUrl || "", designFee, id]
+    );
+    await dongBoViTriInTheoMatAo(conn, id, dataObj.shirtView);
+  });
 
   return {
     id: Number(id),
@@ -609,21 +640,25 @@ async function taoThietKeChoKhach({ userId, name, shirtType, shirtColor, variant
   const dataStr = JSON.stringify(normalizedCanvas);
   const designFee = calculateBoundingBoxAreaFee({ layers: normalizedCanvas.elements });
 
-  const [result] = await db.pool.query(
-    `INSERT INTO CustomDesign
-       (userId, name, productId, variantId, baseColor, canvasData, previewUrl, status, designFee)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?)`,
-    [
-      customerId,
-      String(name).trim().slice(0, 100),
-      productId,
-      selectedVariantId,
-      shirtColor || "#ffffff",
-      dataStr,
-      previewUrl || "",
-      designFee,
-    ]
-  );
+  const result = await db.transaction(async (conn) => {
+    const [insertResult] = await conn.query(
+      `INSERT INTO CustomDesign
+         (userId, name, productId, variantId, baseColor, canvasData, previewUrl, status, designFee)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?)`,
+      [
+        customerId,
+        String(name).trim().slice(0, 100),
+        productId,
+        selectedVariantId,
+        shirtColor || "#ffffff",
+        dataStr,
+        previewUrl || "",
+        designFee,
+      ]
+    );
+    await dongBoViTriInTheoMatAo(conn, insertResult.insertId, normalizedCanvas.shirtView);
+    return insertResult;
+  });
 
   return {
     id: result.insertId,

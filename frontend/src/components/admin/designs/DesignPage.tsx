@@ -98,7 +98,9 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
     tuKhoa: initialFilters?.designId
       ? `TK-${String(initialFilters.designId).padStart(4, "0")}`
       : "",
-    trangThai: initialFilters?.designId ? "" : initialFilters?.designStatus ?? "",
+    trangThai: initialFilters?.designId
+      ? "tat_ca"
+      : initialFilters?.designStatus || "khong_nhap",
     viTriIn: "",
     tuNgay: "",
     denNgay: "",
@@ -146,7 +148,7 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
     setIdThietKeDangLoc(null);
     setBoDuc({
       tuKhoa: "",
-      trangThai: "",
+      trangThai: "tat_ca",
       viTriIn: "",
       tuNgay: "",
       denNgay: "",
