@@ -19,6 +19,14 @@ export interface CartItem {
   colorLabel: string;
   price: number;
   quantity: number;
+  /** ID của CustomDesign (nếu là sản phẩm có thiết kế riêng) */
+  designId?: number;
+  /**
+   * Ảnh in print-ready (base64 PNG nền trong suốt) export từ canvas Design Studio.
+   * KHÔNG được persist xuống localStorage (xem `partialize`) vì base64 rất nặng —
+   * chỉ sống in-memory theo phiên để gửi kèm khi tạo đơn.
+   */
+  printImage?: string;
 }
 
 export interface CartState {
@@ -39,8 +47,12 @@ export interface CartState {
   toSyncPayload: () => Array<{ variantId: number; quantity: number }>;
 }
 
-function buildCartItemId(variantId: number): string {
-  return `variant_${variantId}`;
+function buildCartItemId(variantId: number, designId?: number): string {
+  // Có thiết kế riêng → tách thành dòng giỏ hàng riêng để không gộp nhầm
+  // hai thiết kế khác nhau trên cùng một biến thể.
+  return designId
+    ? `variant_${variantId}_design_${designId}`
+    : `variant_${variantId}`;
 }
 
 function apiItemToCartItem(item: CartItemFromAPI): CartItem {
@@ -69,14 +81,19 @@ export const useCartStore = create<CartState>()(
         get().items.reduce((acc, i) => acc + i.price * i.quantity, 0),
 
       addItem: (item) => {
-        const id = buildCartItemId(item.variantId);
+        const id = buildCartItemId(item.variantId, item.designId);
         set((s) => {
           const existing = s.items.find((i) => i.cartItemId === id);
           if (existing) {
             return {
               items: s.items.map((i) =>
                 i.cartItemId === id
-                  ? { ...i, quantity: i.quantity + item.quantity }
+                  ? {
+                      ...i,
+                      quantity: i.quantity + item.quantity,
+                      // Giữ ảnh in mới nhất (nếu lần thêm này có kèm)
+                      printImage: item.printImage ?? i.printImage,
+                    }
                   : i
               ),
             };
@@ -113,6 +130,12 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: "teestudio_cart",
+      // Không lưu `printImage` (base64 rất nặng, dễ vượt quota localStorage ~5MB).
+      // Ảnh in chỉ cần sống in-memory theo phiên để gửi kèm lúc tạo đơn.
+      partialize: (state) => ({
+        ...state,
+        items: state.items.map((i) => ({ ...i, printImage: undefined })),
+      }),
     }
   )
 );

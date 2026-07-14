@@ -23,13 +23,14 @@ async function mapShirtTypeToProductId(shirtType) {
 }
 
 /**
- * Get all saved DRAFT designs for a user.
+ * Get all saved designs for a user (mọi trạng thái: DRAFT/PENDING_REVIEW/NEEDS_REVISION/APPROVED)
+ * để khách hàng thấy được thiết kế của mình kể cả sau khi đã gửi duyệt hoặc bị yêu cầu chỉnh sửa.
  */
 async function getMyDesigns(userId) {
   const [rows] = await db.pool.query(
-    `SELECT id, name, productId, baseColor, canvasData, previewUrl, status, updatedAt 
-     FROM CustomDesign 
-     WHERE userId = ? AND status = 'DRAFT'
+    `SELECT id, name, productId, baseColor, canvasData, previewUrl, status, adminNote, updatedAt
+     FROM CustomDesign
+     WHERE userId = ? AND status IN ('DRAFT', 'PENDING_REVIEW', 'NEEDS_REVISION', 'APPROVED')
      ORDER BY updatedAt DESC`,
     [userId]
   );
@@ -69,17 +70,19 @@ async function saveNewDesign(userId, payload) {
 }
 
 /**
- * Update an existing DRAFT design.
+ * Update an existing design — chỉ cho phép khi DRAFT (đang soạn) hoặc NEEDS_REVISION
+ * (admin yêu cầu sửa). PENDING_REVIEW/APPROVED bị khoá để tránh sửa giữa lúc admin
+ * đang xét duyệt hoặc thiết kế đã lên production.
  */
 async function updateDesign(userId, designId, payload) {
   const { name, shirtType, shirtColor, canvasData, previewUrl } = payload;
-  
+
   // Verify ownership and status
   const [check] = await db.pool.query(
-    "SELECT id FROM CustomDesign WHERE id = ? AND userId = ? AND status = 'DRAFT'",
+    "SELECT id FROM CustomDesign WHERE id = ? AND userId = ? AND status IN ('DRAFT', 'NEEDS_REVISION')",
     [designId, userId]
   );
-  
+
   if (check.length === 0) {
     const error = new Error("Design not found or cannot be edited");
     error.status = 404;
@@ -118,9 +121,27 @@ async function deleteDesign(userId, designId) {
   return { success: true };
 }
 
+/**
+ * Gửi thiết kế cho admin duyệt: DRAFT hoặc NEEDS_REVISION → PENDING_REVIEW.
+ * Không xoá adminNote cũ — giữ làm ngữ cảnh cho tới khi admin duyệt hoặc ghi chú mới đè lên.
+ */
+async function submitForReview(userId, designId) {
+  const [result] = await db.pool.query(
+    "UPDATE CustomDesign SET status = 'PENDING_REVIEW' WHERE id = ? AND userId = ? AND status IN ('DRAFT', 'NEEDS_REVISION')",
+    [designId, userId]
+  );
+  if (result.affectedRows === 0) {
+    const error = new Error("Không tìm thấy thiết kế hoặc thiết kế không ở trạng thái có thể gửi duyệt");
+    error.status = 404;
+    throw error;
+  }
+  return { id: designId, status: "PENDING_REVIEW" };
+}
+
 module.exports = {
   getMyDesigns,
   saveNewDesign,
   updateDesign,
   deleteDesign,
+  submitForReview,
 };

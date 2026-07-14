@@ -1,4 +1,10 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL + "/users/me/designs";
+import apiClient from "@/lib/apiClient";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
+
+const DESIGNS_PATH = "/users/me/designs";
+
+/** Khớp với các giá trị CustomDesign.status trong DB. */
+export type DesignStatus = "DRAFT" | "PENDING_REVIEW" | "NEEDS_REVISION" | "APPROVED";
 
 export interface SavedDesign {
   id: number;
@@ -7,63 +13,70 @@ export interface SavedDesign {
   baseColor: string;
   canvasData: any;
   previewUrl: string;
-  status: string;
+  status: DesignStatus;
+  /** Ghi chú của admin khi yêu cầu chỉnh sửa (chỉ có ý nghĩa khi status = NEEDS_REVISION). */
+  adminNote: string | null;
   updatedAt: string;
 }
 
+/*
+ * Dùng apiClient (axios) thay cho fetch thô để:
+ *  - Luôn gắn access token mới nhất từ storage (interceptor request).
+ *  - Tự động refresh token khi gặp 401 rồi retry (interceptor response).
+ * Tham số `token` được giữ lại cho tương thích chỗ gọi cũ nhưng không cần dùng
+ * (auth do interceptor xử lý).
+ */
 export const userDesignService = {
-  getMyDesigns: async (token: string): Promise<SavedDesign[]> => {
-    const res = await fetch(API_URL, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-    if (!res.ok) throw new Error("Lỗi khi tải danh sách thiết kế");
-    const json = await res.json();
-    return json.data;
-  },
-
-  createDesign: async (token: string, payload: any): Promise<SavedDesign> => {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.message || "Lỗi khi lưu thiết kế");
+  getMyDesigns: async (_token?: string): Promise<SavedDesign[]> => {
+    try {
+      const res = await apiClient.get(DESIGNS_PATH);
+      return res.data.data;
+    } catch (err) {
+      throw new Error(getApiErrorMessage(err, "Lỗi khi tải danh sách thiết kế"));
     }
-    const json = await res.json();
-    return json.data;
   },
 
-  updateDesign: async (token: string, id: number, payload: any): Promise<SavedDesign> => {
-    const res = await fetch(`${API_URL}/${id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.message || "Lỗi khi cập nhật thiết kế");
+  createDesign: async (_token: string | undefined, payload: any): Promise<SavedDesign> => {
+    try {
+      // Timeout dài hơn vì có upload ảnh preview (base64) lên Cloudinary
+      const res = await apiClient.post(DESIGNS_PATH, payload, { timeout: 60000 });
+      return res.data.data;
+    } catch (err) {
+      throw new Error(getApiErrorMessage(err, "Lỗi khi lưu thiết kế"));
     }
-    const json = await res.json();
-    return json.data;
   },
 
-  deleteDesign: async (token: string, id: number): Promise<void> => {
-    const res = await fetch(`${API_URL}/${id}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-    if (!res.ok) throw new Error("Lỗi khi xoá thiết kế");
-  }
+  updateDesign: async (
+    _token: string | undefined,
+    id: number,
+    payload: any
+  ): Promise<SavedDesign> => {
+    try {
+      const res = await apiClient.put(`${DESIGNS_PATH}/${id}`, payload, { timeout: 60000 });
+      return res.data.data;
+    } catch (err) {
+      throw new Error(getApiErrorMessage(err, "Lỗi khi cập nhật thiết kế"));
+    }
+  },
+
+  deleteDesign: async (_token: string | undefined, id: number): Promise<void> => {
+    try {
+      await apiClient.delete(`${DESIGNS_PATH}/${id}`);
+    } catch (err) {
+      throw new Error(getApiErrorMessage(err, "Lỗi khi xoá thiết kế"));
+    }
+  },
+
+  /** Gửi thiết kế (DRAFT hoặc NEEDS_REVISION) cho admin duyệt → chuyển sang PENDING_REVIEW. */
+  submitForReview: async (
+    _token: string | undefined,
+    id: number
+  ): Promise<{ id: number; status: DesignStatus }> => {
+    try {
+      const res = await apiClient.patch(`${DESIGNS_PATH}/${id}/submitForReview`);
+      return res.data.data;
+    } catch (err) {
+      throw new Error(getApiErrorMessage(err, "Lỗi khi gửi thiết kế để duyệt"));
+    }
+  },
 };

@@ -80,9 +80,26 @@ const deleteDesign = async (req, res, next) => {
   }
 };
 
+const submitForReview = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const designId = parseInt(req.params.id);
+    if (!designId) {
+      return res.status(400).json({ success: false, message: "Invalid design ID" });
+    }
+
+    const result = await userDesignService.submitForReview(userId, designId);
+    res.json({ success: true, data: result, message: 'Submitted for review successfully' });
+  } catch (error) {
+    const status = error.status || 500;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getMyDesigns,
   createDesign,
   updateDesign,
   deleteDesign,
+  submitForReview,
 };

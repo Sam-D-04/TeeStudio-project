@@ -14,6 +14,7 @@ const adminProductRoutes = require("../modules/products/admin.product.routes");
 const adminInventoryRoutes = require("../modules/inventory/admin.inventory.routes");
 const adminPromotionRoutes = require("../modules/promotions/admin.promotion.routes");
 const adminDashboardRoutes = require("../modules/dashboard/admin.dashboard.routes");
+const aiDesignRoutes = require("../modules/ai-design/ai-design.routes");
 
 // Import controller cho 2 public endpoints (vi-tri-in, stickers dành cho Design Studio)
 const designController = require("../modules/designs/admin.design.controller");
@@ -71,6 +72,11 @@ router.use("/cart", cartRoutes);
 // ── Customer đặt hàng ────────────────────────────────────────────────────────
 // POST /api/orders  → Khách đặt đơn (yêu cầu đăng nhập, role CUSTOMER)
 router.use("/orders", customerOrderRoutes);
+
+// ── AI Trợ lý thiết kế (Gemini, yêu cầu đăng nhập) ─────────────────────────
+// POST /api/design-studio/ai-assist/generate → sinh thiết kế mới (câu chữ + bố cục)
+// POST /api/design-studio/ai-assist/arrange  → tự sắp xếp lại các phần tử đang có
+router.use("/design-studio/ai-assist", aiDesignRoutes);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Route dành cho Admin

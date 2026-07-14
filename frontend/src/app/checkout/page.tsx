@@ -38,7 +38,9 @@ function formatVND(value: number) {
 
 const SHIPPING_FEE = 35_000;
 
-type PaymentMethod = "VNPAY" | "COD";
+type PaymentMethod = "VNPAY" | "MOMO" | "COD";
+/** Các phương thức thanh toán online — chuyển hướng sang cổng thanh toán sau khi tạo đơn */
+const ONLINE_PAYMENT_METHODS = new Set<PaymentMethod>(["VNPAY", "MOMO"]);
 
 interface CheckoutFormValues {
   recipientName: string;
@@ -73,6 +75,27 @@ const paymentOptions: Array<{
           fontFamily="Arial"
         >
           VNPAY
+        </text>
+      </svg>
+    ),
+  },
+  {
+    value: "MOMO",
+    label: "Thanh toán qua Ví MoMo",
+    desc: "Quét mã QR hoặc ứng dụng MoMo",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <rect width="24" height="24" rx="6" fill="#A50064" />
+        <text
+          x="12"
+          y="16"
+          textAnchor="middle"
+          fill="#fff"
+          fontSize="11"
+          fontWeight="bold"
+          fontFamily="Arial"
+        >
+          M
         </text>
       </svg>
     ),
@@ -178,7 +201,7 @@ export default function CheckoutPage() {
         shippingFee: SHIPPING_FEE,
       };
       const result = await createOrder(payload, token);
-      if (values.paymentMethod === "VNPAY" && result.paymentUrl) {
+      if (ONLINE_PAYMENT_METHODS.has(values.paymentMethod) && result.paymentUrl) {
         clearCart();
         window.location.href = result.paymentUrl;
       } else {

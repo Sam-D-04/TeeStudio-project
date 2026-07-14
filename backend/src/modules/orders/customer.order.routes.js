@@ -40,7 +40,7 @@ const customerCheckoutSchema = {
     paymentMethod: {
       required: true,
       type: "string",
-      enum: ["COD", "VNPAY"],
+      enum: ["COD", "VNPAY", "MOMO"],
     },
     items: {
       required: true,
@@ -55,6 +55,16 @@ const customerCheckoutSchema = {
           }
           if (!item.quantity || typeof item.quantity !== "number" || item.quantity < 1) {
             return "quantity phải là số nguyên dương";
+          }
+          // designId (tuỳ chọn) – ID thiết kế POD
+          if (item.designId !== undefined &&
+              (typeof item.designId !== "number" || item.designId < 1)) {
+            return "designId không hợp lệ";
+          }
+          // printImage (tuỳ chọn) – ảnh in print-ready dạng base64 data URI
+          if (item.printImage !== undefined &&
+              (typeof item.printImage !== "string" || !item.printImage.startsWith("data:image"))) {
+            return "printImage phải là chuỗi base64 ảnh (data:image/...)";
           }
         }
         return true;

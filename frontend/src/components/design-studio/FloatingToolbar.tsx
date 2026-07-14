@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useDesignStore } from "@/store/useDesignStore";
+import { removeImageBackground } from "@/lib/backgroundRemoval";
 
 /* ─── Các icon dùng trong toolbar ─── */
 const DuplicateIcon = () => (
@@ -49,21 +50,21 @@ function ToolBtn({
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        width:          28,
-        height:         28,
-        display:        "flex",
-        alignItems:     "center",
+        width: 28,
+        height: 28,
+        display: "flex",
+        alignItems: "center",
         justifyContent: "center",
-        background:     hov
+        background: hov
           ? danger ? "rgba(248,113,113,0.15)" : "#334155"
           : "transparent",
-        border:         "none",
-        borderRadius:   6,
-        cursor:         "pointer",
-        color:          active ? "#f59e0b" : danger ? "#f87171" : "#94a3b8",
-        transition:     "background 0.15s, color 0.15s",
-        padding:        0,
-        flexShrink:     0,
+        border: "none",
+        borderRadius: 6,
+        cursor: "pointer",
+        color: active ? "#f59e0b" : danger ? "#f87171" : "#94a3b8",
+        transition: "background 0.15s, color 0.15s",
+        padding: 0,
+        flexShrink: 0,
       }}
     >
       {children}
@@ -85,9 +86,11 @@ interface Props {
 
 interface ToolbarPos { x: number; y: number; }
 
-const TOOLBAR_W = 180;
+/* Bề rộng toolbar khớp theo nội dung: ảnh có thêm 2 nút lật nên rộng hơn */
+const TOOLBAR_W_IMAGE = 224; // Nhân bản | Lật ngang · Lật dọc | Tách nền | Khoá | Xoá
+const TOOLBAR_W_DEFAULT = 114; // Nhân bản | Khoá | Xoá (không có nút lật)
 const TOOLBAR_H = 36;
-const MARGIN    = 10;
+const MARGIN = 10;
 
 /* ─── Icon lật ngang / lật dọc (chỉ dùng cho ảnh) ─── */
 const FlipHIcon = () => (
@@ -100,6 +103,12 @@ const FlipVIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h18M7 7l4-4 4 4M7 17l4 4 4-4" />
   </svg>
 );
+/* Icon tách nền (đũa thần) */
+const MagicIcon = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="m15 4 1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2ZM4 20 14 10M18 14l.5 1 1 .5-1 .5-.5 1-.5-1-1-.5 1-.5.5-1Z" />
+  </svg>
+);
 
 export default function FloatingToolbar({ shirtContainerRef, zoom }: Props) {
   const { selectedId, elements, duplicateElement, removeElement, toggleLock, updateElement, pushHistory } =
@@ -107,6 +116,29 @@ export default function FloatingToolbar({ shirtContainerRef, zoom }: Props) {
 
   const el = elements.find((e) => e.id === selectedId) ?? null;
   const [pos, setPos] = useState<ToolbarPos | null>(null);
+
+  /* Trạng thái tách nền ảnh (chạy local trong trình duyệt) */
+  const [bgProcessing, setBgProcessing] = useState(false);
+  const [bgProgress, setBgProgress] = useState(0);
+
+  /* Bề rộng thực tế của toolbar theo loại object đang chọn */
+  const toolbarW = el?.type === "image" ? TOOLBAR_W_IMAGE : TOOLBAR_W_DEFAULT;
+
+  const handleRemoveBg = async () => {
+    if (!el || el.type !== "image" || !el.src || bgProcessing) return;
+    setBgProcessing(true);
+    setBgProgress(0);
+    try {
+      const dataUrl = await removeImageBackground(el.src, (p) => setBgProgress(p.fraction));
+      pushHistory();
+      updateElement(el.id, { src: dataUrl });
+    } catch (e) {
+      console.error("[Tách nền] thất bại:", e);
+      alert("Tách nền thất bại. Ảnh có thể bị chặn CORS hoặc lỗi tải model. Hãy thử ảnh khác hoặc kiểm tra kết nối mạng (lần đầu cần tải model).");
+    } finally {
+      setBgProcessing(false);
+    }
+  };
 
   useEffect(() => {
     if (!el) { setPos(null); return; }
@@ -125,11 +157,11 @@ export default function FloatingToolbar({ shirtContainerRef, zoom }: Props) {
       const itemDisplayW = (el.width ?? 100) * zoom;
 
       /* Canh giữa trên đỉnh item, không để tràn ra ngoài viewport */
-      let x = itemDisplayX + itemDisplayW / 2 - TOOLBAR_W / 2;
+      let x = itemDisplayX + itemDisplayW / 2 - toolbarW / 2;
       let y = itemDisplayY - TOOLBAR_H - MARGIN;
 
       // Giữ trong viewport
-      x = Math.max(8, Math.min(x, window.innerWidth  - TOOLBAR_W - 8));
+      x = Math.max(8, Math.min(x, window.innerWidth - toolbarW - 8));
       y = Math.max(8, y);
 
       setPos({ x, y });
@@ -144,74 +176,107 @@ export default function FloatingToolbar({ shirtContainerRef, zoom }: Props) {
       window.removeEventListener("resize", compute);
       window.removeEventListener("scroll", compute, true);
     };
-  }, [el, zoom, shirtContainerRef]);
+  }, [el, zoom, shirtContainerRef, toolbarW]);
 
   if (!el || !pos) return null;
 
   return (
-    <div
-      style={{
-        position:       "fixed",
-        left:           pos.x,
-        top:            pos.y,
-        zIndex:         9999,
-        display:        "flex",
-        alignItems:     "center",
-        gap:            4,
-        background:     "#1e293b",
-        border:         "1px solid #334155",
-        borderRadius:   8,
-        padding:        "4px 6px",
-        boxShadow:      "0 4px 20px rgba(0,0,0,0.5)",
-        pointerEvents:  "all",
-        userSelect:     "none",
-        width:          TOOLBAR_W,
-        height:         TOOLBAR_H,
-        boxSizing:      "border-box",
-        /* Hiệu ứng hiện mượt */
-        animation:      "ds-toolbar-pop 0.12s ease",
-      }}
-    >
-      <ToolBtn title="Nhân bản (Ctrl+D)" onClick={() => duplicateElement(el.id)}>
-        <DuplicateIcon />
-      </ToolBtn>
-
-      <Divider />
-
-      {/* Flip — chỉ cho image */}
-      {el.type === "image" && (
-        <>
-          <ToolBtn
-            title="Lật ngang"
-            active={el.flipH}
-            onClick={() => { pushHistory(); updateElement(el.id, { flipH: !(el.flipH ?? false) }); }}
-          >
-            <FlipHIcon />
-          </ToolBtn>
-          <ToolBtn
-            title="Lật dọc"
-            active={el.flipV}
-            onClick={() => { pushHistory(); updateElement(el.id, { flipV: !(el.flipV ?? false) }); }}
-          >
-            <FlipVIcon />
-          </ToolBtn>
-          <Divider />
-        </>
-      )}
-
-      <ToolBtn
-        title={el.locked ? "Mở khoá" : "Khoá vật thể"}
-        onClick={() => toggleLock(el.id)}
-        active={el.locked}
+    <>
+      <div
+        style={{
+          position: "fixed",
+          left: pos.x,
+          top: pos.y,
+          zIndex: 9999,
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          background: "#1e293b",
+          border: "1px solid #334155",
+          borderRadius: 8,
+          padding: "4px 6px",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+          pointerEvents: "all",
+          userSelect: "none",
+          width: toolbarW,
+          height: TOOLBAR_H,
+          boxSizing: "border-box",
+          /* Hiệu ứng hiện mượt */
+          animation: "ds-toolbar-pop 0.12s ease",
+        }}
       >
-        <LockIcon locked={el.locked} />
-      </ToolBtn>
+        <ToolBtn title="Nhân bản (Ctrl+D)" onClick={() => duplicateElement(el.id)}>
+          <DuplicateIcon />
+        </ToolBtn>
 
-      <Divider />
+        <Divider />
 
-      <ToolBtn title="Xoá (Del)" onClick={() => removeElement(el.id)} danger>
-        <DeleteIcon />
-      </ToolBtn>
-    </div>
+        {/* Flip — chỉ cho image */}
+        {el.type === "image" && (
+          <>
+            <ToolBtn
+              title="Lật ngang"
+              active={el.flipH}
+              onClick={() => { pushHistory(); updateElement(el.id, { flipH: !(el.flipH ?? false) }); }}
+            >
+              <FlipHIcon />
+            </ToolBtn>
+            <ToolBtn
+              title="Lật dọc"
+              active={el.flipV}
+              onClick={() => { pushHistory(); updateElement(el.id, { flipV: !(el.flipV ?? false) }); }}
+            >
+              <FlipVIcon />
+            </ToolBtn>
+            <Divider />
+            <ToolBtn title="Tách nền ảnh (AI, chạy trên máy)" onClick={handleRemoveBg}>
+              <MagicIcon />
+            </ToolBtn>
+            <Divider />
+          </>
+        )}
+
+        <ToolBtn
+          title={el.locked ? "Mở khoá" : "Khoá vật thể"}
+          onClick={() => toggleLock(el.id)}
+          active={el.locked}
+        >
+          <LockIcon locked={el.locked} />
+        </ToolBtn>
+
+        <Divider />
+
+        <ToolBtn title="Xoá (Del)" onClick={() => removeElement(el.id)} danger>
+          <DeleteIcon />
+        </ToolBtn>
+      </div>
+
+      {/* Lớp phủ khi đang tách nền ảnh (chạy local, lần đầu tải model) */}
+      {bgProcessing && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 10050,
+            background: "rgba(2,6,23,0.72)", backdropFilter: "blur(3px)",
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", gap: 14,
+          }}
+        >
+          <div style={{
+            width: 40, height: 40, borderRadius: "50%",
+            border: "3px solid #334155", borderTopColor: "#38bdf8",
+            animation: "ds-spin 0.8s linear infinite",
+          }} />
+          <div style={{ color: "#e2e8f0", fontSize: 15, fontWeight: 700 }}>Đang tách nền ảnh…</div>
+
+          <div style={{ width: 220, height: 6, borderRadius: 4, background: "#1e293b", overflow: "hidden" }}>
+            <div style={{
+              width: `${Math.round(bgProgress * 100)}%`, height: "100%",
+              background: "linear-gradient(90deg,#0ea5e9,#6366f1)", transition: "width 0.2s",
+            }} />
+          </div>
+          <style>{`@keyframes ds-spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
+    </>
   );
 }

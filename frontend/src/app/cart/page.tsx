@@ -22,7 +22,6 @@ function formatVND(value: number) {
   }).format(value);
 }
 
-const SHIPPING_FEE = 35_000;
 
 export default function CartPage() {
   const items        = useCartStore((s) => s.items);
@@ -39,7 +38,8 @@ export default function CartPage() {
   if (!hydrated) return null;
 
   const subtotal = totalPrice();
-  const total    = subtotal + (subtotal > 0 ? SHIPPING_FEE : 0);
+  // Phí vận chuyển được tính ở bước thanh toán, không cộng vào giỏ hàng
+  const total    = subtotal;
 
   return (
     <>
@@ -461,10 +461,9 @@ export default function CartPage() {
                     Tóm tắt đơn hàng
                   </h2>
 
-                  {/* Rows */}
+                  {/* Rows — phí vận chuyển tính khi thanh toán */}
                   {[
                     { label: "Tạm tính", value: formatVND(subtotal) },
-                    { label: "Phí vận chuyển", value: formatVND(SHIPPING_FEE) },
                   ].map((row) => (
                     <div
                       key={row.label}
@@ -516,6 +515,10 @@ export default function CartPage() {
                       {formatVND(total)}
                     </span>
                   </div>
+
+                  <p style={{ fontSize: 12, color: "#94a3b8", margin: "-14px 0 20px" }}>
+                    Phí vận chuyển sẽ được tính ở bước thanh toán.
+                  </p>
 
                   <Link href="/checkout">
                     <Button

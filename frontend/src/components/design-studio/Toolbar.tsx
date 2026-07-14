@@ -38,6 +38,11 @@ const PlusIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
   </svg>
 );
+const SendIcon = () => (
+  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.126A59.769 59.769 0 0 1 21.485 12 59.77 59.77 0 0 1 3.27 20.876L5.999 12Zm0 0h7.5" />
+  </svg>
+);
 const CartIcon = () => (
   <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round"
@@ -61,6 +66,9 @@ interface ToolbarProps {
   onAddToCart?: () => void;
   onViewCart?: () => void;
   isSaving?: boolean;
+  /** Lưu thiết kế hiện tại rồi gửi cho admin duyệt (DRAFT/NEEDS_REVISION → PENDING_REVIEW) */
+  onSubmitForReview?: () => void;
+  isSubmittingReview?: boolean;
 }
 
 const menuItemStyle: React.CSSProperties = {
@@ -71,8 +79,10 @@ const menuItemStyle: React.CSSProperties = {
   textAlign: "left", transition: "background 0.1s",
 };
 
-export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDesign, onAddToCart, onViewCart, isSaving }: ToolbarProps) {
-  const { undo, redo, undoStack, redoStack, clearDesign, shirtType } = useDesignStore();
+export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDesign, onAddToCart, onViewCart, isSaving, onSubmitForReview, isSubmittingReview }: ToolbarProps) {
+  const { undo, redo, undoStack, redoStack, clearDesign, shirtType, currentDesignId, currentDesignStatus } = useDesignStore();
+  const canSubmitForReview =
+    !!currentDesignId && (currentDesignStatus === "DRAFT" || currentDesignStatus === "NEEDS_REVISION");
   const { isAuthenticated, user, clearSession, hydrate } = useAuthStore();
   const cartCount = useCartStore((s) => s.totalItems());
   const router = useRouter();
@@ -194,6 +204,18 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
           ) : <SaveIcon />}
           {isSaving ? "Đang lưu..." : "Lưu thiết kế"}
         </button>
+
+        {canSubmitForReview && onSubmitForReview && (
+          <button
+            className="ds-toolbar-btn"
+            onClick={onSubmitForReview}
+            disabled={isSubmittingReview}
+            title="Lưu thiết kế và gửi cho admin duyệt"
+            style={{ background: "#f97316", color: "#fff", border: "none" }}
+          >
+            <SendIcon /> {isSubmittingReview ? "Đang gửi..." : "Lưu & Gửi duyệt lại"}
+          </button>
+        )}
 
         <div className="ds-toolbar-divider" />
 

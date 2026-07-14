@@ -78,8 +78,8 @@ function HoodieVector({ color = "#c7d2fe" }: { color?: string }) {
    Client Component
 ───────────────────────────────────────── */
 
-const fmt = (n: number) =>
-  "từ " + n.toLocaleString("vi-VN") + "đ";
+const fmt = (n: any) =>
+  "từ " + Number(n).toLocaleString("vi-VN") + "đ";
 
 interface Props {
   products: ProductFromDB[];

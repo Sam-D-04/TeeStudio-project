@@ -13,6 +13,7 @@ const {
   taoMaGiaoDichMomoMoi,
   layThoiDiemHetHanMomo,
 } = require("../payments/momo.service");
+const { uploadBase64Image } = require("../uploads/upload.service");
 
 const DEPOSIT_PERCENT = 50;
 const ONLINE_PAYMENT_METHODS = new Set(["VNPAY", "MOMO"]);
@@ -1801,6 +1802,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
       unitPrice,
       designId: item.designId || null,
       designFee: 0, // sẽ cập nhật nếu có designId
+      printImage: item.printImage || null, // ảnh in print-ready (base64) chờ upload
     });
   }
 
@@ -1865,6 +1867,24 @@ async function taoMoiDonHang(data, actor, ipAddress) {
 
     // Gán designFee từ DB
     enriched.designFee = Number(design.designFee);
+
+    // Upload ảnh in print-ready lên Cloudinary rồi lưu URL vào CustomDesign.printFileUrl.
+    // Làm ngoài transaction (bên dưới) vì đây là gọi mạng, không nên giữ transaction lâu.
+    // Lỗi upload không được chặn việc tạo đơn (canvasData vẫn là bản gốc dự phòng).
+    if (enriched.printImage && enriched.printImage.startsWith("data:image")) {
+      try {
+        const printFileUrl = await uploadBase64Image(enriched.printImage, "print-files");
+        await db.pool.query(
+          "UPDATE CustomDesign SET printFileUrl = ? WHERE id = ?",
+          [printFileUrl, enriched.designId]
+        );
+      } catch (uploadErr) {
+        console.error(
+          `[taoMoiDonHang] Upload printFileUrl cho design ${enriched.designId} thất bại:`,
+          uploadErr
+        );
+      }
+    }
   }
 
   const hasCustomDesign = itemsEnriched.some((item) => Boolean(item.designId));

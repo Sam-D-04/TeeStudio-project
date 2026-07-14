@@ -168,6 +168,8 @@ export default function DesignStudioApp() {
   const [isMyDesignsOpen, setIsMyDesignsOpen] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
+  /* Ảnh in print-ready (base64) chụp từ canvas Konva khi mở modal thêm vào giỏ */
+  const [printImage, setPrintImage] = useState<string | undefined>(undefined);
 
   const handleSaveClick = useCallback(() => {
     if (!isAuthenticated || !accessToken) {
@@ -197,8 +199,8 @@ export default function DesignStudioApp() {
     }
   }, [showToast]);
 
-  const handleConfirmSave = useCallback(async (name: string) => {
-    if (!accessToken) return;
+  const handleConfirmSave = useCallback(async (name: string): Promise<boolean> => {
+    if (!accessToken) return false;
     try {
       setIsSaving(true);
 
@@ -247,12 +249,34 @@ export default function DesignStudioApp() {
         showToast("Đã lưu thiết kế mới thành công");
       }
       setIsSaveModalOpen(false);
+      return true;
     } catch (err: any) {
       showToast(err.message || "Lỗi khi lưu thiết kế");
+      return false;
     } finally {
       setIsSaving(false);
     }
   }, [accessToken, currentDesignId, shirtType, shirtColor, setSelectedId, setCurrentDesignId, showToast]);
+
+  /* Lưu thiết kế hiện tại rồi gửi ngay cho admin duyệt (DRAFT/NEEDS_REVISION → PENDING_REVIEW) */
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const handleSubmitForReview = useCallback(async () => {
+    if (!accessToken || !currentDesignId) return;
+    setIsSubmittingReview(true);
+    try {
+      const name = useDesignStore.getState().designName;
+      const saved = await handleConfirmSave(name);
+      if (!saved) return; // handleConfirmSave đã tự hiện toast lỗi
+
+      await userDesignService.submitForReview(accessToken, currentDesignId);
+      useDesignStore.getState().setCurrentDesignStatus("PENDING_REVIEW");
+      showToast("Đã gửi thiết kế cho admin duyệt");
+    } catch (err: any) {
+      showToast(err.message || "Lỗi khi gửi duyệt thiết kế");
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  }, [accessToken, currentDesignId, handleConfirmSave, showToast]);
 
   const handleLoadDesign = useCallback((design: SavedDesign) => {
     const doLoad = () => {
@@ -272,6 +296,7 @@ export default function DesignStudioApp() {
         shirtType: design.productId === 1 ? "tshirt" : design.productId === 2 ? "polo" : "hoodie",
         shirtColor: design.baseColor,
         currentDesignId: design.id,
+        currentDesignStatus: design.status,
         designName: design.name,
       });
 
@@ -344,6 +369,47 @@ export default function DesignStudioApp() {
     ? getPoloFrontPolygon(CONTAINER_W, CONTAINER_H)
     : undefined;
 
+  /*
+    Chụp ảnh in print-ready từ Konva stage.
+    - Stage chỉ chứa layer thiết kế (mockup áo là <img> DOM riêng) → PNG nền trong suốt.
+    - Crop đúng vùng in; toạ độ crop nhân zoom vì stage đang scale theo zoom.
+    - pixelRatio (multiplier) nâng độ phân giải lên ~2400px cạnh dài (đủ ~250-300 DPI).
+    - Base64 lossless → không làm mờ; độ nét phụ thuộc pixelRatio + ảnh gốc.
+  */
+  const capturePrintImage = (): string | undefined => {
+    const stage = stageRef.current;
+    if (!stage) return undefined;
+    // Ẩn khung chọn (Transformer) để không lọt vào ảnh in
+    const transformers = stage.find("Transformer");
+    transformers.forEach((t) => t.hide());
+    try {
+      const TARGET_LONG_EDGE = 2400; // px
+      const longEdgeScreen = Math.max(printAreaForCanvas.w, printAreaForCanvas.h) * zoom;
+      const pixelRatio = longEdgeScreen > 0 ? TARGET_LONG_EDGE / longEdgeScreen : 3;
+      return stage.toDataURL({
+        mimeType: "image/png",
+        x: printAreaForCanvas.x * zoom,
+        y: printAreaForCanvas.y * zoom,
+        width: printAreaForCanvas.w * zoom,
+        height: printAreaForCanvas.h * zoom,
+        pixelRatio,
+      });
+    } catch (e) {
+      console.error("[DesignStudio] Không export được ảnh in:", e);
+      return undefined;
+    } finally {
+      transformers.forEach((t) => t.show());
+      stage.batchDraw();
+    }
+  };
+
+  /* Mở modal thêm vào giỏ: chụp ảnh in (nếu có thiết kế) rồi mới mở */
+  const handleOpenCart = () => {
+    setSelectedId(null);
+    setPrintImage(elements.length > 0 ? capturePrintImage() : undefined);
+    setIsCartModalOpen(true);
+  };
+
   /* ── Print area border color — black on light shirts, yellow on dark ── */
   const LIGHT_COLORS = ["#ffffff", "#f8fafc", "#f1f5f9", "#e2e8f0", "#fafafa", "#fff"];
   const isLightShirt = LIGHT_COLORS.includes(shirtColor.toLowerCase())
@@ -377,9 +443,11 @@ export default function DesignStudioApp() {
         onShowToast={showToast}
         onOpenMyDesigns={() => setIsMyDesignsOpen(true)}
         onNewDesign={handleNewDesign}
-        onAddToCart={() => setIsCartModalOpen(true)}
+        onAddToCart={handleOpenCart}
         onViewCart={() => setIsCartDrawerOpen(true)}
         isSaving={isSaving}
+        onSubmitForReview={handleSubmitForReview}
+        isSubmittingReview={isSubmittingReview}
       />
 
       <div className="ds-body">
@@ -604,6 +672,7 @@ export default function DesignStudioApp() {
         productId={urlProductId ?? SHIRT_TO_PRODUCT_ID[shirtType] ?? 1}
         shirtColor={colorName || shirtColor}
         designId={currentDesignId ?? undefined}
+        printImage={printImage}
       />
 
       <CartDrawer
