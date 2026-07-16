@@ -87,6 +87,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     id: number | null;
     label: string;
   }>({ id: null, label: "Chưa gán khách" });
+  const [hasRelatedOrder, setHasRelatedOrder] = useState(false);
   const [variantSelection, setVariantSelection] = useState<{ id: number; key: string }>();
   const [preferredSize, setPreferredSize] = useState<string>();
   const [sizeResult, setSizeResult] = useState<{
@@ -114,7 +115,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     () => (sizeResult.key === variantKey ? sizeResult.variants : []),
     [sizeResult.key, sizeResult.variants, variantKey]
   );
-  const loadingSizes = sizeResult.key !== variantKey;
+  const loadingSizes = !hasRelatedOrder && sizeResult.key !== variantKey;
 
   // ─── Bước 1 & 2: Load canvasData từ API → tái tạo canvas ──────────────
   useEffect(() => {
@@ -134,6 +135,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     queueMicrotask(() => {
       setLoading(true);
       setLoadError(null);
+      setHasRelatedOrder(false);
     });
 
     designService
@@ -145,6 +147,8 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
           id: data.khachHangId,
           label: data.khachHangId ? formatCustomerLabel(data) : "Chưa gán khách",
         });
+
+        setHasRelatedOrder(Boolean(data.coDonHang));
 
         const cd = data.canvasData;
         if (!cd || !Array.isArray(cd.elements)) {
@@ -227,6 +231,13 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     let active = true;
     const requestedKey = `${shirtType}|${shirtColor.toLowerCase()}`;
 
+    if (hasRelatedOrder) {
+      setSizeResult({ key: requestedKey, variants: [] });
+      return () => {
+        active = false;
+      };
+    }
+
     designService
       .layBienTheTaoThietKe(shirtType, shirtColor)
       .then((result) => {
@@ -242,15 +253,16 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     return () => {
       active = false;
     };
-  }, [message, shirtColor, shirtType]);
+  }, [hasRelatedOrder, message, shirtColor, shirtType]);
 
   useEffect(() => {
+    if (hasRelatedOrder) return;
     if (sizeResult.key !== variantKey || variantId || !preferredSize) return;
     const matchingVariant = sizeOptions.find((variant) => variant.size === preferredSize && variant.stockQty > 0);
     if (matchingVariant) {
       queueMicrotask(() => setVariantSelection({ id: matchingVariant.id, key: variantKey }));
     }
-  }, [preferredSize, sizeOptions, sizeResult.key, variantId, variantKey]);
+  }, [hasRelatedOrder, preferredSize, sizeOptions, sizeResult.key, variantId, variantKey]);
 
   // ─── Keyboard shortcuts ────────────────────────────────────────────────
   useEffect(() => {
@@ -344,7 +356,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
   // ─── Bước 3 & 4: Lưu thay đổi ────────────────────────────────────────
   const saveDesign = useCallback(async () => {
     if (!elements.length) return message.warning("Thiết kế cần có ít nhất một hình ảnh hoặc văn bản");
-    if (!variantId) return message.warning("Vui lòng chọn size áo");
+    if (!hasRelatedOrder && !variantId) return message.warning("Vui lòng chọn size áo");
     if (!shirtContainerRef.current) return;
 
     try {
@@ -373,7 +385,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
       await designService.suaThietKeChoKhach(designId, {
         shirtType,
         shirtColor,
-        variantId,
+        ...(hasRelatedOrder ? {} : { variantId }),
         canvasData: {
           version: 1,
           shirtType,
@@ -401,7 +413,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     } finally {
       setSaving(false);
     }
-  }, [designId, elements.length, maThietKe, message, modal, router, setSelectedId, shirtColor, shirtType, shirtView, variantId]);
+  }, [designId, elements.length, hasRelatedOrder, maThietKe, message, modal, router, setSelectedId, shirtColor, shirtType, shirtView, variantId]);
 
   // ─── Hủy bỏ – quay về danh sách không lưu gì ─────────────────────────
   const handleCancel = useCallback(() => {
@@ -599,23 +611,39 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
             >
               Gỡ khách hàng
             </Button>
-            <Select
-              loading={loadingSizes}
-              value={variantId}
-              onChange={(id) => {
-                const selectedVariant = sizeOptions.find((variant) => variant.id === id);
-                setPreferredSize(selectedVariant?.size);
-                setVariantSelection({ id, key: variantKey });
-              }}
-              placeholder="Chọn size"
-              style={{ width: 150 }}
-              options={sizeOptions.map((variant) => ({
-                value: variant.id,
-                label: `${variant.size}${variant.stockQty <= 0 ? " — Hết hàng" : ""}`,
-                disabled: variant.stockQty <= 0,
-              }))}
-              notFoundContent={loadingSizes ? <Spin size="small" /> : "Không có size phù hợp"}
-            />
+            {hasRelatedOrder ? (
+              <span
+                title="Size ao thuoc don hang, chinh sua trong muc Don hang"
+                style={{
+                  color: "#cbd5e1",
+                  fontSize: 13,
+                  border: "1px solid #334155",
+                  borderRadius: 6,
+                  padding: "5px 10px",
+                  background: "rgba(15,23,42,.65)",
+                }}
+              >
+                Size: {preferredSize || "Theo don hang"}
+              </span>
+            ) : (
+              <Select
+                loading={loadingSizes}
+                value={variantId}
+                onChange={(id) => {
+                  const selectedVariant = sizeOptions.find((variant) => variant.id === id);
+                  setPreferredSize(selectedVariant?.size);
+                  setVariantSelection({ id, key: variantKey });
+                }}
+                placeholder="Chon size"
+                style={{ width: 150 }}
+                options={sizeOptions.map((variant) => ({
+                  value: variant.id,
+                  label: `${variant.size}${variant.stockQty <= 0 ? " - Het hang" : ""}`,
+                  disabled: variant.stockQty <= 0,
+                }))}
+                notFoundContent={loadingSizes ? <Spin size="small" /> : "Khong co size phu hop"}
+              />
+            )}
           </div>
 
           <div className="ds-toolbar-right">
@@ -647,6 +675,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
           }
           onAddImageToCanvas={handleAddImageToCanvas}
           showMyDesigns={false}
+          lockShirtOptions={hasRelatedOrder}
         />
 
         <div

@@ -38,6 +38,9 @@ export type ThietKe = {
   tenMauAo: string;         // Ví dụ "Đen"
   viTriIn: string;          // Ví dụ "Ngực trái"
   trangThai: TrangThaiThietKe;
+  coDonHang?: boolean;
+  duocPhepSua?: boolean;
+  lyDoKhoaSua?: string | null;
   ngayGui: string;          // Ngày gửi thiết kế, ví dụ "03/06/2026"
 };
 
@@ -144,6 +147,11 @@ function HangThietKe({
   onSua: (id: number) => void;
   dangXuLy?: boolean;
 }) {
+  const editTitle =
+    thietKe.duocPhepSua === false
+      ? thietKe.lyDoKhoaSua || "Thiết kế này không thể chỉnh sửa"
+      : "Sửa thiết kế cho khách";
+
   return (
     <tr
       style={{
@@ -241,9 +249,9 @@ function HangThietKe({
           {/* Nút Sửa – điều hướng Admin sang trang Editor để sửa thiết kế */}
           <NutThaoTac
             icon={<EditOutlined />}
-            title="Sửa thiết kế cho khách"
+            title={editTitle}
             onClick={() => onSua(thietKe.id)}
-            disabled={dangXuLy}
+            disabled={dangXuLy || thietKe.duocPhepSua === false}
             mauHover="#f59e0b"
           />
         </div>

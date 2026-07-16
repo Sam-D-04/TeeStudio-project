@@ -31,6 +31,9 @@ export type ThietKe = {
   viTriIn: string;
   trangThai: TrangThaiThietKe;
   ngayGui: string;             // Format DD/MM/YYYY
+  coDonHang?: boolean;
+  duocPhepSua?: boolean;
+  lyDoKhoaSua?: string | null;
 };
 
 export type ChiTietThietKe = ThietKe & {
@@ -81,6 +84,9 @@ export type CanvasDataThietKe = {
   sizeAo: string | null;
   tenSanPham: string;
   trangThai: TrangThaiThietKe;
+  coDonHang?: boolean;
+  duocPhepSua?: boolean;
+  lyDoKhoaSua?: string | null;
   canvasData: {
     version: number;
     shirtType: ShirtType;

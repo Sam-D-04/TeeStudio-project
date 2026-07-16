@@ -71,6 +71,27 @@ END)`;
 const DIEU_KIEN_CHO_GUI_XUONG = `${BIEU_THUC_TRANG_THAI_DON_IN} = 'READY_TO_PRINT'`;
 
 const LOAI_AO_HOP_LE = new Set(["tshirt", "polo", "hoodie"]);
+const TRANG_THAI_THIET_KE_DUOC_SUA = new Set([
+  "PENDING_REVIEW",
+  "NEEDS_REVISION",
+  "DRAFT",
+]);
+const TRANG_THAI_SAN_XUAT_DUOC_SUA = new Set([
+  "WAITING_DESIGN_APPROVAL",
+  "APPROVED",
+  "PROCESSING",
+  "READY_TO_PRINT",
+]);
+const TRANG_THAI_DON_HANG_KHOA_SUA = new Set([
+  "PRINTING",
+  "READY_TO_SHIP",
+  "SHIPPED",
+  "SHIPPING",
+  "COMPLETED",
+]);
+const TRANG_THAI_SAN_XUAT_KHOA_SUA = new Set(["PRINTING", "PRINTED", "PACKED"]);
+const THONG_BAO_THIET_KE_DA_SAN_XUAT =
+  "Thiết kế đã được đưa vào sản xuất, không thể chỉnh sửa.";
 
 const MAU_AO_MAC_DINH = {
   black: "#000000",
@@ -159,7 +180,7 @@ function chuanHoaCanvasData(canvasData, shirtType) {
   };
 }
 
-async function timSanPhamTheoLoaiAo(shirtType) {
+async function timSanPhamTheoLoaiAo(shirtType, executor = db.pool) {
   const tenGanDung = {
     tshirt: "%Áo Thun%",
     polo: "%Polo%",
@@ -247,6 +268,135 @@ function taoLoi(message, statusCode = 400) {
   const err = new Error(message);
   err.statusCode = statusCode;
   return err;
+}
+
+function tinhQuyenSuaThietKe({ designStatus, donHang = [] }) {
+  if (!donHang.length) {
+    return {
+      hasOrder: false,
+      canEdit: designStatus === "DRAFT",
+      lockReason: designStatus === "DRAFT"
+        ? null
+        : "Thiết kế không phải bản nháp nên không thể chỉnh sửa tự do.",
+    };
+  }
+
+  const biKhoa = donHang.some((don) =>
+    TRANG_THAI_DON_HANG_KHOA_SUA.has(don.orderStatus)
+    || TRANG_THAI_SAN_XUAT_KHOA_SUA.has(don.productionStatus)
+    || TRANG_THAI_SAN_XUAT_KHOA_SUA.has(don.productionOrderStatus)
+  );
+  if (biKhoa) {
+    return {
+      hasOrder: true,
+      canEdit: false,
+      lockReason: THONG_BAO_THIET_KE_DA_SAN_XUAT,
+    };
+  }
+
+  const duocSua =
+    TRANG_THAI_THIET_KE_DUOC_SUA.has(designStatus)
+    || donHang.some((don) =>
+      TRANG_THAI_SAN_XUAT_DUOC_SUA.has(don.productionStatus)
+      || TRANG_THAI_SAN_XUAT_DUOC_SUA.has(don.productionOrderStatus)
+    );
+
+  return {
+    hasOrder: true,
+    canEdit: duocSua,
+    lockReason: duocSua
+      ? null
+      : "Thiết kế chỉ được sửa trước khi đơn hàng vào sản xuất.",
+  };
+}
+
+async function layTrangThaiLienQuanThietKe(conn, designId, { forUpdate = false } = {}) {
+  const lockClause = forUpdate ? " FOR UPDATE" : "";
+  const [rows] = await conn.query(
+    `SELECT id, status
+     FROM CustomDesign
+     WHERE id = ?${lockClause}`,
+    [designId]
+  );
+  if (!rows.length) {
+    throw taoLoi("Không tìm thấy thiết kế", 404);
+  }
+
+  const [donHang] = await conn.query(
+    `SELECT
+       oi.id AS orderItemId,
+       oi.productionStatus,
+       co.status AS orderStatus,
+       op.status AS productionOrderStatus
+     FROM OrderItem oi
+     JOIN CustomerOrder co ON co.id = oi.orderId
+     LEFT JOIN OrderProduction op ON op.orderItemId = oi.id
+     WHERE oi.designId = ?${lockClause}`,
+    [designId]
+  );
+
+  const quyenSua = tinhQuyenSuaThietKe({
+    designStatus: rows[0].status,
+    donHang,
+  });
+
+  return {
+    id: rows[0].id,
+    status: rows[0].status,
+    donHang,
+    ...quyenSua,
+  };
+}
+
+function chanSuaThietKeNeuBiKhoa(thongTinQuyen) {
+  if (!thongTinQuyen.canEdit) {
+    throw taoLoi(thongTinQuyen.lockReason || THONG_BAO_THIET_KE_DA_SAN_XUAT, 403);
+  }
+}
+
+async function layQuyenSuaNhieuThietKe(designIds) {
+  const ids = [...new Set(designIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+  if (!ids.length) return new Map();
+
+  const [designRows] = await db.pool.query(
+    `SELECT id, status
+     FROM CustomDesign
+     WHERE id IN (?)`,
+    [ids]
+  );
+  const [orderRows] = await db.pool.query(
+    `SELECT
+       oi.designId,
+       oi.id AS orderItemId,
+       oi.productionStatus,
+       co.status AS orderStatus,
+       op.status AS productionOrderStatus
+     FROM OrderItem oi
+     JOIN CustomerOrder co ON co.id = oi.orderId
+     LEFT JOIN OrderProduction op ON op.orderItemId = oi.id
+     WHERE oi.designId IN (?)`,
+    [ids]
+  );
+
+  const ordersByDesignId = new Map();
+  for (const order of orderRows) {
+    const designId = Number(order.designId);
+    if (!ordersByDesignId.has(designId)) ordersByDesignId.set(designId, []);
+    ordersByDesignId.get(designId).push(order);
+  }
+
+  const result = new Map();
+  for (const design of designRows) {
+    const designId = Number(design.id);
+    result.set(
+      designId,
+      tinhQuyenSuaThietKe({
+        designStatus: design.status,
+        donHang: ordersByDesignId.get(designId) || [],
+      })
+    );
+  }
+  return result;
 }
 
 async function dongBoViTriInTheoMatAo(conn, designId, shirtView) {
@@ -470,8 +620,15 @@ async function layDanhSachThietKe({
     LIMIT ? OFFSET ?
   `;
   const [rows] = await db.pool.query(sqlData, [...thamSo, soMoi, offset]);
+  const quyenSuaTheoThietKe = await layQuyenSuaNhieuThietKe(rows.map((row) => row.id));
 
-  const danhSach = rows.map((row, idx) => ({
+  const danhSach = rows.map((row, idx) => {
+    const quyenSua = quyenSuaTheoThietKe.get(Number(row.id)) || {
+      hasOrder: false,
+      canEdit: false,
+      lockReason: null,
+    };
+    return {
     id: row.id,
     maThietKe: `TK-${String(row.id).padStart(4, "0")}`,
     urlPreview: row.urlPreview || null,
@@ -482,8 +639,12 @@ async function layDanhSachThietKe({
     tenMauAo: row.tenMauAo || "Không rõ",
     viTriIn: row.viTriIn || "Chưa xác định",
     trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[row.status] || "cho_kiem_tra",
-    ngayGui: formatNgay(row.ngayGui),
-  }));
+      ngayGui: formatNgay(row.ngayGui),
+      coDonHang: quyenSua.hasOrder,
+      duocPhepSua: quyenSua.canEdit,
+      lyDoKhoaSua: quyenSua.lockReason,
+    };
+  });
 
   return {
     danhSach,
@@ -667,6 +828,9 @@ async function layCanvasDataThietKe(id) {
   const row = rows[0];
 
   // Parse canvasData từ chuỗi JSON → object (trả về null nếu lỗi)
+  const quyenSua = await layTrangThaiLienQuanThietKe(db.pool, id);
+  chanSuaThietKeNeuBiKhoa(quyenSua);
+
   let canvasData = null;
   if (row.canvasData) {
     try {
@@ -698,6 +862,9 @@ async function layCanvasDataThietKe(id) {
     tenThietKe: row.tenThietKe || "Thiết kế chưa đặt tên",
     mauAo,
     productId: Number(row.productId),
+    coDonHang: quyenSua.hasOrder,
+    duocPhepSua: quyenSua.canEdit,
+    lyDoKhoaSua: quyenSua.lockReason,
     variantId: row.variantId ? Number(row.variantId) : null,
     khachHangId: row.khachHangId ? Number(row.khachHangId) : null,
     tenKhachHang: row.tenKhachHang || "Chưa gán khách",
@@ -739,11 +906,6 @@ async function suaThietKeChoKhach(id, { canvasData, previewUrl, shirtType, shirt
     throw taoLoi("Loại áo không hợp lệ", 400);
   }
 
-  const productId = await timSanPhamTheoLoaiAo(requestedShirtType);
-  const selectedVariantId = Number(variantId);
-  if (!Number.isInteger(selectedVariantId) || selectedVariantId <= 0) {
-    throw taoLoi("Vui lòng chọn size áo", 400);
-  }
 
   dataObj = {
     ...dataObj,
@@ -753,8 +915,11 @@ async function suaThietKeChoKhach(id, { canvasData, previewUrl, shirtType, shirt
 
   // Ghi đè canvasData + previewUrl + đổi status APPROVED + cập nhật phí
   await db.transaction(async (conn) => {
+    const quyenSua = await layTrangThaiLienQuanThietKe(conn, id, { forUpdate: true });
+    chanSuaThietKeNeuBiKhoa(quyenSua);
+
     const [rows] = await conn.query(
-      `SELECT cd.id, cd.status, cd.baseColor, pv.colorHex, pv.color
+      `SELECT cd.id, cd.status, cd.productId, cd.variantId, cd.baseColor, cd.canvasData, pv.colorHex, pv.color
        FROM CustomDesign cd
        LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
        WHERE cd.id = ?
@@ -765,27 +930,57 @@ async function suaThietKeChoKhach(id, { canvasData, previewUrl, shirtType, shirt
       throw taoLoi("Không tìm thấy thiết kế", 404);
     }
 
-    const [variants] = await conn.query(
-      `SELECT id, colorHex, color, size
-       FROM ProductVariant
-       WHERE id = ? AND productId = ? AND (status IS NULL OR status = 'ACTIVE')
-       LIMIT 1`,
-      [selectedVariantId, productId]
-    );
-    if (!variants.length) {
-      throw taoLoi("Size đã chọn không thuộc loại áo này hoặc không còn hoạt động", 400);
+    let productId = Number(rows[0].productId);
+    let selectedVariantId = rows[0].variantId ? Number(rows[0].variantId) : null;
+    let normalizedColor = chuanHoaMauAo(rows[0].colorHex, rows[0].baseColor, rows[0].color);
+
+    if (quyenSua.hasOrder) {
+      let savedCanvasData = null;
+      try {
+        savedCanvasData = typeof rows[0].canvasData === "string"
+          ? JSON.parse(rows[0].canvasData)
+          : rows[0].canvasData;
+      } catch {
+        savedCanvasData = null;
+      }
+
+      dataObj = {
+        ...dataObj,
+        shirtType: LOAI_AO_HOP_LE.has(savedCanvasData?.shirtType)
+          ? savedCanvasData.shirtType
+          : requestedShirtType,
+      };
     }
 
-    const normalizedColor = chuanHoaMauAo(
-      shirtColor,
-      dataObj.shirtColor,
-      variants[0].colorHex,
-      variants[0].color,
-      rows[0].baseColor
-    );
-    const variantColor = chuanHoaMauAo(variants[0].colorHex, variants[0].color);
-    if (variantColor !== normalizedColor) {
-      throw taoLoi("Size đã chọn không phù hợp với màu áo", 400);
+    if (!quyenSua.hasOrder) {
+      productId = await timSanPhamTheoLoaiAo(requestedShirtType, conn);
+      selectedVariantId = Number(variantId);
+      if (!Number.isInteger(selectedVariantId) || selectedVariantId <= 0) {
+        throw taoLoi("Vui lòng chọn size áo", 400);
+      }
+
+      const [variants] = await conn.query(
+        `SELECT id, colorHex, color, size
+         FROM ProductVariant
+         WHERE id = ? AND productId = ? AND (status IS NULL OR status = 'ACTIVE')
+         LIMIT 1`,
+        [selectedVariantId, productId]
+      );
+      if (!variants.length) {
+        throw taoLoi("Size da chon khong thuoc loai ao nay hoac khong con hoat dong", 400);
+      }
+
+      normalizedColor = chuanHoaMauAo(
+        shirtColor,
+        dataObj.shirtColor,
+        variants[0].colorHex,
+        variants[0].color,
+        rows[0].baseColor
+      );
+      const variantColor = chuanHoaMauAo(variants[0].colorHex, variants[0].color);
+      if (variantColor !== normalizedColor) {
+        throw taoLoi("Size da chon khong phu hop voi mau ao", 400);
+      }
     }
     dataObj = {
       ...dataObj,

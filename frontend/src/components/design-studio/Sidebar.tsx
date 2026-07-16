@@ -53,6 +53,7 @@ interface SidebarProps {
   onRemoveUploadedImage: (idx: number) => void;
   onAddImageToCanvas: (src: string) => void;
   showMyDesigns?: boolean;
+  lockShirtOptions?: boolean;
 }
 
 export default function Sidebar({
@@ -61,6 +62,7 @@ export default function Sidebar({
   onRemoveUploadedImage,
   onAddImageToCanvas,
   showMyDesigns = true,
+  lockShirtOptions = false,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = React.useState<TabId>("images");
   const [stickers, setStickers] = React.useState<Sticker[]>([]);
@@ -323,7 +325,11 @@ export default function Sidebar({
                 <button
                   key={type}
                   className={`ds-shirt-option ${shirtType === type ? "ds-shirt-option--active" : ""}`}
-                  onClick={() => setShirtType(type)}
+                  disabled={lockShirtOptions}
+                  onClick={() => {
+                    if (!lockShirtOptions) setShirtType(type);
+                  }}
+                  title={lockShirtOptions ? "Phôi áo đã gắn với đơn hàng" : undefined}
                 >
                   <ShirtMiniIcon type={type} />
                   {type === "tshirt" ? "Áo Thun" : type === "polo" ? "Áo Polo" : "Hoodie"}
@@ -353,9 +359,16 @@ export default function Sidebar({
                 <button
                   key={color}
                   className={`ds-color-swatch ${shirtColor === color ? "ds-color-swatch--active" : ""}`}
-                  style={{ background: color }}
-                  onClick={() => setShirtColor(color)}
-                  title={color}
+                  style={{
+                    background: color,
+                    opacity: lockShirtOptions && shirtColor !== color ? 0.35 : undefined,
+                    cursor: lockShirtOptions ? "not-allowed" : undefined,
+                  }}
+                  disabled={lockShirtOptions}
+                  onClick={() => {
+                    if (!lockShirtOptions) setShirtColor(color);
+                  }}
+                  title={lockShirtOptions ? "Màu áo phôi đã gắn với đơn hàng" : color}
                 >
                   {shirtColor === color && (
                     <span style={{ color: color === "#ffffff" ? "#000" : "#fff" }}>✓</span>
