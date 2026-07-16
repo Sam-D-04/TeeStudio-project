@@ -207,7 +207,6 @@ export default function AdminDesignStudio() {
   }, [modal]);
 
   const saveDesign = useCallback(async () => {
-    if (!customerId) return message.warning("Vui lòng chọn khách hàng");
     if (!variantId) return message.warning("Vui lòng chọn size áo");
     if (!designName.trim()) return message.warning("Vui lòng nhập tên thiết kế");
     if (!elements.length) return message.warning("Thiết kế cần có ít nhất một hình ảnh hoặc văn bản");
@@ -233,7 +232,7 @@ export default function AdminDesignStudio() {
       }
 
       const result = await designService.taoThietKeChoKhach({
-        userId: customerId,
+        userId: customerId ?? null,
         name: designName.trim(),
         shirtType,
         shirtColor,
@@ -250,8 +249,10 @@ export default function AdminDesignStudio() {
       });
 
       modal.success({
-        title: "Đã tạo thiết kế cho khách",
-        content: `Thiết kế #${result.id} đã xuất hiện trong kho thiết kế của khách hàng.`,
+        title: customerId ? "Đã tạo thiết kế cho khách" : "Đã tạo thiết kế",
+        content: customerId
+          ? `Thiết kế #${result.id} đã xuất hiện trong kho thiết kế của khách hàng.`
+          : `Thiết kế #${result.id} đang chờ gán khách hàng.`,
         okText: "Về trang quản lý",
         onOk: () => router.push("/admin/thiet-ke"),
       });
@@ -295,16 +296,17 @@ export default function AdminDesignStudio() {
         <header className="ds-toolbar" style={{ height: "auto", minHeight: 64, flexWrap: "wrap", gap: 10, paddingBlock: 8 }}>
           <div className="ds-toolbar-left">
             <Button icon={<ArrowLeftOutlined />} onClick={() => router.push("/admin/thiet-ke")}>Quay lại</Button>
-            <strong style={{ color: "#f8fafc" }}>Tạo thiết kế cho khách</strong>
+            <strong style={{ color: "#f8fafc" }}>Tạo thiết kế</strong>
           </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "center", flexWrap: "wrap" }}>
           <Select
               showSearch
+              allowClear
               loading={loadingCustomers}
               value={customerId}
               onChange={setCustomerId}
-              placeholder="Chọn khách hàng"
+              placeholder="Chọn khách hàng (không bắt buộc)"
               optionFilterProp="label"
               style={{ width: 260 }}
               options={customers.map((customer) => ({
@@ -340,7 +342,7 @@ export default function AdminDesignStudio() {
           <Button icon={<RedoOutlined />} disabled={!redoStack.length} onClick={redo} />
           <Button danger icon={<DeleteOutlined />} onClick={resetDesign}>Xóa</Button>
           <Button type="primary" icon={<SaveOutlined />} loading={saving} disabled={uploading} onClick={saveDesign}>
-            Lưu cho khách
+            Lưu thiết kế
           </Button>
         </div>
       </header>

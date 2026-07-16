@@ -171,7 +171,7 @@ export type ThongKeThietKe = {
 };
 
 export type TaoThietKeChoKhachInput = {
-  userId: number;
+  userId?: number | null;
   name: string;
   shirtType: ShirtType;
   shirtColor: string;
@@ -311,10 +311,10 @@ export async function layCanvasDataThietKe(id: number): Promise<CanvasDataThietK
 /** Tạo một thiết kế DRAFT và gắn trực tiếp vào tài khoản khách hàng. */
 export async function taoThietKeChoKhach(
   payload: TaoThietKeChoKhachInput
-): Promise<{ id: number; userId: number; name: string; status: "DRAFT"; previewUrl: string }> {
+): Promise<{ id: number; userId: number | null; name: string; status: "DRAFT"; previewUrl: string }> {
   const res = await apiClient.post<{
     success: boolean;
-    data: { id: number; userId: number; name: string; status: "DRAFT"; previewUrl: string };
+    data: { id: number; userId: number | null; name: string; status: "DRAFT"; previewUrl: string };
   }>("/admin/designs/customer-drafts", payload);
   return res.data.data;
 }

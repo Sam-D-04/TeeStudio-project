@@ -875,9 +875,10 @@ async function doiKhachHangThietKe(id, customerId) {
 // POST /api/admin/designs/customer-drafts
 // =====================================================================
 async function taoThietKeChoKhach({ userId, name, shirtType, shirtColor, variantId, canvasData, previewUrl }) {
-  const customerId = Number(userId);
-  if (!Number.isInteger(customerId) || customerId <= 0) {
-    throw taoLoi("Vui lòng chọn khách hàng", 400);
+  const hasCustomer = userId !== undefined && userId !== null && userId !== "";
+  const customerId = hasCustomer ? Number(userId) : null;
+  if (hasCustomer && (!Number.isInteger(customerId) || customerId <= 0)) {
+    throw taoLoi("Vui lòng chọn khách hàng hợp lệ", 400);
   }
   if (!name || !String(name).trim()) {
     throw taoLoi("Vui lòng nhập tên thiết kế", 400);
@@ -886,12 +887,14 @@ async function taoThietKeChoKhach({ userId, name, shirtType, shirtColor, variant
     throw taoLoi("Loại áo không hợp lệ", 400);
   }
 
-  const [accounts] = await db.pool.query(
-    "SELECT id FROM Account WHERE id = ? AND role = 'CUSTOMER' AND status = 'ACTIVE' LIMIT 1",
-    [customerId]
-  );
-  if (!accounts.length) {
-    throw taoLoi("Không tìm thấy tài khoản khách hàng đang hoạt động", 404);
+  if (hasCustomer) {
+    const [accounts] = await db.pool.query(
+      "SELECT id FROM Account WHERE id = ? AND role = 'CUSTOMER' AND status = 'ACTIVE' LIMIT 1",
+      [customerId]
+    );
+    if (!accounts.length) {
+      throw taoLoi("Không tìm thấy tài khoản khách hàng đang hoạt động", 404);
+    }
   }
 
   const productId = await timSanPhamTheoLoaiAo(shirtType);

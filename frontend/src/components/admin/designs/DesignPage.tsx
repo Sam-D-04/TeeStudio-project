@@ -83,7 +83,7 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
   );
   const [locTrangThaiDonIn, setLocTrangThaiDonIn] = useState(
     initialFilters?.printStatus ||
-      (initialFilters?.tab === "don_can_in" ? "cho_gui_xuong" : "")
+    (initialFilters?.tab === "don_can_in" ? "cho_gui_xuong" : "")
   );
   const [khoangNgayDonIn, setKhoangNgayDonIn] = useState({ tuNgay: "", denNgay: "" });
 
@@ -274,7 +274,7 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
               }}
             >
               <PlusOutlined />
-              Tạo thiết kế cho khách
+              Tạo thiết kế
             </button>
           )}
           {/* Nút phụ 1: Thêm sticker */}

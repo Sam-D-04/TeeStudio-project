@@ -177,7 +177,9 @@ const taoThietKeChoKhach = async (req, res, next) => {
     const data = await designService.taoThietKeChoKhach(payload);
     res.status(201).json({
       success: true,
-      message: "Đã tạo thiết kế và gắn vào tài khoản khách hàng",
+      message: data.userId
+        ? "Đã tạo thiết kế và gắn vào tài khoản khách hàng"
+        : "Đã tạo thiết kế chưa gán khách hàng",
       data,
     });
   } catch (error) {
