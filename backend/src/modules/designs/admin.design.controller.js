@@ -80,7 +80,7 @@ const getCanvasDataThietKe = async (req, res, next) => {
 
 /**
  * PUT /api/admin/designs/:id/sua
- * Admin sửa thiết kế của khách: ghi đè canvasData + previewUrl, tự chuyển status APPROVED.
+ * Admin sửa thiết kế của khách: ghi đè canvasData + previewUrl, giữ nguyên status.
  *
  * Body: { canvasData: object|string, previewUrl: string (base64 hoặc URL Cloudinary) }
  */
@@ -104,7 +104,7 @@ const suaThietKeChoKhach = async (req, res, next) => {
     const data = await designService.suaThietKeChoKhach(id, payload);
     res.json({
       success: true,
-      message: `Đã lưu thiết kế ${data.maThietKe} và duyệt thành công`,
+      message: `Đã lưu thiết kế ${data.maThietKe}`,
       data,
     });
   } catch (error) {

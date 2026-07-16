@@ -326,7 +326,7 @@ export async function taoThietKeChoKhach(
 }
 
 /**
- * Admin sửa thiết kế của khách: ghi đè canvasData + previewUrl, tự chuyển APPROVED.
+ * Admin sửa thiết kế của khách: ghi đè canvasData + previewUrl, giữ nguyên trạng thái duyệt.
  * PUT /api/admin/designs/:id/sua
  */
 export async function suaThietKeChoKhach(

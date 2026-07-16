@@ -74,7 +74,6 @@ const LOAI_AO_HOP_LE = new Set(["tshirt", "polo", "hoodie"]);
 const TRANG_THAI_THIET_KE_DUOC_SUA = new Set([
   "PENDING_REVIEW",
   "NEEDS_REVISION",
-  "DRAFT",
 ]);
 const TRANG_THAI_SAN_XUAT_DUOC_SUA = new Set([
   "WAITING_DESIGN_APPROVAL",
@@ -92,6 +91,32 @@ const TRANG_THAI_DON_HANG_KHOA_SUA = new Set([
 const TRANG_THAI_SAN_XUAT_KHOA_SUA = new Set(["PRINTING", "PRINTED", "PACKED"]);
 const THONG_BAO_THIET_KE_DA_SAN_XUAT =
   "Thiết kế đã được đưa vào sản xuất, không thể chỉnh sửa.";
+const TEN_TRANG_THAI_THIET_KE_DB = {
+  DRAFT: "Bản nháp",
+  PENDING_REVIEW: "Chờ duyệt",
+  NEEDS_REVISION: "Cần sửa",
+  APPROVED: "Đã duyệt",
+};
+const TEN_TRANG_THAI_DON_HANG_DB = {
+  PENDING: "Chờ xác nhận",
+  CONFIRMED: "Đã xác nhận",
+  PROCESSING: "Đang xử lý",
+  PRINTING: "Đang xử lý in",
+  READY_TO_SHIP: "Chờ giao",
+  SHIPPING: "Đang giao hàng",
+  SHIPPED: "Đang giao hàng",
+  COMPLETED: "Hoàn tất",
+  CANCELLED: "Đã hủy",
+};
+const TEN_TRANG_THAI_SAN_XUAT_DB = {
+  WAITING_DESIGN_APPROVAL: "Chờ duyệt thiết kế",
+  APPROVED: "Đã duyệt thiết kế",
+  PROCESSING: "Chờ gửi xưởng",
+  READY_TO_PRINT: "Chờ gửi xưởng",
+  PRINTING: "Đang in",
+  PRINTED: "Đã in xong",
+  PACKED: "Đã đóng gói",
+};
 
 const MAU_AO_MAC_DINH = {
   black: "#000000",
@@ -187,7 +212,7 @@ async function timSanPhamTheoLoaiAo(shirtType, executor = db.pool) {
     hoodie: "%Hoodie%",
   }[shirtType];
 
-  const [rows] = await db.pool.query(
+  const [rows] = await executor.query(
     "SELECT id FROM Product WHERE name LIKE ? AND status = 'ACTIVE' ORDER BY id LIMIT 1",
     [tenGanDung]
   );
@@ -270,6 +295,65 @@ function taoLoi(message, statusCode = 400) {
   return err;
 }
 
+function layTenTrangThai(map, status) {
+  return map[status] || status || "Không rõ";
+}
+
+function moTaDonHang(don) {
+  return don?.orderCode ? `Đơn ${don.orderCode}` : "Đơn hàng liên quan";
+}
+
+function moTaTrangThaiDonLienQuan(donHang) {
+  if (!donHang.length) return "Không tìm thấy đơn hàng liên quan.";
+
+  return donHang
+    .slice(0, 3)
+    .map((don) => {
+      const trangThaiDon = layTenTrangThai(TEN_TRANG_THAI_DON_HANG_DB, don.orderStatus);
+      const trangThaiSanXuat = layTenTrangThai(
+        TEN_TRANG_THAI_SAN_XUAT_DB,
+        don.productionStatus || don.productionOrderStatus
+      );
+      return `${moTaDonHang(don)}: đơn hàng ${trangThaiDon}, sản xuất ${trangThaiSanXuat}`;
+    })
+    .join("; ");
+}
+
+function taoLyDoKhoaKhongCoDon(designStatus) {
+  const tenTrangThai = layTenTrangThai(TEN_TRANG_THAI_THIET_KE_DB, designStatus);
+  if (designStatus === "APPROVED") {
+    return `Thiết kế đang ở trạng thái ${tenTrangThai} nhưng chưa gắn đơn hàng. Chỉ bản nháp DRAFT chưa tạo đơn mới được sửa tự do.`;
+  }
+  if (designStatus === "PENDING_REVIEW" || designStatus === "NEEDS_REVISION") {
+    return `Thiết kế đang ở trạng thái ${tenTrangThai} nhưng hệ thống chưa tìm thấy đơn hàng liên quan. Vui lòng kiểm tra liên kết đơn hàng trước khi sửa.`;
+  }
+  return `Thiết kế đang ở trạng thái ${tenTrangThai}; chỉ bản nháp DRAFT chưa tạo đơn mới được sửa tự do.`;
+}
+
+function taoLyDoKhoaTheoDonHang(donHang) {
+  const khoaTheoDonHang = donHang.find((don) =>
+    TRANG_THAI_DON_HANG_KHOA_SUA.has(don.orderStatus)
+  );
+  if (khoaTheoDonHang) {
+    const trangThai = layTenTrangThai(TEN_TRANG_THAI_DON_HANG_DB, khoaTheoDonHang.orderStatus);
+    return `${moTaDonHang(khoaTheoDonHang)} đang ở trạng thái ${trangThai}, không thể sửa thiết kế.`;
+  }
+
+  const khoaTheoSanXuat = donHang.find((don) =>
+    TRANG_THAI_SAN_XUAT_KHOA_SUA.has(don.productionStatus)
+    || TRANG_THAI_SAN_XUAT_KHOA_SUA.has(don.productionOrderStatus)
+  );
+  if (khoaTheoSanXuat) {
+    const status = TRANG_THAI_SAN_XUAT_KHOA_SUA.has(khoaTheoSanXuat.productionStatus)
+      ? khoaTheoSanXuat.productionStatus
+      : khoaTheoSanXuat.productionOrderStatus;
+    const trangThai = layTenTrangThai(TEN_TRANG_THAI_SAN_XUAT_DB, status);
+    return `${moTaDonHang(khoaTheoSanXuat)} có trạng thái sản xuất ${trangThai}, không thể sửa thiết kế.`;
+  }
+
+  return THONG_BAO_THIET_KE_DA_SAN_XUAT;
+}
+
 function tinhQuyenSuaThietKe({ designStatus, donHang = [] }) {
   if (!donHang.length) {
     return {
@@ -277,7 +361,7 @@ function tinhQuyenSuaThietKe({ designStatus, donHang = [] }) {
       canEdit: designStatus === "DRAFT",
       lockReason: designStatus === "DRAFT"
         ? null
-        : "Thiết kế không phải bản nháp nên không thể chỉnh sửa tự do.",
+        : taoLyDoKhoaKhongCoDon(designStatus),
     };
   }
 
@@ -290,7 +374,7 @@ function tinhQuyenSuaThietKe({ designStatus, donHang = [] }) {
     return {
       hasOrder: true,
       canEdit: false,
-      lockReason: THONG_BAO_THIET_KE_DA_SAN_XUAT,
+      lockReason: taoLyDoKhoaTheoDonHang(donHang),
     };
   }
 
@@ -306,7 +390,9 @@ function tinhQuyenSuaThietKe({ designStatus, donHang = [] }) {
     canEdit: duocSua,
     lockReason: duocSua
       ? null
-      : "Thiết kế chỉ được sửa trước khi đơn hàng vào sản xuất.",
+      : designStatus === "APPROVED"
+        ? `Thiết kế đã duyệt nhưng dòng đơn chưa ở trạng thái cho phép sửa phút chót. ${moTaTrangThaiDonLienQuan(donHang)}. Chỉ cho sửa khi sản xuất còn WAITING_DESIGN_APPROVAL/APPROVED/PROCESSING/READY_TO_PRINT.`
+        : `Thiết kế chỉ được sửa khi đang Chờ duyệt/Cần sửa hoặc dòng đơn còn trước in. Trạng thái thiết kế hiện tại: ${layTenTrangThai(TEN_TRANG_THAI_THIET_KE_DB, designStatus)}. ${moTaTrangThaiDonLienQuan(donHang)}.`,
   };
 }
 
@@ -326,6 +412,7 @@ async function layTrangThaiLienQuanThietKe(conn, designId, { forUpdate = false }
     `SELECT
        oi.id AS orderItemId,
        oi.productionStatus,
+       co.orderCode,
        co.status AS orderStatus,
        op.status AS productionOrderStatus
      FROM OrderItem oi
@@ -369,6 +456,7 @@ async function layQuyenSuaNhieuThietKe(designIds) {
        oi.designId,
        oi.id AS orderItemId,
        oi.productionStatus,
+       co.orderCode,
        co.status AS orderStatus,
        op.status AS productionOrderStatus
      FROM OrderItem oi
@@ -878,11 +966,11 @@ async function layCanvasDataThietKe(id) {
 }
 
 // =====================================================================
-// SERVICE 2.4: Admin sửa thiết kế cho khách (ghi đè + tự duyệt)
+// SERVICE 2.4: Admin sửa thiết kế cho khách (ghi đè, giữ nguyên trạng thái)
 // PUT /api/admin/designs/:id/sua
 //
-// Lưu đè đồng thời canvasData MỚI + previewUrl MỚI, và tự động
-// chuyển status → APPROVED vì admin đã kiểm duyệt khi sửa trực tiếp.
+// Lưu đè đồng thời canvasData MỚI + previewUrl MỚI, không tự động
+// chuyển status. Duyệt thiết kế vẫn là thao tác riêng qua /duyet.
 // =====================================================================
 async function suaThietKeChoKhach(id, { canvasData, previewUrl, shirtType, shirtColor, variantId }) {
   let dataObj = canvasData;
@@ -913,7 +1001,9 @@ async function suaThietKeChoKhach(id, { canvasData, previewUrl, shirtType, shirt
     shirtView: dataObj.shirtView === "back" ? "back" : "front",
   };
 
-  // Ghi đè canvasData + previewUrl + đổi status APPROVED + cập nhật phí
+  // Ghi đè canvasData + previewUrl + cập nhật phí, giữ nguyên status hiện tại.
+  let currentStatus = null;
+
   await db.transaction(async (conn) => {
     const quyenSua = await layTrangThaiLienQuanThietKe(conn, id, { forUpdate: true });
     chanSuaThietKeNeuBiKhoa(quyenSua);
@@ -929,6 +1019,8 @@ async function suaThietKeChoKhach(id, { canvasData, previewUrl, shirtType, shirt
     if (!rows || rows.length === 0) {
       throw taoLoi("Không tìm thấy thiết kế", 404);
     }
+
+    currentStatus = rows[0].status;
 
     let productId = Number(rows[0].productId);
     let selectedVariantId = rows[0].variantId ? Number(rows[0].variantId) : null;
@@ -992,7 +1084,7 @@ async function suaThietKeChoKhach(id, { canvasData, previewUrl, shirtType, shirt
 
     await conn.query(
       `UPDATE CustomDesign
-       SET productId = ?, variantId = ?, canvasData = ?, previewUrl = ?, status = 'APPROVED', designFee = ?, baseColor = ?
+       SET productId = ?, variantId = ?, canvasData = ?, previewUrl = ?, designFee = ?, baseColor = ?
        WHERE id = ?`,
       [productId, selectedVariantId, dataStr, previewUrl || "", designFee, normalizedColor, id]
     );
@@ -1002,7 +1094,7 @@ async function suaThietKeChoKhach(id, { canvasData, previewUrl, shirtType, shirt
   return {
     id: Number(id),
     maThietKe: `TK-${String(id).padStart(4, "0")}`,
-    trangThai: "da_duyet",
+    trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[currentStatus] || "cho_kiem_tra",
   };
 }
 

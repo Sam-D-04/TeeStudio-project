@@ -7,7 +7,7 @@
  *  1. Load: Gọi API GET /admin/designs/:id/canvas → lấy canvasData JSON
  *  2. Tái tạo canvas: Load elements, shirtType, shirtColor, shirtView vào Zustand store
  *  3. Sửa: Admin chỉnh sửa trực tiếp trên canvas
- *  4. Lưu: Chụp ảnh preview mới → gọi PUT /admin/designs/:id/sua → ghi đè DB + APPROVED
+ *  4. Lưu: Chụp ảnh preview mới → gọi PUT /admin/designs/:id/sua → ghi đè DB, giữ nguyên trạng thái
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -232,7 +232,9 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     const requestedKey = `${shirtType}|${shirtColor.toLowerCase()}`;
 
     if (hasRelatedOrder) {
-      setSizeResult({ key: requestedKey, variants: [] });
+      queueMicrotask(() => {
+        if (active) setSizeResult({ key: requestedKey, variants: [] });
+      });
       return () => {
         active = false;
       };
@@ -398,8 +400,8 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
       });
 
       modal.success({
-        title: `Đã lưu và duyệt ${maThietKe}`,
-        content: "Thiết kế đã được cập nhật và chuyển sang trạng thái Đã duyệt.",
+        title: `Đã lưu ${maThietKe}`,
+        content: "Thiết kế đã được cập nhật. Trạng thái duyệt không thay đổi.",
         okText: "Về trang quản lý",
         onOk: () => router.push("/admin/thiet-ke"),
       });
