@@ -35,7 +35,7 @@ export type ThietKe = {
 
 export type ChiTietThietKe = ThietKe & {
   tenThietKe: string;
-  khachHangId: number;
+  khachHangId: number | null;
   emailKhachHang: string | null;
   sanPhamId: number;
   productId: number;
@@ -74,6 +74,10 @@ export type CanvasDataThietKe = {
   mauAo: string;
   productId: number;
   variantId: number | null;
+  khachHangId: number | null;
+  tenKhachHang: string;
+  emailKhachHang: string | null;
+  soDienThoai: string | null;
   sizeAo: string | null;
   tenSanPham: string;
   trangThai: TrangThaiThietKe;
@@ -195,6 +199,15 @@ export type TuyChonBienTheTaoThietKe = {
   productId: number;
   productName: string;
   variants: BienTheTaoThietKe[];
+};
+
+export type KetQuaGanKhachThietKe = {
+  id: number;
+  maThietKe: string;
+  khachHangId: number | null;
+  tenKhachHang: string;
+  emailKhachHang?: string | null;
+  soDienThoai?: string | null;
 };
 
 // =====================================================================
@@ -322,6 +335,27 @@ export async function suaThietKeChoKhach(
 }
 
 /** Upload ảnh trước khi đưa vào canvas để JSON không chứa blob URL tạm thời. */
+export async function doiKhachHangThietKe(
+  id: number,
+  customerId: number
+): Promise<KetQuaGanKhachThietKe> {
+  const res = await apiClient.patch<{
+    success: boolean;
+    data: KetQuaGanKhachThietKe;
+  }>(`/admin/designs/${id}/customer`, { customerId });
+  return res.data.data;
+}
+
+export async function goKhachHangKhoiThietKe(
+  id: number
+): Promise<KetQuaGanKhachThietKe> {
+  const res = await apiClient.delete<{
+    success: boolean;
+    data: KetQuaGanKhachThietKe;
+  }>(`/admin/designs/${id}/customer`);
+  return res.data.data;
+}
+
 export async function taiAnhThietKe(file: File): Promise<string> {
   const formData = new FormData();
   formData.append("image", file);

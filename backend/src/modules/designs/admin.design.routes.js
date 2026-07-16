@@ -102,6 +102,8 @@ router.get("/", verifyToken, requireAdmin, controller.getDanhSachThietKe);
 // Lưu ý: /:id/canvas và /:id/sua phải khai báo TRƯỚC /:id để tránh conflict routing
 router.get("/:id/canvas", verifyToken, requireDesignCreator, controller.getCanvasDataThietKe);
 router.put("/:id/sua", verifyToken, requireDesignCreator, controller.suaThietKeChoKhach);
+router.patch("/:id/customer", verifyToken, requireDesignCreator, controller.doiKhachHangThietKe);
+router.delete("/:id/customer", verifyToken, requireDesignCreator, controller.goKhachHangKhoiThietKe);
 router.patch("/:id/duyet", verifyToken, requireAdmin, controller.duyetThietKe);
 router.patch("/:id/yeu-cau-chinh-sua", verifyToken, requireAdmin, controller.yeuCauChinhSua);
 router.get("/:id", verifyToken, requireAdmin, controller.getChiTietThietKe);

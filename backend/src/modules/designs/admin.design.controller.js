@@ -112,6 +112,44 @@ const suaThietKeChoKhach = async (req, res, next) => {
   }
 };
 
+/** PATCH /api/admin/designs/:id/customer - Doi khach hang so huu thiet ke. */
+const doiKhachHangThietKe = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id || id <= 0) {
+      return res.status(400).json({ success: false, message: "ID thiet ke khong hop le" });
+    }
+
+    const data = await designService.doiKhachHangThietKe(id, req.body.customerId);
+    res.json({
+      success: true,
+      message: "Da doi khach hang cho thiet ke",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** DELETE /api/admin/designs/:id/customer - Go thiet ke khoi tai khoan khach hang. */
+const goKhachHangKhoiThietKe = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id || id <= 0) {
+      return res.status(400).json({ success: false, message: "ID thiet ke khong hop le" });
+    }
+
+    const data = await designService.goKhachHangKhoiThietKe(id);
+    res.json({
+      success: true,
+      message: "Da go khach hang khoi thiet ke",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /** GET /api/admin/designs/customer-draft-variants - Các size hợp lệ theo loại áo và màu. */
 const getBienTheTaoThietKe = async (req, res, next) => {
   try {
@@ -343,6 +381,8 @@ module.exports = {
   getChiTietThietKe,
   getCanvasDataThietKe,
   suaThietKeChoKhach,
+  doiKhachHangThietKe,
+  goKhachHangKhoiThietKe,
   getBienTheTaoThietKe,
   taoThietKeChoKhach,
   taiAnhThietKe,

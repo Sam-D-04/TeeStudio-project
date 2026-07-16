@@ -429,7 +429,7 @@ async function layDanhSachThietKe({
   const sqlDem = `
     SELECT COUNT(DISTINCT cd.id) AS tong_so
     FROM CustomDesign cd
-    JOIN Account a ON a.id = cd.userId
+    LEFT JOIN Account a ON a.id = cd.userId
     JOIN Product p ON p.id = cd.productId
     LEFT JOIN DesignPrintPosition dpp ON dpp.designId = cd.id
     LEFT JOIN PrintPosition pp ON pp.id = dpp.printPositionId
@@ -459,7 +459,7 @@ async function layDanhSachThietKe({
         WHERE dppViTri.designId = cd.id
       )                    AS viTriIn
     FROM CustomDesign cd
-    JOIN Account a ON a.id = cd.userId
+    LEFT JOIN Account a ON a.id = cd.userId
     JOIN Product p ON p.id = cd.productId
     LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
     LEFT JOIN DesignPrintPosition dpp ON dpp.designId = cd.id
@@ -476,7 +476,7 @@ async function layDanhSachThietKe({
     maThietKe: `TK-${String(row.id).padStart(4, "0")}`,
     urlPreview: row.urlPreview || null,
     mauAo: chuanHoaMauAo(row.mauAoHex, row.mauAo, row.tenMauAo),
-    tenKhachHang: row.tenKhachHang || "Khách hàng",
+    tenKhachHang: row.tenKhachHang || "Chưa gán khách",
     soDienThoai: row.soDienThoai || null,
     tenSanPham: row.tenSanPham || "Sản phẩm",
     tenMauAo: row.tenMauAo || "Không rõ",
@@ -543,7 +543,7 @@ async function layChiTietThietKe(id) {
          LIMIT 1
        ) AS maDonHang
      FROM CustomDesign cd
-     JOIN Account a ON a.id = cd.userId
+     LEFT JOIN Account a ON a.id = cd.userId
      JOIN Product p ON p.id = cd.productId
      LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
      WHERE cd.id = ?
@@ -584,14 +584,14 @@ async function layChiTietThietKe(id) {
     id: row.id,
     maThietKe: `TK-${String(row.id).padStart(4, "0")}`,
     tenThietKe: row.tenThietKe || `Thiết kế ${row.id}`,
-    khachHangId: Number(row.khachHangId),
+    khachHangId: row.khachHangId ? Number(row.khachHangId) : null,
     emailKhachHang: row.emailKhachHang || null,
     sanPhamId: Number(row.sanPhamId),
     productId: Number(row.productId),
     variantId: row.variantId ? Number(row.variantId) : null,
     urlPreview: row.urlPreview || null,
     mauAo: chuanHoaMauAo(row.mauAoHex, row.mauAo, row.tenMauAo),
-    tenKhachHang: row.tenKhachHang || "Khách hàng",
+    tenKhachHang: row.tenKhachHang || "Chưa gán khách",
     soDienThoai: row.soDienThoai || null,
     tenSanPham: row.tenSanPham || "Sản phẩm",
     tenMauAo: row.tenMauAo || "Không rõ",
@@ -643,11 +643,16 @@ async function layCanvasDataThietKe(id) {
        cd.name      AS tenThietKe,
        cd.productId,
        cd.variantId,
+       a.id         AS khachHangId,
+       a.fullName   AS tenKhachHang,
+       a.email      AS emailKhachHang,
+       a.phone      AS soDienThoai,
        pv.colorHex  AS mauAoHex,
        pv.color     AS tenMauAo,
        pv.size      AS sizeAo,
        p.name       AS tenSanPham
      FROM CustomDesign cd
+     LEFT JOIN Account a ON a.id = cd.userId
      JOIN Product p ON p.id = cd.productId
      LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
      WHERE cd.id = ?
@@ -694,6 +699,10 @@ async function layCanvasDataThietKe(id) {
     mauAo,
     productId: Number(row.productId),
     variantId: row.variantId ? Number(row.variantId) : null,
+    khachHangId: row.khachHangId ? Number(row.khachHangId) : null,
+    tenKhachHang: row.tenKhachHang || "Chưa gán khách",
+    emailKhachHang: row.emailKhachHang || null,
+    soDienThoai: row.soDienThoai || null,
     sizeAo: row.sizeAo || null,
     tenSanPham: row.tenSanPham || "Sản phẩm",
     trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[row.status] || "cho_kiem_tra",
@@ -803,7 +812,66 @@ async function suaThietKeChoKhach(id, { canvasData, previewUrl, shirtType, shirt
 }
 
 // =====================================================================
-// SERVICE 2.2: Admin tạo thiết kế nháp và gắn vào tài khoản khách hàng
+// SERVICE 2.2: Admin go/doi khach hang so huu thiet ke
+// PATCH/DELETE /api/admin/designs/:id/customer
+// =====================================================================
+async function goKhachHangKhoiThietKe(id) {
+  const [rows] = await db.pool.query(
+    "SELECT id FROM CustomDesign WHERE id = ? LIMIT 1",
+    [id]
+  );
+  if (!rows.length) {
+    throw taoLoi("Khong tim thay thiet ke", 404);
+  }
+
+  await db.pool.query(
+    "UPDATE CustomDesign SET userId = NULL WHERE id = ?",
+    [id]
+  );
+
+  return {
+    id: Number(id),
+    maThietKe: `TK-${String(id).padStart(4, "0")}`,
+    khachHangId: null,
+    tenKhachHang: "Chua gan khach",
+  };
+}
+
+async function doiKhachHangThietKe(id, customerId) {
+  const nextCustomerId = Number(customerId);
+  if (!Number.isInteger(nextCustomerId) || nextCustomerId <= 0) {
+    throw taoLoi("Vui long chon khach hang moi", 400);
+  }
+
+  const [accounts] = await db.pool.query(
+    "SELECT id, fullName, email, phone FROM Account WHERE id = ? AND role = 'CUSTOMER' AND status = 'ACTIVE' LIMIT 1",
+    [nextCustomerId]
+  );
+  if (!accounts.length) {
+    throw taoLoi("Khong tim thay tai khoan khach hang dang hoat dong", 404);
+  }
+
+  const [result] = await db.pool.query(
+    "UPDATE CustomDesign SET userId = ? WHERE id = ?",
+    [nextCustomerId, id]
+  );
+  if (!result.affectedRows) {
+    throw taoLoi("Khong tim thay thiet ke", 404);
+  }
+
+  const customer = accounts[0];
+  return {
+    id: Number(id),
+    maThietKe: `TK-${String(id).padStart(4, "0")}`,
+    khachHangId: Number(customer.id),
+    tenKhachHang: customer.fullName || "Khach hang",
+    emailKhachHang: customer.email || null,
+    soDienThoai: customer.phone || null,
+  };
+}
+
+// =====================================================================
+// SERVICE 2.3: Admin tạo thiết kế nháp và gắn vào tài khoản khách hàng
 // POST /api/admin/designs/customer-drafts
 // =====================================================================
 async function taoThietKeChoKhach({ userId, name, shirtType, shirtColor, variantId, canvasData, previewUrl }) {
@@ -1259,6 +1327,8 @@ module.exports = {
   layChiTietThietKe,
   layCanvasDataThietKe,
   suaThietKeChoKhach,
+  goKhachHangKhoiThietKe,
+  doiKhachHangThietKe,
   layBienTheTaoThietKe,
   taoThietKeChoKhach,
   duyetThietKe,

@@ -10,9 +10,9 @@
  *  4. Lưu: Chụp ảnh preview mới → gọi PUT /admin/designs/:id/sua → ghi đè DB + APPROVED
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { App, Button, Select, Spin, ConfigProvider, theme } from "antd";
+import { App, Button, Modal, Select, Spin, ConfigProvider, theme } from "antd";
 import {
   ArrowLeftOutlined,
   DeleteOutlined,
@@ -21,12 +21,15 @@ import {
   UndoOutlined,
   EditOutlined,
   LoadingOutlined,
+  UserDeleteOutlined,
+  UserSwitchOutlined,
 } from "@ant-design/icons";
 import html2canvas from "html2canvas";
 import { v4 as uuidv4 } from "uuid";
 import type Konva from "konva";
 
 import { useDesignStore } from "@/store/useDesignStore";
+import * as accountService from "@/services/admin/accountService";
 import * as designService from "@/services/admin/designService";
 import CanvasEditor from "@/components/design-studio/CanvasEditor";
 import FloatingToolbar from "@/components/design-studio/FloatingToolbar";
@@ -48,6 +51,20 @@ type AdminEditDesignStudioProps = {
   designId: number;
 };
 
+function formatCustomerLabel(customer: {
+  tenKhachHang?: string | null;
+  fullName?: string | null;
+  soDienThoai?: string | null;
+  phone?: string | null;
+  emailKhachHang?: string | null;
+  email?: string | null;
+}) {
+  const name = customer.tenKhachHang || customer.fullName || "Khách hàng";
+  const contact =
+    customer.soDienThoai || customer.phone || customer.emailKhachHang || customer.email || "";
+  return contact ? `${name} - ${contact}` : name;
+}
+
 export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudioProps) {
   const router = useRouter();
   const { message, modal } = App.useApp();
@@ -61,6 +78,15 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
   const [zoom, setZoom] = useState(1);
   const [maThietKe, setMaThietKe] = useState("");
   const [tenThietKe, setTenThietKe] = useState("");
+  const [customers, setCustomers] = useState<accountService.TaiKhoanKhachHang[]>([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(true);
+  const [customerActionLoading, setCustomerActionLoading] = useState(false);
+  const [customerModalOpen, setCustomerModalOpen] = useState(false);
+  const [targetCustomerId, setTargetCustomerId] = useState<number>();
+  const [ownerCustomer, setOwnerCustomer] = useState<{
+    id: number | null;
+    label: string;
+  }>({ id: null, label: "Chưa gán khách" });
   const [variantSelection, setVariantSelection] = useState<{ id: number; key: string }>();
   const [preferredSize, setPreferredSize] = useState<string>();
   const [sizeResult, setSizeResult] = useState<{
@@ -84,7 +110,10 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
 
   const variantKey = `${shirtType}|${shirtColor.toLowerCase()}`;
   const variantId = variantSelection?.key === variantKey ? variantSelection.id : undefined;
-  const sizeOptions = sizeResult.key === variantKey ? sizeResult.variants : [];
+  const sizeOptions = useMemo(
+    () => (sizeResult.key === variantKey ? sizeResult.variants : []),
+    [sizeResult.key, sizeResult.variants, variantKey]
+  );
   const loadingSizes = sizeResult.key !== variantKey;
 
   // ─── Bước 1 & 2: Load canvasData từ API → tái tạo canvas ──────────────
@@ -102,14 +131,20 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
       redoStack: [],
     });
 
-    setLoading(true);
-    setLoadError(null);
+    queueMicrotask(() => {
+      setLoading(true);
+      setLoadError(null);
+    });
 
     designService
       .layCanvasDataThietKe(designId)
       .then((data) => {
         setMaThietKe(data.maThietKe);
         setTenThietKe(data.tenThietKe);
+        setOwnerCustomer({
+          id: data.khachHangId,
+          label: data.khachHangId ? formatCustomerLabel(data) : "Chưa gán khách",
+        });
 
         const cd = data.canvasData;
         if (!cd || !Array.isArray(cd.elements)) {
@@ -170,6 +205,26 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
 
   useEffect(() => {
     let active = true;
+
+    accountService
+      .layDanhSachTaiKhoan({ page: 1, limit: 100, status: "ACTIVE" })
+      .then((result) => {
+        if (active) setCustomers(result.items);
+      })
+      .catch(() => {
+        if (active) message.error("Không thể tải danh sách khách hàng");
+      })
+      .finally(() => {
+        if (active) setLoadingCustomers(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [message]);
+
+  useEffect(() => {
+    let active = true;
     const requestedKey = `${shirtType}|${shirtColor.toLowerCase()}`;
 
     designService
@@ -193,7 +248,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     if (sizeResult.key !== variantKey || variantId || !preferredSize) return;
     const matchingVariant = sizeOptions.find((variant) => variant.size === preferredSize && variant.stockQty > 0);
     if (matchingVariant) {
-      setVariantSelection({ id: matchingVariant.id, key: variantKey });
+      queueMicrotask(() => setVariantSelection({ id: matchingVariant.id, key: variantKey }));
     }
   }, [preferredSize, sizeOptions, sizeResult.key, variantId, variantKey]);
 
@@ -361,6 +416,63 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
   }, [modal, router]);
 
   // ─── Tính toán vùng in ────────────────────────────────────────────────
+  const handleRemoveCustomer = useCallback(() => {
+    modal.confirm({
+      title: "Gỡ khách hàng khỏi thiết kế?",
+      content:
+        "Thiết kế sẽ biến mất khỏi tài khoản khách hiện tại ngay lập tức, nhưng vẫn còn trong trang quản trị để admin có thể gán lại.",
+      okText: "Gỡ khách hàng",
+      okButtonProps: { danger: true },
+      cancelText: "Hủy",
+      onOk: async () => {
+        try {
+          setCustomerActionLoading(true);
+          await designService.goKhachHangKhoiThietKe(designId);
+          setOwnerCustomer({ id: null, label: "Chưa gán khách" });
+          setTargetCustomerId(undefined);
+          message.success("Đã gỡ khách hàng khỏi thiết kế");
+        } catch (error: unknown) {
+          const apiMessage = typeof error === "object" && error && "response" in error
+            ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+            : undefined;
+          message.error(apiMessage || "Không thể gỡ khách hàng");
+        } finally {
+          setCustomerActionLoading(false);
+        }
+      },
+    });
+  }, [designId, message, modal]);
+
+  const openCustomerModal = useCallback(() => {
+    setTargetCustomerId(ownerCustomer.id || undefined);
+    setCustomerModalOpen(true);
+  }, [ownerCustomer.id]);
+
+  const handleChangeCustomer = useCallback(async () => {
+    if (!targetCustomerId) {
+      message.warning("Vui lòng chọn khách hàng mới");
+      return;
+    }
+
+    try {
+      setCustomerActionLoading(true);
+      const result = await designService.doiKhachHangThietKe(designId, targetCustomerId);
+      setOwnerCustomer({
+        id: result.khachHangId,
+        label: formatCustomerLabel(result),
+      });
+      setCustomerModalOpen(false);
+      message.success("Đã đổi khách hàng cho thiết kế");
+    } catch (error: unknown) {
+      const apiMessage = typeof error === "object" && error && "response" in error
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+        : undefined;
+      message.error(apiMessage || "Không thể đổi khách hàng");
+    } finally {
+      setCustomerActionLoading(false);
+    }
+  }, [designId, message, targetCustomerId]);
+
   const area = getPrintAreaBoundary(shirtType, shirtView, CONTAINER_W, CONTAINER_H);
   const printArea = { x: area.left, y: area.top, w: area.width, h: area.height };
   const polygonPoints = hasPrintAreaPolygon(shirtType, shirtView)
@@ -454,6 +566,39 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
 
           {/* Phải: Undo/Redo + Xóa + Lưu thay đổi */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "center", flexWrap: "wrap" }}>
+            <span
+              title={ownerCustomer.label}
+              style={{
+                maxWidth: 260,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                color: ownerCustomer.id ? "#cbd5e1" : "#fbbf24",
+                fontSize: 13,
+                border: "1px solid #334155",
+                borderRadius: 6,
+                padding: "5px 10px",
+                background: "rgba(15,23,42,.65)",
+              }}
+            >
+              Khách: {ownerCustomer.label}
+            </span>
+            <Button
+              icon={<UserSwitchOutlined />}
+              onClick={openCustomerModal}
+              disabled={customerActionLoading}
+            >
+              Đổi khách
+            </Button>
+            <Button
+              danger
+              icon={<UserDeleteOutlined />}
+              onClick={handleRemoveCustomer}
+              loading={customerActionLoading}
+              disabled={!ownerCustomer.id}
+            >
+              Gỡ khách hàng
+            </Button>
             <Select
               loading={loadingSizes}
               value={variantId}
@@ -604,6 +749,32 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
           <PropertiesPanel />
         </div>
       </div>
+
+      <Modal
+        title="Đổi khách hàng cho thiết kế"
+        open={customerModalOpen}
+        onCancel={() => setCustomerModalOpen(false)}
+        onOk={handleChangeCustomer}
+        okText="Gán cho khách này"
+        cancelText="Hủy"
+        confirmLoading={customerActionLoading}
+      >
+        <Select
+          showSearch
+          loading={loadingCustomers}
+          value={targetCustomerId}
+          onChange={setTargetCustomerId}
+          placeholder="Chọn khách hàng mới"
+          optionFilterProp="label"
+          style={{ width: "100%" }}
+          options={customers.map((customer) => ({
+            value: customer.id,
+            label: formatCustomerLabel(customer),
+            disabled: customer.id === ownerCustomer.id,
+          }))}
+          notFoundContent={loadingCustomers ? <Spin size="small" /> : "Không có khách hàng"}
+        />
+      </Modal>
 
       <FloatingToolbar shirtContainerRef={shirtContainerRef} zoom={zoom} />
     </div>

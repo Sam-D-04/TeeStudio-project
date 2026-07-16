@@ -521,7 +521,7 @@ INSERT INTO `Supplier` (`id`, `name`, `phone`, `createdAt`) VALUES
 
 CREATE TABLE IF NOT EXISTS `CustomDesign` (
 	`id` INT NOT NULL AUTO_INCREMENT,
-	`userId` INT NOT NULL,
+	`userId` INT NULL COMMENT 'Cho phép NULL khi admin gỡ khách hàng khỏi thiết kế để tái sử dụng',
 	`productId` INT NOT NULL,
 	`variantId` INT NULL,
 	`name` VARCHAR(255) NULL DEFAULT 'Thiết kế chưa đặt tên' COMMENT '[FROM MEMBER] Tên thiết kế do khách đặt',
