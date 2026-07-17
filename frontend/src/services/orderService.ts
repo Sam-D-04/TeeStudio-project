@@ -12,8 +12,12 @@ export interface CreateOrderPayload {
   recipientName: string;
   phone: string;
   email?: string;
-  /** Địa chỉ giao hàng dạng chuỗi đầy đủ */
+  /** Địa chỉ giao hàng dạng chuỗi đầy đủ (số nhà + phường/xã + tỉnh/thành) */
   addressLine: string;
+  /** Tên tỉnh/thành phố đã chọn */
+  city?: string;
+  /** Tên phường/xã đã chọn */
+  ward?: string;
   note?: string;
   /** Phương thức thanh toán: VNPAY, MOMO hoặc COD */
   paymentMethod: "VNPAY" | "MOMO" | "COD";

@@ -33,12 +33,18 @@ async function layGioHang(userId) {
        pv.productId,
        p.name         AS productName,
        p.basePrice    AS price,
-       (SELECT pi.imageUrl FROM ProductImage pi
-        WHERE pi.productId = p.id AND pi.isPrimary = 1
-        LIMIT 1)      AS image
+       -- Ưu tiên ảnh xem trước của thiết kế riêng (nếu có) thay vì ảnh phôi áo gốc,
+       -- để giỏ hàng hiển thị đúng sản phẩm khách đã thiết kế.
+       COALESCE(
+         NULLIF(cd.previewUrl, ''),
+         (SELECT pi.imageUrl FROM ProductImage pi
+          WHERE pi.productId = p.id AND pi.isPrimary = 1
+          LIMIT 1)
+       )              AS image
      FROM CartItem ci
      JOIN ProductVariant pv ON ci.variantId = pv.id
      JOIN Product p ON pv.productId = p.id
+     LEFT JOIN CustomDesign cd ON cd.id = ci.designId
      WHERE ci.cartId = ?
      ORDER BY ci.id ASC`,
     [cartId]

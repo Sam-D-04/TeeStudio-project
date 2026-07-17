@@ -8,6 +8,7 @@ import {
   Form,
   Input,
   Radio,
+  Select,
   message,
   Spin,
 } from "antd";
@@ -46,9 +47,33 @@ interface CheckoutFormValues {
   recipientName: string;
   phone: string;
   email: string;
-  address: string;
+  provinceCode: string;
+  wardCode: string;
+  addressDetail: string;
   note?: string;
   paymentMethod: PaymentMethod;
+}
+
+/* ── Dữ liệu tỉnh/thành – phường/xã (VN, 2 cấp sau sáp nhập hành chính) ── */
+interface WardData {
+  Code: string;
+  Name: string;
+  ProvinceCode: string;
+}
+interface ProvinceData {
+  Code: string;
+  Name: string;
+  Wards: WardData[];
+}
+
+/** Bỏ dấu tiếng Việt để so khớp tìm kiếm không phân biệt dấu (vd "ha noi" ra "Hà Nội") */
+function stripDiacritics(str: string): string {
+  return str
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase();
 }
 
 /* ── Payment method options ── */
@@ -129,9 +154,24 @@ export default function CheckoutPage() {
   const token        = useAuthStore((s) => s.accessToken);
   const [loading, setLoading]         = useState(false);
   const [hydrated, setHydrated]       = useState(false);
+  const [provinces, setProvinces]     = useState<ProvinceData[]>([]);
+  const [addressLoading, setAddressLoading] = useState(true);
+  const provinceCode = Form.useWatch("provinceCode", form);
 
   /* Hydration guard */
   useEffect(() => setHydrated(true), []);
+
+  /* Tải danh sách tỉnh/thành – phường/xã (file tĩnh, chỉ tải 1 lần) */
+  useEffect(() => {
+    fetch("/data/vn-address.json")
+      .then((res) => res.json())
+      .then((data: ProvinceData[]) => setProvinces(data))
+      .catch(() => message.error("Không tải được danh sách tỉnh/thành, phường/xã"))
+      .finally(() => setAddressLoading(false));
+  }, []);
+
+  const selectedProvince = provinces.find((p) => p.Code === provinceCode);
+  const wardsForProvince = selectedProvince?.Wards ?? [];
 
   /* Pre-fill user data */
   useEffect(() => {
@@ -189,12 +229,19 @@ export default function CheckoutPage() {
     }
     setLoading(true);
     try {
+      const province = provinces.find((p) => p.Code === values.provinceCode);
+      const ward = province?.Wards.find((w) => w.Code === values.wardCode);
+      const addressLine = [values.addressDetail, ward?.Name, province?.Name]
+        .filter(Boolean)
+        .join(", ");
+
       const payload: CreateOrderPayload = {
         recipientName: values.recipientName,
         phone: values.phone,
         email: values.email,
-        // Backend nhận field addressLine
-        addressLine: values.address,
+        addressLine,
+        city: province?.Name,
+        ward: ward?.Name,
         note: values.note,
         paymentMethod: values.paymentMethod,
         items: cartItemsToOrderItems(items),
@@ -352,15 +399,54 @@ export default function CheckoutPage() {
                     />
                   </Form.Item>
 
-                  <Form.Item
-                    name="address"
-                    label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Địa chỉ giao hàng *</span>}
-                    rules={[{ required: true, message: "Vui lòng nhập địa chỉ giao hàng" }]}
+                  <div
+                    style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}
+                    className="max-sm:grid-cols-1"
                   >
-                    <Input.TextArea
-                      placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố"
-                      rows={3}
-                      style={{ borderRadius: 8, resize: "none" }}
+                    <Form.Item
+                      name="provinceCode"
+                      label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Tỉnh/Thành phố *</span>}
+                      rules={[{ required: true, message: "Vui lòng chọn tỉnh/thành phố" }]}
+                    >
+                      <Select
+                        showSearch
+                        loading={addressLoading}
+                        placeholder="Tìm tỉnh/thành phố..."
+                        style={{ height: 40 }}
+                        options={provinces.map((p) => ({ value: p.Code, label: p.Name }))}
+                        filterOption={(input, option) =>
+                          stripDiacritics(option?.label ?? "").includes(stripDiacritics(input))
+                        }
+                        onChange={() => form.setFieldValue("wardCode", undefined)}
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      name="wardCode"
+                      label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Phường/Xã *</span>}
+                      rules={[{ required: true, message: "Vui lòng chọn phường/xã" }]}
+                    >
+                      <Select
+                        showSearch
+                        disabled={!provinceCode}
+                        placeholder={provinceCode ? "Tìm phường/xã..." : "Chọn tỉnh/thành phố trước"}
+                        style={{ height: 40 }}
+                        options={wardsForProvince.map((w) => ({ value: w.Code, label: w.Name }))}
+                        filterOption={(input, option) =>
+                          stripDiacritics(option?.label ?? "").includes(stripDiacritics(input))
+                        }
+                      />
+                    </Form.Item>
+                  </div>
+
+                  <Form.Item
+                    name="addressDetail"
+                    label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Số nhà, tên đường *</span>}
+                    rules={[{ required: true, message: "Vui lòng nhập số nhà, tên đường" }]}
+                  >
+                    <Input
+                      placeholder="Vd: 12 Nguyễn Trãi"
+                      style={{ height: 40, borderRadius: 8 }}
                     />
                   </Form.Item>
 
@@ -512,7 +598,9 @@ export default function CheckoutPage() {
                             height: 44,
                             borderRadius: 8,
                             border: "1px solid #e2e8f0",
-                            background: "#f8fafc",
+                            // Sản phẩm có thiết kế riêng: dùng màu áo làm nền vì ảnh in
+                            // là PNG nền trong suốt, chỉ chứa nội dung đã in.
+                            background: item.designId ? item.color : "#f8fafc",
                             flexShrink: 0,
                             overflow: "hidden",
                             display: "flex",
@@ -526,7 +614,7 @@ export default function CheckoutPage() {
                             <img
                               src={item.image}
                               alt={item.name}
-                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                              style={{ width: "100%", height: "100%", objectFit: item.designId ? "contain" : "cover" }}
                             />
                           ) : (
                             <ShoppingCartOutlined style={{ fontSize: 18, color: "#bec8d2" }} />

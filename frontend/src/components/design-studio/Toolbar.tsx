@@ -66,9 +66,6 @@ interface ToolbarProps {
   onAddToCart?: () => void;
   onViewCart?: () => void;
   isSaving?: boolean;
-  /** Lưu thiết kế hiện tại rồi gửi cho admin duyệt (DRAFT/NEEDS_REVISION → PENDING_REVIEW) */
-  onSubmitForReview?: () => void;
-  isSubmittingReview?: boolean;
 }
 
 const menuItemStyle: React.CSSProperties = {
@@ -79,10 +76,8 @@ const menuItemStyle: React.CSSProperties = {
   textAlign: "left", transition: "background 0.1s",
 };
 
-export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDesign, onAddToCart, onViewCart, isSaving, onSubmitForReview, isSubmittingReview }: ToolbarProps) {
-  const { undo, redo, undoStack, redoStack, clearDesign, shirtType, currentDesignId, currentDesignStatus } = useDesignStore();
-  const canSubmitForReview =
-    !!currentDesignId && (currentDesignStatus === "DRAFT" || currentDesignStatus === "NEEDS_REVISION");
+export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDesign, onAddToCart, onViewCart, isSaving }: ToolbarProps) {
+  const { undo, redo, undoStack, redoStack, clearDesign, shirtType } = useDesignStore();
   const { isAuthenticated, user, clearSession, hydrate } = useAuthStore();
   const cartCount = useCartStore((s) => s.totalItems());
   const router = useRouter();
@@ -131,7 +126,7 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
         <span style={{ fontSize: 13, color: "#94a3b8" }}>Thiết kế {shirtLabel}</span>
       </div>
 
-      {/* Ở giữa: Hoàn tác / Làm lại / Tạo mới / Xoá hết */}
+      {/* Ở giữa: Hoàn tác / Làm lại / Tạo mới / Xoá / Tải ảnh */}
       <div className="ds-toolbar-center">
         <button className="ds-toolbar-btn ds-toolbar-btn--icon" onClick={undo}
           disabled={undoStack.length === 0} title="Hoàn tác (Ctrl+Z)">
@@ -157,13 +152,25 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
         >
           <TrashIcon />
         </button>
-      </div>
-
-      {/* Bên phải: Tải ảnh + Giỏ hàng + Lưu + Khu vực tài khoản */}
-      <div className="ds-toolbar-right">
+        <div className="ds-toolbar-divider" />
         <button className="ds-toolbar-btn ds-toolbar-btn--outline" onClick={onDownloadImage} title="Tải xuống ảnh PNG">
           <DownloadIcon /> Tải ảnh
         </button>
+      </div>
+
+      {/* Bên phải: Lưu + Thêm giỏ + Giỏ hàng + Khu vực tài khoản */}
+      <div className="ds-toolbar-right">
+        <button className="ds-toolbar-btn ds-toolbar-btn--primary" onClick={onSave}
+          title="Lưu thiết kế (Ctrl+S)" disabled={isSaving}>
+          {isSaving ? (
+            <svg className="ds-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+            </svg>
+          ) : <SaveIcon />}
+          {isSaving ? "Đang lưu..." : "Lưu thiết kế"}
+        </button>
+
         {onAddToCart && (
           <button
             className="ds-toolbar-btn"
@@ -174,6 +181,7 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
             <CartIcon /> Thêm vào giỏ
           </button>
         )}
+
         <button
           className="ds-toolbar-btn ds-toolbar-btn--icon"
           onClick={onViewCart}
@@ -194,28 +202,6 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
             </span>
           )}
         </button>
-        <button className="ds-toolbar-btn ds-toolbar-btn--primary" onClick={onSave}
-          title="Lưu thiết kế (Ctrl+S)" disabled={isSaving}>
-          {isSaving ? (
-            <svg className="ds-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
-            </svg>
-          ) : <SaveIcon />}
-          {isSaving ? "Đang lưu..." : "Lưu thiết kế"}
-        </button>
-
-        {canSubmitForReview && onSubmitForReview && (
-          <button
-            className="ds-toolbar-btn"
-            onClick={onSubmitForReview}
-            disabled={isSubmittingReview}
-            title="Lưu thiết kế và gửi cho admin duyệt"
-            style={{ background: "#f97316", color: "#fff", border: "none" }}
-          >
-            <SendIcon /> {isSubmittingReview ? "Đang gửi..." : "Lưu & Gửi duyệt lại"}
-          </button>
-        )}
 
         <div className="ds-toolbar-divider" />
 

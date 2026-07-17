@@ -130,6 +130,21 @@ export default function PrintOrderTab({
     setTrangThaiMoi("");
   }
 
+  // Mở file in chuẩn (độ phân giải cao, đã cắt đúng vùng in) ở tab mới cho xưởng in tải về.
+  // Đơn cũ (đặt trước khi có tính năng lưu printFileUrl) sẽ chưa có file này → tạm mở ảnh xem trước.
+  function xemFileIn(don: DonCanIn) {
+    if (don.urlFileIn) {
+      window.open(don.urlFileIn, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (don.urlPreview) {
+      messageApi.warning("Đơn này chưa có file in chuẩn, đang mở tạm ảnh xem trước.");
+      window.open(don.urlPreview, "_blank", "noopener,noreferrer");
+      return;
+    }
+    messageApi.warning("Đơn này chưa có ảnh thiết kế để xem.");
+  }
+
   const tuyChonTrangThai = donDangChinhSua?.trangThai === "cho_gui_xuong"
     ? [{ value: "dang_in", label: "Đang in" }]
     : donDangChinhSua?.trangThai === "dang_in"
@@ -530,12 +545,10 @@ export default function PrintOrderTab({
                       {/* Thao tác */}
                       <td style={{ padding: "14px 16px", textAlign: "right", whiteSpace: "nowrap" }}>
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
-                          {/* Nút Xem */}
+                          {/* Nút Xem file in chuẩn */}
                           <button
-                            title="Xem chi tiết đơn"
-                            onClick={() =>
-                              alert(`Xem chi tiết đơn ${don.maDon} – Sẽ mở drawer trong phiên bản tiếp theo`)
-                            }
+                            title="Xem file in chuẩn"
+                            onClick={() => xemFileIn(don)}
                             style={{
                               width: 32,
                               height: 32,

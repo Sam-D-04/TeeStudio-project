@@ -44,7 +44,7 @@ export interface CartState {
   loadFromBackend: (apiItems: CartItemFromAPI[]) => void;
 
   /** Chuyển items hiện tại sang format để gửi sync API */
-  toSyncPayload: () => Array<{ variantId: number; quantity: number }>;
+  toSyncPayload: () => Array<{ variantId: number; quantity: number; designId?: number }>;
 }
 
 function buildCartItemId(variantId: number, designId?: number): string {
@@ -57,7 +57,7 @@ function buildCartItemId(variantId: number, designId?: number): string {
 
 function apiItemToCartItem(item: CartItemFromAPI): CartItem {
   return {
-    cartItemId: buildCartItemId(item.variantId),
+    cartItemId: buildCartItemId(item.variantId, item.designId ?? undefined),
     dbId: item.id,
     productId: item.productId,
     variantId: item.variantId,
@@ -68,6 +68,7 @@ function apiItemToCartItem(item: CartItemFromAPI): CartItem {
     colorLabel: item.color,
     price: item.price,
     quantity: item.quantity,
+    designId: item.designId ?? undefined,
   };
 }
 
@@ -126,15 +127,26 @@ export const useCartStore = create<CartState>()(
       },
 
       toSyncPayload: () =>
-        get().items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
+        get().items.map((i) => ({
+          variantId: i.variantId,
+          quantity: i.quantity,
+          designId: i.designId,
+        })),
     }),
     {
       name: "teestudio_cart",
       // Không lưu `printImage` (base64 rất nặng, dễ vượt quota localStorage ~5MB).
       // Ảnh in chỉ cần sống in-memory theo phiên để gửi kèm lúc tạo đơn.
+      // `image` cũng có thể tạm thời là base64 (khi vừa thêm 1 thiết kế chưa lưu từ
+      // Design Studio) — không persist phần này, để tránh vượt quota tương tự;
+      // ảnh sẽ được khôi phục về URL Cloudinary thật khi giỏ hàng đồng bộ với backend.
       partialize: (state) => ({
         ...state,
-        items: state.items.map((i) => ({ ...i, printImage: undefined })),
+        items: state.items.map((i) => ({
+          ...i,
+          image: i.image?.startsWith("data:") ? "" : i.image,
+          printImage: undefined,
+        })),
       }),
     }
   )

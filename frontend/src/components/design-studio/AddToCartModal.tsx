@@ -89,23 +89,24 @@ interface Props {
   designId?: number;
   /** Ảnh in print-ready (base64 PNG) chụp từ canvas — gửi kèm khi tạo đơn */
   printImage?: string;
+  /** Ảnh đại diện thiết kế (base64 hoặc URL) — chỉ để hiển thị thumbnail trong giỏ hàng */
+  designPreviewUrl?: string;
 }
 
-export default function AddToCartModal({ open, onClose, productId, shirtColor, designId, printImage }: Props) {
+export default function AddToCartModal({ open, onClose, productId, shirtColor, designId, printImage, designPreviewUrl }: Props) {
   const addItem   = useCartStore((s) => s.addItem);
   const cartItems = useCartStore((s) => s.items);
 
   const [product, setProduct]       = useState<PublicProduct | null>(null);
   const [loading, setLoading]       = useState(false);
-  const [selectedSize, setSelectedSize] = useState("");
-  const [quantity, setQuantity]     = useState(1);
+  /** Số lượng đang chọn cho từng size, vd { S: 2, M: 1 } — size không có key nghĩa là qty 0 */
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [adding, setAdding]         = useState(false);
 
   /* Fetch khi modal mở */
   useEffect(() => {
     if (!open) return;
-    setSelectedSize("");
-    setQuantity(1);
+    setQuantities({});
     setProduct(null);
     setLoading(true);
     getProductById(productId)
@@ -146,53 +147,59 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
       ? availableSizes
       : dedupeBySize(product?.variants.filter((v) => v.stockQty > 0) ?? []);
 
-  const selectedVariant = displaySizes.find((v) => v.size === selectedSize) ?? null;
-
   /* Số lượng variant này đã có sẵn trong giỏ (cartItemId = variant_<id>) */
-  const inCartQty = selectedVariant
-    ? cartItems.find((i) => i.variantId === selectedVariant.id)?.quantity ?? 0
-    : 0;
+  const getInCartQty = (variantId: number) =>
+    cartItems.find((i) => i.variantId === variantId)?.quantity ?? 0;
   /* Số lượng tối đa còn có thể thêm = tồn kho DB trừ đi phần đã có trong giỏ */
-  const maxAddable = selectedVariant ? Math.max(0, selectedVariant.stockQty - inCartQty) : 0;
+  const getMaxAddable = (v: PublicVariant) => Math.max(0, v.stockQty - getInCartQty(v.id));
 
-  /* Nếu tồn kho ít hơn số lượng đang chọn thì tự kéo về mức hợp lệ */
-  useEffect(() => {
-    if (selectedVariant && quantity > maxAddable) {
-      setQuantity(Math.max(1, maxAddable));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSize, maxAddable]);
+  const setSizeQty = (size: string, qty: number, max: number) => {
+    const clamped = Math.max(0, Math.min(max, qty));
+    setQuantities((q) => {
+      const next = { ...q };
+      if (clamped === 0) delete next[size];
+      else next[size] = clamped;
+      return next;
+    });
+  };
+
+  const totalQty = Object.values(quantities).reduce((a, b) => a + b, 0);
 
   const handleAddToCart = () => {
-    if (!product || !selectedVariant) {
-      message.warning("Vui lòng chọn size");
+    if (!product) return;
+    const entries = displaySizes
+      .map((v) => ({ v, qty: quantities[v.size] ?? 0 }))
+      .filter((e) => e.qty > 0);
+    if (entries.length === 0) {
+      message.warning("Vui lòng chọn size và số lượng");
       return;
     }
-    if (maxAddable <= 0) {
-      message.warning("Sản phẩm đã hết hàng hoặc bạn đã thêm hết số lượng còn lại vào giỏ.");
-      return;
-    }
-    if (quantity > maxAddable) {
-      message.warning(`Chỉ còn ${maxAddable} sản phẩm có thể thêm.`);
-      setQuantity(maxAddable);
-      return;
+    for (const { v, qty } of entries) {
+      const max = getMaxAddable(v);
+      if (qty > max) {
+        message.warning(`Size ${v.size} chỉ còn ${max} sản phẩm có thể thêm.`);
+        return;
+      }
     }
     setAdding(true);
     const primaryImage = product.images.find((i) => i.isPrimary)?.url ?? product.images[0]?.url ?? "";
-    addItem({
-      productId: product.id,
-      variantId: selectedVariant.id,
-      name: product.name,
-      image: primaryImage,
-      size: selectedVariant.size,
-      color: colorHex,
-      colorLabel: getColorLabel(shirtColor),
-      price: product.basePrice,
-      quantity,
-      designId,
-      printImage,
+    entries.forEach(({ v, qty }) => {
+      addItem({
+        productId: product.id,
+        variantId: v.id,
+        name: product.name,
+        image: designPreviewUrl || primaryImage,
+        size: v.size,
+        color: colorHex,
+        colorLabel: getColorLabel(shirtColor),
+        price: product.basePrice,
+        quantity: qty,
+        designId,
+        printImage,
+      });
     });
-    message.success(`Đã thêm ${quantity} × ${product.name} (${selectedVariant.size}) vào giỏ hàng!`);
+    const summary = entries.map(({ v, qty }) => `${v.size}×${qty}`).join(", ");
+    message.success(`Đã thêm ${totalQty} sản phẩm (${summary}) vào giỏ hàng!`);
     setAdding(false);
     onClose();
   };
@@ -260,10 +267,10 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
               </div>
             </div>
 
-            {/* Chọn size */}
-            <div style={{ marginBottom: 20 }}>
+            {/* Chọn size & số lượng (có thể chọn nhiều size cùng lúc) */}
+            <div style={{ marginBottom: 24 }}>
               <label style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", display: "block", marginBottom: 10 }}>
-                Chọn size
+                Chọn size & số lượng
                 {availableSizes.length === 0 && product.variants.length > 0 && (
                   <span style={{ fontWeight: 400, color: "#94a3b8", marginLeft: 8, fontSize: 12 }}>
                     (hiển thị tất cả màu)
@@ -273,95 +280,75 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
               {displaySizes.length === 0 ? (
                 <p style={{ color: "#f87171", fontSize: 13 }}>Không còn hàng cho màu này.</p>
               ) : (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {displaySizes.map((v) => {
-                    const active = v.size === selectedSize;
+                    const max = getMaxAddable(v);
+                    const qty = quantities[v.size] ?? 0;
+                    const inCart = getInCartQty(v.id);
+                    const disabled = max <= 0;
+                    const active = qty > 0;
                     return (
-                      <button
+                      <div
                         key={v.id}
-                        onClick={() => setSelectedSize(v.size)}
                         style={{
-                          minWidth: 52, height: 44, padding: "0 12px",
-                          borderRadius: 10,
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "8px 10px 8px 14px", borderRadius: 10,
                           border: active ? "2px solid #0ea5e9" : "1.5px solid #e2e8f0",
-                          background: active ? "#e0f2fe" : "#ffffff",
-                          color: active ? "#0284c7" : "#334155",
-                          fontWeight: active ? 700 : 500,
-                          fontSize: 13, cursor: "pointer",
-                          transition: "all 0.15s", fontFamily: "inherit",
-                          boxShadow: active ? "0 0 0 1px #bae6fd" : "none",
-                          position: "relative",
+                          background: active ? "#e0f2fe" : disabled ? "#f8fafc" : "#ffffff",
+                          opacity: disabled ? 0.6 : 1,
+                          transition: "all 0.15s",
                         }}
                       >
-                        {v.size}
-                        {v.stockQty <= 5 && (
-                          <span style={{
-                            position: "absolute", top: -6, right: -6,
-                            background: "#f97316", color: "#fff",
-                            fontSize: 9, fontWeight: 800, borderRadius: 10,
-                            padding: "1px 5px", lineHeight: 1.4,
-                          }}>
-                            {v.stockQty}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: active ? "#0284c7" : "#334155" }}>
+                            {v.size}
                           </span>
-                        )}
-                      </button>
+                          <span style={{ fontSize: 11, color: v.stockQty <= 5 && !disabled ? "#f97316" : "#94a3b8" }}>
+                            {disabled
+                              ? "Hết hàng"
+                              : `còn ${max}${inCart > 0 ? `, đã có ${inCart} trong giỏ` : ""}`}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+                          <button
+                            disabled={disabled || qty <= 0}
+                            onClick={() => setSizeQty(v.size, qty - 1, max)}
+                            style={{
+                              width: 32, height: 32, border: "1.5px solid #e2e8f0",
+                              borderRadius: "8px 0 0 8px", background: "#f8fafc",
+                              cursor: disabled || qty <= 0 ? "not-allowed" : "pointer",
+                              fontSize: 16, color: disabled || qty <= 0 ? "#cbd5e1" : "#475569",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                          >
+                            −
+                          </button>
+                          <div style={{
+                            width: 40, height: 32, border: "1.5px solid #e2e8f0",
+                            borderLeft: "none", borderRight: "none",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 13, fontWeight: 700, color: "#0f172a",
+                          }}>
+                            {qty}
+                          </div>
+                          <button
+                            disabled={disabled || qty >= max}
+                            onClick={() => setSizeQty(v.size, qty + 1, max)}
+                            style={{
+                              width: 32, height: 32, border: "1.5px solid #e2e8f0",
+                              borderRadius: "0 8px 8px 0", background: "#f8fafc",
+                              cursor: disabled || qty >= max ? "not-allowed" : "pointer",
+                              fontSize: 16, color: disabled || qty >= max ? "#cbd5e1" : "#475569",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
-              )}
-            </div>
-
-            {/* Chọn số lượng */}
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", display: "block", marginBottom: 10 }}>
-                Số lượng
-                {selectedVariant && (
-                  <span style={{ fontWeight: 400, color: "#94a3b8", marginLeft: 8, fontSize: 12 }}>
-                    (còn {selectedVariant.stockQty} trong kho
-                    {inCartQty > 0 ? `, đã có ${inCartQty} trong giỏ` : ""})
-                  </span>
-                )}
-              </label>
-              <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-                <button
-                  disabled={quantity <= 1}
-                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  style={{
-                    width: 36, height: 36, border: "1.5px solid #e2e8f0",
-                    borderRadius: "8px 0 0 8px", background: "#f8fafc",
-                    cursor: quantity <= 1 ? "not-allowed" : "pointer",
-                    fontSize: 18, color: quantity <= 1 ? "#cbd5e1" : "#475569",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}
-                >
-                  −
-                </button>
-                <div style={{
-                  width: 52, height: 36, border: "1.5px solid #e2e8f0",
-                  borderLeft: "none", borderRight: "none",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 14, fontWeight: 700, color: "#0f172a",
-                }}>
-                  {quantity}
-                </div>
-                <button
-                  disabled={!selectedVariant || quantity >= maxAddable}
-                  onClick={() => setQuantity((q) => Math.min(maxAddable, q + 1))}
-                  style={{
-                    width: 36, height: 36, border: "1.5px solid #e2e8f0",
-                    borderRadius: "0 8px 8px 0", background: "#f8fafc",
-                    cursor: (!selectedVariant || quantity >= maxAddable) ? "not-allowed" : "pointer",
-                    fontSize: 18, color: (!selectedVariant || quantity >= maxAddable) ? "#cbd5e1" : "#475569",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}
-                >
-                  +
-                </button>
-              </div>
-              {selectedVariant && maxAddable <= 0 && (
-                <p style={{ margin: "8px 0 0", fontSize: 12, color: "#f87171" }}>
-                  Bạn đã thêm hết số lượng còn lại của size này vào giỏ.
-                </p>
               )}
             </div>
 
@@ -373,18 +360,18 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
               gap: 12, marginBottom: 16,
             }}>
               <div>
-                <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>Tổng cộng</p>
+                <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>Tổng cộng ({totalQty} sản phẩm)</p>
                 <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0ea5e9" }}>
-                  {fmt(product.basePrice * quantity)}
+                  {fmt(product.basePrice * totalQty)}
                 </p>
               </div>
               <div style={{ fontSize: 12, color: "#94a3b8", textAlign: "right" }}>
-                {fmt(product.basePrice)} × {quantity}
+                {fmt(product.basePrice)} × {totalQty}
               </div>
             </div>
 
             {(() => {
-              const canAdd = !!selectedSize && maxAddable > 0;
+              const canAdd = totalQty > 0;
               return (
                 <button
                   onClick={handleAddToCart}
@@ -407,11 +394,7 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
                       d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
                     <path d="M3 6h18M16 10a4 4 0 01-8 0" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  {!selectedSize
-                    ? "Chọn size để tiếp tục"
-                    : maxAddable <= 0
-                    ? "Đã hết số lượng khả dụng"
-                    : "Thêm vào giỏ hàng"}
+                  {canAdd ? "Thêm vào giỏ hàng" : "Chọn size để tiếp tục"}
                 </button>
               );
             })()}

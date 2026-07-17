@@ -7,7 +7,7 @@ const router = require("express").Router();
 const { verifyToken, requireRoles } = require("../../common/middlewares/auth.middleware");
 const { ROLES } = require("../../common/constants/roles");
 const validate = require("../../common/middlewares/validate.middleware");
-const orderService = require("./admin.order.service");
+const orderService = require("./customer.order.service");
 
 /**
  * Schema kiểm tra dữ liệu đầu vào khi customer đặt hàng.
@@ -32,6 +32,14 @@ const customerCheckoutSchema = {
     addressLine: {
       required: true,
       type: "string",
+    },
+    city: {
+      type: "string",
+      maxLength: 255,
+    },
+    ward: {
+      type: "string",
+      maxLength: 255,
     },
     note: {
       type: "string",
@@ -98,7 +106,7 @@ router.post(
         ...req.body,
         userId: req.user.id,
       };
-      const result = await orderService.taoMoiDonHang(data, req.user, req.ip);
+      const result = await orderService.createOrderAsCustomer(data, req.user, req.ip);
       res.status(201).json({
         success: true,
         message: "Đặt hàng thành công",

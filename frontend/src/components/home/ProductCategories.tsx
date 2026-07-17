@@ -15,6 +15,8 @@ export interface ProductFromDB {
   material: string;
   categoryName: string;
   imageUrl: string | null;
+  /** Ảnh mặt trước theo từng màu (ảnh chính đứng đầu) — dùng để xoay vòng khi hover */
+  images?: string[];
 }
 
 // ─── Fetch data ───────────────────────────────────────────────────────────────

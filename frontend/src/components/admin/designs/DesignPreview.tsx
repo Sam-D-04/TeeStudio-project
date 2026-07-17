@@ -1,8 +1,14 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 /**
  * DesignPreview – Ô thumbnail hiển thị bản xem trước thiết kế.
  *
  * Trong giai đoạn phát triển (khi chưa có ảnh thật từ Cloudinary),
  * component tự vẽ mockup đơn giản dựa theo màu áo và mã thiết kế.
+ * Cùng một mockup này cũng được dùng làm ảnh dự phòng khi `urlAnh`
+ * trỏ tới một URL không tải được (ví dụ dữ liệu mẫu/demo dùng URL giả).
  *
  * Khi backend tích hợp Cloudinary, chỉ cần truyền prop `urlAnh` là đủ.
  *
@@ -22,6 +28,10 @@ export default function DesignPreview({
   mauAo = "#e2e8f0",
   maThietKe = "TK",
 }: DesignPreviewProps) {
+  // Reset lại cờ lỗi mỗi khi đổi sang URL ảnh khác (chuyển trang, đổi đơn...)
+  const [loiTaiAnh, setLoiTaiAnh] = useState(false);
+  useEffect(() => setLoiTaiAnh(false), [urlAnh]);
+
   // Lấy 2 ký tự đầu của mã để hiển thị trong ô mockup
   const kyTuDau = maThietKe.replace(/[^A-Za-z]/g, "").slice(0, 2).toUpperCase() || "TK";
 
@@ -38,8 +48,8 @@ export default function DesignPreview({
     return doSang > 128 ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.6)";
   }
 
-  // Nếu có URL ảnh thật → hiển thị ảnh
-  if (urlAnh) {
+  // Nếu có URL ảnh thật và ảnh tải được → hiển thị ảnh
+  if (urlAnh && !loiTaiAnh) {
     return (
       <div
         style={{
@@ -55,6 +65,7 @@ export default function DesignPreview({
           src={urlAnh}
           alt="Bản xem trước thiết kế"
           style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          onError={() => setLoiTaiAnh(true)}
         />
       </div>
     );

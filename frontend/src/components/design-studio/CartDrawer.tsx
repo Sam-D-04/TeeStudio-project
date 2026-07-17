@@ -113,12 +113,15 @@ export default function CartDrawer({ open, onClose }: Props) {
               <div style={{
                 width: 72, height: 72, borderRadius: 8,
                 border: "1px solid #e2e8f0", overflow: "hidden",
-                flexShrink: 0, background: "#f8fafc",
+                flexShrink: 0,
+                // Sản phẩm có thiết kế riêng: dùng màu áo làm nền vì ảnh in
+                // là PNG nền trong suốt, chỉ chứa nội dung đã in.
+                background: item.designId ? item.color : "#f8fafc",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
                 {item.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: item.designId ? "contain" : "cover" }} />
                 ) : (
                   <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#cbd5e1" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round"

@@ -65,6 +65,7 @@ export type DonCanIn = {
   maDon: string;
   maThietKe: string;
   urlPreview: string | null;
+  urlFileIn: string | null;    // Ảnh in chuẩn (độ phân giải cao, đã cắt đúng vùng in) cho xưởng in
   mauAo: string;
   tenKhachHang: string;
   soLuong: number;

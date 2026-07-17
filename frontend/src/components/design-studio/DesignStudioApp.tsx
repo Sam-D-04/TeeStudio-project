@@ -125,19 +125,26 @@ export default function DesignStudioApp() {
     return () => window.removeEventListener("keydown", handler);
   }, [undo, redo, removeElement, showToast, setSelectedId]);
 
-  /* ── Upload ── */
+  /* ── Upload ──
+     Dùng base64 (FileReader) thay vì URL.createObjectURL: blob URL chỉ sống trong
+     phiên trình duyệt hiện tại, nên khi lưu thẳng vào canvasData rồi load lại thiết
+     kế ở phiên khác thì ảnh sẽ không hiển thị được. Base64 portable trong cả phiên
+     làm việc và được backend upload lên Cloudinary khi lưu thiết kế. */
   const handleUploadImages = useCallback((files: FileList) => {
     Array.from(files).forEach((file) => {
       if (!file.type.startsWith("image/")) return;
       if (file.size > 5 * 1024 * 1024) { showToast("File quá lớn (>5MB)"); return; }
-      setUploadedImages((prev) => [...prev, URL.createObjectURL(file)]);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setUploadedImages((prev) => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
     });
   }, [showToast]);
 
   const handleRemoveUploadedImage = useCallback((idx: number) => {
     setUploadedImages((prev) => {
       const arr = [...prev];
-      URL.revokeObjectURL(arr[idx]);
       arr.splice(idx, 1);
       return arr;
     });
@@ -258,25 +265,6 @@ export default function DesignStudioApp() {
     }
   }, [accessToken, currentDesignId, shirtType, shirtColor, setSelectedId, setCurrentDesignId, showToast]);
 
-  /* Lưu thiết kế hiện tại rồi gửi ngay cho admin duyệt (DRAFT/NEEDS_REVISION → PENDING_REVIEW) */
-  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
-  const handleSubmitForReview = useCallback(async () => {
-    if (!accessToken || !currentDesignId) return;
-    setIsSubmittingReview(true);
-    try {
-      const name = useDesignStore.getState().designName;
-      const saved = await handleConfirmSave(name);
-      if (!saved) return; // handleConfirmSave đã tự hiện toast lỗi
-
-      await userDesignService.submitForReview(accessToken, currentDesignId);
-      useDesignStore.getState().setCurrentDesignStatus("PENDING_REVIEW");
-      showToast("Đã gửi thiết kế cho admin duyệt");
-    } catch (err: any) {
-      showToast(err.message || "Lỗi khi gửi duyệt thiết kế");
-    } finally {
-      setIsSubmittingReview(false);
-    }
-  }, [accessToken, currentDesignId, handleConfirmSave, showToast]);
 
   const handleLoadDesign = useCallback((design: SavedDesign) => {
     const doLoad = () => {
@@ -446,8 +434,6 @@ export default function DesignStudioApp() {
         onAddToCart={handleOpenCart}
         onViewCart={() => setIsCartDrawerOpen(true)}
         isSaving={isSaving}
-        onSubmitForReview={handleSubmitForReview}
-        isSubmittingReview={isSubmittingReview}
       />
 
       <div className="ds-body">
@@ -673,6 +659,7 @@ export default function DesignStudioApp() {
         shirtColor={colorName || shirtColor}
         designId={currentDesignId ?? undefined}
         printImage={printImage}
+        designPreviewUrl={printImage}
       />
 
       <CartDrawer

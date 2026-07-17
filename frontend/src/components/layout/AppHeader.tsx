@@ -12,7 +12,6 @@ const navItems = [
   { key: "/explore",      label: "Khám phá" },
   { key: "/design-studio",label: "Thiết kế áo" },
   { key: "/collections",  label: "Bộ sưu tập" },
-  { key: "/creator",      label: "Bán hàng" },
 ];
 
 export default function AppHeader() {
@@ -29,6 +28,11 @@ export default function AppHeader() {
     else   router.push("/explore");
   };
   const totalItems    = useCartStore((s) => s.totalItems());
+
+  /* Hydration guard: localStorage-persisted cart chỉ đọc được ở client,
+     nên lần render đầu tiên phải khớp server (0) rồi mới cập nhật số thật. */
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 8);
@@ -188,7 +192,7 @@ export default function AppHeader() {
             <HeaderAuthActions />
 
             {/* Cart */}
-            <Badge count={totalItems} showZero={false} size="small" color="#0ea5e9">
+            <Badge count={hydrated ? totalItems : 0} showZero={false} size="small" color="#0ea5e9">
               <button
                 onClick={() => setCartOpen(true)}
                 style={{
