@@ -11,6 +11,7 @@ const db = require("../../database/mysql");
 const { taoLinkThanhToanVnpay } = require("../payments/vnpay.service");
 const { taoLinkThanhToanMomo } = require("../payments/momo.service");
 const { uploadBase64Image } = require("../uploads/upload.service");
+const { sendOrderConfirmationEmail } = require("../../common/services/emailService");
 
 const DEPOSIT_PERCENT = 50;
 const ONLINE_PAYMENT_METHODS = new Set(["VNPAY", "MOMO"]);
@@ -165,7 +166,7 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
 
   // 1a. Kiểm tra userId tồn tại và còn ACTIVE
   const [rowsUser] = await db.pool.query(
-    "SELECT id, fullName FROM Account WHERE id = ? AND status = 'ACTIVE' LIMIT 1",
+    "SELECT id, fullName, email FROM Account WHERE id = ? AND status = 'ACTIVE' LIMIT 1",
     [userId]
   );
   if (rowsUser.length === 0) {
@@ -173,6 +174,9 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
     err.statusCode = 400;
     throw err;
   }
+  // Dùng email đã đăng ký trong Account để gửi mail xác nhận đơn (đáng tin cậy
+  // hơn field "email" khách tự gõ ở form checkout, vì form đó cho sửa tự do).
+  const emailKhachHang = rowsUser[0].email;
 
   // 1c. Validate từng item: variant tồn tại + đủ tồn kho
   const itemsEnriched = []; // sẽ chứa thông tin đầy đủ để tính giá
@@ -608,6 +612,31 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
 
     // ── COMMIT ──
     await conn.commit();
+
+    // Gửi email xác nhận đơn hàng - CHỦ ĐỘNG không để lỗi gửi mail làm fail cả
+    // request đặt hàng, vì tới đây đơn đã tạo thành công trong DB rồi. Chỉ log
+    // lỗi lại để dễ dò khi cần (vd tài khoản Gmail gửi mail hết hạn mật khẩu).
+    if (emailKhachHang) {
+      try {
+        await sendOrderConfirmationEmail({
+          to: emailKhachHang,
+          recipientName,
+          orderCode,
+          items: itemsEnriched,
+          subtotal,
+          shippingFee,
+          discountAmount,
+          totalAmount,
+          paymentMethod,
+          diaChiGiaoHang: { diaChiChiTiet: addressLine, ward, city },
+        });
+      } catch (error) {
+        console.error(
+          `Không gửi được email xác nhận đơn hàng ${orderCode}:`,
+          error.message
+        );
+      }
+    }
 
     return {
       id: orderId,

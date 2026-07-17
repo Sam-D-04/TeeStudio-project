@@ -92,6 +92,165 @@ const sendAccountCredentialsEmail = async ({
   }
 };
 
+// Định dạng số tiền theo kiểu Việt Nam, vd 120000 -> "120.000₫"
+const formatVND = (value) => `${Number(value || 0).toLocaleString("vi-VN")}₫`;
+
+// Nhãn tiếng Việt cho phương thức thanh toán, dùng để nói cho khách biết bước
+// tiếp theo cần làm gì (vd COD thì nhắc chuẩn bị tiền mặt khi nhận hàng).
+const NHAN_PHUONG_THUC_THANH_TOAN = {
+  COD: "Thanh toán khi nhận hàng (COD)",
+  VNPAY: "VNPAY",
+  MOMO: "Ví MoMo",
+};
+
+/**
+ * sendOrderConfirmationEmail - Gửi email xác nhận ngay sau khi khách đặt hàng
+ * thành công.
+ *
+ * Hàm này CHỦ ĐỘNG throw lỗi khi gửi thất bại (giống sendAccountCredentialsEmail),
+ * việc quyết định "lỗi gửi mail có làm fail cả luồng đặt hàng hay không" là
+ * trách nhiệm của nơi gọi hàm này (customer.order.service.js) - nơi đó phải tự
+ * bọc try/catch riêng và chỉ log lỗi, không throw tiếp, vì đơn hàng lúc gọi hàm
+ * này đã được tạo thành công trong DB rồi, không nên vì gửi mail lỗi mà báo cho
+ * khách là "đặt hàng thất bại".
+ */
+const sendOrderConfirmationEmail = async ({
+  to,
+  recipientName,
+  orderCode,
+  items,
+  subtotal,
+  shippingFee,
+  discountAmount,
+  totalAmount,
+  paymentMethod,
+  diaChiGiaoHang,
+}) => {
+  try {
+    const { transporter: gmailTransporter, user } = getTransporter();
+    const safeName = escapeHtml(recipientName);
+    const safeOrderCode = escapeHtml(orderCode);
+    const nhanPhuongThuc =
+      NHAN_PHUONG_THUC_THANH_TOAN[paymentMethod] || paymentMethod;
+
+    // Dòng chữ liệt kê từng sản phẩm cho bản text thuần (không có HTML)
+    const dongSanPhamText = items
+      .map(
+        (item) =>
+          `- ${item.tenSanPham} (${item.size}/${item.color}) x${item.quantity}: ${formatVND(
+            item.unitPrice * item.quantity + item.designFee
+          )}`
+      )
+      .join("\n");
+
+    // Bảng sản phẩm cho bản HTML
+    const dongSanPhamHtml = items
+      .map((item) => {
+        const thanhTien = item.unitPrice * item.quantity + item.designFee;
+        return `
+          <tr>
+            <td style="padding:10px 8px;border-bottom:1px solid #f1f5f9">
+              ${escapeHtml(item.tenSanPham)}<br>
+              <span style="color:#94a3b8;font-size:12px">${escapeHtml(item.size)} / ${escapeHtml(item.color)}</span>
+            </td>
+            <td style="padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:center">${item.quantity}</td>
+            <td style="padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:right">${formatVND(thanhTien)}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const diaChiText = [
+      diaChiGiaoHang.diaChiChiTiet,
+      diaChiGiaoHang.ward,
+      diaChiGiaoHang.city,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    return await gmailTransporter.sendMail({
+      from: { name: "TeeStudio", address: user },
+      to,
+      subject: `TeeStudio - Xác nhận đơn hàng ${orderCode}`,
+      text: [
+        `Xin chào ${recipientName},`,
+        "",
+        `Cảm ơn bạn đã đặt hàng tại TeeStudio. Đơn hàng ${orderCode} của bạn đã được ghi nhận.`,
+        "",
+        "Sản phẩm:",
+        dongSanPhamText,
+        "",
+        `Tạm tính: ${formatVND(subtotal)}`,
+        `Phí vận chuyển: ${formatVND(shippingFee)}`,
+        ...(discountAmount > 0 ? [`Giảm giá: -${formatVND(discountAmount)}`] : []),
+        `Tổng cộng: ${formatVND(totalAmount)}`,
+        "",
+        `Phương thức thanh toán: ${nhanPhuongThuc}`,
+        `Địa chỉ giao hàng: ${diaChiText}`,
+        "",
+        "Bạn có thể xem trạng thái đơn hàng trong mục \"Đơn hàng của tôi\" trên website.",
+        "",
+        "Đây là email tự động, vui lòng không trả lời email này.",
+      ].join("\n"),
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#0f172a;line-height:1.6">
+          <h2 style="color:#0284c7">Cảm ơn bạn đã đặt hàng tại TeeStudio!</h2>
+          <p>Xin chào <strong>${safeName}</strong>,</p>
+          <p>Đơn hàng <strong>${safeOrderCode}</strong> của bạn đã được ghi nhận và đang chờ xử lý.</p>
+
+          <table style="width:100%;border-collapse:collapse;margin-top:16px">
+            <thead>
+              <tr style="background:#f0f9ff">
+                <th style="padding:10px 8px;text-align:left;font-size:13px">Sản phẩm</th>
+                <th style="padding:10px 8px;text-align:center;font-size:13px">SL</th>
+                <th style="padding:10px 8px;text-align:right;font-size:13px">Thành tiền</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${dongSanPhamHtml}
+            </tbody>
+          </table>
+
+          <div style="margin-top:12px;padding:16px 20px;background:#f8fafc;border-radius:10px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+              <span>Tạm tính</span><span>${formatVND(subtotal)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+              <span>Phí vận chuyển</span><span>${formatVND(shippingFee)}</span>
+            </div>
+            ${
+              discountAmount > 0
+                ? `<div style="display:flex;justify-content:space-between;margin-bottom:6px;color:#16a34a">
+                     <span>Giảm giá</span><span>-${formatVND(discountAmount)}</span>
+                   </div>`
+                : ""
+            }
+            <div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0;font-weight:bold">
+              <span>Tổng cộng</span><span style="color:#0ea5e9">${formatVND(totalAmount)}</span>
+            </div>
+          </div>
+
+          <p style="margin-top:16px"><strong>Phương thức thanh toán:</strong> ${escapeHtml(nhanPhuongThuc)}</p>
+          <p><strong>Địa chỉ giao hàng:</strong> ${escapeHtml(diaChiText)}</p>
+
+          <div style="margin-top:16px">
+            Bạn có thể xem trạng thái đơn hàng trong mục "Đơn hàng của tôi" trên website.<br><br>
+            Đây là email tự động, vui lòng không trả lời email này.
+          </div>
+        </div>
+      `,
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      throw error;
+    }
+
+    console.error("Không thể gửi email xác nhận đơn hàng:", error.message);
+    throw createServiceError("Không thể gửi email xác nhận đơn hàng.", 502);
+  }
+};
+
 module.exports = {
   sendAccountCredentialsEmail,
+  sendOrderConfirmationEmail,
 };

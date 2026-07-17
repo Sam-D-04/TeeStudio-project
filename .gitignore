@@ -19,3 +19,14 @@ yarn-error.log*
 # OS/editor
 .DS_Store
 *.pem
+
+# Cấu hình MCP tool cục bộ (vd Playwright MCP) - không cần chia sẻ qua git
+.mcp.json
+
+# Tài liệu/ghi chú nội bộ, không phải source code
+docs/
+.claude/
+
+# File dữ liệu dump lớn, không phải source code
+Database_main.sql
+full_json_generated_data_vn_units.json
