@@ -14,20 +14,38 @@
 ## ƯU TIÊN CAO
 
 ### Task 1 — Trang "Đơn hàng của tôi" (project-review.md §5.1 — lỗ hổng nặng nhất)
-- [ ] Backend: thêm `GET /api/orders` (customer, `verifyToken`) — trả danh sách đơn
+- [x] Backend: thêm `GET /api/orders` (customer, `verifyToken`) — trả danh sách đơn
       của `req.user.id`, phân trang, sort theo `createdAt DESC`
-- [ ] Backend: thêm `GET /api/orders/:id` (customer) — chi tiết 1 đơn, **phải kiểm
-      tra đơn thuộc về `req.user.id`** trước khi trả (tránh IDOR — đoán ID xem đơn
-      người khác)
-- [ ] Backend: response chi tiết đơn gồm items, địa chỉ, lịch sử trạng thái
-      (`OrderHistory`), thông tin thanh toán
-- [ ] Frontend: trang danh sách đơn (route gợi ý `/tai-khoan/don-hang`)
-- [ ] Frontend: trang chi tiết đơn — timeline trạng thái, sản phẩm, tổng tiền, địa
-      chỉ giao hàng
-- [ ] Frontend: thêm link "Đơn hàng của tôi" vào menu user ở `AppHeader.tsx`
-- [ ] Frontend: `orderService.ts` thêm `getMyOrders()`, `getOrderById(id)`
-- [ ] Test thủ công: đặt 1 đơn mới → vào trang danh sách → thấy đơn vừa đặt → xem
-      chi tiết đúng thông tin
+      (`layDanhSachDonHangCuaKhach` trong `customer.order.service.js`)
+- [x] Backend: thêm `GET /api/orders/:id` (customer) — chi tiết 1 đơn, **đã kiểm
+      tra đơn thuộc về `req.user.id` ngay trong WHERE** trước khi trả (chặn IDOR —
+      đã verify bằng request thật: xem đơn của user khác trả về 404, không lộ
+      thông tin đơn có tồn tại hay không)
+- [x] Backend: response chi tiết đơn gồm items (sản phẩm/màu/size/ảnh), địa chỉ
+      giao hàng, lịch sử trạng thái (từ `OrderHistory`), danh sách các lượt
+      thanh toán (từ `Payment`)
+- [x] Frontend: trang danh sách đơn tại `/tai-khoan/don-hang`
+      (`frontend/src/app/tai-khoan/don-hang/page.tsx`) — có phân trang, trạng thái
+      rỗng khi chưa có đơn, badge trạng thái màu
+- [x] Frontend: trang chi tiết đơn tại `/tai-khoan/don-hang/[id]`
+      (`frontend/src/app/tai-khoan/don-hang/[id]/page.tsx`) — timeline trạng thái
+      dạng chấm tròn nối dây, danh sách sản phẩm, tổng kết tiền (có nhánh riêng
+      cho đơn đặt cọc), địa chỉ giao hàng, lịch sử thanh toán
+- [x] Frontend: thêm link "Đơn hàng của tôi" — tên khách hàng ở góc phải header giờ
+      bấm vào sẽ dẫn tới trang danh sách đơn (`HeaderAuthActions.tsx`)
+- [x] Frontend: `orderService.ts` thêm `getMyOrders(page, limit)`,
+      `getOrderById(orderId)` + đầy đủ type khớp với response backend
+- [x] Component dùng chung: `CustomerOrderStatusBadge.tsx`
+      (`frontend/src/components/orders/`) — bảng màu khớp với `OrderStatusBadge.tsx`
+      bên admin để nhất quán 2 phía
+- [x] Test thủ công qua API thật (2026-07-17): tạo tài khoản test, đặt 1 đơn mới
+      qua `POST /api/orders`, gọi `GET /api/orders` thấy đúng đơn vừa đặt,
+      `GET /api/orders/:id` trả đúng chi tiết, thử xem đơn của user khác bị chặn
+      404, không token bị chặn 401. Cả 2 trang frontend type-check sạch và serve
+      200 không lỗi Next.js overlay. **Không có browser tool trong môi trường để
+      chụp demo trực quan** — nếu cần xác nhận UI bằng mắt, tự mở
+      `/tai-khoan/don-hang` và đăng nhập bằng tài khoản test
+      (`test.task1@teestudio.dev` / `Test1234`, đã có sẵn 1 đơn hàng thật để xem).
 
 ### Task 2 — Email xác nhận đơn hàng (project-review.md §5.3)
 - [ ] Backend: viết `sendOrderConfirmationEmail()` trong `emailService.js` (tái sử

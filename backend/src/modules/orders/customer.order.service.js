@@ -8,21 +8,28 @@
  */
 
 const db = require("../../database/mysql");
-const {
-  taoLinkThanhToanVnpay,
-  taoMaGiaoDichVnpayMoi,
-} = require("../payments/vnpay.service");
-const {
-  taoLinkThanhToanMomo,
-  taoMaGiaoDichMomoMoi,
-  layThoiDiemHetHanMomo,
-} = require("../payments/momo.service");
+const { taoLinkThanhToanVnpay } = require("../payments/vnpay.service");
+const { taoLinkThanhToanMomo } = require("../payments/momo.service");
 const { uploadBase64Image } = require("../uploads/upload.service");
 
 const DEPOSIT_PERCENT = 50;
 const ONLINE_PAYMENT_METHODS = new Set(["VNPAY", "MOMO"]);
 const PREPAID_PAYMENT_TYPES = new Set(["FULL", "FULL_PAYMENT", "DEPOSIT"]);
 const ACTION_CUSTOMER_CREATED = "Khách hàng đặt đơn";
+
+// Nhãn tiếng Việt cho từng trạng thái đơn hàng - dùng để hiển thị cho khách hàng
+// trong trang "Đơn hàng của tôi". Giữ đúng ý nghĩa màu sắc/nội dung với
+// MAP_TRANG_THAI_DB_SANG_FE bên admin.order.service.js để 2 phía nhất quán.
+const NHAN_TRANG_THAI_DON_HANG = {
+  PENDING: "Chờ xác nhận",
+  CONFIRMED: "Đã xác nhận",
+  PROCESSING: "Đang xử lý in",
+  PRINTING: "Đang xử lý in",
+  READY_TO_SHIP: "Chờ giao",
+  SHIPPING: "Đang giao hàng",
+  COMPLETED: "Hoàn tất",
+  CANCELLED: "Đã hủy",
+};
 
 function taoMaDonHangMoi() {
   const now = new Date();
@@ -35,6 +42,16 @@ function taoMaDonHangMoi() {
   return `TS-${dateStr}-${randomPart}`;
 }
 
+// LƯU Ý: hàm này phải gọi taoLinkThanhToanVnpay/taoLinkThanhToanMomo ĐÚNG tên
+// tham số của 2 hàm đó (orderCode, amount, ipAddress, transactionRef) và trả
+// THẲNG kết quả gateway trả về (không bọc thêm { paymentUrl: ... } lần nữa) -
+// vì bản thân kết quả đó đã là object { paymentUrl, expiresAt, transactionRef, ... }
+// rồi. Logic này phải giống hệt taoThongTinThanhToanOnline bên
+// admin.order.service.js để tránh lệch nhau giữa 2 luồng tạo đơn (admin/khách).
+//
+// Không cần tự sinh transactionRef ở đây: nếu không truyền vào, cả
+// taoLinkThanhToanVnpay lẫn taoLinkThanhToanMomo đều tự sinh mã giao dịch riêng
+// dựa theo orderCode (xem phần fallback trong 2 hàm đó).
 async function taoThongTinThanhToanOnline({
   paymentMethod,
   orderCode,
@@ -42,32 +59,20 @@ async function taoThongTinThanhToanOnline({
   ipAddress,
 }) {
   if (paymentMethod === "VNPAY") {
-    const maGiaoDich = taoMaGiaoDichVnpayMoi();
-    const vnpayUrl = taoLinkThanhToanVnpay({
-      transactionId: maGiaoDich,
-      amount: Math.round(amount),
-      orderInfo: `Thanh toán đơn hàng ${orderCode}`,
+    return taoLinkThanhToanVnpay({
+      orderCode,
+      amount,
       ipAddress,
     });
-    return {
-      paymentUrl: vnpayUrl,
-      transactionRef: maGiaoDich,
-    };
-  } else if (paymentMethod === "MOMO") {
-    const maGiaoDich = taoMaGiaoDichMomoMoi();
-    const momoLink = taoLinkThanhToanMomo({
-      transactionId: maGiaoDich,
-      amount: Math.round(amount),
-      orderInfo: `Thanh toán đơn hàng ${orderCode}`,
-    });
-    const expiresAt = layThoiDiemHetHanMomo();
-    return {
-      paymentUrl: momoLink,
-      qrCodeValue: momoLink,
-      transactionRef: maGiaoDich,
-      expiresAt,
-    };
   }
+
+  if (paymentMethod === "MOMO") {
+    return taoLinkThanhToanMomo({
+      orderCode,
+      amount,
+    });
+  }
+
   return null;
 }
 
@@ -625,6 +630,247 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
   }
 }
 
+// =====================================================================
+// layDanhSachDonHangCuaKhach – Lấy danh sách đơn hàng của 1 khách hàng.
+//
+// Dùng cho trang "Đơn hàng của tôi" (GET /api/orders).
+// Chỉ trả về đơn thuộc đúng userId đang đăng nhập – điều kiện lọc userId nằm
+// ngay trong câu WHERE nên khách A không thể xem được đơn của khách B.
+// =====================================================================
+async function layDanhSachDonHangCuaKhach(userId, { page = 1, limit = 10 } = {}) {
+  // Chuẩn hoá tham số phân trang, tránh giá trị âm hoặc quá lớn từ query string
+  const soTrangHienTai = Math.max(1, Number(page) || 1);
+  const soDongMoiTrang = Math.min(50, Math.max(1, Number(limit) || 10));
+  const viTriBatDau = (soTrangHienTai - 1) * soDongMoiTrang;
+
+  // Đếm tổng số đơn của khách để frontend tính được tổng số trang
+  const [rowsDemTong] = await db.pool.query(
+    "SELECT COUNT(*) AS tongSoDon FROM CustomerOrder WHERE userId = ?",
+    [userId]
+  );
+  const tongSoDon = rowsDemTong[0].tongSoDon;
+
+  // Lấy danh sách đơn của trang hiện tại, đơn mới đặt hiển thị lên đầu
+  const [rowsDonHang] = await db.pool.query(
+    `SELECT id, orderCode, status, paymentStatus, paymentType,
+            totalAmount, depositAmount, codAmount, createdAt
+     FROM CustomerOrder
+     WHERE userId = ?
+     ORDER BY createdAt DESC
+     LIMIT ? OFFSET ?`,
+    [userId, soDongMoiTrang, viTriBatDau]
+  );
+
+  const tongSoTrang = Math.max(1, Math.ceil(tongSoDon / soDongMoiTrang));
+
+  // Không có đơn nào trong trang này thì trả sớm, khỏi query thêm items làm gì
+  if (rowsDonHang.length === 0) {
+    return {
+      items: [],
+      page: soTrangHienTai,
+      limit: soDongMoiTrang,
+      total: tongSoDon,
+      totalPages: tongSoTrang,
+    };
+  }
+
+  // Lấy toàn bộ sản phẩm của các đơn trong trang này CHỈ BẰNG 1 câu query
+  // (tránh vòng lặp query từng đơn một - N+1 query rất chậm khi số đơn nhiều).
+  const danhSachOrderId = rowsDonHang.map((donHang) => donHang.id);
+  const [rowsItem] = await db.pool.query(
+    `SELECT oi.orderId, oi.quantity, oi.designId,
+            pr.name AS tenSanPham,
+            piImg.imageUrl AS anhSanPham,
+            cd.previewUrl AS anhXemTruocThietKe
+     FROM OrderItem oi
+     JOIN ProductVariant pv ON pv.id = oi.variantId
+     JOIN Product pr ON pr.id = pv.productId
+     LEFT JOIN ProductImage piImg ON piImg.productId = pr.id AND piImg.isPrimary = 1
+     LEFT JOIN CustomDesign cd ON cd.id = oi.designId
+     WHERE oi.orderId IN (?)
+     ORDER BY oi.id ASC`,
+    [danhSachOrderId]
+  );
+
+  // Gom các sản phẩm về đúng đơn hàng của nó theo orderId, để bước sau ghép vào
+  const itemTheoOrderId = new Map();
+  for (const item of rowsItem) {
+    if (!itemTheoOrderId.has(item.orderId)) {
+      itemTheoOrderId.set(item.orderId, []);
+    }
+    itemTheoOrderId.get(item.orderId).push(item);
+  }
+
+  const items = rowsDonHang.map((donHang) => {
+    const danhSachItemCuaDon = itemTheoOrderId.get(donHang.id) || [];
+    const itemDauTien = danhSachItemCuaDon[0];
+
+    return {
+      id: donHang.id,
+      orderCode: donHang.orderCode,
+      status: donHang.status,
+      statusLabel: NHAN_TRANG_THAI_DON_HANG[donHang.status] || donHang.status,
+      paymentStatus: donHang.paymentStatus,
+      paymentType: donHang.paymentType,
+      totalAmount: Number(donHang.totalAmount),
+      depositAmount: Number(donHang.depositAmount || 0),
+      codAmount: Number(donHang.codAmount || 0),
+      createdAt: donHang.createdAt,
+      // Ảnh đại diện cho cả đơn: ưu tiên ảnh xem trước thiết kế riêng (nếu có),
+      // không thì lấy ảnh sản phẩm gốc của item đầu tiên trong đơn
+      anhDaiDien: itemDauTien
+        ? itemDauTien.anhXemTruocThietKe || itemDauTien.anhSanPham || null
+        : null,
+      tenSanPhamDauTien: itemDauTien ? itemDauTien.tenSanPham : "",
+      soLuongMatHang: danhSachItemCuaDon.length,
+      tongSoLuongSanPham: danhSachItemCuaDon.reduce(
+        (tong, item) => tong + Number(item.quantity || 0),
+        0
+      ),
+    };
+  });
+
+  return {
+    items,
+    page: soTrangHienTai,
+    limit: soDongMoiTrang,
+    total: tongSoDon,
+    totalPages: tongSoTrang,
+  };
+}
+
+// =====================================================================
+// layChiTietDonHangCuaKhach – Lấy chi tiết đầy đủ 1 đơn hàng của khách.
+//
+// Dùng cho trang chi tiết đơn (GET /api/orders/:id).
+// QUAN TRỌNG: điều kiện WHERE luôn kiểm tra CẢ id lẫn userId cùng lúc, để
+// khách hàng không thể xem đơn của người khác chỉ bằng cách đổi số ID trên
+// URL (đây gọi là lỗ hổng IDOR - Insecure Direct Object Reference).
+// =====================================================================
+async function layChiTietDonHangCuaKhach(orderId, userId) {
+  const [rowsDonHang] = await db.pool.query(
+    `SELECT co.*,
+            ua.recipientName, ua.phone AS sdtNguoiNhan,
+            ua.addressLine, ua.ward, ua.district, ua.city
+     FROM CustomerOrder co
+     LEFT JOIN UserAddress ua ON ua.id = co.addressId
+     WHERE co.id = ? AND co.userId = ?
+     LIMIT 1`,
+    [orderId, userId]
+  );
+
+  // Không tìm thấy đơn (hoặc đơn đó không phải của khách này) → coi như 404,
+  // không tiết lộ cho khách biết đơn đó có tồn tại hay không (an toàn hơn).
+  if (rowsDonHang.length === 0) {
+    const err = new Error("Không tìm thấy đơn hàng");
+    err.statusCode = 404;
+    throw err;
+  }
+  const donHang = rowsDonHang[0];
+
+  // Lấy danh sách sản phẩm trong đơn kèm thông tin biến thể + thiết kế (nếu có)
+  const [rowsItem] = await db.pool.query(
+    `SELECT oi.id, oi.quantity, oi.unitPrice, oi.designFee, oi.lineTotal,
+            oi.productionStatus, oi.designId,
+            pv.color, pv.size, pv.sku,
+            pr.name AS tenSanPham,
+            piImg.imageUrl AS anhSanPham,
+            cd.previewUrl AS anhXemTruocThietKe
+     FROM OrderItem oi
+     JOIN ProductVariant pv ON pv.id = oi.variantId
+     JOIN Product pr ON pr.id = pv.productId
+     LEFT JOIN ProductImage piImg ON piImg.productId = pr.id AND piImg.isPrimary = 1
+     LEFT JOIN CustomDesign cd ON cd.id = oi.designId
+     WHERE oi.orderId = ?
+     ORDER BY oi.id ASC`,
+    [orderId]
+  );
+
+  const items = rowsItem.map((item) => ({
+    id: item.id,
+    tenSanPham: item.tenSanPham,
+    mauSac: item.color,
+    kichCo: item.size,
+    sku: item.sku,
+    soLuong: Number(item.quantity),
+    donGiaVnd: Number(item.unitPrice),
+    phiThietKeVnd: Number(item.designFee || 0),
+    thanhTienVnd: Number(item.lineTotal),
+    trangThaiSanXuat: item.productionStatus,
+    coThietKeRieng: Boolean(item.designId),
+    // Sản phẩm có thiết kế riêng thì ưu tiên hiển thị ảnh xem trước thiết kế
+    // (đúng với những gì khách đã tự vẽ), không thì dùng ảnh sản phẩm gốc
+    anhSanPham: item.anhXemTruocThietKe || item.anhSanPham || null,
+  }));
+
+  // Lấy lịch sử thay đổi trạng thái, theo đúng thứ tự thời gian để dựng timeline
+  const [rowsLichSu] = await db.pool.query(
+    `SELECT toStatus, action, note, createdAt
+     FROM OrderHistory
+     WHERE orderId = ?
+     ORDER BY createdAt ASC, id ASC`,
+    [orderId]
+  );
+  const lichSuTrangThai = rowsLichSu.map((row) => ({
+    trangThai: row.toStatus,
+    trangThaiLabel: NHAN_TRANG_THAI_DON_HANG[row.toStatus] || row.toStatus,
+    ghiChu: row.note,
+    thoiGian: row.createdAt,
+  }));
+
+  // Lấy toàn bộ lượt thanh toán của đơn (có thể nhiều hơn 1 nếu đơn trả cọc
+  // trước rồi trả COD phần còn lại khi nhận hàng)
+  const [rowsThanhToan] = await db.pool.query(
+    `SELECT paymentMethod, paymentType, amount, status, paidAt, createdAt
+     FROM Payment
+     WHERE orderId = ?
+     ORDER BY createdAt ASC`,
+    [orderId]
+  );
+  const thanhToan = rowsThanhToan.map((row) => ({
+    phuongThuc: row.paymentMethod,
+    loai: row.paymentType,
+    soTienVnd: Number(row.amount),
+    trangThai: row.status,
+    thoiGianThanhToan: row.paidAt,
+  }));
+
+  return {
+    id: donHang.id,
+    orderCode: donHang.orderCode,
+    status: donHang.status,
+    statusLabel: NHAN_TRANG_THAI_DON_HANG[donHang.status] || donHang.status,
+    createdAt: donHang.createdAt,
+    // Thông tin tiền bạc của đơn
+    subtotal: Number(donHang.subtotal),
+    discountAmount: Number(donHang.discountAmount || 0),
+    shippingFee: Number(donHang.shippingFee || 0),
+    totalAmount: Number(donHang.totalAmount),
+    depositAmount: Number(donHang.depositAmount || 0),
+    codAmount: Number(donHang.codAmount || 0),
+    paymentType: donHang.paymentType,
+    paymentStatus: donHang.paymentStatus,
+    // Thông tin giao hàng
+    diaChiGiaoHang: {
+      tenNguoiNhan: donHang.recipientName,
+      soDienThoai: donHang.sdtNguoiNhan,
+      diaChiChiTiet: donHang.addressLine,
+      phuongXa: donHang.ward,
+      quanHuyen: donHang.district,
+      tinhThanh: donHang.city,
+    },
+    donViVanChuyen: donHang.shippingCarrier,
+    maVanDon: donHang.trackingCode,
+    lyDoHuy: donHang.cancelReason,
+    // Danh sách sản phẩm, lịch sử trạng thái và các lượt thanh toán
+    items,
+    lichSuTrangThai,
+    thanhToan,
+  };
+}
+
 module.exports = {
   createOrderAsCustomer,
+  layDanhSachDonHangCuaKhach,
+  layChiTietDonHangCuaKhach,
 };

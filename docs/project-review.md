@@ -39,6 +39,10 @@
   `frontend/.env.local` khỏi git, thêm `helmet`, giới hạn `cors()` theo
   `FRONTEND_URL`, thêm rate-limit 10 lần/15 phút cho `/auth/login` và
   `/auth/register`. Chi tiết: `docs/tasks.md` Task 5.
+- ✅ Task 1 (trang "Đơn hàng của tôi" — vá lỗ hổng nặng nhất ở §5.1): thêm
+  `GET /api/orders` + `GET /api/orders/:id` (có chặn IDOR), trang danh sách +
+  chi tiết đơn ở `/tai-khoan/don-hang`, link vào từ tên khách hàng trên header.
+  Chi tiết: `docs/tasks.md` Task 1.
 
 ---
 

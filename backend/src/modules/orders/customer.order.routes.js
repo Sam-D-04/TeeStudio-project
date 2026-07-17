@@ -1,6 +1,8 @@
 /**
- * customer.order.routes.js – Route tạo đơn hàng dành cho Customer.
- * POST /api/orders  – Khách hàng đặt hàng (yêu cầu đăng nhập, role CUSTOMER)
+ * customer.order.routes.js – Route đặt hàng và xem đơn hàng dành cho Customer.
+ * POST /api/orders      – Khách hàng đặt hàng (yêu cầu đăng nhập, role CUSTOMER)
+ * GET  /api/orders      – Khách hàng xem danh sách đơn hàng của chính mình
+ * GET  /api/orders/:id  – Khách hàng xem chi tiết 1 đơn hàng của chính mình
  */
 
 const router = require("express").Router();
@@ -110,6 +112,86 @@ router.post(
       res.status(201).json({
         success: true,
         message: "Đặt hàng thành công",
+        data: result,
+      });
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message,
+        });
+      }
+      next(error);
+    }
+  }
+);
+
+/**
+ * Schema kiểm tra query string khi khách xem danh sách đơn hàng của mình.
+ * page/limit đều không bắt buộc - không truyền thì dùng giá trị mặc định.
+ */
+const danhSachDonHangSchema = {
+  query: {
+    page: {
+      type: "integer",
+      min: 1,
+    },
+    limit: {
+      type: "integer",
+      min: 1,
+      max: 50,
+    },
+  },
+};
+
+/**
+ * GET /api/orders
+ * Khách hàng xem danh sách đơn hàng của chính mình (có phân trang).
+ * Dùng cho trang "Đơn hàng của tôi" ở frontend.
+ */
+router.get(
+  "/",
+  verifyToken,
+  requireRoles(ROLES.CUSTOMER),
+  validate(danhSachDonHangSchema),
+  async (req, res, next) => {
+    try {
+      const result = await orderService.layDanhSachDonHangCuaKhach(req.user.id, {
+        page: req.query.page,
+        limit: req.query.limit,
+      });
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/orders/:id
+ * Khách hàng xem chi tiết 1 đơn hàng - chỉ xem được đơn của chính mình.
+ * Service đã kiểm tra userId ngay trong câu WHERE nên không cần kiểm tra lại
+ * ở đây, nhưng vẫn validate id truyền vào phải là số nguyên dương hợp lệ.
+ */
+router.get(
+  "/:id",
+  verifyToken,
+  requireRoles(ROLES.CUSTOMER),
+  async (req, res, next) => {
+    try {
+      const orderId = Number(req.params.id);
+      if (!Number.isInteger(orderId) || orderId < 1) {
+        return res.status(400).json({
+          success: false,
+          message: "ID đơn hàng không hợp lệ",
+        });
+      }
+      const result = await orderService.layChiTietDonHangCuaKhach(orderId, req.user.id);
+      res.json({
+        success: true,
         data: result,
       });
     } catch (error) {

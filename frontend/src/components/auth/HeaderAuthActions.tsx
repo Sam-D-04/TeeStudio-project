@@ -53,7 +53,10 @@ export default function HeaderAuthActions({
             <Button block={mobile}>{user.fullName}</Button>
           </Link>
         ) : (
-          <span className="px-2 text-sm font-semibold text-slate-700">{user.fullName}</span>
+          // Khách hàng: bấm vào tên để tới trang "Đơn hàng của tôi"
+          <Link href="/tai-khoan/don-hang" onClick={onNavigate}>
+            <Button block={mobile}>{user.fullName}</Button>
+          </Link>
         )}
         <Button block={mobile} danger onClick={() => void logout()}>
           Đăng xuất
