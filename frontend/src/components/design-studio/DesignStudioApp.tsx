@@ -175,8 +175,16 @@ export default function DesignStudioApp() {
   const [isMyDesignsOpen, setIsMyDesignsOpen] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
-  /* Ảnh in print-ready (base64) chụp từ canvas Konva khi mở modal thêm vào giỏ */
-  const [printImage, setPrintImage] = useState<string | undefined>(undefined);
+  /*
+    Ảnh in print-ready (base64) chụp từ canvas Konva khi mở modal thêm vào giỏ.
+    Tối đa 2 ảnh - mặt nào không có phần tử nào thì để undefined (không tạo
+    ảnh trắng vô nghĩa). Việc gửi cả 2 ảnh này lên backend khi tạo đơn là việc
+    của Giai đoạn 3 (schema + lưu trữ) - AddToCartModal/giỏ hàng/checkout hiện
+    tại vẫn chỉ nhận 1 ảnh nên bên dưới tạm ưu tiên ảnh mặt trước, dùng ảnh mặt
+    sau nếu khách chỉ thiết kế mặt sau.
+  */
+  const [printImageFront, setPrintImageFront] = useState<string | undefined>(undefined);
+  const [printImageBack, setPrintImageBack] = useState<string | undefined>(undefined);
 
   const handleSaveClick = useCallback(() => {
     if (!isAuthenticated || !accessToken) {
@@ -363,43 +371,89 @@ export default function DesignStudioApp() {
     : undefined;
 
   /*
-    Chụp ảnh in print-ready từ Konva stage.
+    Chụp ảnh in print-ready cho CẢ 2 MẶT (trước/sau) từ Konva stage.
     - Stage chỉ chứa layer thiết kế (mockup áo là <img> DOM riêng) → PNG nền trong suốt.
-    - Crop đúng vùng in; toạ độ crop nhân zoom vì stage đang scale theo zoom.
+    - Trước đây hàm này chỉ chụp đúng mặt đang xem tại thời điểm bấm "Thêm vào
+      giỏ hàng" - nếu khách thiết kế cả 2 mặt nhưng đang xem mặt trước lúc bấm,
+      ảnh in mặt sau bị MẤT hoàn toàn. Giờ hàm tự chuyển qua từng mặt CÓ phần
+      tử để chụp riêng (mặt trống thì bỏ qua, không tạo ảnh trắng vô nghĩa),
+      rồi khôi phục lại đúng mặt khách đang xem ban đầu sau khi chụp xong.
+    - Dùng useDesignStore.setState() trực tiếp (không qua action setShirtView)
+      để không đẩy các lần chuyển mặt tạm thời này vào undoStack - đây là
+      thao tác nội bộ phục vụ chụp ảnh, không phải thao tác của người dùng.
+    - Vùng crop (print area) của từng mặt tính lại bằng getPrintAreaBoundary
+      thay vì dùng biến printAreaForCanvas ở ngoài - biến đó thuộc closure của
+      lần render ứng với mặt ban đầu, không tự cập nhật khi ta đổi mặt bên
+      trong hàm này.
+    - Có chờ ngắn (setTimeout) sau khi đổi mặt để Konva kịp vẽ lại đúng phần
+      tử của mặt vừa chuyển sang trước khi chụp, tránh chụp nhầm frame cũ.
     - pixelRatio (multiplier) nâng độ phân giải lên ~2400px cạnh dài (đủ ~250-300 DPI).
-    - Base64 lossless → không làm mờ; độ nét phụ thuộc pixelRatio + ảnh gốc.
   */
-  const capturePrintImage = (): string | undefined => {
+  const capturePrintImages = async (): Promise<{ printImageFront?: string; printImageBack?: string }> => {
     const stage = stageRef.current;
-    if (!stage) return undefined;
-    // Ẩn khung chọn (Transformer) để không lọt vào ảnh in
-    const transformers = stage.find("Transformer");
-    transformers.forEach((t) => t.hide());
-    try {
-      const TARGET_LONG_EDGE = 2400; // px
-      const longEdgeScreen = Math.max(printAreaForCanvas.w, printAreaForCanvas.h) * zoom;
-      const pixelRatio = longEdgeScreen > 0 ? TARGET_LONG_EDGE / longEdgeScreen : 3;
-      return stage.toDataURL({
-        mimeType: "image/png",
-        x: printAreaForCanvas.x * zoom,
-        y: printAreaForCanvas.y * zoom,
-        width: printAreaForCanvas.w * zoom,
-        height: printAreaForCanvas.h * zoom,
-        pixelRatio,
-      });
-    } catch (e) {
-      console.error("[DesignStudio] Không export được ảnh in:", e);
-      return undefined;
-    } finally {
-      transformers.forEach((t) => t.show());
-      stage.batchDraw();
+    if (!stage) return {};
+
+    const originalView = useDesignStore.getState().shirtView;
+    const elementsNow   = useDesignStore.getState().elements;
+    const sidesToCapture = (["front", "back"] as const).filter((side) =>
+      elementsNow.some((el) => (el.side ?? "front") === side)
+    );
+    if (sidesToCapture.length === 0) return {};
+
+    const TARGET_LONG_EDGE = 2400; // px
+    const result: { printImageFront?: string; printImageBack?: string } = {};
+
+    for (const side of sidesToCapture) {
+      if (useDesignStore.getState().shirtView !== side) {
+        useDesignStore.setState({ shirtView: side, selectedId: null });
+        await new Promise((r) => setTimeout(r, 120));
+      }
+
+      const paSide = getPrintAreaBoundary(shirtType, side, CONTAINER_W, CONTAINER_H);
+      // Ẩn khung chọn (Transformer) để không lọt vào ảnh in
+      const transformers = stage.find("Transformer");
+      transformers.forEach((t) => t.hide());
+      try {
+        const longEdgeScreen = Math.max(paSide.width, paSide.height) * zoom;
+        const pixelRatio = longEdgeScreen > 0 ? TARGET_LONG_EDGE / longEdgeScreen : 3;
+        const dataUrl = stage.toDataURL({
+          mimeType: "image/png",
+          x: paSide.left * zoom,
+          y: paSide.top * zoom,
+          width: paSide.width * zoom,
+          height: paSide.height * zoom,
+          pixelRatio,
+        });
+        if (side === "front") result.printImageFront = dataUrl;
+        else result.printImageBack = dataUrl;
+      } catch (e) {
+        console.error(`[DesignStudio] Không export được ảnh in mặt ${side}:`, e);
+      } finally {
+        transformers.forEach((t) => t.show());
+        stage.batchDraw();
+      }
     }
+
+    // Khôi phục lại đúng mặt khách đang xem trước khi bấm "Thêm vào giỏ hàng"
+    if (useDesignStore.getState().shirtView !== originalView) {
+      useDesignStore.setState({ shirtView: originalView, selectedId: null });
+    }
+
+    return result;
   };
 
   /* Mở modal thêm vào giỏ: chụp ảnh in (nếu có thiết kế) rồi mới mở */
-  const handleOpenCart = () => {
+  const handleOpenCart = async () => {
     setSelectedId(null);
-    setPrintImage(elements.length > 0 ? capturePrintImage() : undefined);
+    if (elements.length > 0) {
+      showToast("Đang chuẩn bị ảnh in...");
+      const { printImageFront: front, printImageBack: back } = await capturePrintImages();
+      setPrintImageFront(front);
+      setPrintImageBack(back);
+    } else {
+      setPrintImageFront(undefined);
+      setPrintImageBack(undefined);
+    }
     setIsCartModalOpen(true);
   };
 
@@ -663,8 +717,15 @@ export default function DesignStudioApp() {
         productId={urlProductId ?? SHIRT_TO_PRODUCT_ID[shirtType] ?? 1}
         shirtColor={colorName || shirtColor}
         designId={currentDesignId ?? undefined}
-        printImage={printImage}
-        designPreviewUrl={printImage}
+        /*
+          AddToCartModal/giỏ hàng/checkout hiện tại chỉ nhận 1 ảnh in (chưa
+          được nâng lên 2 ảnh - việc đó thuộc Giai đoạn 3: schema + lưu trữ
+          cả printImageFront/printImageBack). Tạm ưu tiên ảnh mặt trước, dùng
+          ảnh mặt sau nếu khách chỉ thiết kế mặt sau - giữ đúng hành vi cũ cho
+          thiết kế 1 mặt, không làm mất gì so với trước khi có Giai đoạn 2.
+        */
+        printImage={printImageFront ?? printImageBack}
+        designPreviewUrl={printImageFront ?? printImageBack}
       />
 
       <CartDrawer
