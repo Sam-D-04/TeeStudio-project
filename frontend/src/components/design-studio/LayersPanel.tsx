@@ -73,10 +73,17 @@ function Preview({ el }: { el: DesignElement }) {
 }
 
 export default function LayersPanel() {
-  const { elements, selectedId, setSelectedId, removeElement } = useDesignStore();
+  const { elements, selectedId, setSelectedId, removeElement, shirtView } = useDesignStore();
+
+  // "elements" chứa chung phần tử của cả 2 mặt áo - bảng lớp chỉ nên hiển thị
+  // (và cho thao tác) phần tử của mặt đang xem, khớp với những gì đang thấy
+  // trên canvas. Nếu không lọc, người dùng sẽ thấy/xoá nhầm lớp của mặt kia.
+  const phanTuMatDangXem = elements.filter(
+    (el) => (el.side ?? "front") === shirtView
+  );
 
   // Đảo ngược mảng để lớp nằm trên cùng (thêm sau) hiển thị đầu danh sách
-  const layers = [...elements].reverse();
+  const layers = [...phanTuMatDangXem].reverse();
 
   return (
     <div className="ds-layers-panel">
@@ -84,7 +91,7 @@ export default function LayersPanel() {
       <div className="ds-layers-header">
         <LayersIcon />
         <span>Lớp</span>
-        <span className="ds-layers-count">{elements.length}</span>
+        <span className="ds-layers-count">{phanTuMatDangXem.length}</span>
       </div>
 
       {/* Danh sách các lớp */}

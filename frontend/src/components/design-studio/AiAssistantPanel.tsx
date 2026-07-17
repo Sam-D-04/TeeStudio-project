@@ -43,9 +43,16 @@ const ghostBtn: React.CSSProperties = {
   fontWeight: 500, fontSize: 13, cursor: "pointer", marginBottom: 8, textAlign: "left",
 };
 
-/** Gán id + type:"text" cho các phần tử AI trả về (backend chỉ trả thuộc tính text). */
-function toDesignElements(items: AiTextElement[]): DesignElement[] {
-  return items.map((el) => ({ ...el, id: uuidv4(), type: "text" as const }));
+/**
+ * Gán id + type:"text" cho các phần tử AI trả về (backend chỉ trả thuộc tính
+ * text). Đồng thời gắn "side" theo mặt áo đang xem lúc gọi AI - vì nội dung
+ * AI sinh ra là để đặt lên đúng mặt khách đang thiết kế.
+ */
+function toDesignElements(
+  items: AiTextElement[],
+  side: DesignElement["side"]
+): DesignElement[] {
+  return items.map((el) => ({ ...el, id: uuidv4(), type: "text" as const, side }));
 }
 
 export default function AiAssistantPanel() {
@@ -60,7 +67,11 @@ export default function AiAssistantPanel() {
   const [error, setError] = React.useState<string | null>(null);
 
   const hasItems = elements.length > 0;
-  const textElements = elements.filter((e) => e.type === "text");
+  // Chỉ lấy phần tử chữ CỦA MẶT ĐANG XEM - "Sắp xếp bố cục" chỉ nên sắp xếp
+  // lại chữ trên mặt khách đang thiết kế, không đụng tới chữ ở mặt kia.
+  const textElements = elements.filter(
+    (e) => e.type === "text" && (e.side ?? "front") === shirtView
+  );
   const hasText = textElements.length > 0;
   const palette = React.useMemo(() => suggestTextPalette(shirtColor), [shirtColor]);
 
@@ -81,7 +92,7 @@ export default function AiAssistantPanel() {
     setGenerating(true);
     try {
       const result = await aiDesignService.generate({ shirtType, shirtView, shirtColor, printArea, prompt });
-      applyElements(toDesignElements(result));
+      applyElements(toDesignElements(result, shirtView));
     } catch (err: any) {
       setError(err.message || "AI không sinh được thiết kế. Vui lòng thử lại.");
     } finally {
@@ -95,9 +106,15 @@ export default function AiAssistantPanel() {
     setArranging(true);
     try {
       const result = await aiDesignService.arrange({ shirtType, shirtView, shirtColor, printArea, elements: textElements });
-      // Ghép kết quả (chỉ phần tử chữ) trở lại đúng vị trí trong mảng gốc, giữ nguyên ảnh
+      // Ghép kết quả trở lại đúng vị trí trong mảng gốc - CHỈ áp dụng cho phần
+      // tử chữ của mặt đang xem (khớp với "textElements" đã gửi lên AI ở trên),
+      // giữ nguyên mọi phần tử khác (ảnh, và chữ ở mặt kia nếu có).
       let i = 0;
-      const merged = elements.map((e) => (e.type === "text" ? { ...e, ...result[i++] } : e));
+      const merged = elements.map((e) =>
+        e.type === "text" && (e.side ?? "front") === shirtView
+          ? { ...e, ...result[i++] }
+          : e
+      );
       applyElements(merged);
     } catch (err: any) {
       setError(err.message || "AI không sắp xếp được bố cục. Vui lòng thử lại.");

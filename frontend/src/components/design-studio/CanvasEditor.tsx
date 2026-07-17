@@ -341,7 +341,15 @@ export default function CanvasEditor({
   zoom,
   clipPoints,
 }: CanvasEditorProps) {
-  const { elements, selectedId, setSelectedId } = useDesignStore();
+  const { elements, selectedId, setSelectedId, shirtView } = useDesignStore();
+
+  // "elements" trong store chứa CHUNG phần tử của cả mặt trước lẫn mặt sau.
+  // Chỉ vẽ lên canvas những phần tử thuộc đúng mặt đang xem - nếu không, thiết
+  // kế mặt trước sẽ bị "lộ" ra khi đang xem mặt sau (2 vùng in nằm gần trùng
+  // nhau trên màn hình nên trước đây rất dễ nhầm là cùng 1 thiết kế).
+  const phanTuMatDangXem = elements.filter(
+    (el) => (el.side ?? "front") === shirtView
+  );
 
   /* Map: elementId → Konva.Node — chia sẻ giữa shapes và Transformer */
   const shapeRefs = useRef<Map<string, Konva.Node>>(new Map());
@@ -407,7 +415,7 @@ export default function CanvasEditor({
                 clipHeight: printArea.h,
               })}
         >
-          {elements.map((el) => {
+          {phanTuMatDangXem.map((el) => {
             const commonProps = {
               el,
               onSelect:  (e: Konva.KonvaEventObject<Event>) => {

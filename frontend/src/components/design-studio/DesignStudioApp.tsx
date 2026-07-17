@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type Konva from "konva";
 
-import { useDesignStore } from "@/store/useDesignStore";
+import { useDesignStore, type DesignElement } from "@/store/useDesignStore";
 import useAuthStore from "@/store/useAuthStore";
 import { userDesignService, SavedDesign } from "@/services/userDesignService";
 import { calcDesignFee } from "@/utils/designFeeCalculator";
@@ -271,7 +271,12 @@ export default function DesignStudioApp() {
       const state = useDesignStore.getState();
       state.clearDesign(); // Xoá sạch canvas hiện tại (có lưu vào lịch sử undo)
 
-      const elements = design.canvasData?.elements || [];
+      // Thiết kế lưu TRƯỚC KHI có field "side" (phân biệt mặt trước/sau) sẽ
+      // không có "side" trong dữ liệu cũ - mặc định coi các phần tử đó thuộc
+      // mặt trước, để không bị mất nội dung thiết kế cũ khi tải lại.
+      const elements = (design.canvasData?.elements || []).map(
+        (el: DesignElement) => ({ ...el, side: el.side ?? "front" })
+      );
       const view = design.canvasData?.shirtView || "front";
 
       // Gán trực tiếp từng field vào store (không qua các action riêng lẻ)
