@@ -127,6 +127,17 @@ async function layChiTietSanPhamCongKhai(id) {
     [id]
   );
 
+  // Lấy bảng ưu đãi số lượng (nếu có) - đúng các mốc dùng để tự động giảm giá
+  // khi tạo đơn (xem customer.order.service.js), hiển thị công khai để khách
+  // biết trước khi đặt hàng thay vì chỉ áp dụng ngầm.
+  const [bulkPricing] = await db.pool.query(
+    `SELECT minQty, discountPercent
+     FROM BulkPricing
+     WHERE productId = ?
+     ORDER BY minQty ASC`,
+    [id]
+  );
+
   return {
     id: p.id,
     name: p.name,
@@ -148,6 +159,10 @@ async function layChiTietSanPhamCongKhai(id) {
       url: img.imageUrl,
       altText: img.altText || p.name,
       isPrimary: img.isPrimary === 1,
+    })),
+    bulkPricing: bulkPricing.map((b) => ({
+      minQty: b.minQty,
+      discountPercent: Number(b.discountPercent),
     })),
   };
 }

@@ -22,6 +22,12 @@ export interface ProductImage {
   isPrimary: boolean;
 }
 
+// Một mốc ưu đãi số lượng: mua từ minQty trở lên được giảm discountPercent %
+export interface BulkPricingTier {
+  minQty: number;
+  discountPercent: number;
+}
+
 export interface ProductDetail {
   id: number;
   name: string;
@@ -33,6 +39,7 @@ export interface ProductDetail {
   basePrice: number;
   variants: ProductVariant[];
   images: ProductImage[];
+  bulkPricing: BulkPricingTier[];
 }
 
 // ─── Hằng số ────────────────────────────────────────────────────────────────
@@ -823,6 +830,47 @@ export default function ProductDetailClient({ product }: Props) {
                   </p>
                 )}
               </div>
+
+              {/* Ưu đãi số lượng - đúng các mốc BulkPricing đã tự động áp dụng
+                  khi tạo đơn (backend), hiển thị công khai để khách biết trước
+                  khi đặt hàng thay vì chỉ ẩn ngầm không ai thấy. */}
+              {product.bulkPricing.length > 0 && (
+                <div
+                  style={{
+                    background: "#fff7ed",
+                    borderRadius: 16,
+                    border: "1px solid #fed7aa",
+                    padding: "16px 20px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                    <span style={{ fontSize: 16 }}>🎉</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                      Mua nhiều giảm giá
+                    </span>
+                  </div>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <tbody>
+                      {product.bulkPricing.map((tier) => (
+                        <tr key={tier.minQty}>
+                          <td style={{ padding: "4px 0", fontSize: 13, color: "#9a3412" }}>
+                            Từ {tier.minQty} sản phẩm
+                          </td>
+                          <td style={{ padding: "4px 0", fontSize: 13, fontWeight: 700, color: "#ea580c", textAlign: "right" }}>
+                            − {tier.discountPercent}%
+                          </td>
+                          <td style={{ padding: "4px 0 4px 12px", fontSize: 12, color: "#c2410c", textAlign: "right" }}>
+                            {fmt(product.basePrice * (1 - tier.discountPercent / 100))} / chiếc
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p style={{ fontSize: 11, color: "#c2410c", margin: "8px 0 0" }}>
+                    Giảm giá tự động áp dụng khi đặt hàng đủ số lượng, không cần mã.
+                  </p>
+                </div>
+              )}
 
               {/* Thông tin nhanh: chất liệu, xuất xứ, cách in, thời gian giao hàng */}
               <div
