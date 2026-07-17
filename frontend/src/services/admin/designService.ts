@@ -9,6 +9,7 @@
  */
 
 import apiClient from "@/lib/apiClient";
+import { downloadExcelReport } from "@/lib/downloadExcelReport";
 
 // =====================================================================
 // KIỂU DỮ LIỆU (Types) – khớp với response từ Backend
@@ -65,7 +66,8 @@ export type DonCanIn = {
   maDon: string;
   maThietKe: string;
   urlPreview: string | null;
-  urlFileIn: string | null;    // Ảnh in chuẩn (độ phân giải cao, đã cắt đúng vùng in) cho xưởng in
+  urlFileIn: string | null;    // Ảnh in chuẩn mặt trước (độ phân giải cao, đã cắt đúng vùng in) cho xưởng in
+  urlFileInBack: string | null; // Ảnh in chuẩn mặt sau - null nếu thiết kế không có mặt sau
   mauAo: string;
   tenKhachHang: string;
   soLuong: number;
@@ -208,6 +210,32 @@ export async function layDanhSachDonCanIn(
     { params }
   );
   return res.data.data;
+}
+
+/**
+ * Xuất file Excel "thông số in" cho xưởng in - lọc giống hệt màn hình "Đơn cần
+ * in" hiện tại (không phân trang), kèm link ảnh in cả 2 mặt (trước/sau).
+ * GET /api/admin/designs/don-can-in/xuat-excel
+ */
+export async function xuatDonCanIn(
+  thamSo: {
+    tu_khoa?: string;
+    trang_thai?: string;
+    tu_ngay?: string;
+    den_ngay?: string;
+  } = {}
+): Promise<string> {
+  const params: Record<string, string> = {};
+  if (thamSo.tu_khoa?.trim()) params.tu_khoa = thamSo.tu_khoa.trim();
+  if (thamSo.trang_thai) params.trang_thai = thamSo.trang_thai;
+  if (thamSo.tu_ngay) params.tu_ngay = thamSo.tu_ngay;
+  if (thamSo.den_ngay) params.den_ngay = thamSo.den_ngay;
+
+  return downloadExcelReport(
+    "/admin/designs/don-can-in/xuat-excel",
+    params,
+    `don-can-in-${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
 }
 
 /** Cập nhật một bước tiến độ in; backend sẽ chặn bỏ qua hoặc lùi trạng thái. */

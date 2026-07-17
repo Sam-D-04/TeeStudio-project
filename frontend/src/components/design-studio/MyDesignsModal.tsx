@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Modal, Card, Col, Row, Typography, Spin, Empty, Button, message, Popconfirm } from "antd";
 import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { userDesignService, SavedDesign } from "@/services/userDesignService";
@@ -7,6 +7,19 @@ import CustomerDesignStatusBadge from "./CustomerDesignStatusBadge";
 
 const { Text } = Typography;
 const { Meta } = Card;
+
+/* Nhãn nhỏ "Trước"/"Sau" đè góc dưới-trái mỗi nửa ảnh in thật */
+const nhanMatStyle: CSSProperties = {
+  position: "absolute",
+  bottom: 6,
+  left: 6,
+  fontSize: 10,
+  fontWeight: 700,
+  padding: "1px 6px",
+  borderRadius: 10,
+  background: "rgba(15,23,42,0.65)",
+  color: "#fff",
+};
 
 interface MyDesignsModalProps {
   open: boolean;
@@ -103,7 +116,39 @@ export default function MyDesignsModal({ open, onCancel, onSelectDesign }: MyDes
                   hoverable
                   cover={
                     <div style={{ background: "#f1f5f9", height: 180, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      {design.previewUrl ? (
+                      {design.printFileUrlFront || design.printFileUrlBack ? (
+                        // Thiết kế đã từng được đặt hàng nên có ảnh in thật (Cloudinary) -
+                        // ưu tiên hiển thị ảnh in thật thay vì bản xem trước canvas, tách
+                        // đúng 2 nửa trước/sau nếu có cả 2 mặt.
+                        <div style={{ display: "flex", width: "100%", height: "100%" }}>
+                          {design.printFileUrlFront && (
+                            <div
+                              style={{
+                                flex: 1, position: "relative", display: "flex",
+                                alignItems: "center", justifyContent: "center",
+                                borderRight: design.printFileUrlBack ? "1px solid #e2e8f0" : "none",
+                              }}
+                            >
+                              <img
+                                alt={`${design.name} - mặt trước`}
+                                src={design.printFileUrlFront}
+                                style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                              />
+                              <span style={nhanMatStyle}>Trước</span>
+                            </div>
+                          )}
+                          {design.printFileUrlBack && (
+                            <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <img
+                                alt={`${design.name} - mặt sau`}
+                                src={design.printFileUrlBack}
+                                style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                              />
+                              <span style={nhanMatStyle}>Sau</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : design.previewUrl ? (
                         <img
                           alt={design.name}
                           src={design.previewUrl}

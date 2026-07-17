@@ -28,7 +28,8 @@ async function mapShirtTypeToProductId(shirtType) {
  */
 async function getMyDesigns(userId) {
   const [rows] = await db.pool.query(
-    `SELECT id, name, productId, baseColor, canvasData, previewUrl, status, adminNote, updatedAt
+    `SELECT id, name, productId, baseColor, canvasData, previewUrl,
+            printFileUrlFront, printFileUrlBack, status, adminNote, updatedAt
      FROM CustomDesign
      WHERE userId = ? AND status IN ('DRAFT', 'PENDING_REVIEW', 'NEEDS_REVISION', 'APPROVED')
      ORDER BY updatedAt DESC`,

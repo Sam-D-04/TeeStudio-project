@@ -126,7 +126,34 @@ export default function MyDesignsTab() {
                 title={canEdit ? "Nhấn để sửa" : undefined}
               >
                 <div style={{ width: "100%", height: 100, background: "#0f172a", position: "relative" }}>
-                  {d.previewUrl ? (
+                  {d.printFileUrlFront || d.printFileUrlBack ? (
+                    // Thiết kế đã từng đặt hàng nên có ảnh in thật (Cloudinary) - ưu
+                    // tiên hiển thị thay vì bản xem trước canvas, tách 2 nửa nếu có
+                    // cả 2 mặt.
+                    <div style={{ display: "flex", width: "100%", height: "100%" }}>
+                      {d.printFileUrlFront && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={d.printFileUrlFront}
+                          alt="Mặt trước"
+                          title="Mặt trước"
+                          style={{
+                            flex: 1, minWidth: 0, height: "100%", objectFit: "cover",
+                            borderRight: d.printFileUrlBack ? "1px solid #334155" : "none",
+                          }}
+                        />
+                      )}
+                      {d.printFileUrlBack && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={d.printFileUrlBack}
+                          alt="Mặt sau"
+                          title="Mặt sau"
+                          style={{ flex: 1, minWidth: 0, height: "100%", objectFit: "cover" }}
+                        />
+                      )}
+                    </div>
+                  ) : d.previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={d.previewUrl} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   ) : (

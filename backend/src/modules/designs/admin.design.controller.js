@@ -6,6 +6,7 @@
  */
 
 const designService = require("./admin.design.service");
+const { guiBaoCaoExcel } = require("../../common/utils/excel-report");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KPI THỐNG KÊ
@@ -126,6 +127,22 @@ const getDanhSachDonCanIn = async (req, res, next) => {
 };
 
 /**
+ * GET /api/admin/designs/don-can-in/xuat-excel
+ * Xuất file Excel "thông số in" cho xưởng in - lọc giống hệt màn hình "Đơn cần
+ * in" hiện tại (không phân trang, tối đa 5000 dòng), kèm link ảnh in cả 2 mặt.
+ *
+ * Query params: tu_khoa, trang_thai, tu_ngay, den_ngay
+ */
+const exportDonCanIn = async (req, res, next) => {
+  try {
+    const report = await designService.xuatDonCanIn(req.query);
+    return guiBaoCaoExcel(res, report);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
  * PATCH /api/admin/designs/don-can-in/:id/trang-thai
  * Cập nhật tuần tự tiến độ của một mặt hàng cần in.
  */
@@ -242,6 +259,7 @@ module.exports = {
   duyetThietKe,
   yeuCauChinhSua,
   getDanhSachDonCanIn,
+  exportDonCanIn,
   capNhatTrangThaiDonIn,
   getDanhSachSticker,
   themSticker,

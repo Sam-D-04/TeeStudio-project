@@ -13,6 +13,11 @@ export interface SavedDesign {
   baseColor: string;
   canvasData: any;
   previewUrl: string;
+  /** Ảnh in print-ready (Cloudinary) đã lưu từ lần đặt hàng gần nhất - chỉ có
+   *  sau khi thiết kế này được đặt hàng ít nhất 1 lần, mặt nào không thiết kế
+   *  thì null. Chưa từng đặt hàng thì cả 2 đều null - dùng previewUrl. */
+  printFileUrlFront: string | null;
+  printFileUrlBack: string | null;
   status: DesignStatus;
   /** Ghi chú của admin khi yêu cầu chỉnh sửa (chỉ có ý nghĩa khi status = NEEDS_REVISION). */
   adminNote: string | null;
