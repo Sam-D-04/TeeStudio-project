@@ -239,7 +239,8 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
       unitPrice,
       designId: item.designId || null,
       designFee: 0,
-      printImage: item.printImage || null,
+      printImageFront: item.printImageFront || null,
+      printImageBack: item.printImageBack || null,
     });
   }
 
@@ -303,17 +304,32 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
 
     enriched.designFee = Number(design.designFee);
 
-    // Upload ảnh in print-ready lên Cloudinary
-    if (enriched.printImage && enriched.printImage.startsWith("data:image")) {
+    // Upload ảnh in print-ready lên Cloudinary - tối đa 2 ảnh (mặt trước/sau),
+    // mỗi mặt upload + lưu độc lập nên lỗi ở mặt này không ảnh hưởng mặt kia.
+    if (enriched.printImageFront && enriched.printImageFront.startsWith("data:image")) {
       try {
-        const printFileUrl = await uploadBase64Image(enriched.printImage, "print-files");
+        const printFileUrlFront = await uploadBase64Image(enriched.printImageFront, "print-files");
         await db.pool.query(
-          "UPDATE CustomDesign SET printFileUrl = ? WHERE id = ?",
-          [printFileUrl, enriched.designId]
+          "UPDATE CustomDesign SET printFileUrlFront = ? WHERE id = ?",
+          [printFileUrlFront, enriched.designId]
         );
       } catch (uploadErr) {
         console.error(
-          `[createOrderAsCustomer] Upload printFileUrl cho design ${enriched.designId} thất bại:`,
+          `[createOrderAsCustomer] Upload printFileUrlFront cho design ${enriched.designId} thất bại:`,
+          uploadErr
+        );
+      }
+    }
+    if (enriched.printImageBack && enriched.printImageBack.startsWith("data:image")) {
+      try {
+        const printFileUrlBack = await uploadBase64Image(enriched.printImageBack, "print-files");
+        await db.pool.query(
+          "UPDATE CustomDesign SET printFileUrlBack = ? WHERE id = ?",
+          [printFileUrlBack, enriched.designId]
+        );
+      } catch (uploadErr) {
+        console.error(
+          `[createOrderAsCustomer] Upload printFileUrlBack cho design ${enriched.designId} thất bại:`,
           uploadErr
         );
       }

@@ -71,10 +71,15 @@ const customerCheckoutSchema = {
               (typeof item.designId !== "number" || item.designId < 1)) {
             return "designId không hợp lệ";
           }
-          // printImage (tuỳ chọn) – ảnh in print-ready dạng base64 data URI
-          if (item.printImage !== undefined &&
-              (typeof item.printImage !== "string" || !item.printImage.startsWith("data:image"))) {
-            return "printImage phải là chuỗi base64 ảnh (data:image/...)";
+          // printImageFront/printImageBack (tuỳ chọn) – ảnh in print-ready dạng
+          // base64 data URI, mỗi mặt 1 ảnh riêng (mặt nào không thiết kế thì bỏ qua)
+          if (item.printImageFront !== undefined &&
+              (typeof item.printImageFront !== "string" || !item.printImageFront.startsWith("data:image"))) {
+            return "printImageFront phải là chuỗi base64 ảnh (data:image/...)";
+          }
+          if (item.printImageBack !== undefined &&
+              (typeof item.printImageBack !== "string" || !item.printImageBack.startsWith("data:image"))) {
+            return "printImageBack phải là chuỗi base64 ảnh (data:image/...)";
           }
         }
         return true;

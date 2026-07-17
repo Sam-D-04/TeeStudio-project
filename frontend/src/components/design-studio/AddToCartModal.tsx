@@ -87,13 +87,15 @@ interface Props {
   productId: number;
   shirtColor: string;
   designId?: number;
-  /** Ảnh in print-ready (base64 PNG) chụp từ canvas — gửi kèm khi tạo đơn */
-  printImage?: string;
+  /** Ảnh in print-ready (base64 PNG) chụp từ canvas — gửi kèm khi tạo đơn. Tối đa
+   *  2 ảnh (mặt trước/sau), mặt nào khách không thiết kế thì undefined. */
+  printImageFront?: string;
+  printImageBack?: string;
   /** Ảnh đại diện thiết kế (base64 hoặc URL) — chỉ để hiển thị thumbnail trong giỏ hàng */
   designPreviewUrl?: string;
 }
 
-export default function AddToCartModal({ open, onClose, productId, shirtColor, designId, printImage, designPreviewUrl }: Props) {
+export default function AddToCartModal({ open, onClose, productId, shirtColor, designId, printImageFront, printImageBack, designPreviewUrl }: Props) {
   const addItem   = useCartStore((s) => s.addItem);
   const cartItems = useCartStore((s) => s.items);
 
@@ -195,7 +197,8 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
         price: product.basePrice,
         quantity: qty,
         designId,
-        printImage,
+        printImageFront,
+        printImageBack,
       });
     });
     const summary = entries.map(({ v, qty }) => `${v.size}×${qty}`).join(", ");

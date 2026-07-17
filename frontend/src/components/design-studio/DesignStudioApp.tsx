@@ -717,14 +717,8 @@ export default function DesignStudioApp() {
         productId={urlProductId ?? SHIRT_TO_PRODUCT_ID[shirtType] ?? 1}
         shirtColor={colorName || shirtColor}
         designId={currentDesignId ?? undefined}
-        /*
-          AddToCartModal/giỏ hàng/checkout hiện tại chỉ nhận 1 ảnh in (chưa
-          được nâng lên 2 ảnh - việc đó thuộc Giai đoạn 3: schema + lưu trữ
-          cả printImageFront/printImageBack). Tạm ưu tiên ảnh mặt trước, dùng
-          ảnh mặt sau nếu khách chỉ thiết kế mặt sau - giữ đúng hành vi cũ cho
-          thiết kế 1 mặt, không làm mất gì so với trước khi có Giai đoạn 2.
-        */
-        printImage={printImageFront ?? printImageBack}
+        printImageFront={printImageFront}
+        printImageBack={printImageBack}
         designPreviewUrl={printImageFront ?? printImageBack}
       />
 

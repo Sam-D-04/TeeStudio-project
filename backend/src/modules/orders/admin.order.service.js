@@ -1868,19 +1868,21 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     // Gán designFee từ DB
     enriched.designFee = Number(design.designFee);
 
-    // Upload ảnh in print-ready lên Cloudinary rồi lưu URL vào CustomDesign.printFileUrl.
+    // Upload ảnh in print-ready lên Cloudinary rồi lưu URL vào CustomDesign.printFileUrlFront.
     // Làm ngoài transaction (bên dưới) vì đây là gọi mạng, không nên giữ transaction lâu.
     // Lỗi upload không được chặn việc tạo đơn (canvasData vẫn là bản gốc dự phòng).
+    // Admin tạo đơn hiện chưa có luồng nào gửi kèm ảnh mặt sau (printImageBack)
+    // nên chỉ xử lý 1 ảnh (mặt trước) như trước đây, khớp với cột đã đổi tên.
     if (enriched.printImage && enriched.printImage.startsWith("data:image")) {
       try {
-        const printFileUrl = await uploadBase64Image(enriched.printImage, "print-files");
+        const printFileUrlFront = await uploadBase64Image(enriched.printImage, "print-files");
         await db.pool.query(
-          "UPDATE CustomDesign SET printFileUrl = ? WHERE id = ?",
-          [printFileUrl, enriched.designId]
+          "UPDATE CustomDesign SET printFileUrlFront = ? WHERE id = ?",
+          [printFileUrlFront, enriched.designId]
         );
       } catch (uploadErr) {
         console.error(
-          `[taoMoiDonHang] Upload printFileUrl cho design ${enriched.designId} thất bại:`,
+          `[taoMoiDonHang] Upload printFileUrlFront cho design ${enriched.designId} thất bại:`,
           uploadErr
         );
       }

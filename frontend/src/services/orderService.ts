@@ -27,8 +27,10 @@ export interface CreateOrderPayload {
     quantity: number;
     /** ID thiết kế POD (tuỳ chọn) */
     designId?: number;
-    /** Ảnh in print-ready (base64 PNG) — backend upload Cloudinary rồi lưu printFileUrl */
-    printImage?: string;
+    /** Ảnh in print-ready (base64 PNG) — backend upload Cloudinary rồi lưu vào
+     *  printFileUrlFront/printFileUrlBack. Mặt nào khách không thiết kế thì bỏ qua. */
+    printImageFront?: string;
+    printImageBack?: string;
   }>;
   shippingFee?: number;
   promotionId?: number;
@@ -179,7 +181,8 @@ export function cartItemsToOrderItems(
     variantId: i.variantId,
     quantity: i.quantity,
     ...(i.designId ? { designId: i.designId } : {}),
-    ...(i.printImage ? { printImage: i.printImage } : {}),
+    ...(i.printImageFront ? { printImageFront: i.printImageFront } : {}),
+    ...(i.printImageBack ? { printImageBack: i.printImageBack } : {}),
   }));
 }
 

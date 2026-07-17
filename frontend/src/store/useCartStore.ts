@@ -22,11 +22,13 @@ export interface CartItem {
   /** ID của CustomDesign (nếu là sản phẩm có thiết kế riêng) */
   designId?: number;
   /**
-   * Ảnh in print-ready (base64 PNG nền trong suốt) export từ canvas Design Studio.
+   * Ảnh in print-ready (base64 PNG nền trong suốt) export từ canvas Design Studio -
+   * tối đa 2 ảnh (mặt trước/sau), mặt nào khách không thiết kế thì undefined.
    * KHÔNG được persist xuống localStorage (xem `partialize`) vì base64 rất nặng —
    * chỉ sống in-memory theo phiên để gửi kèm khi tạo đơn.
    */
-  printImage?: string;
+  printImageFront?: string;
+  printImageBack?: string;
 }
 
 export interface CartState {
@@ -93,7 +95,8 @@ export const useCartStore = create<CartState>()(
                       ...i,
                       quantity: i.quantity + item.quantity,
                       // Giữ ảnh in mới nhất (nếu lần thêm này có kèm)
-                      printImage: item.printImage ?? i.printImage,
+                      printImageFront: item.printImageFront ?? i.printImageFront,
+                      printImageBack: item.printImageBack ?? i.printImageBack,
                     }
                   : i
               ),
@@ -135,17 +138,18 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: "teestudio_cart",
-      // Không lưu `printImage` (base64 rất nặng, dễ vượt quota localStorage ~5MB).
-      // Ảnh in chỉ cần sống in-memory theo phiên để gửi kèm lúc tạo đơn.
-      // `image` cũng có thể tạm thời là base64 (khi vừa thêm 1 thiết kế chưa lưu từ
-      // Design Studio) — không persist phần này, để tránh vượt quota tương tự;
+      // Không lưu `printImageFront`/`printImageBack` (base64 rất nặng, dễ vượt quota
+      // localStorage ~5MB). Ảnh in chỉ cần sống in-memory theo phiên để gửi kèm lúc
+      // tạo đơn. `image` cũng có thể tạm thời là base64 (khi vừa thêm 1 thiết kế chưa
+      // lưu từ Design Studio) — không persist phần này, để tránh vượt quota tương tự;
       // ảnh sẽ được khôi phục về URL Cloudinary thật khi giỏ hàng đồng bộ với backend.
       partialize: (state) => ({
         ...state,
         items: state.items.map((i) => ({
           ...i,
           image: i.image?.startsWith("data:") ? "" : i.image,
-          printImage: undefined,
+          printImageFront: undefined,
+          printImageBack: undefined,
         })),
       }),
     }
