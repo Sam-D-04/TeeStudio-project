@@ -12,6 +12,7 @@ const { taoLinkThanhToanVnpay } = require("../payments/vnpay.service");
 const { taoLinkThanhToanMomo } = require("../payments/momo.service");
 const { uploadBase64Image } = require("../uploads/upload.service");
 const { sendOrderConfirmationEmail } = require("../../common/services/emailService");
+const { apDungMaGiamGia } = require("../promotions/promotion.service");
 
 const DEPOSIT_PERCENT = 50;
 const ONLINE_PAYMENT_METHODS = new Set(["VNPAY", "MOMO"]);
@@ -372,7 +373,6 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
   let promotionData = null;
 
   if (promotionId) {
-    const now = new Date();
     const [rowsPromo] = await db.pool.query(
       `SELECT id, code, discountType, discountValue, minOrderAmount,
               usageLimit, usedCount, startDate, endDate, status, isNewCustomerOnly
@@ -388,70 +388,13 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
     }
 
     const promo = rowsPromo[0];
-
-    if (promo.status !== "ACTIVE") {
-      const err = new Error("Mã khuyến mãi không còn hiệu lực");
-      err.statusCode = 400;
-      throw err;
-    }
-
-    if (
-      new Date(promo.startDate) > now ||
-      (promo.endDate && new Date(promo.endDate) < now)
-    ) {
-      const err = new Error("Mã khuyến mãi đã hết hạn hoặc chưa đến ngày áp dụng");
-      err.statusCode = 400;
-      throw err;
-    }
-
-    if (promo.usageLimit !== null && promo.usedCount >= promo.usageLimit) {
-      const err = new Error("Mã khuyến mãi đã hết lượt sử dụng");
-      err.statusCode = 400;
-      throw err;
-    }
-
-    if (promo.isNewCustomerOnly) {
-      const [rowsExistingOrders] = await db.pool.query(
-        "SELECT id FROM CustomerOrder WHERE userId = ? LIMIT 1",
-        [userId]
-      );
-      if (rowsExistingOrders.length > 0) {
-        const err = new Error("Mã khuyến mãi này chỉ dành cho khách hàng chưa từng đặt hàng");
-        err.statusCode = 400;
-        throw err;
-      }
-    }
-
     const orderBaseAmount = subtotal + tongDesignFee;
-    if (orderBaseAmount < Number(promo.minOrderAmount)) {
-      const err = new Error(
-        `Đơn hàng cần tối thiểu ${Number(promo.minOrderAmount).toLocaleString("vi-VN")}₫ để áp dụng mã khuyến mãi này`
-      );
-      err.statusCode = 400;
-      throw err;
-    }
 
-    const [rowsUsed] = await db.pool.query(
-      "SELECT id FROM PromotionUsage WHERE promotionId = ? AND userId = ? LIMIT 1",
-      [promotionId, userId]
-    );
-    if (rowsUsed.length > 0) {
-      const err = new Error(
-        `Khách hàng này đã sử dụng mã khuyến mãi "${promo.code}" trước đó. Mỗi khách chỉ được dùng mỗi mã 1 lần`
-      );
-      err.statusCode = 400;
-      throw err;
-    }
-
-    if (promo.discountType === "PERCENT") {
-      discountAmount = orderBaseAmount * (Number(promo.discountValue) / 100);
-    } else if (promo.discountType === "FIXED") {
-      discountAmount = Number(promo.discountValue);
-    } else if (promo.discountType === "FREE_SHIPPING") {
-      shippingFee = 0;
-    }
-    discountAmount = Math.min(discountAmount, orderBaseAmount);
-    discountAmount = Math.round(discountAmount * 100) / 100;
+    // Dùng chung apDungMaGiamGia với customer.promotion.service.js (validate lúc
+    // checkout) để 2 nơi không bao giờ lệch luật hay lệch cách tính.
+    const ketQuaApDung = await apDungMaGiamGia(promo, { userId, orderBaseAmount });
+    discountAmount = ketQuaApDung.discountAmount;
+    if (ketQuaApDung.mienPhiVanChuyen) shippingFee = 0;
 
     promotionData = promo;
   }

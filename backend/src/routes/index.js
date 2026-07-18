@@ -13,6 +13,7 @@ const adminPaymentRoutes = require("../modules/payments/admin.payment.routes").a
 const adminProductRoutes = require("../modules/products/admin.product.routes");
 const adminInventoryRoutes = require("../modules/inventory/admin.inventory.routes");
 const adminPromotionRoutes = require("../modules/promotions/admin.promotion.routes");
+const customerPromotionRoutes = require("../modules/promotions/customer.promotion.routes");
 const adminDashboardRoutes = require("../modules/dashboard/admin.dashboard.routes");
 const aiDesignRoutes = require("../modules/ai-design/ai-design.routes");
 
@@ -72,6 +73,10 @@ router.use("/cart", cartRoutes);
 // ── Customer đặt hàng ────────────────────────────────────────────────────────
 // POST /api/orders  → Khách đặt đơn (yêu cầu đăng nhập, role CUSTOMER)
 router.use("/orders", customerOrderRoutes);
+
+// ── Customer xem trước mã khuyến mãi ────────────────────────────────────────
+// POST /api/promotions/validate → Xem trước số tiền giảm trước khi đặt hàng
+router.use("/promotions", customerPromotionRoutes);
 
 // ── AI Trợ lý thiết kế (Gemini, yêu cầu đăng nhập) ─────────────────────────
 // POST /api/design-studio/ai-assist/generate → sinh thiết kế mới (câu chữ + bố cục)

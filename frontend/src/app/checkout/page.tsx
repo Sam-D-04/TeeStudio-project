@@ -25,6 +25,7 @@ import {
   cartItemsToOrderItems,
   type CreateOrderPayload,
 } from "@/services/orderService";
+import { validatePromotionCode, type PromotionPreview } from "@/services/promotionService";
 import AppHeader from "@/components/layout/AppHeader";
 import AppFooter from "@/components/layout/AppFooter";
 
@@ -158,6 +159,12 @@ export default function CheckoutPage() {
   const [addressLoading, setAddressLoading] = useState(true);
   const provinceCode = Form.useWatch("provinceCode", form);
 
+  /* ── Mã khuyến mãi ── */
+  const [promoInput, setPromoInput]     = useState("");
+  const [promoApplying, setPromoApplying] = useState(false);
+  const [promoError, setPromoError]     = useState<string | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<PromotionPreview | null>(null);
+
   /* Hydration guard */
   useEffect(() => setHydrated(true), []);
 
@@ -186,7 +193,36 @@ export default function CheckoutPage() {
   if (!hydrated) return null;
 
   const subtotal = totalPrice();
-  const total    = subtotal + SHIPPING_FEE;
+  // Mã miễn phí vận chuyển thì trừ luôn phí ship; các loại giảm khác (PERCENT/FIXED)
+  // trừ vào discountAmount đã tính sẵn từ backend (validatePromotionCode) - không tự
+  // tính lại ở FE để tránh lệch công thức với backend.
+  const shippingFee   = appliedPromo?.mienPhiVanChuyen ? 0 : SHIPPING_FEE;
+  const discountAmount = appliedPromo?.discountAmount ?? 0;
+  const total = Math.max(0, subtotal + shippingFee - discountAmount);
+
+  /* ── Áp dụng mã khuyến mãi ── */
+  const handleApplyPromo = async () => {
+    const code = promoInput.trim();
+    if (!code) return;
+    setPromoApplying(true);
+    setPromoError(null);
+    try {
+      const result = await validatePromotionCode(code, subtotal);
+      setAppliedPromo(result);
+      message.success(`Đã áp dụng mã "${result.code}"`);
+    } catch (err) {
+      setAppliedPromo(null);
+      setPromoError(err instanceof Error ? err.message : "Không áp dụng được mã khuyến mãi");
+    } finally {
+      setPromoApplying(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoError(null);
+    setPromoInput("");
+  };
 
   /* Redirect if cart is empty */
   if (items.length === 0) {
@@ -246,6 +282,7 @@ export default function CheckoutPage() {
         paymentMethod: values.paymentMethod,
         items: cartItemsToOrderItems(items),
         shippingFee: SHIPPING_FEE,
+        ...(appliedPromo ? { promotionId: appliedPromo.promotionId } : {}),
       };
       const result = await createOrder(payload, token);
       if (ONLINE_PAYMENT_METHODS.has(values.paymentMethod) && result.paymentUrl) {
@@ -672,11 +709,58 @@ export default function CheckoutPage() {
                     ))}
                   </div>
 
+                  {/* Mã khuyến mãi */}
+                  <div style={{ padding: "16px 24px", borderTop: "1px solid #f1f5f9" }}>
+                    {appliedPromo ? (
+                      <div
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "10px 12px", background: "#f0fdf4",
+                          border: "1px solid #bbf7d0", borderRadius: 8,
+                        }}
+                      >
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "#16a34a" }}>
+                          🎉 Mã &quot;{appliedPromo.code}&quot; đã áp dụng
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleRemovePromo}
+                          style={{ background: "none", border: "none", color: "#16a34a", cursor: "pointer", fontSize: 12, fontWeight: 600, padding: 0 }}
+                        >
+                          Xoá
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <Input
+                            placeholder="Nhập mã khuyến mãi"
+                            value={promoInput}
+                            onChange={(e) => setPromoInput(e.target.value)}
+                            onPressEnter={() => void handleApplyPromo()}
+                            style={{ height: 40, borderRadius: 8 }}
+                          />
+                          <Button
+                            onClick={() => void handleApplyPromo()}
+                            loading={promoApplying}
+                            disabled={!promoInput.trim()}
+                            style={{ height: 40, borderRadius: 8, flexShrink: 0 }}
+                          >
+                            Áp dụng
+                          </Button>
+                        </div>
+                        {promoError && (
+                          <p style={{ margin: "8px 0 0", fontSize: 12, color: "#dc2626" }}>{promoError}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+
                   {/* Totals */}
                   <div style={{ padding: "16px 24px", borderTop: "1px solid #f1f5f9" }}>
                     {[
                       { label: "Tạm tính", value: formatVND(subtotal) },
-                      { label: "Phí vận chuyển", value: formatVND(SHIPPING_FEE) },
+                      { label: "Phí vận chuyển", value: formatVND(shippingFee) },
                     ].map((r) => (
                       <div
                         key={r.label}
@@ -692,6 +776,21 @@ export default function CheckoutPage() {
                         <span style={{ fontWeight: 600, color: "#0f172a" }}>{r.value}</span>
                       </div>
                     ))}
+
+                    {discountAmount > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: 13,
+                          color: "#16a34a",
+                          marginBottom: 10,
+                        }}
+                      >
+                        <span>Giảm giá ({appliedPromo?.code})</span>
+                        <span style={{ fontWeight: 600 }}>−{formatVND(discountAmount)}</span>
+                      </div>
+                    )}
 
                     <div
                       style={{
