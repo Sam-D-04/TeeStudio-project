@@ -46,6 +46,8 @@ export type ChiTietDonHangItem = {
   productId: number;
   variantId: number;
   designId: number | null;
+  designStatus: "DRAFT" | "PENDING_REVIEW" | "NEEDS_REVISION" | "APPROVED" | null;
+  designAdminNote: string | null;
   productionStatus: string | null;
   tenSanPham: string;
   mauSac: string;
@@ -136,6 +138,7 @@ export type ThamSoLocDonHang = {
   gio?: string;
   loai?: string;
   tuKhoa?: string;
+  excludeStatus?: string;
 };
 
 // =====================================================================
@@ -174,6 +177,7 @@ export async function layDanhSachDonHang(
   if (thamSo.gio) params.gio = thamSo.gio;
   if (thamSo.loai && thamSo.loai !== "tat_ca") params.loai = thamSo.loai;
   if (thamSo.tuKhoa && thamSo.tuKhoa.trim()) params.tuKhoa = thamSo.tuKhoa.trim();
+  if (thamSo.excludeStatus) params.excludeStatus = thamSo.excludeStatus;
 
   const res = await apiClient.get<{ success: boolean; data: KetQuaDanhSach }>(
     "/admin/orders",
@@ -212,6 +216,18 @@ export async function capNhatTrangThaiDonHang({
     success: boolean;
     data: { id: number; trangThai: string };
   }>(`/admin/orders/${id}/status`, { trangThai, shippingCarrier, trackingCode });
+  return res.data.data;
+}
+
+/** Yêu cầu khách chỉnh sửa toàn bộ thiết kế thuộc đơn đang chờ xác nhận. */
+export async function yeuCauChinhSuaThietKeDonHang(
+  id: number,
+  ghiChu: string
+): Promise<{ id: number; designIds: number[]; designStatus: "NEEDS_REVISION" }> {
+  const res = await apiClient.patch<{
+    success: boolean;
+    data: { id: number; designIds: number[]; designStatus: "NEEDS_REVISION" };
+  }>(`/admin/orders/${id}/design-revision`, { ghiChu });
   return res.data.data;
 }
 

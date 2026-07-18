@@ -14,7 +14,8 @@
 export type TrangThaiThietKe =
   | "cho_kiem_tra"
   | "can_chinh_sua"
-  | "da_duyet";
+  | "da_duyet"
+  | "nhap";
 
 // Bảng cấu hình màu sắc + nhãn hiển thị cho từng trạng thái
 const CAU_HINH_TRANG_THAI: Record<
@@ -35,6 +36,11 @@ const CAU_HINH_TRANG_THAI: Record<
     nhan: "Đã duyệt",
     mauNen: "#dcfce7",   // Xanh lá nhạt
     mauChu: "#10b981",   // Xanh lá đậm
+  },
+  nhap: {
+    nhan: "Bản nháp",
+    mauNen: "#f1f5f9",   // Xám nhạt
+    mauChu: "#475569",   // Xám đậm
   },
 };
 

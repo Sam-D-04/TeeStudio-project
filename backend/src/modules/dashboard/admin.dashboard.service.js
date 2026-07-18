@@ -92,7 +92,7 @@ function formatNgay(date) {
  * Tính toán 7 chỉ số cho dashboard trong khoảng [tuNgay, denNgay]:
  *  - Doanh thu tháng (tổng totalAmount đơn COMPLETED)
  *  - Doanh thu từ thiết kế (tổng designFee trong khoảng)
- *  - Đơn hàng mới (PENDING trong khoảng)
+ *  - Tổng số đơn hàng tạo trong khoảng
  *  - Tồn kho mức thấp (variant available <= 15, bất kể thời gian)
  *  - Giá trị trung bình đơn (AOV = tổng / số đơn COMPLETED)
  *  - Tỷ lệ đơn hàng thành công (COMPLETED / (COMPLETED + CANCELLED))
@@ -138,12 +138,11 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
     [batDau, ketThuc]
   );
 
-  // --- Đơn hàng mới (PENDING) tạo trong khoảng thời gian ---
+  // --- Tổng số đơn hàng tạo trong khoảng thời gian ---
   const [rowsDonMoi] = await db.pool.query(
     `SELECT COUNT(*) AS so_don_moi
      FROM CustomerOrder
-     WHERE status = 'PENDING'
-       AND DATE(createdAt) >= ? AND DATE(createdAt) <= ?`,
+     WHERE DATE(createdAt) >= ? AND DATE(createdAt) <= ?`,
     [batDau, ketThuc]
   );
 
@@ -215,6 +214,7 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
   return {
     doanhThuThangVnd: doanhThu,
     doanhThuThietKeVnd: doanhThuThietKe,
+    tongSoDonHang: soDonMoi,
     soDonMoi,
     soVariantTonKhoThap: soVariantThap,
     giaTriTrungBinhDonVnd: aov,
@@ -261,24 +261,37 @@ function taoBanDoDoanhThu(rows) {
   );
 }
 
-function taoDanhSachTheoGio(batDau, doanhThuTheoMoc) {
+function taoBanDoDonDat(rows) {
+  return new Map(
+    rows.map((row) => [
+      row.moc_raw,
+      {
+        soDonDat: Number(row.so_don_dat) || 0,
+      },
+    ])
+  );
+}
+
+function taoDanhSachTheoGio(batDau, doanhThuTheoMoc, donDatTheoMoc) {
   return Array.from({ length: 24 }, (_, hour) => {
     const gio = String(hour).padStart(2, "0");
-    const thongKe = doanhThuTheoMoc.get(gio) || {
+    const thongKeDoanhThu = doanhThuTheoMoc.get(gio) || {
       doanhThuVnd: 0,
       soDonHoanTat: 0,
     };
+    const thongKeDonDat = donDatTheoMoc.get(gio) || { soDonDat: 0 };
 
     return {
       ngay: `${batDau}T${gio}:00:00`,
       nhan: `${gio}:00`,
-      doanhThuVnd: thongKe.doanhThuVnd,
-      soDonHoanTat: thongKe.soDonHoanTat,
+      doanhThuVnd: thongKeDoanhThu.doanhThuVnd,
+      soDonHoanTat: thongKeDoanhThu.soDonHoanTat,
+      soDonDat: thongKeDonDat.soDonDat,
     };
   });
 }
 
-function taoDanhSachTheoNgay(batDau, ketThuc, doanhThuTheoMoc) {
+function taoDanhSachTheoNgay(batDau, ketThuc, doanhThuTheoMoc, donDatTheoMoc) {
   const danhSachNgay = [];
   const [namBatDau, thangBatDau, ngayBatDau] = batDau.split("-").map(Number);
   const [namKetThuc, thangKetThuc, ngayKetThuc] = ketThuc.split("-").map(Number);
@@ -290,16 +303,18 @@ function taoDanhSachTheoNgay(batDau, ketThuc, doanhThuTheoMoc) {
     const thang = String(cursor.getUTCMonth() + 1).padStart(2, "0");
     const ngay = String(cursor.getUTCDate()).padStart(2, "0");
     const ngayRaw = `${nam}-${thang}-${ngay}`;
-    const thongKe = doanhThuTheoMoc.get(ngayRaw) || {
+    const thongKeDoanhThu = doanhThuTheoMoc.get(ngayRaw) || {
       doanhThuVnd: 0,
       soDonHoanTat: 0,
     };
+    const thongKeDonDat = donDatTheoMoc.get(ngayRaw) || { soDonDat: 0 };
 
     danhSachNgay.push({
       ngay: ngayRaw,
       nhan: `${ngay}/${thang}`,
-      doanhThuVnd: thongKe.doanhThuVnd,
-      soDonHoanTat: thongKe.soDonHoanTat,
+      doanhThuVnd: thongKeDoanhThu.doanhThuVnd,
+      soDonHoanTat: thongKeDoanhThu.soDonHoanTat,
+      soDonDat: thongKeDonDat.soDonDat,
     });
 
     cursor.setUTCDate(cursor.getUTCDate() + 1);
@@ -308,7 +323,7 @@ function taoDanhSachTheoNgay(batDau, ketThuc, doanhThuTheoMoc) {
   return danhSachNgay;
 }
 
-function taoDanhSachTheoThang(batDau, ketThuc, doanhThuTheoMoc) {
+function taoDanhSachTheoThang(batDau, ketThuc, doanhThuTheoMoc, donDatTheoMoc) {
   const danhSachThang = [];
   const [namBatDau, thangBatDau] = batDau.split("-").map(Number);
   const [namKetThuc, thangKetThuc] = ketThuc.split("-").map(Number);
@@ -321,16 +336,18 @@ function taoDanhSachTheoThang(batDau, ketThuc, doanhThuTheoMoc) {
     const thangSo = cursor.getUTCMonth() + 1;
     const thang = String(thangSo).padStart(2, "0");
     const thangRaw = `${nam}-${thang}`;
-    const thongKe = doanhThuTheoMoc.get(thangRaw) || {
+    const thongKeDoanhThu = doanhThuTheoMoc.get(thangRaw) || {
       doanhThuVnd: 0,
       soDonHoanTat: 0,
     };
+    const thongKeDonDat = donDatTheoMoc.get(thangRaw) || { soDonDat: 0 };
 
     danhSachThang.push({
       ngay: `${thangRaw}-01`,
       nhan: quaNhieuNam ? `T${thangSo}/${nam}` : `Tháng ${thangSo}`,
-      doanhThuVnd: thongKe.doanhThuVnd,
-      soDonHoanTat: thongKe.soDonHoanTat,
+      doanhThuVnd: thongKeDoanhThu.doanhThuVnd,
+      soDonHoanTat: thongKeDoanhThu.soDonHoanTat,
+      soDonDat: thongKeDonDat.soDonDat,
     });
 
     cursor.setUTCMonth(cursor.getUTCMonth() + 1);
@@ -342,27 +359,26 @@ function taoDanhSachTheoThang(batDau, ketThuc, doanhThuTheoMoc) {
 function taoTongHopBieuDo(danhSach) {
   const tongDoanhThuVnd = danhSach.reduce((sum, row) => sum + row.doanhThuVnd, 0);
   const tongDonHoanTat = danhSach.reduce((sum, row) => sum + row.soDonHoanTat, 0);
+  const tongSoDonDat = danhSach.reduce((sum, row) => sum + row.soDonDat, 0);
   const doanhThuLonNhatVnd = danhSach.reduce(
     (max, r) => Math.max(max, r.doanhThuVnd),
     0
   );
 
-  return { tongDoanhThuVnd, tongDonHoanTat, doanhThuLonNhatVnd };
+  return { tongDoanhThuVnd, tongDonHoanTat, tongSoDonDat, doanhThuLonNhatVnd };
 }
 
 async function layDuLieuBieuDo(tuNgay, denNgay) {
   const [batDau, ketThuc] = chuanHoaKhoangNgay(tuNgay, denNgay);
   const groupBy = xacDinhDonViNhom(batDau, ketThuc);
-  let rows;
+  let rowsDoanhThu;
+  let rowsDonDat;
   let danhSach;
 
   if (groupBy === "hour") {
-    [rows] = await db.pool.query(
+    [rowsDoanhThu] = await db.pool.query(
       `SELECT
-         DATE_FORMAT(
-           GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt)),
-           '%H'
-         ) AS moc_raw,
+         DATE_FORMAT(COALESCE(pRevenue.fullyPaidAt, co.updatedAt), '%H') AS moc_raw,
          COALESCE(SUM(co.totalAmount), 0) AS doanh_thu,
          COUNT(*)                      AS so_don_hoan_tat
        FROM CustomerOrder co
@@ -374,19 +390,32 @@ async function layDuLieuBieuDo(tuNgay, denNgay) {
          GROUP BY orderId
        ) pRevenue ON pRevenue.orderId = co.id
        WHERE co.status = 'COMPLETED'
-         AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) = ?
+         AND co.paymentStatus = 'PAID'
+         AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) = ?
        GROUP BY moc_raw
        ORDER BY moc_raw ASC`,
       [batDau]
     );
-    danhSach = taoDanhSachTheoGio(batDau, taoBanDoDoanhThu(rows));
-  } else if (groupBy === "month") {
-    [rows] = await db.pool.query(
+    [rowsDonDat] = await db.pool.query(
       `SELECT
-         DATE_FORMAT(
-           GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt)),
-           '%Y-%m'
-         ) AS moc_raw,
+         DATE_FORMAT(createdAt, '%H') AS moc_raw,
+         COUNT(*)                    AS so_don_dat
+       FROM CustomerOrder
+       WHERE status <> 'CANCELLED'
+         AND DATE(createdAt) = ?
+       GROUP BY moc_raw
+       ORDER BY moc_raw ASC`,
+      [batDau]
+    );
+    danhSach = taoDanhSachTheoGio(
+      batDau,
+      taoBanDoDoanhThu(rowsDoanhThu),
+      taoBanDoDonDat(rowsDonDat)
+    );
+  } else if (groupBy === "month") {
+    [rowsDoanhThu] = await db.pool.query(
+      `SELECT
+         DATE_FORMAT(COALESCE(pRevenue.fullyPaidAt, co.updatedAt), '%Y-%m') AS moc_raw,
          COALESCE(SUM(co.totalAmount), 0)   AS doanh_thu,
          COUNT(*)                        AS so_don_hoan_tat
        FROM CustomerOrder co
@@ -398,8 +427,21 @@ async function layDuLieuBieuDo(tuNgay, denNgay) {
          GROUP BY orderId
        ) pRevenue ON pRevenue.orderId = co.id
        WHERE co.status = 'COMPLETED'
-         AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) >= ?
-         AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) <= ?
+         AND co.paymentStatus = 'PAID'
+         AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) >= ?
+         AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) <= ?
+       GROUP BY moc_raw
+       ORDER BY moc_raw ASC`,
+      [batDau, ketThuc]
+    );
+    [rowsDonDat] = await db.pool.query(
+      `SELECT
+         DATE_FORMAT(createdAt, '%Y-%m') AS moc_raw,
+         COUNT(*)                       AS so_don_dat
+       FROM CustomerOrder
+       WHERE status <> 'CANCELLED'
+         AND DATE(createdAt) >= ?
+         AND DATE(createdAt) <= ?
        GROUP BY moc_raw
        ORDER BY moc_raw ASC`,
       [batDau, ketThuc]
@@ -407,15 +449,13 @@ async function layDuLieuBieuDo(tuNgay, denNgay) {
     danhSach = taoDanhSachTheoThang(
       batDau,
       ketThuc,
-      taoBanDoDoanhThu(rows)
+      taoBanDoDoanhThu(rowsDoanhThu),
+      taoBanDoDonDat(rowsDonDat)
     );
   } else {
-    [rows] = await db.pool.query(
+    [rowsDoanhThu] = await db.pool.query(
       `SELECT
-         DATE_FORMAT(
-           GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt)),
-           '%Y-%m-%d'
-         ) AS moc_raw,
+         DATE_FORMAT(COALESCE(pRevenue.fullyPaidAt, co.updatedAt), '%Y-%m-%d') AS moc_raw,
          COALESCE(SUM(co.totalAmount), 0)      AS doanh_thu,
          COUNT(*)                           AS so_don_hoan_tat
        FROM CustomerOrder co
@@ -427,13 +467,31 @@ async function layDuLieuBieuDo(tuNgay, denNgay) {
          GROUP BY orderId
        ) pRevenue ON pRevenue.orderId = co.id
        WHERE co.status = 'COMPLETED'
-         AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) >= ?
-         AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) <= ?
+         AND co.paymentStatus = 'PAID'
+         AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) >= ?
+         AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) <= ?
        GROUP BY moc_raw
        ORDER BY moc_raw ASC`,
       [batDau, ketThuc]
     );
-    danhSach = taoDanhSachTheoNgay(batDau, ketThuc, taoBanDoDoanhThu(rows));
+    [rowsDonDat] = await db.pool.query(
+      `SELECT
+         DATE_FORMAT(createdAt, '%Y-%m-%d') AS moc_raw,
+         COUNT(*)                          AS so_don_dat
+       FROM CustomerOrder
+       WHERE status <> 'CANCELLED'
+         AND DATE(createdAt) >= ?
+         AND DATE(createdAt) <= ?
+       GROUP BY moc_raw
+       ORDER BY moc_raw ASC`,
+      [batDau, ketThuc]
+    );
+    danhSach = taoDanhSachTheoNgay(
+      batDau,
+      ketThuc,
+      taoBanDoDoanhThu(rowsDoanhThu),
+      taoBanDoDonDat(rowsDonDat)
+    );
   }
 
   return {

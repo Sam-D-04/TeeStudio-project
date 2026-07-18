@@ -10,19 +10,17 @@
  *  4. Sản phẩm/Màu  – tên áo + chấm màu + nhãn màu
  *  5. Vị trí in      – ví dụ "Ngực trái"
  *  6. Trạng thái     – badge màu (component DesignStatusBadge)
- *  7. Thao tác       – nút Xem / Yêu cầu chỉnh sửa / Duyệt
+ *  7. Thao tác       – nút Xem + nút Sửa
  *
  * Props:
  *  - danhSach: danh sách thiết kế cần hiển thị
  *  - onXem: hàm gọi khi click "Xem"
- *  - onYeuCauChinhSua: hàm gọi khi click "Yêu cầu chỉnh sửa"
- *  - onDuyet: hàm gọi khi click "Duyệt"
+ *  - onSua: hàm gọi khi click "Sửa" (điều hướng sang trang Editor)
  */
 
 import {
   EyeOutlined,
   EditOutlined,
-  CheckOutlined,
 } from "@ant-design/icons";
 import DesignStatusBadge, { type TrangThaiThietKe } from "./DesignStatusBadge";
 import DesignPreview from "./DesignPreview";
@@ -40,22 +38,23 @@ export type ThietKe = {
   tenMauAo: string;         // Ví dụ "Đen"
   viTriIn: string;          // Ví dụ "Ngực trái"
   trangThai: TrangThaiThietKe;
+  coDonHang?: boolean;
+  duocPhepSua?: boolean;
+  lyDoKhoaSua?: string | null;
   ngayGui: string;          // Ngày gửi thiết kế, ví dụ "03/06/2026"
 };
 
 type DesignTableProps = {
   danhSach: ThietKe[];
   onXem: (id: number) => void;
-  onYeuCauChinhSua: (id: number) => void;
-  onDuyet: (id: number) => void;
+  onSua: (id: number) => void;
   dangXuLy?: boolean;  // true khi đang có mutation chạy → disable nút
 };
 
 export default function DesignTable({
   danhSach,
   onXem,
-  onYeuCauChinhSua,
-  onDuyet,
+  onSua,
   dangXuLy = false,
 }: DesignTableProps) {
   // Trường hợp không có dữ liệu
@@ -123,8 +122,7 @@ export default function DesignTable({
               key={tk.id}
               thietKe={tk}
               onXem={onXem}
-              onYeuCauChinhSua={onYeuCauChinhSua}
-              onDuyet={onDuyet}
+              onSua={onSua}
               dangXuLy={dangXuLy}
             />
           ))}
@@ -141,19 +139,18 @@ export default function DesignTable({
 function HangThietKe({
   thietKe,
   onXem,
-  onYeuCauChinhSua,
-  onDuyet,
+  onSua,
   dangXuLy = false,
 }: {
   thietKe: ThietKe;
   onXem: (id: number) => void;
-  onYeuCauChinhSua: (id: number) => void;
-  onDuyet: (id: number) => void;
+  onSua: (id: number) => void;
   dangXuLy?: boolean;
 }) {
-  // Xác định có nên hiển thị nút "Duyệt" không
-  // Chỉ hiện khi thiết kế đang ở trạng thái "Chờ kiểm tra"
-  const coTheXetDuyet = thietKe.trangThai === "cho_kiem_tra";
+  const editTitle =
+    thietKe.duocPhepSua === false
+      ? thietKe.lyDoKhoaSua || "Thiết kế này không thể chỉnh sửa"
+      : "Sửa thiết kế cho khách";
 
   return (
     <tr
@@ -249,27 +246,14 @@ function HangThietKe({
             disabled={dangXuLy}
           />
 
-          {/* Nút Yêu cầu chỉnh sửa – chỉ hiện khi đang "Chờ kiểm tra" */}
-          {coTheXetDuyet && (
-            <NutThaoTac
-              icon={<EditOutlined />}
-              title="Yêu cầu khách chỉnh sửa"
-              onClick={() => onYeuCauChinhSua(thietKe.id)}
-              mauHover="#ea580c"
-              disabled={dangXuLy}
-            />
-          )}
-
-          {/* Nút Duyệt – chỉ hiện khi đang "Chờ kiểm tra" */}
-          {coTheXetDuyet && (
-            <NutThaoTac
-              icon={<CheckOutlined />}
-              title="Duyệt thiết kế"
-              onClick={() => onDuyet(thietKe.id)}
-              laNutChinh
-              disabled={dangXuLy}
-            />
-          )}
+          {/* Nút Sửa – điều hướng Admin sang trang Editor để sửa thiết kế */}
+          <NutThaoTac
+            icon={<EditOutlined />}
+            title={editTitle}
+            onClick={() => onSua(thietKe.id)}
+            disabled={dangXuLy || thietKe.duocPhepSua === false}
+            mauHover="#f59e0b"
+          />
         </div>
       </td>
     </tr>

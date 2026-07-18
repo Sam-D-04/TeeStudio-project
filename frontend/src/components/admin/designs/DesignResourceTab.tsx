@@ -7,18 +7,21 @@
  *  - GET /api/admin/designs/stickers
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Modal } from "antd";
 import {
   PlusOutlined,
   DeleteOutlined,
   PictureOutlined,
+  UploadOutlined,
   LoadingOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
 
 import * as designService from "@/services/admin/designService";
 import type { Sticker } from "@/services/admin/designService";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 
 // Màu nền cho từng loại sticker (khi chưa có ảnh thật)
 const MAU_NEN_LOAI: Record<string, string> = {
@@ -41,9 +44,16 @@ export default function DesignResourceTab() {
   const [hienFormSticker, setHienFormSticker] = useState(false);
   const [formSticker, setFormSticker] = useState({
     ten: "",
-    urlAnh: "",
     loai: "hinh_ve" as "logo" | "hinh_ve" | "chu_viet",
   });
+  const [anhSticker, setAnhSticker] = useState<File | null>(null);
+  const [xemTruocAnh, setXemTruocAnh] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (xemTruocAnh) URL.revokeObjectURL(xemTruocAnh);
+    };
+  }, [xemTruocAnh]);
 
   // ─── Fetch sticker ──────────────────────────────────────────────────────
   const {
@@ -61,16 +71,18 @@ export default function DesignResourceTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stickers-admin"] });
       setHienFormSticker(false);
-      setFormSticker({ ten: "", urlAnh: "", loai: "hinh_ve" });
+      setFormSticker({ ten: "", loai: "hinh_ve" });
+      setAnhSticker(null);
+      setXemTruocAnh("");
     },
-    onError: (err: Error) => alert(`Lỗi: ${err.message}`),
+    onError: (error) => alert(getApiErrorMessage(error, "Không thể thêm sticker")),
   });
 
   // ─── Mutation: Xóa sticker ──────────────────────────────────────────────
   const mutationXoaSticker = useMutation({
     mutationFn: designService.xoaSticker,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["stickers-admin"] }),
-    onError: (err: Error) => alert(`Lỗi khi xóa sticker: ${err.message}`),
+    onError: (error) => alert(getApiErrorMessage(error, "Không thể xóa sticker")),
   });
 
   // ─── Handlers ───────────────────────────────────────────────────────────
@@ -83,8 +95,35 @@ export default function DesignResourceTab() {
   function xuLyGuiFormSticker(e: React.FormEvent) {
     e.preventDefault();
     if (!formSticker.ten.trim()) return alert("Vui lòng nhập tên sticker");
-    if (!formSticker.urlAnh.trim()) return alert("Vui lòng nhập URL ảnh sticker");
-    mutationThemSticker.mutate(formSticker);
+    if (!anhSticker) return alert("Vui lòng chọn ảnh sticker");
+    mutationThemSticker.mutate({ ...formSticker, ten: formSticker.ten.trim(), anh: anhSticker });
+  }
+
+  function xuLyChonAnh(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const acceptedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
+    if (!acceptedTypes.includes(file.type)) {
+      e.target.value = "";
+      return alert("Ảnh sticker phải là JPG, PNG, WEBP, GIF hoặc SVG");
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      e.target.value = "";
+      return alert("Ảnh sticker không được vượt quá 5 MB");
+    }
+
+    setAnhSticker(file);
+    setXemTruocAnh(URL.createObjectURL(file));
+  }
+
+  function dongModalSticker() {
+    if (mutationThemSticker.isPending) return;
+    setHienFormSticker(false);
+    setFormSticker({ ten: "", loai: "hinh_ve" });
+    setAnhSticker(null);
+    setXemTruocAnh("");
   }
 
   // Style chung cho input/select trong form
@@ -121,7 +160,7 @@ export default function DesignResourceTab() {
           </div>
 
           <button
-            onClick={() => setHienFormSticker(!hienFormSticker)}
+            onClick={() => setHienFormSticker(true)}
             style={{
               height: 36, padding: "0 14px", display: "flex", alignItems: "center", gap: 6,
               background: "#0ea5e9", border: "none", borderRadius: 8,
@@ -133,16 +172,24 @@ export default function DesignResourceTab() {
           </button>
         </div>
 
-        {/* Form thêm sticker */}
-        {hienFormSticker && (
+        <Modal
+          title="Thêm sticker"
+          open={hienFormSticker}
+          onCancel={dongModalSticker}
+          footer={null}
+          centered
+          width={480}
+          destroyOnHidden
+          mask={{ closable: !mutationThemSticker.isPending }}
+          closable={!mutationThemSticker.isPending}
+        >
           <form
             onSubmit={xuLyGuiFormSticker}
             style={{
-              background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12,
-              padding: 16, marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end",
+              paddingTop: 12, display: "flex", flexDirection: "column", gap: 16,
             }}
           >
-            <div style={{ flex: "1 1 180px" }}>
+            <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 4 }}>
                 Tên sticker *
               </label>
@@ -153,18 +200,71 @@ export default function DesignResourceTab() {
                 onChange={(e) => setFormSticker((f) => ({ ...f, ten: e.target.value }))}
               />
             </div>
-            <div style={{ flex: "2 1 260px" }}>
+            <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 4 }}>
-                URL ảnh (Cloudinary) *
+                Ảnh sticker *
               </label>
               <input
-                style={styleInput}
-                placeholder="https://res.cloudinary.com/..."
-                value={formSticker.urlAnh}
-                onChange={(e) => setFormSticker((f) => ({ ...f, urlAnh: e.target.value }))}
+                id="sticker-image-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                onChange={xuLyChonAnh}
+                style={{ display: "none" }}
               />
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <label
+                  htmlFor="sticker-image-input"
+                  style={{
+                    height: 38,
+                    padding: "0 14px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 7,
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    background: "#ffffff",
+                    color: "#334155",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <UploadOutlined />
+                  Chọn ảnh
+                </label>
+                <span
+                  title={anhSticker?.name}
+                  style={{
+                    minWidth: 0,
+                    flex: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    color: anhSticker ? "#334155" : "#94a3b8",
+                    fontSize: 12,
+                  }}
+                >
+                  {anhSticker?.name || "Chưa chọn ảnh"}
+                </span>
+              </div>
+              <p style={{ margin: "5px 0 0", fontSize: 11, color: "#94a3b8" }}>
+                JPG, PNG, WEBP, GIF hoặc SVG. Tối đa 5 MB.
+              </p>
+              {xemTruocAnh && (
+                <div style={{
+                  marginTop: 10, width: 96, height: 96, border: "1px solid #e2e8f0",
+                  borderRadius: 8, overflow: "hidden", background: "#f8fafc",
+                }}>
+                  <img
+                    src={xemTruocAnh}
+                    alt="Xem trước sticker"
+                    style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                  />
+                </div>
+              )}
             </div>
-            <div style={{ flex: "1 1 140px" }}>
+            <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 4 }}>
                 Loại *
               </label>
@@ -178,7 +278,19 @@ export default function DesignResourceTab() {
                 <option value="chu_viet">Chữ viết</option>
               </select>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={dongModalSticker}
+                disabled={mutationThemSticker.isPending}
+                style={{
+                  height: 38, padding: "0 16px", background: "#ffffff",
+                  border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13,
+                  cursor: mutationThemSticker.isPending ? "not-allowed" : "pointer", color: "#475569",
+                }}
+              >
+                Hủy
+              </button>
               <button
                 type="submit"
                 disabled={mutationThemSticker.isPending}
@@ -188,21 +300,11 @@ export default function DesignResourceTab() {
                   cursor: mutationThemSticker.isPending ? "not-allowed" : "pointer",
                 }}
               >
-                {mutationThemSticker.isPending ? "Đang lưu..." : "Lưu"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setHienFormSticker(false)}
-                style={{
-                  height: 38, padding: "0 16px", background: "#ffffff",
-                  border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "#475569",
-                }}
-              >
-                Hủy
+                {mutationThemSticker.isPending ? "Đang tải lên..." : "Thêm sticker"}
               </button>
             </div>
           </form>
-        )}
+        </Modal>
 
         {/* Loading / Error sticker */}
         {dangTaiSticker && (

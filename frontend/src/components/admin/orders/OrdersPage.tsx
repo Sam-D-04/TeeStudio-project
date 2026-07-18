@@ -63,6 +63,7 @@ export type OrdersInitialFilters = {
   endDate?: string;
   dateField?: "created" | "completed";
   hour?: string;
+  excludeStatus?: string;
 };
 
 type OrdersPageProps = {
@@ -84,6 +85,9 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
   );
   const [completionHour, setCompletionHour] = useState(
     initialFilters?.hour ?? ""
+  );
+  const [excludeStatus, setExcludeStatus] = useState(
+    initialFilters?.excludeStatus ?? ""
   );
   const [typeFilter, setTypeFilter] = useState("tat_ca");
   const [tuKhoa, setTuKhoa] = useState("");
@@ -131,6 +135,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
       denNgay,
       dateField,
       completionHour,
+      excludeStatus,
       typeFilter,
       tuKhoa,
     ],
@@ -146,6 +151,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
         gio: completionHour,
         loai: typeFilter,
         tuKhoa,
+        excludeStatus,
       }),
   });
 
@@ -168,6 +174,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
       setDateField("created");
       setCompletionHour("");
     }
+    setExcludeStatus("");
     setCurrentPage(1);
     if (key === "tat_ca") {
       router.push("/admin/don-hang");
@@ -178,12 +185,14 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
     setTuNgay(startDate);
     setDenNgay(endDate);
     setCompletionHour("");
+    setExcludeStatus("");
     setCurrentPage(1);
   }
   function handleDateClear() {
     setTuNgay("");
     setDenNgay("");
     setCompletionHour("");
+    setExcludeStatus("");
     setCurrentPage(1);
   }
   function handleTypeChange(v: string) { setTypeFilter(v); setCurrentPage(1); }
@@ -196,6 +205,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
     setTuNgay("");
     setDenNgay("");
     setCompletionHour("");
+    setExcludeStatus("");
     setCurrentPage(1);
     setResetKey((prev) => prev + 1);
     router.push("/admin/don-hang");

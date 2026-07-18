@@ -164,6 +164,24 @@
 }
 
 /* =========================================
+   ANT DESIGN APP WRAPPER OVERRIDES
+   ========================================= */
+@layer base {
+  .ant-app {
+    background-color: transparent !important;
+    color: inherit !important;
+    font-family: inherit !important;
+  }
+  .ant-app a {
+    color: inherit;
+    text-decoration: inherit;
+  }
+  .ant-app a:hover {
+    color: inherit;
+  }
+}
+
+/* =========================================
    UTILITY CLASSES
    ========================================= */
 
@@ -295,4 +313,44 @@
 .ant-btn-primary {
   font-weight: 600 !important;
   letter-spacing: 0.01em !important;
+}
+
+.design-detail-modal .ant-modal-content {
+  overflow: hidden;
+}
+
+.design-detail-modal .ant-modal-close {
+  inset-inline-end: 30px;
+  top: 14px;
+  z-index: 3;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
+.design-detail-modal .ant-modal-close:hover,
+.design-detail-modal .ant-modal-close:focus-visible {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.design-detail-modal .design-detail-modal-scroll {
+  max-height: calc(100vh - 128px);
+  overflow-y: auto;
+  padding: 4px 28px 24px 24px;
+  scrollbar-gutter: stable;
+}
+
+.design-detail-modal .design-revision-note-field .ant-input-textarea-show-count::after {
+  display: block;
+  float: none;
+  margin-top: 4px;
+  text-align: right;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 16px;
 }

@@ -1,0 +1,140 @@
+flowchart TD
+  A["Hệ thống quản trị TeeStudio<br/>Sơ đồ chức năng tổng quát theo 9 menu AdminSidebar"]
+
+  A --> M1
+  A --> M2
+  A --> M3
+  A --> M4
+  A --> M5
+  A --> M6
+  A --> M7
+  A --> M8
+  A --> M9
+
+  subgraph G1["1. Tổng quan (/admin) - ADMIN"]
+    direction TB
+    M1["Tổng quan"]
+    M1 --> M1_1["Lọc dữ liệu dashboard theo khoảng thời gian"]
+    M1 --> M1_2["Xem KPI vận hành: doanh thu, đơn hàng, đơn mới, giá trị trung bình đơn, tỷ lệ thành công, tỷ lệ hủy"]
+    M1 --> M1_3["Xem biểu đồ doanh thu và số đơn theo giờ/ngày/tháng"]
+    M1 --> M1_4["Theo dõi thiết kế cần xử lý và mở nhanh sang Thiết kế & In ấn"]
+    M1 --> M1_5["Theo dõi cảnh báo tồn kho thấp và mở nhanh sang Kho hàng"]
+    M1 --> M1_6["Xem top sản phẩm bán chạy"]
+  end
+
+  subgraph G2["2. Thống kê (/admin/thong-ke) - ADMIN"]
+    direction TB
+    M2["Thống kê"]
+    M2 --> M2_1["Lọc báo cáo theo khoảng thời gian"]
+    M2 --> M2_2["Xem chỉ số tổng hợp: doanh thu, số đơn, số sản phẩm bán ra, giá trị trung bình đơn"]
+    M2 --> M2_3["So sánh chỉ số với kỳ trước"]
+    M2 --> M2_4["Đối soát tài chính: doanh thu ghi nhận, tiền đã thu, COD đang treo, đơn đã thanh toán đủ"]
+    M2 --> M2_5["Xem biểu đồ doanh thu theo ngày/tháng"]
+    M2 --> M2_6["Xem bảng top sản phẩm bán chạy"]
+    M2 --> M2_7["Xem phân bổ trạng thái đơn hàng và tình trạng thanh toán"]
+    M2 --> M2_8["Xuất báo cáo thống kê Excel theo khoảng ngày đã chọn"]
+  end
+
+  subgraph G3["3. Đơn hàng (/admin/don-hang) - ADMIN, PRODUCTION"]
+    direction TB
+    M3["Đơn hàng"]
+    M3 --> M3_1["Xem KPI: đơn mới, đang xử lý in, chờ thanh toán, hoàn tất hôm nay"]
+    M3 --> M3_2["Xem danh sách đơn hàng có phân trang"]
+    M3 --> M3_3["Lọc theo trạng thái: tất cả, chờ xác nhận, đã xác nhận, đang xử lý in, chờ giao, đang giao, hoàn tất, đã hủy"]
+    M3 --> M3_4["Lọc theo thanh toán, khoảng ngày, loại đơn và tìm kiếm mã đơn/khách hàng"]
+    M3 --> M3_5["Xem chi tiết đơn: khách hàng, thanh toán, vận chuyển, sản phẩm, chi phí, lịch sử xử lý"]
+    M3 --> M3_6["Tạo đơn mới: chọn khách hàng, địa chỉ, áo mẫu hoặc áo POD, biến thể màu/size, số lượng"]
+    M3 --> M3_7["Áp dụng khuyến mãi, phí giao hàng, phương thức COD/VNPAY/MOMO, thanh toán FULL hoặc DEPOSIT"]
+    M3 --> M3_8["Cập nhật trạng thái theo luồng: chờ xác nhận -> đã xác nhận -> đang xử lý in -> chờ giao -> đang giao -> hoàn tất"]
+    M3 --> M3_9["Nhập đơn vị vận chuyển và mã vận đơn khi chuyển sang đang giao"]
+    M3 --> M3_10["Yêu cầu khách chỉnh sửa thiết kế khi đơn POD chưa đạt"]
+    M3 --> M3_11["Hủy đơn kèm lý do và hoàn trả dữ liệu tồn kho liên quan"]
+    M3 --> M3_12["Sửa địa chỉ giao hàng khi đơn còn trong trạng thái cho phép"]
+    M3 --> M3_13["Hiển thị, sao chép hoặc tạo lại mã QR thanh toán online khi còn pending/hết hạn/thất bại"]
+  end
+
+  subgraph G4["4. Sản phẩm / Phôi áo (/admin/san-pham-phoi-ao) - ADMIN, WAREHOUSE"]
+    direction TB
+    M4["Sản phẩm / Phôi áo"]
+    M4 --> M4_1["Xem KPI: tổng phôi áo, đang hiển thị, tổng biến thể, sắp hết hàng"]
+    M4 --> M4_2["Xem danh sách phôi áo có phân trang và mở rộng danh sách biến thể"]
+    M4 --> M4_3["Tìm kiếm và lọc theo danh mục, trạng thái hiển thị, tình trạng tồn kho"]
+    M4 --> M4_4["Xem chi tiết phôi áo ở chế độ chỉ đọc"]
+    M4 --> M4_5["Tạo phôi áo mới: danh mục, tên, giá nền, chất liệu, form, xuất xứ, mô tả"]
+    M4 --> M4_6["Tạo biến thể màu/size/SKU cho phôi áo"]
+    M4 --> M4_7["Sửa thông tin phôi áo và trạng thái hiển thị"]
+    M4 --> M4_8["Sửa hoặc bổ sung biến thể màu/size/SKU"]
+    M4 --> M4_9["Xóa hoặc ẩn phôi áo theo ràng buộc giao dịch"]
+    M4 --> M4_10["Theo dõi panel cảnh báo tồn kho thấp và điều hướng sang nhập kho"]
+  end
+
+  subgraph G5["5. Thiết kế & In ấn (/admin/thiet-ke) - ADMIN, PRODUCTION"]
+    direction TB
+    M5["Thiết kế & In ấn"]
+    M5 --> M5_1["Xem KPI: thiết kế chờ kiểm tra, cần chỉnh sửa, đơn chờ gửi xưởng, đơn đang in"]
+    M5 --> M5_2["Tab Thiết kế khách hàng: xem danh sách, tìm kiếm, lọc trạng thái, vị trí in, khoảng ngày"]
+    M5 --> M5_3["Xem modal chi tiết thiết kế: preview, khách hàng, sản phẩm, đơn liên quan, phí, ghi chú"]
+    M5 --> M5_4["Duyệt thiết kế hoặc yêu cầu khách chỉnh sửa kèm ghi chú phản hồi"]
+    M5 --> M5_5["Sửa thiết kế trong Admin Editor: tải canvas, chỉnh nội dung, upload ảnh, lưu preview"]
+    M5 --> M5_6["Gán hoặc gỡ khách hàng khỏi thiết kế trong Editor"]
+    M5 --> M5_7["Tạo thiết kế DRAFT cho khách bằng Admin Design Studio và chọn biến thể còn tồn"]
+    M5 --> M5_8["Tab Đơn cần in: xem danh sách, lọc trạng thái, tìm kiếm, lọc ngày đặt"]
+    M5 --> M5_9["Cập nhật tiến độ in: chờ gửi xưởng -> đang in -> đã in xong"]
+    M5 --> M5_10["Mở chi tiết đơn hàng liên quan từ đơn cần in"]
+    M5 --> M5_11["Tab Tài nguyên thiết kế: xem, thêm, xóa sticker/logo/hình vẽ/chữ viết"]
+  end
+
+  subgraph G6["6. Kho hàng (/admin/kho-hang) - ADMIN, WAREHOUSE"]
+    direction TB
+    M6["Kho hàng"]
+    M6 --> M6_1["Xem KPI: tổng phôi còn tồn, biến thể sắp hết, cần xuất cho đơn in, nhập kho trong tháng"]
+    M6 --> M6_2["Xem danh sách tồn kho theo biến thể màu/size/SKU có phân trang"]
+    M6 --> M6_3["Tìm kiếm và lọc theo tồn thấp, sắp hết, hết hàng, cần xuất đơn in, nhập tháng này"]
+    M6 --> M6_4["Xem drawer chi tiết tồn kho: số tồn, số giữ, khả dụng, đơn chờ xuất, lịch sử biến động gần đây"]
+    M6 --> M6_5["Ghi giao dịch kho: nhập từ nhà cung cấp, hoàn trả, xuất kho, điều chỉnh tồn"]
+    M6 --> M6_6["Trang Nhập kho: nhập nhiều dòng sản phẩm/biến thể/số lượng/nhà cung cấp/lý do"]
+    M6 --> M6_7["Tạo nhanh nhà cung cấp từ màn hình nhập kho"]
+    M6 --> M6_8["Trang Lịch sử kho: xem giao dịch IMPORT, EXPORT, ORDER_EXPORT, RETURN, ADJUSTMENT"]
+    M6 --> M6_9["Tìm kiếm và lọc lịch sử kho theo loại giao dịch"]
+  end
+
+  subgraph G7["7. Thanh toán (/admin/thanh-toan) - ADMIN"]
+    direction TB
+    M7["Thanh toán"]
+    M7 --> M7_1["Xem KPI: tổng tiền hôm nay, giao dịch chờ thanh toán, cần đối soát, thất bại"]
+    M7 --> M7_2["Xem danh sách giao dịch có phân trang"]
+    M7 --> M7_3["Tìm kiếm và lọc theo trạng thái, phương thức thanh toán, khoảng ngày tạo/ngày thanh toán"]
+    M7 --> M7_4["Xem drawer chi tiết giao dịch: mã thanh toán, đơn hàng, khách hàng, IPN history"]
+    M7 --> M7_5["Xác nhận đã thu tiền COD cho giao dịch cần đối soát"]
+    M7 --> M7_6["Lưu ghi chú kế toán cho giao dịch"]
+    M7 --> M7_7["Xuất báo cáo thanh toán Excel theo bộ lọc hiện tại"]
+  end
+
+  subgraph G8["8. Khuyến mãi & Báo giá (/admin/khuyen-mai-bao-gia) - ADMIN"]
+    direction TB
+    M8["Khuyến mãi & Báo giá"]
+    M8 --> M8_1["Xem KPI: mã đang hoạt động, sắp hết hạn, lượt dùng tháng này, tiền đã giảm tháng này"]
+    M8 --> M8_2["Tab Mã khuyến mãi: xem danh sách, tìm kiếm, lọc trạng thái, loại giảm, khoảng ngày"]
+    M8 --> M8_3["Tạo, xem, sửa, xóa mã khuyến mãi"]
+    M8 --> M8_4["Thiết lập loại giảm: phần trăm, số tiền, miễn phí vận chuyển"]
+    M8 --> M8_5["Thiết lập điều kiện: đơn tối thiểu, ngày bắt đầu/kết thúc, giới hạn lượt, chỉ khách mới, trạng thái"]
+    M8 --> M8_6["Tab Giá số lượng lớn: xem sản phẩm, tạo/sửa/xóa mức giảm theo số lượng"]
+    M8 --> M8_7["Tab Phụ phí in & thiết kế: sửa giá trị phụ phí, bật/tắt phụ phí theo vị trí in và phương pháp in"]
+    M8 --> M8_8["Tab Công thức báo giá: cập nhật phí vận chuyển mặc định, ngưỡng miễn phí, VAT"]
+    M8 --> M8_9["Xem trước kết quả báo giá sau cấu hình"]
+  end
+
+  subgraph G9["9. Tài khoản (/admin/tai-khoan) - ADMIN"]
+    direction TB
+    M9["Tài khoản"]
+    M9 --> M9_1["Tab Khách hàng: xem thống kê tổng tài khoản, đang hoạt động, đã vô hiệu hóa"]
+    M9 --> M9_2["Xem danh sách khách hàng có phân trang"]
+    M9 --> M9_3["Tìm kiếm khách hàng và lọc theo trạng thái"]
+    M9 --> M9_4["Tạo tài khoản khách hàng mới; hệ thống tự xử lý mật khẩu/gửi thông tin"]
+    M9 --> M9_5["Sửa họ tên, số điện thoại, email và trạng thái tài khoản khách hàng"]
+    M9 --> M9_6["Vô hiệu hóa hoặc khôi phục tài khoản khách hàng"]
+    M9 --> M9_7["Tab Nhân sự nội bộ: xem danh sách nhân sự ADMIN, WAREHOUSE, PRODUCTION"]
+    M9 --> M9_8["Tìm kiếm nhân sự và lọc theo trạng thái"]
+    M9 --> M9_9["Tạo tài khoản nhân sự; hệ thống tự sinh mật khẩu và gửi email"]
+    M9 --> M9_10["Cập nhật vai trò và trạng thái tài khoản nhân sự"]
+  end

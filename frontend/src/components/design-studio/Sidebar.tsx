@@ -28,9 +28,11 @@ const ImageIcon = () => (
   </svg>
 );
 
-const TSHIRT_COLORS = ["#ffffff", "#000000", "#1d4ed8"];
-const POLO_COLORS   = ["#ffffff", "#f5f5dc", "#1d4ed8"];
-const HOODIE_COLORS = ["#9ca3af", "#8b4513"]; // Xám, Nâu
+// Các màu phải khớp colorHex của ProductVariant để thiết kế luôn gắn được
+// với một biến thể màu + size hợp lệ khi đưa vào đơn hàng.
+const TSHIRT_COLORS = ["#ffffff", "#000000"];
+const POLO_COLORS = ["#ffffff", "#0066cc"];
+const HOODIE_COLORS = ["#000000", "#003153"];
 
 const StickerIcon = () => (
   <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -58,6 +60,8 @@ interface SidebarProps {
   onUploadImages: (files: FileList) => void;
   onRemoveUploadedImage: (idx: number) => void;
   onAddImageToCanvas: (src: string) => void;
+  showMyDesigns?: boolean;
+  lockShirtOptions?: boolean;
 }
 
 export default function Sidebar({
@@ -65,6 +69,8 @@ export default function Sidebar({
   onUploadImages,
   onRemoveUploadedImage,
   onAddImageToCanvas,
+  showMyDesigns = true,
+  lockShirtOptions = false,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = React.useState<TabId>("images");
   const [stickers, setStickers] = React.useState<any[]>([]);
@@ -126,9 +132,9 @@ export default function Sidebar({
     { id: "text", label: "Văn bản", icon: <TypeIcon /> },
     { id: "shirt", label: "Phôi áo", icon: <ShirtIcon /> },
     { id: "ai", label: "Trợ lý", icon: <AiIcon /> },
-    { 
-      id: "my-designs", 
-      label: "Của tôi", 
+    {
+      id: "my-designs",
+      label: "Của tôi",
       icon: (
         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
@@ -141,7 +147,7 @@ export default function Sidebar({
     <aside className="ds-sidebar">
       {/* Thanh chọn tab */}
       <div className="ds-sidebar-tabs">
-        {tabs.map((tab) => (
+        {tabs.filter((tab) => showMyDesigns || tab.id !== "my-designs").map((tab) => (
           <button
             key={tab.id}
             className={`ds-sidebar-tab ${activeTab === tab.id ? "ds-sidebar-tab--active" : ""}`}
@@ -357,7 +363,11 @@ export default function Sidebar({
                 <button
                   key={type}
                   className={`ds-shirt-option ${shirtType === type ? "ds-shirt-option--active" : ""}`}
-                  onClick={() => setShirtType(type)}
+                  disabled={lockShirtOptions}
+                  onClick={() => {
+                    if (!lockShirtOptions) setShirtType(type);
+                  }}
+                  title={lockShirtOptions ? "Phôi áo đã gắn với đơn hàng" : undefined}
                 >
                   <ShirtMiniIcon type={type} />
                   {type === "tshirt" ? "Áo Thun" : type === "polo" ? "Áo Polo" : "Hoodie"}
@@ -387,9 +397,16 @@ export default function Sidebar({
                 <button
                   key={color}
                   className={`ds-color-swatch ${shirtColor === color ? "ds-color-swatch--active" : ""}`}
-                  style={{ background: color }}
-                  onClick={() => setShirtColor(color)}
-                  title={color}
+                  style={{
+                    background: color,
+                    opacity: lockShirtOptions && shirtColor !== color ? 0.35 : undefined,
+                    cursor: lockShirtOptions ? "not-allowed" : undefined,
+                  }}
+                  disabled={lockShirtOptions}
+                  onClick={() => {
+                    if (!lockShirtOptions) setShirtColor(color);
+                  }}
+                  title={lockShirtOptions ? "Màu áo phôi đã gắn với đơn hàng" : color}
                 >
                   {shirtColor === color && (
                     <span style={{ color: color === "#ffffff" ? "#000" : "#fff" }}>✓</span>

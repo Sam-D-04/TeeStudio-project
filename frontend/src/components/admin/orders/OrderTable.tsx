@@ -1,4 +1,5 @@
 import { EyeOutlined, EditOutlined } from "@ant-design/icons";
+import { Image } from "antd";
 import {
   getOrderPaymentState,
   isOrderStatusLockedByPayment,
@@ -138,11 +139,12 @@ export default function OrderTable({ orders, onViewDetail, onEditStatus }: Order
                   {/* Ô thumbnail ảnh sản phẩm (48x48px) */}
                   <div className="h-12 w-12 shrink-0 overflow-hidden rounded border border-border bg-surface-container">
                     {order.product.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <Image
                         src={order.product.imageUrl}
                         alt={order.product.name}
                         className="h-full w-full object-cover"
+                        rootClassName="h-full w-full"
+                        preview={{ mask: "Xem ảnh" }}
                       />
                     ) : (
                       // Placeholder khi chưa có ảnh

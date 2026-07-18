@@ -23,6 +23,7 @@ const {
   cancelOrderSchema,
   createOrderSchema,
   updateShippingAddressSchema,
+  requestDesignRevisionSchema,
 } = require("./order.validation");
 
 const requireAdmin = requireRoles(ROLES.ADMIN, ROLES.PRODUCTION);
@@ -129,6 +130,15 @@ router.patch(
   requireAdmin,
   validate(updateStatusSchema),
   orderController.capNhatTrangThai
+);
+
+// PATCH /api/admin/orders/:id/design-revision – Yêu cầu khách sửa thiết kế
+router.patch(
+  "/:id/design-revision",
+  verifyToken,
+  requireAdmin,
+  validate(requestDesignRevisionSchema),
+  orderController.yeuCauChinhSuaThietKe
 );
 
 // PATCH /api/admin/orders/:id/cancel – Hủy đơn hàng

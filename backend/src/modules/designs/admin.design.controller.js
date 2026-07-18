@@ -6,7 +6,9 @@
  */
 
 const designService = require("./admin.design.service");
-const { guiBaoCaoExcel } = require("../../common/utils/excel-report");
+
+const uploadService = require("../uploads/upload.service");
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KPI THỐNG KÊ
@@ -33,7 +35,7 @@ const getThongKe = async (req, res, next) => {
  * GET /api/admin/designs
  * Danh sách thiết kế với lọc và phân trang.
  *
- * Query params: page, limit, tu_khoa, trang_thai, vi_tri_in, tu_ngay, den_ngay
+ * Query params: page, limit, design_id, tu_khoa, trang_thai, vi_tri_in, tu_ngay, den_ngay
  */
 const getDanhSachThietKe = async (req, res, next) => {
   try {
@@ -54,6 +56,147 @@ const getChiTietThietKe = async (req, res, next) => {
 
     const data = await designService.layChiTietThietKe(id);
     res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/admin/designs/:id/canvas
+ * Lấy canvasData để load vào Editor (chỉ dùng khi Admin mở trang sửa thiết kế).
+ * Tách riêng khỏi getChiTietThietKe vì canvasData là JSON lớn, không cần ở mọi nơi.
+ */
+const getCanvasDataThietKe = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id || id <= 0) {
+      return res.status(400).json({ success: false, message: "ID thiết kế không hợp lệ" });
+    }
+
+    const data = await designService.layCanvasDataThietKe(id);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PUT /api/admin/designs/:id/sua
+ * Admin sửa thiết kế của khách: ghi đè canvasData + previewUrl, giữ nguyên status.
+ *
+ * Body: { canvasData: object|string, previewUrl: string (base64 hoặc URL Cloudinary) }
+ */
+const suaThietKeChoKhach = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id || id <= 0) {
+      return res.status(400).json({ success: false, message: "ID thiết kế không hợp lệ" });
+    }
+
+    const payload = { ...req.body };
+
+    // Nếu previewUrl là base64 → upload lên Cloudinary để lấy URL bền vững
+    if (payload.previewUrl?.startsWith("data:image")) {
+      payload.previewUrl = await uploadService.uploadBase64Image(
+        payload.previewUrl,
+        "user-designs"
+      );
+    }
+
+    const data = await designService.suaThietKeChoKhach(id, payload);
+    res.json({
+      success: true,
+      message: `Đã lưu thiết kế ${data.maThietKe}`,
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** PATCH /api/admin/designs/:id/customer - Doi khach hang so huu thiet ke. */
+const doiKhachHangThietKe = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id || id <= 0) {
+      return res.status(400).json({ success: false, message: "ID thiet ke khong hop le" });
+    }
+
+    const data = await designService.doiKhachHangThietKe(id, req.body.customerId);
+    res.json({
+      success: true,
+      message: "Da doi khach hang cho thiet ke",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** DELETE /api/admin/designs/:id/customer - Go thiet ke khoi tai khoan khach hang. */
+const goKhachHangKhoiThietKe = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id || id <= 0) {
+      return res.status(400).json({ success: false, message: "ID thiet ke khong hop le" });
+    }
+
+    const data = await designService.goKhachHangKhoiThietKe(id);
+    res.json({
+      success: true,
+      message: "Da go khach hang khoi thiet ke",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** GET /api/admin/designs/customer-draft-variants - Các size hợp lệ theo loại áo và màu. */
+const getBienTheTaoThietKe = async (req, res, next) => {
+  try {
+    const data = await designService.layBienTheTaoThietKe(
+      req.query.shirtType,
+      req.query.shirtColor
+    );
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** POST /api/admin/designs/customer-drafts - Admin tạo bản nháp cho một khách hàng. */
+const taoThietKeChoKhach = async (req, res, next) => {
+  try {
+    const payload = { ...req.body };
+    if (payload.previewUrl?.startsWith("data:image")) {
+      payload.previewUrl = await uploadService.uploadBase64Image(
+        payload.previewUrl,
+        "user-designs"
+      );
+    }
+
+    const data = await designService.taoThietKeChoKhach(payload);
+    res.status(201).json({
+      success: true,
+      message: data.userId
+        ? "Đã tạo thiết kế và gắn vào tài khoản khách hàng"
+        : "Đã tạo thiết kế chưa gán khách hàng",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** POST /api/admin/designs/assets - Upload ảnh dùng trong canvas, trả URL bền vững. */
+const taiAnhThietKe = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "Vui lòng chọn ảnh" });
+    }
+    const url = await uploadService.uploadImageBuffer(req.file.buffer, "design-assets");
+    res.status(201).json({ success: true, data: { url } });
   } catch (error) {
     next(error);
   }
@@ -188,24 +331,24 @@ const getDanhSachSticker = async (req, res, next) => {
  * POST /api/admin/designs/stickers
  * Thêm sticker mới.
  *
- * Body: { ten, urlAnh, loai }
- * (Upload file lên Cloudinary được xử lý bởi FE hoặc middleware upload riêng;
- *  controller chỉ nhận URL đã được upload)
+ * Multipart body: { ten, loai, anh }
+ * Ảnh được upload lên Cloudinary trước khi URL được lưu vào database.
  */
 const themSticker = async (req, res, next) => {
   try {
-    const { ten, urlAnh, loai } = req.body;
+    const { ten, loai } = req.body;
 
-    if (!ten) {
+    if (!ten || !ten.trim()) {
       return res.status(400).json({ success: false, message: "Vui lòng nhập tên sticker" });
     }
-    if (!urlAnh) {
-      return res.status(400).json({ success: false, message: "Vui lòng cung cấp URL ảnh sticker" });
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "Vui lòng chọn ảnh sticker" });
     }
-    if (!loai) {
-      return res.status(400).json({ success: false, message: "Vui lòng chọn loại sticker" });
+    if (!["logo", "hinh_ve", "chu_viet"].includes(loai)) {
+      return res.status(400).json({ success: false, message: "Loại sticker không hợp lệ" });
     }
 
+    const urlAnh = await uploadService.uploadImageBuffer(req.file.buffer, "stickers");
     const data = await designService.themSticker({ ten, urlAnh, loai });
     res.status(201).json({
       success: true,
@@ -256,6 +399,13 @@ module.exports = {
   getThongKe,
   getDanhSachThietKe,
   getChiTietThietKe,
+  getCanvasDataThietKe,
+  suaThietKeChoKhach,
+  doiKhachHangThietKe,
+  goKhachHangKhoiThietKe,
+  getBienTheTaoThietKe,
+  taoThietKeChoKhach,
+  taiAnhThietKe,
   duyetThietKe,
   yeuCauChinhSua,
   getDanhSachDonCanIn,

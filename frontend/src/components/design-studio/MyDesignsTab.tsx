@@ -61,6 +61,8 @@ export default function MyDesignsTab() {
   const handleLoadDesign = (d: SavedDesign) => {
     useDesignStore.setState({
       elements: d.canvasData.elements || [],
+      shirtType: d.canvasData.shirtType
+        || (d.productId === 1 ? "tshirt" : d.productId === 2 ? "polo" : "hoodie"),
       shirtView: d.canvasData.shirtView || "front",
       shirtColor: d.baseColor,
       currentDesignId: d.id,

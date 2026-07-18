@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
-import { ConfigProvider } from "antd";
+import { App, ConfigProvider } from "antd";
 import viVN from "antd/locale/vi_VN";
 import QueryProvider from "@/providers/QueryProvider";
 import "./globals.css";
@@ -71,7 +71,7 @@ export default function RootLayout({
         <QueryProvider>
           <AntdRegistry>
             <ConfigProvider theme={antdTheme} locale={viVN}>
-              {children}
+              <App className="flex-1 flex flex-col">{children}</App>
             </ConfigProvider>
           </AntdRegistry>
         </QueryProvider>

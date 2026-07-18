@@ -2,6 +2,7 @@
 
 import {
   AppstoreOutlined,
+  BarChartOutlined,
   BgColorsOutlined,
   CloseOutlined,
   CreditCardOutlined,
@@ -34,6 +35,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { label: "Tổng quan", icon: <DashboardOutlined />, href: "/admin", allowedRoles: ["ADMIN"] },
+  { label: "Thống kê", icon: <BarChartOutlined />, href: "/admin/thong-ke", allowedRoles: ["ADMIN"] },
   { label: "Đơn hàng", icon: <ShoppingCartOutlined />, href: "/admin/don-hang", allowedRoles: ["ADMIN", "PRODUCTION"] },
   { label: "Sản phẩm / Phôi áo", icon: <SkinOutlined />, href: "/admin/san-pham-phoi-ao", allowedRoles: ["ADMIN", "WAREHOUSE"] },
   { label: "Thiết kế & In ấn", icon: <BgColorsOutlined />, href: "/admin/thiet-ke", allowedRoles: ["ADMIN", "PRODUCTION"] },
@@ -118,11 +120,11 @@ function SidebarContent({
       >
         {collapsed ? null : (
           <>
-            <div className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-primary text-on-primary">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-[#0f172a] text-white">
               <AppstoreOutlined className="text-[22px]" />
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-[20px] font-black leading-tight text-primary">
+              <h1 className="text-[20px] font-black leading-tight text-slate-900">
                 TeeStudio
               </h1>
               <p className="text-body-sm text-text-secondary">Quản trị sản xuất</p>
@@ -160,8 +162,8 @@ function SidebarContent({
                 ? pathname === "/admin"
                 : pathname.startsWith(item.href);
             const itemClass = isActive
-              ? "bg-secondary-fixed text-on-secondary-fixed-variant"
-              : "text-text-secondary hover:bg-surface-alt hover:text-primary";
+              ? "border-border bg-[#f1f5f9] shadow-sm"
+              : "border-transparent hover:border-border hover:bg-surface-alt hover:shadow-sm";
 
             return (
               <li key={item.href}>
@@ -170,7 +172,7 @@ function SidebarContent({
                   onClick={onClose}
                   aria-label={item.label}
                   title={collapsed ? item.label : undefined}
-                  className={`mx-2 flex h-11 items-center rounded-[8px] py-2 text-sidebar-item font-semibold transition-colors ${
+                  className={`mx-2 flex h-11 items-center rounded-[8px] border py-2 text-sidebar-item font-semibold !text-[#0f172a] transition-all duration-200 hover:!text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
                     collapsed ? "justify-center px-0" : "min-w-0 gap-3 px-4"
                   } ${itemClass}`}
                 >
@@ -206,7 +208,7 @@ function SidebarContent({
             {collapsed ? null : (
               <>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold text-text-primary">
+                  <span className="block truncate font-semibold text-slate-900">
                     {user?.fullName || "Tài khoản"}
                   </span>
                   <span className="block truncate text-xs text-text-secondary">

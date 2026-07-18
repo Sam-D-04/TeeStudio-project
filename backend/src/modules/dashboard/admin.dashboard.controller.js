@@ -6,8 +6,6 @@
 "use strict";
 
 const dashboardService = require("./admin.dashboard.service");
-const dashboardReportService = require("./admin.dashboard.report.service");
-const { guiBaoCaoExcel } = require("../../common/utils/excel-report");
 
 // =====================================================================
 // CONTROLLER 1: Thẻ chỉ số tổng quan
@@ -121,29 +119,6 @@ const getSanPhamBanChay = async (req, res, next) => {
 };
 
 // =====================================================================
-// CONTROLLER 6: Xuất báo cáo Excel
-// =====================================================================
-
-/**
- * GET /api/admin/dashboard/xuat-bao-cao
- * Trả về file Excel dữ liệu thô gồm đơn hàng, chi tiết sản phẩm, tồn kho và thiết kế.
- * Query params: tuNgay (YYYY-MM-DD), denNgay (YYYY-MM-DD)
- */
-const exportBaoCaoDashboard = async (req, res, next) => {
-  try {
-    const { tuNgay, denNgay } = req.query;
-    const report = await dashboardReportService.taoBaoCaoDashboard(
-      tuNgay,
-      denNgay
-    );
-
-    return guiBaoCaoExcel(res, report);
-  } catch (error) {
-    return next(error);
-  }
-};
-
-// =====================================================================
 // EXPORTS
 // =====================================================================
 
@@ -153,5 +128,4 @@ module.exports = {
   getThietKeCanXuLy,
   getTonKhoCanhBao,
   getSanPhamBanChay,
-  exportBaoCaoDashboard,
 };

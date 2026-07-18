@@ -61,7 +61,7 @@ function formatKhoangThoiGian(dateRange?: KhoangThoiGian): string {
   return `${batDau.format("DD/MM/YYYY")} - ${ketThuc.format("DD/MM/YYYY")}`;
 }
 
-function taoLinkDonHangTheoCot(
+function taoLinkDoanhThuTheoCot(
   item: DiemBieuDo,
   groupBy: DashboardGroupBy
 ): string {
@@ -85,6 +85,29 @@ function taoLinkDonHangTheoCot(
   return `/admin/don-hang?${params.toString()}`;
 }
 
+function taoLinkDonDatTheoCot(
+  item: DiemBieuDo,
+  groupBy: DashboardGroupBy
+): string {
+  const params = new URLSearchParams({
+    dateField: "created",
+    excludeStatus: "CANCELLED",
+  });
+  const mocThoiGian = dayjs(item.ngay);
+
+  if (groupBy === "month") {
+    params.set("from", mocThoiGian.startOf("month").format("YYYY-MM-DD"));
+    params.set("to", mocThoiGian.endOf("month").format("YYYY-MM-DD"));
+  } else {
+    params.set("date", mocThoiGian.format("YYYY-MM-DD"));
+    if (groupBy === "hour") {
+      params.set("hour", mocThoiGian.format("HH"));
+    }
+  }
+
+  return `/admin/don-hang?${params.toString()}`;
+}
+
 export default function RevenueOverviewChart({
   data = [],
   groupBy = "day",
@@ -92,8 +115,10 @@ export default function RevenueOverviewChart({
   isLoading = false,
   isError = false,
 }: RevenueOverviewChartProps) {
-  const maxValue = data.length > 0 ? Math.max(...data.map((item) => item.doanhThuVnd)) : 0;
-  const coDoanhThu = maxValue > 0;
+  const maxRevenue = data.length > 0 ? Math.max(...data.map((item) => item.doanhThuVnd)) : 0;
+  const maxOrders = data.length > 0 ? Math.max(...data.map((item) => item.soDonDat ?? item.soDonHoanTat ?? 0)) : 0;
+  const coDuLieuBieuDo = maxRevenue > 0 || maxOrders > 0;
+  const maxOrderAxis = Math.max(maxOrders, 1);
   const nhanTrucX = taoTapChiSoNhan(data.length, groupBy);
   const chartMinWidth = Math.max(560, data.length * 28);
   const khoangThoiGian =
@@ -106,8 +131,18 @@ export default function RevenueOverviewChart({
         <div>
           <h3 className="flex items-center gap-2 text-card-title font-bold text-text-main">
             <BarChartOutlined className="text-primary-container" />
-            <span>Biểu đồ doanh thu tổng quan</span>
+            <span>Biểu đồ số đơn và Doanh thu</span>
           </h3>
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs font-medium text-text-secondary">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-[3px] bg-primary-container/70" />
+              Doanh thu
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-[3px] bg-success/80" />
+              Số đơn đặt
+            </span>
+          </div>
         </div>
         <span className="shrink-0 text-sm font-medium text-text-secondary">
           {khoangThoiGian}
@@ -115,12 +150,12 @@ export default function RevenueOverviewChart({
       </div>
 
       <div
-        aria-label="Khu vực biểu đồ doanh thu tổng quan"
+        aria-label="Khu vực biểu đồ số đơn và doanh thu"
         className="relative min-h-[18rem] flex-1 overflow-hidden rounded-[8px] border border-border bg-surface-alt"
       >
-        <div className="absolute inset-x-12 top-12 border-t border-dashed border-border" />
-        <div className="absolute inset-x-12 top-1/2 border-t border-dashed border-border" />
-        <div className="absolute inset-x-12 bottom-12 border-t border-dashed border-border" />
+        <div className="absolute left-14 right-14 top-12 border-t border-dashed border-border" />
+        <div className="absolute left-14 right-14 top-1/2 border-t border-dashed border-border" />
+        <div className="absolute bottom-12 left-14 right-14 border-t border-dashed border-border" />
 
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -139,55 +174,79 @@ export default function RevenueOverviewChart({
           </div>
         )}
 
-        {!isLoading && !isError && !coDoanhThu && (
+        {!isLoading && !isError && !coDuLieuBieuDo && (
           <div className="absolute inset-0 flex items-center justify-center px-4 text-center">
             <span className="rounded-[8px] border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-text-secondary shadow-sm">
-              Chưa có doanh thu đã thu trong khoảng thời gian này.
+              Chưa có doanh thu hoặc đơn đặt trong khoảng thời gian này.
             </span>
           </div>
         )}
 
-        {!isLoading && !isError && coDoanhThu && (
+        {!isLoading && !isError && coDuLieuBieuDo && (
           <>
             <div className="absolute bottom-10 left-3 top-10 flex w-10 flex-col justify-between text-right text-[10px] font-medium text-text-muted">
-              <span>{rutGonTienVnd(maxValue)}</span>
-              <span>{rutGonTienVnd(maxValue / 2)}</span>
+              <span>{rutGonTienVnd(maxRevenue)}</span>
+              <span>{rutGonTienVnd(maxRevenue / 2)}</span>
               <span>0đ</span>
             </div>
+            <div className="absolute bottom-10 right-3 top-10 flex w-10 flex-col justify-between text-left text-[10px] font-medium text-text-muted">
+              <span>{maxOrders.toLocaleString("vi-VN")}</span>
+              <span>{Math.round(maxOrders / 2).toLocaleString("vi-VN")}</span>
+              <span>0 đơn</span>
+            </div>
 
-            <div className="absolute inset-y-0 left-14 right-0 overflow-x-auto overflow-y-hidden">
+            <div className="absolute inset-y-0 left-14 right-14 overflow-x-auto overflow-y-hidden">
               <div className="relative h-full min-w-full" style={{ minWidth: `${chartMinWidth}px` }}>
                 <div className="absolute bottom-12 left-4 right-5 top-12 flex items-end gap-2">
                   {data.map((item, index) => {
-                    const heightPct =
-                      item.doanhThuVnd > 0
-                        ? Math.max(8, (item.doanhThuVnd / maxValue) * 100)
-                        : 1;
+                    const orderCount = item.soDonDat ?? item.soDonHoanTat ?? 0;
+                    const revenueHeightPct =
+                      item.doanhThuVnd > 0 && maxRevenue > 0
+                        ? Math.max(8, (item.doanhThuVnd / maxRevenue) * 100)
+                        : 0;
+                    const orderHeightPct =
+                      orderCount > 0
+                        ? Math.max(8, (orderCount / maxOrderAxis) * 100)
+                        : 0;
                     return (
-                      <Link
+                      <div
                         key={item.ngay || `${item.nhan}-${index}`}
-                        href={taoLinkDonHangTheoCot(item, groupBy)}
-                        aria-label={`Xem đơn hàng ${item.nhan}, doanh thu ${formatTienVnd(item.doanhThuVnd)}`}
-                        className="group relative flex h-full min-w-[14px] flex-1 cursor-pointer items-end justify-center rounded-t-[6px] outline-none focus-visible:ring-2 focus-visible:ring-primary-container"
-                        title={`${item.nhan}: ${formatTienVnd(item.doanhThuVnd)} | ${item.soDonHoanTat || 0} đơn đã thu đủ`}
+                        className="group relative flex h-full min-w-[18px] flex-1 items-end justify-center gap-1 rounded-t-[6px]"
+                        title={`${item.nhan}: ${formatTienVnd(item.doanhThuVnd)} | ${orderCount} đơn đặt`}
                       >
                         <span
-                          className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-[6px] bg-text-main px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+                          className="pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-[6px] bg-text-main px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
                           style={{
-                            bottom: `min(calc(${heightPct}% + 0.35rem), calc(100% - 1.75rem))`,
+                            bottom: `min(calc(${Math.max(revenueHeightPct, orderHeightPct)}% + 0.35rem), calc(100% - 1.75rem))`,
                           }}
                         >
-                          {rutGonTienVnd(item.doanhThuVnd)}
+                          {rutGonTienVnd(item.doanhThuVnd)} · {orderCount} đơn đặt
                         </span>
-                        <span
-                          className={`block w-full max-w-[34px] rounded-t-[6px] transition-all duration-300 ${
-                            item.doanhThuVnd > 0
-                              ? "bg-primary-container/60 group-hover:bg-primary-container"
-                              : "bg-border"
-                          }`}
-                          style={{ height: `${heightPct}%` }}
-                        />
-                      </Link>
+                        {item.doanhThuVnd > 0 ? (
+                          <Link
+                            href={taoLinkDoanhThuTheoCot(item, groupBy)}
+                            aria-label={`Xem doanh thu ${item.nhan}: ${formatTienVnd(item.doanhThuVnd)}`}
+                            className="block h-full w-full max-w-[18px] rounded-t-[5px] outline-none focus-visible:ring-2 focus-visible:ring-primary-container"
+                            style={{ height: `${revenueHeightPct}%` }}
+                          >
+                            <span className="block h-full w-full rounded-t-[5px] bg-primary-container/60 transition-all duration-300 hover:bg-primary-container" />
+                          </Link>
+                        ) : (
+                          <span className="block w-full max-w-[18px]" />
+                        )}
+                        {orderCount > 0 ? (
+                          <Link
+                            href={taoLinkDonDatTheoCot(item, groupBy)}
+                            aria-label={`Xem ${orderCount} đơn đặt ${item.nhan}, không gồm đơn hủy`}
+                            className="block h-full w-full max-w-[18px] rounded-t-[5px] outline-none focus-visible:ring-2 focus-visible:ring-success"
+                            style={{ height: `${orderHeightPct}%` }}
+                          >
+                            <span className="block h-full w-full rounded-t-[5px] bg-success/70 transition-all duration-300 hover:bg-success" />
+                          </Link>
+                        ) : (
+                          <span className="block w-full max-w-[18px]" />
+                        )}
+                      </div>
                     );
                   })}
                 </div>

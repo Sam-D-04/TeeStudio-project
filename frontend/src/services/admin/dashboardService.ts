@@ -9,7 +9,6 @@
  */
 
 import apiClient from "@/lib/apiClient";
-import { downloadExcelReport } from "@/lib/downloadExcelReport";
 
 // =====================================================================
 // KIỂU DỮ LIỆU (Types) – khớp với response từ Backend
@@ -25,6 +24,7 @@ export type KhoangThoiGian = {
 export type TongQuanChiSo = {
   doanhThuThangVnd: number;
   doanhThuThietKeVnd: number;
+  tongSoDonHang?: number;
   soDonMoi: number;
   soVariantTonKhoThap: number;
   giaTriTrungBinhDonVnd: number;
@@ -40,6 +40,7 @@ export type DiemBieuDo = {
   nhan: string;       // Nhãn hiển thị trên trục X
   doanhThuVnd: number;
   soDonHoanTat: number;
+  soDonDat: number;
 };
 
 export type DashboardGroupBy = "hour" | "day" | "month";
@@ -49,6 +50,7 @@ export type DuLieuBieuDo = {
   danhSach: DiemBieuDo[];
   tongDoanhThuVnd: number;
   tongDonHoanTat: number;
+  tongSoDonDat?: number;
   doanhThuLonNhatVnd: number;
   groupBy: DashboardGroupBy;
   khoangThoiGian: KhoangThoiGian;
@@ -186,17 +188,3 @@ export async function laySanPhamBanChay(
   return res.data.data;
 }
 
-/**
- * Xuất dữ liệu thô đơn hàng, chi tiết sản phẩm, tồn kho và thiết kế.
- * GET /api/admin/dashboard/xuat-bao-cao
- */
-export async function xuatBaoCaoDashboard(
-  tuNgay: string,
-  denNgay: string
-): Promise<string> {
-  return downloadExcelReport(
-    "/admin/dashboard/xuat-bao-cao",
-    { tuNgay, denNgay },
-    `bao-cao-dashboard-${tuNgay}-den-${denNgay}.xlsx`
-  );
-}

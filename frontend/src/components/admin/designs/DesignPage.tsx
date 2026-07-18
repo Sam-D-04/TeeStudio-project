@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 /**
  * DesignPage – Trang chính "Thiết kế & In ấn" (Orchestrator).
@@ -19,8 +19,10 @@
 
 import { useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
+import { useQuery } from "@tanstack/react-query";
 import { message } from "antd";
+
 import {
   HighlightOutlined,
   PrinterOutlined,
@@ -31,7 +33,9 @@ import {
   PictureOutlined,
   LoadingOutlined,
   WarningOutlined,
+  PlusOutlined,
 } from "@ant-design/icons";
+import useAuthStore from "@/store/useAuthStore";
 
 // Service gọi API
 import * as designService from "@/services/admin/designService";
@@ -41,6 +45,7 @@ import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import DesignStatCard from "./DesignStatCard";
 import DesignFilterBar, { type BoDucThietKe } from "./DesignFilterBar";
 import DesignTable from "./DesignTable";
+import DesignDetailModal from "./DesignDetailModal";
 import PrintOrderTab from "./PrintOrderTab";
 import DesignResourceTab from "./DesignResourceTab";
 
@@ -59,6 +64,7 @@ export type DesignInitialFilters = {
   tab?: TenTab;
   designStatus?: string;
   printStatus?: string;
+  designId?: number | null;
 };
 
 type DesignPageProps = {
@@ -69,10 +75,16 @@ type DesignPageProps = {
 // Component chính
 // ─────────────────────────────────────────────────────────────────────────────
 export default function DesignPage({ initialFilters }: DesignPageProps) {
-  const queryClient = useQueryClient();
   const router = useRouter();
+
+  const currentUser = useAuthStore((state) => state.user);
+
+  // Thiết kế đang được mở trong modal chi tiết
+  const [idThietKeDangXem, setIdThietKeDangXem] = useState<number | null>(null);
+
   const [messageApi, messageContextHolder] = message.useMessage();
   const [dangXuatExcel, setDangXuatExcel] = useState(false);
+
 
   // ── State điều hướng tab ──
   const [tabDangChon, setTabDangChon] = useState<TenTab>(
@@ -80,17 +92,24 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
   );
   const [locTrangThaiDonIn, setLocTrangThaiDonIn] = useState(
     initialFilters?.printStatus ||
-      (initialFilters?.tab === "don_can_in" ? "cho_gui_xuong" : "")
+    (initialFilters?.tab === "don_can_in" ? "cho_gui_xuong" : "")
   );
   const [khoangNgayDonIn, setKhoangNgayDonIn] = useState({ tuNgay: "", denNgay: "" });
 
   // ── State phân trang bảng thiết kế ──
   const [trangHienTai, setTrangHienTai] = useState(1);
+  const [idThietKeDangLoc, setIdThietKeDangLoc] = useState<number | null>(
+    initialFilters?.designId ?? null
+  );
 
   // ── State bộ lọc bảng thiết kế ──
   const [boDuc, setBoDuc] = useState<BoDucThietKe>({
-    tuKhoa: "",
-    trangThai: initialFilters?.designStatus ?? "",
+    tuKhoa: initialFilters?.designId
+      ? `TK-${String(initialFilters.designId).padStart(4, "0")}`
+      : "",
+    trangThai: initialFilters?.designId
+      ? "tat_ca"
+      : initialFilters?.designStatus || "khong_nhap",
     viTriIn: "",
     tuNgay: "",
     denNgay: "",
@@ -112,11 +131,12 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
     isLoading: dangTaiThietKe,
     isError: loiThietKe,
   } = useQuery({
-    queryKey: ["thiet-ke-danh-sach", trangHienTai, boDuc],
+    queryKey: ["thiet-ke-danh-sach", trangHienTai, boDuc, idThietKeDangLoc],
     queryFn: () =>
       designService.layDanhSachThietKe({
         page: trangHienTai,
         limit: 10,
+        design_id: idThietKeDangLoc ?? undefined,
         tu_khoa: boDuc.tuKhoa,
         trang_thai: boDuc.trangThai,
         vi_tri_in: boDuc.viTriIn,
@@ -126,42 +146,18 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
     staleTime: 15_000,
   });
 
-  // ─── Mutation: Duyệt thiết kế ───────────────────────────────────────────
-  const mutationDuyet = useMutation({
-    mutationFn: (id: number) => designService.duyetThietKe(id),
-    onSuccess: () => {
-      // Reload lại cả danh sách và KPI
-      queryClient.invalidateQueries({ queryKey: ["thiet-ke-danh-sach"] });
-      queryClient.invalidateQueries({ queryKey: ["thiet-ke-thong-ke"] });
-    },
-    onError: (err: Error) => {
-      alert(`Lỗi khi duyệt thiết kế: ${err.message}`);
-    },
-  });
-
-  // ─── Mutation: Yêu cầu chỉnh sửa ────────────────────────────────────────
-  const mutationChinhSua = useMutation({
-    mutationFn: ({ id, ghiChu }: { id: number; ghiChu?: string }) =>
-      designService.yeuCauChinhSua(id, ghiChu),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["thiet-ke-danh-sach"] });
-      queryClient.invalidateQueries({ queryKey: ["thiet-ke-thong-ke"] });
-    },
-    onError: (err: Error) => {
-      alert(`Lỗi khi gửi yêu cầu chỉnh sửa: ${err.message}`);
-    },
-  });
-
   // ─── Xử lý thay đổi bộ lọc: reset về trang 1 ──────────────────────────
   function xuLyThayDoiBoDuc(boDucMoi: BoDucThietKe) {
+    setIdThietKeDangLoc(null);
     setBoDuc(boDucMoi);
     setTrangHienTai(1);
   }
 
   function datLaiTatCaBoLoc() {
+    setIdThietKeDangLoc(null);
     setBoDuc({
       tuKhoa: "",
-      trangThai: "",
+      trangThai: "tat_ca",
       viTriIn: "",
       tuNgay: "",
       denNgay: "",
@@ -198,9 +194,6 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
   }
 
   // ─── Xuất file Excel "thông số in" cho xưởng in ───────────────────────
-  // Dùng đúng bộ lọc trạng thái + khoảng ngày đang áp dụng ở tab "Đơn cần in"
-  // (locTrangThaiDonIn/khoangNgayDonIn) - đây là 2 state đã được nâng lên
-  // DesignPage nên nút ở header vẫn truy cập được dù đang ở tab nào khác.
   async function xuLyXuatThongSoIn() {
     if (dangXuatExcel) return;
     setDangXuatExcel(true);
@@ -220,28 +213,14 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
     }
   }
 
-  // ─── Xử lý duyệt thiết kế ──────────────────────────────────────────────
-  function xuLyDuyetThietKe(id: number) {
-    if (window.confirm("Bạn có chắc muốn duyệt thiết kế này?\nSau khi duyệt, đơn in sẽ được tạo tự động.")) {
-      mutationDuyet.mutate(id);
-    }
-  }
-
-  // ─── Xử lý yêu cầu chỉnh sửa ──────────────────────────────────────────
-  function xuLyYeuCauChinhSua(id: number) {
-    const ghiChu = window.prompt(
-      "Nhập ghi chú cho khách hàng (lý do cần chỉnh sửa):",
-      ""
-    );
-    if (ghiChu !== null) {
-      // null = nhấn Cancel; chuỗi rỗng = không nhập ghi chú nhưng vẫn gửi
-      mutationChinhSua.mutate({ id, ghiChu: ghiChu || undefined });
-    }
-  }
-
   // ─── Xử lý xem chi tiết ────────────────────────────────────────────────
   function xuLyXemChiTiet(id: number) {
-    alert(`Chức năng xem chi tiết thiết kế #${id} sẽ mở drawer trong phiên bản tiếp theo.`);
+    setIdThietKeDangXem(id);
+  }
+
+  // ─── Điều hướng sang trang Editor để Admin sửa thiết kế ─────────────────
+  function xuLySuaThietKe(id: number) {
+    router.push(`/admin/thiet-ke/${id}/edit`);
   }
 
   // ─── Dữ liệu hiển thị ──────────────────────────────────────────────────
@@ -258,6 +237,12 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {messageContextHolder}
+
+      <DesignDetailModal
+        designId={idThietKeDangXem}
+        open={idThietKeDangXem !== null}
+        onClose={() => setIdThietKeDangXem(null)}
+      />
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* PHẦN 1: Tiêu đề trang + nhóm nút hành động                   */}
@@ -299,6 +284,29 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
 
         {/* Nhóm nút hành động */}
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+          {currentUser?.role === "ADMIN" && (
+            <button
+              onClick={() => router.push("/admin/thiet-ke/tao-moi")}
+              style={{
+                height: 40,
+                padding: "0 18px",
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                background: "#0f172a",
+                border: "none",
+                borderRadius: 10,
+                fontSize: 14,
+                fontWeight: 700,
+                color: "#ffffff",
+                cursor: "pointer",
+                boxShadow: "0 1px 4px rgba(15,23,42,0.25)",
+              }}
+            >
+              <PlusOutlined />
+              Tạo thiết kế
+            </button>
+          )}
           {/* Nút phụ 1: Thêm sticker */}
           <button
             onClick={() => setTabDangChon("tai_nguyen")}
@@ -566,9 +574,7 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
               <DesignTable
                 danhSach={danhSachThietKe}
                 onXem={xuLyXemChiTiet}
-                onYeuCauChinhSua={xuLyYeuCauChinhSua}
-                onDuyet={xuLyDuyetThietKe}
-                dangXuLy={mutationDuyet.isPending || mutationChinhSua.isPending}
+                onSua={xuLySuaThietKe}
               />
             )}
 

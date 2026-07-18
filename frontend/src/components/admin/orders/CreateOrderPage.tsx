@@ -1587,7 +1587,7 @@ export default function CreateOrderPage() {
         requiredMark={false}
         className="rounded-2xl border border-border bg-surface shadow-admin-card"
       >
-        <div className="grid grid-cols-1 gap-5 p-6 md:p-8 xl:grid-cols-[minmax(0,1fr)_440px]">
+        <div className="grid grid-cols-1 gap-5 p-6 md:p-8">
           <div className="space-y-3">
             <CustomerSection
               customers={customers}

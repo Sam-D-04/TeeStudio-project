@@ -65,6 +65,10 @@ function formatCurrency(value: number) {
   }).format(Math.round(Number(value) || 0));
 }
 
+function formatDesignCode(designId: number) {
+  return `TK-${String(designId).padStart(4, "0")}`;
+}
+
 function formatDateTime(value?: string | null) {
   if (!value) return "";
 
@@ -184,7 +188,7 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
                         )}
                         {item.designId ? (
                           <Tag color="geekblue" className="m-0 text-xs">
-                            Design #{item.designId}
+                            Mã TK: {formatDesignCode(item.designId)}
                           </Tag>
                         ) : null}
                       </div>
