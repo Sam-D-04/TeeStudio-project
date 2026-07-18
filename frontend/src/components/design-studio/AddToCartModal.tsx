@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Modal, message, Spin } from "antd";
 import { useCartStore } from "@/store/useCartStore";
 import { getProductById, type PublicProduct, type PublicVariant } from "@/services/productService";
+import { userDesignService } from "@/services/userDesignService";
 
 /* ── Các hàm hỗ trợ xử lý màu sắc (Việt hoá tên màu, quy đổi sang mã hex) ── */
 const VI_TO_EN: Record<string, string> = {
@@ -167,7 +168,7 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
 
   const totalQty = Object.values(quantities).reduce((a, b) => a + b, 0);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product) return;
     const entries = displaySizes
       .map((v) => ({ v, qty: quantities[v.size] ?? 0 }))
@@ -184,6 +185,18 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
       }
     }
     setAdding(true);
+
+    // Gán variantId thật (color+size, có trong ProductVariant) cho thiết kế — bắt buộc để
+    // lúc tạo đơn backend so khớp được màu, vì Design Studio chỉ lưu baseColor dạng hex tự
+    // chọn, không tự gắn với biến thể thật nào cả.
+    if (designId) {
+      try {
+        await userDesignService.attachVariant(designId, entries[0].v.id);
+      } catch (err) {
+        console.error("[AddToCartModal] attachVariant failed:", err);
+      }
+    }
+
     const primaryImage = product.images.find((i) => i.isPrimary)?.url ?? product.images[0]?.url ?? "";
     entries.forEach(({ v, qty }) => {
       addItem({

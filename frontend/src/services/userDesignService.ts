@@ -72,6 +72,20 @@ export const userDesignService = {
     }
   },
 
+  /**
+   * Gán 1 biến thể sản phẩm thật (variantId, có color/size/stock trong DB) cho thiết kế.
+   * Gọi khi khách thêm thiết kế vào giỏ hàng và chọn size — nếu không gọi, backend không
+   * có cách nào so khớp màu thiết kế (chỉ có mã hex tự chọn) với biến thể lúc tạo đơn.
+   */
+  attachVariant: async (id: number, variantId: number): Promise<{ id: number; variantId: number }> => {
+    try {
+      const res = await apiClient.patch(`${DESIGNS_PATH}/${id}/variant`, { variantId });
+      return res.data.data;
+    } catch (err) {
+      throw new Error(getApiErrorMessage(err, "Lỗi khi gán biến thể cho thiết kế"));
+    }
+  },
+
   /** Gửi thiết kế (DRAFT hoặc NEEDS_REVISION) cho admin duyệt → chuyển sang PENDING_REVIEW. */
   submitForReview: async (
     _token: string | undefined,

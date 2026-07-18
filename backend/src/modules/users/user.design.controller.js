@@ -111,6 +111,23 @@ const deleteDesign = async (req, res, next) => {
   }
 };
 
+const attachVariant = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const designId = parseInt(req.params.id);
+    const variantId = parseInt(req.body.variantId);
+    if (!designId || !variantId) {
+      return res.status(400).json({ success: false, message: "Thiếu designId hoặc variantId" });
+    }
+
+    const result = await userDesignService.attachVariant(userId, designId, variantId);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    const status = error.status || 500;
+    res.status(status).json({ success: false, message: error.message });
+  }
+};
+
 const submitForReview = async (req, res, next) => {
   try {
     const userId = req.user.id;
@@ -131,6 +148,7 @@ module.exports = {
   getMyDesigns,
   createDesign,
   updateDesign,
+  attachVariant,
   deleteDesign,
   submitForReview,
 };

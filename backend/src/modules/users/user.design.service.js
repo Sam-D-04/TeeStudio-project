@@ -107,6 +107,40 @@ async function updateDesign(userId, designId, payload) {
 }
 
 /**
+ * Gán variantId (biến thể sản phẩm thật, có color/size/stock) cho thiết kế — gọi khi
+ * khách thêm thiết kế vào giỏ hàng và chọn 1 size cụ thể. Bắt buộc phải có bước này vì
+ * Design Studio chỉ lưu baseColor dạng mã hex tự chọn từ palette dựng sẵn (không gắn với
+ * ProductVariant thật), nên nếu không gán variantId thì lúc tạo đơn không có cách nào so
+ * khớp màu chính xác giữa thiết kế và biến thể khách chọn.
+ * Không giới hạn theo status (khác updateDesign) vì gán variant không làm thay đổi nội
+ * dung thiết kế, và khách có thể thêm vào giỏ ở bất kỳ trạng thái nào (kể cả PENDING_REVIEW/APPROVED).
+ */
+async function attachVariant(userId, designId, variantId) {
+  const [rowsDesign] = await db.pool.query(
+    "SELECT id, productId FROM CustomDesign WHERE id = ? AND userId = ?",
+    [designId, userId]
+  );
+  if (rowsDesign.length === 0) {
+    const error = new Error("Không tìm thấy thiết kế");
+    error.status = 404;
+    throw error;
+  }
+
+  const [rowsVariant] = await db.pool.query(
+    "SELECT id, productId FROM ProductVariant WHERE id = ?",
+    [variantId]
+  );
+  if (rowsVariant.length === 0 || rowsVariant[0].productId !== rowsDesign[0].productId) {
+    const error = new Error("Biến thể sản phẩm không khớp với sản phẩm của thiết kế");
+    error.status = 400;
+    throw error;
+  }
+
+  await db.pool.query("UPDATE CustomDesign SET variantId = ? WHERE id = ?", [variantId, designId]);
+  return { id: designId, variantId };
+}
+
+/**
  * Delete a DRAFT design.
  */
 async function deleteDesign(userId, designId) {
@@ -143,6 +177,7 @@ module.exports = {
   getMyDesigns,
   saveNewDesign,
   updateDesign,
+  attachVariant,
   deleteDesign,
   submitForReview,
 };
