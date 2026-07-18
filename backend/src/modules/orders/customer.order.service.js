@@ -246,6 +246,11 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
   }
 
   // 1d. Validate designId (nếu có) và lấy designFee
+  // designIdsDaUploadAnh: theo dõi designId đã upload ảnh in trong đơn này - một
+  // thiết kế có thể bị tách thành nhiều OrderItem nếu khách chọn nhiều size cùng
+  // lúc (xem AddToCartModal), các item đó mang chung 1 base64 giống hệt nhau nên
+  // chỉ cần upload 1 lần, tránh sinh file trùng lặp trên Cloudinary.
+  const designIdsDaUploadAnh = new Set();
   for (const enriched of itemsEnriched) {
     if (!enriched.designId) continue;
 
@@ -307,32 +312,37 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
 
     // Upload ảnh in print-ready lên Cloudinary - tối đa 2 ảnh (mặt trước/sau),
     // mỗi mặt upload + lưu độc lập nên lỗi ở mặt này không ảnh hưởng mặt kia.
-    if (enriched.printImageFront && enriched.printImageFront.startsWith("data:image")) {
-      try {
-        const printFileUrlFront = await uploadBase64Image(enriched.printImageFront, "print-files");
-        await db.pool.query(
-          "UPDATE CustomDesign SET printFileUrlFront = ? WHERE id = ?",
-          [printFileUrlFront, enriched.designId]
-        );
-      } catch (uploadErr) {
-        console.error(
-          `[createOrderAsCustomer] Upload printFileUrlFront cho design ${enriched.designId} thất bại:`,
-          uploadErr
-        );
+    // Bỏ qua nếu designId này đã upload rồi (item khác size, cùng thiết kế).
+    if (!designIdsDaUploadAnh.has(enriched.designId)) {
+      designIdsDaUploadAnh.add(enriched.designId);
+
+      if (enriched.printImageFront && enriched.printImageFront.startsWith("data:image")) {
+        try {
+          const printFileUrlFront = await uploadBase64Image(enriched.printImageFront, "print-files");
+          await db.pool.query(
+            "UPDATE CustomDesign SET printFileUrlFront = ? WHERE id = ?",
+            [printFileUrlFront, enriched.designId]
+          );
+        } catch (uploadErr) {
+          console.error(
+            `[createOrderAsCustomer] Upload printFileUrlFront cho design ${enriched.designId} thất bại:`,
+            uploadErr
+          );
+        }
       }
-    }
-    if (enriched.printImageBack && enriched.printImageBack.startsWith("data:image")) {
-      try {
-        const printFileUrlBack = await uploadBase64Image(enriched.printImageBack, "print-files");
-        await db.pool.query(
-          "UPDATE CustomDesign SET printFileUrlBack = ? WHERE id = ?",
-          [printFileUrlBack, enriched.designId]
-        );
-      } catch (uploadErr) {
-        console.error(
-          `[createOrderAsCustomer] Upload printFileUrlBack cho design ${enriched.designId} thất bại:`,
-          uploadErr
-        );
+      if (enriched.printImageBack && enriched.printImageBack.startsWith("data:image")) {
+        try {
+          const printFileUrlBack = await uploadBase64Image(enriched.printImageBack, "print-files");
+          await db.pool.query(
+            "UPDATE CustomDesign SET printFileUrlBack = ? WHERE id = ?",
+            [printFileUrlBack, enriched.designId]
+          );
+        } catch (uploadErr) {
+          console.error(
+            `[createOrderAsCustomer] Upload printFileUrlBack cho design ${enriched.designId} thất bại:`,
+            uploadErr
+          );
+        }
       }
     }
   }

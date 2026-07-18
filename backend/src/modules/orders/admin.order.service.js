@@ -1938,6 +1938,10 @@ async function taoMoiDonHang(data, actor, ipAddress) {
   }
 
   // 1d. Validate designId (nếu có) và lấy designFee
+  // designIdsDaUploadAnh: theo dõi designId đã upload ảnh in trong đơn này - nếu
+  // admin thêm nhiều dòng cùng trỏ tới 1 designId (VD: tách theo size), tránh
+  // upload trùng ảnh giống hệt nhau lên Cloudinary.
+  const designIdsDaUploadAnh = new Set();
   for (const enriched of itemsEnriched) {
     if (!enriched.designId) continue;
 
@@ -2015,7 +2019,13 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     // Lỗi upload không được chặn việc tạo đơn (canvasData vẫn là bản gốc dự phòng).
     // Admin tạo đơn hiện chưa có luồng nào gửi kèm ảnh mặt sau (printImageBack)
     // nên chỉ xử lý 1 ảnh (mặt trước) như trước đây, khớp với cột đã đổi tên.
-    if (enriched.printImage && enriched.printImage.startsWith("data:image")) {
+    // Bỏ qua nếu designId này đã upload rồi (dòng khác size, cùng thiết kế).
+    if (
+      !designIdsDaUploadAnh.has(enriched.designId) &&
+      enriched.printImage &&
+      enriched.printImage.startsWith("data:image")
+    ) {
+      designIdsDaUploadAnh.add(enriched.designId);
       try {
         const printFileUrlFront = await uploadBase64Image(enriched.printImage, "print-files");
         await db.pool.query(
