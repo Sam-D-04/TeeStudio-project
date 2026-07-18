@@ -5,18 +5,19 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Input, Badge, Drawer } from "antd";
 import HeaderAuthActions from "@/components/auth/HeaderAuthActions";
+import CartDrawer from "@/components/design-studio/CartDrawer";
 import { useCartStore } from "@/store/useCartStore";
 
 const navItems = [
   { key: "/explore",      label: "Khám phá" },
   { key: "/design-studio",label: "Thiết kế áo" },
   { key: "/collections",  label: "Bộ sưu tập" },
-  { key: "/creator",      label: "Bán hàng" },
 ];
 
 export default function AppHeader() {
   const [scrolled,    setScrolled]    = useState(false);
   const [drawerOpen,  setDrawerOpen]  = useState(false);
+  const [cartOpen,    setCartOpen]    = useState(false);
   const pathname      = usePathname();
   const router        = useRouter();
   const [searchValue, setSearchValue] = useState("");
@@ -27,6 +28,11 @@ export default function AppHeader() {
     else   router.push("/explore");
   };
   const totalItems    = useCartStore((s) => s.totalItems());
+
+  /* Hydration guard: localStorage-persisted cart chỉ đọc được ở client,
+     nên lần render đầu tiên phải khớp server (0) rồi mới cập nhật số thật. */
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 8);
@@ -186,31 +192,30 @@ export default function AppHeader() {
             <HeaderAuthActions />
 
             {/* Cart */}
-            <Link href="/cart" style={{ textDecoration: "none" }}>
-              <Badge count={totalItems} showZero={false} size="small" color="#0ea5e9">
-                <button
-                  style={{
-                    width:        40,
-                    height:       40,
-                    borderRadius: 8,
-                    background:   "#f1f5f9",
-                    border:       "1px solid #e2e8f0",
-                    display:      "flex",
-                    alignItems:   "center",
-                    justifyContent:"center",
-                    cursor:       "pointer",
-                  }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"
-                      stroke="#475569" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-                    />
-                    <path d="M3 6h18M16 10a4 4 0 01-8 0" stroke="#475569" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </Badge>
-            </Link>
+            <Badge count={hydrated ? totalItems : 0} showZero={false} size="small" color="#0ea5e9">
+              <button
+                onClick={() => setCartOpen(true)}
+                style={{
+                  width:        40,
+                  height:       40,
+                  borderRadius: 8,
+                  background:   "#f1f5f9",
+                  border:       "1px solid #e2e8f0",
+                  display:      "flex",
+                  alignItems:   "center",
+                  justifyContent:"center",
+                  cursor:       "pointer",
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"
+                    stroke="#475569" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+                  />
+                  <path d="M3 6h18M16 10a4 4 0 01-8 0" stroke="#475569" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </Badge>
 
             {/* Mobile menu */}
             <button
@@ -292,6 +297,9 @@ export default function AppHeader() {
           <HeaderAuthActions mobile onNavigate={() => setDrawerOpen(false)} />
         </div>
       </Drawer>
+
+      {/* ── Cart Drawer (trượt từ phải) ── */}
+      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
     </>
   );
 }

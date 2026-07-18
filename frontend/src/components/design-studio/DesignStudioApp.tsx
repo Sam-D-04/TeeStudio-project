@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type Konva from "konva";
 
-import { useDesignStore } from "@/store/useDesignStore";
+import { useDesignStore, type DesignElement } from "@/store/useDesignStore";
 import useAuthStore from "@/store/useAuthStore";
 import { userDesignService, SavedDesign } from "@/services/userDesignService";
 import { calcDesignFee } from "@/utils/designFeeCalculator";
@@ -125,19 +125,26 @@ export default function DesignStudioApp() {
     return () => window.removeEventListener("keydown", handler);
   }, [undo, redo, removeElement, showToast, setSelectedId]);
 
-  /* ── Upload ── */
+  /* ── Upload ──
+     Dùng base64 (FileReader) thay vì URL.createObjectURL: blob URL chỉ sống trong
+     phiên trình duyệt hiện tại, nên khi lưu thẳng vào canvasData rồi load lại thiết
+     kế ở phiên khác thì ảnh sẽ không hiển thị được. Base64 portable trong cả phiên
+     làm việc và được backend upload lên Cloudinary khi lưu thiết kế. */
   const handleUploadImages = useCallback((files: FileList) => {
     Array.from(files).forEach((file) => {
       if (!file.type.startsWith("image/")) return;
       if (file.size > 5 * 1024 * 1024) { showToast("File quá lớn (>5MB)"); return; }
-      setUploadedImages((prev) => [...prev, URL.createObjectURL(file)]);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setUploadedImages((prev) => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
     });
   }, [showToast]);
 
   const handleRemoveUploadedImage = useCallback((idx: number) => {
     setUploadedImages((prev) => {
       const arr = [...prev];
-      URL.revokeObjectURL(arr[idx]);
       arr.splice(idx, 1);
       return arr;
     });
@@ -168,6 +175,16 @@ export default function DesignStudioApp() {
   const [isMyDesignsOpen, setIsMyDesignsOpen] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
+  /*
+    Ảnh in print-ready (base64) chụp từ canvas Konva khi mở modal thêm vào giỏ.
+    Tối đa 2 ảnh - mặt nào không có phần tử nào thì để undefined (không tạo
+    ảnh trắng vô nghĩa). Việc gửi cả 2 ảnh này lên backend khi tạo đơn là việc
+    của Giai đoạn 3 (schema + lưu trữ) - AddToCartModal/giỏ hàng/checkout hiện
+    tại vẫn chỉ nhận 1 ảnh nên bên dưới tạm ưu tiên ảnh mặt trước, dùng ảnh mặt
+    sau nếu khách chỉ thiết kế mặt sau.
+  */
+  const [printImageFront, setPrintImageFront] = useState<string | undefined>(undefined);
+  const [printImageBack, setPrintImageBack] = useState<string | undefined>(undefined);
 
   const handleSaveClick = useCallback(() => {
     if (!isAuthenticated || !accessToken) {
@@ -197,8 +214,8 @@ export default function DesignStudioApp() {
     }
   }, [showToast]);
 
-  const handleConfirmSave = useCallback(async (name: string) => {
-    if (!accessToken) return;
+  const handleConfirmSave = useCallback(async (name: string): Promise<boolean> => {
+    if (!accessToken) return false;
     try {
       setIsSaving(true);
 
@@ -250,19 +267,27 @@ export default function DesignStudioApp() {
         showToast("Đã lưu thiết kế mới thành công");
       }
       setIsSaveModalOpen(false);
+      return true;
     } catch (err: any) {
       showToast(err.message || "Lỗi khi lưu thiết kế");
+      return false;
     } finally {
       setIsSaving(false);
     }
   }, [accessToken, currentDesignId, shirtType, shirtColor, setSelectedId, setCurrentDesignId, showToast]);
+
 
   const handleLoadDesign = useCallback((design: SavedDesign) => {
     const doLoad = () => {
       const state = useDesignStore.getState();
       state.clearDesign(); // Xoá sạch canvas hiện tại (có lưu vào lịch sử undo)
 
-      const elements = design.canvasData?.elements || [];
+      // Thiết kế lưu TRƯỚC KHI có field "side" (phân biệt mặt trước/sau) sẽ
+      // không có "side" trong dữ liệu cũ - mặc định coi các phần tử đó thuộc
+      // mặt trước, để không bị mất nội dung thiết kế cũ khi tải lại.
+      const elements = (design.canvasData?.elements || []).map(
+        (el: DesignElement) => ({ ...el, side: el.side ?? "front" })
+      );
       const view = design.canvasData?.shirtView || "front";
 
       // Gán trực tiếp từng field vào store (không qua các action riêng lẻ)
@@ -276,6 +301,7 @@ export default function DesignStudioApp() {
           || (design.productId === 1 ? "tshirt" : design.productId === 2 ? "polo" : "hoodie"),
         shirtColor: design.baseColor,
         currentDesignId: design.id,
+        currentDesignStatus: design.status,
         designName: design.name,
       });
 
@@ -348,6 +374,93 @@ export default function DesignStudioApp() {
     ? getPoloFrontPolygon(CONTAINER_W, CONTAINER_H)
     : undefined;
 
+  /*
+    Chụp ảnh in print-ready cho CẢ 2 MẶT (trước/sau) từ Konva stage.
+    - Stage chỉ chứa layer thiết kế (mockup áo là <img> DOM riêng) → PNG nền trong suốt.
+    - Trước đây hàm này chỉ chụp đúng mặt đang xem tại thời điểm bấm "Thêm vào
+      giỏ hàng" - nếu khách thiết kế cả 2 mặt nhưng đang xem mặt trước lúc bấm,
+      ảnh in mặt sau bị MẤT hoàn toàn. Giờ hàm tự chuyển qua từng mặt CÓ phần
+      tử để chụp riêng (mặt trống thì bỏ qua, không tạo ảnh trắng vô nghĩa),
+      rồi khôi phục lại đúng mặt khách đang xem ban đầu sau khi chụp xong.
+    - Dùng useDesignStore.setState() trực tiếp (không qua action setShirtView)
+      để không đẩy các lần chuyển mặt tạm thời này vào undoStack - đây là
+      thao tác nội bộ phục vụ chụp ảnh, không phải thao tác của người dùng.
+    - Vùng crop (print area) của từng mặt tính lại bằng getPrintAreaBoundary
+      thay vì dùng biến printAreaForCanvas ở ngoài - biến đó thuộc closure của
+      lần render ứng với mặt ban đầu, không tự cập nhật khi ta đổi mặt bên
+      trong hàm này.
+    - Có chờ ngắn (setTimeout) sau khi đổi mặt để Konva kịp vẽ lại đúng phần
+      tử của mặt vừa chuyển sang trước khi chụp, tránh chụp nhầm frame cũ.
+    - pixelRatio (multiplier) nâng độ phân giải lên ~2400px cạnh dài (đủ ~250-300 DPI).
+  */
+  const capturePrintImages = async (): Promise<{ printImageFront?: string; printImageBack?: string }> => {
+    const stage = stageRef.current;
+    if (!stage) return {};
+
+    const originalView = useDesignStore.getState().shirtView;
+    const elementsNow   = useDesignStore.getState().elements;
+    const sidesToCapture = (["front", "back"] as const).filter((side) =>
+      elementsNow.some((el) => (el.side ?? "front") === side)
+    );
+    if (sidesToCapture.length === 0) return {};
+
+    const TARGET_LONG_EDGE = 2400; // px
+    const result: { printImageFront?: string; printImageBack?: string } = {};
+
+    for (const side of sidesToCapture) {
+      if (useDesignStore.getState().shirtView !== side) {
+        useDesignStore.setState({ shirtView: side, selectedId: null });
+        await new Promise((r) => setTimeout(r, 120));
+      }
+
+      const paSide = getPrintAreaBoundary(shirtType, side, CONTAINER_W, CONTAINER_H);
+      // Ẩn khung chọn (Transformer) để không lọt vào ảnh in
+      const transformers = stage.find("Transformer");
+      transformers.forEach((t) => t.hide());
+      try {
+        const longEdgeScreen = Math.max(paSide.width, paSide.height) * zoom;
+        const pixelRatio = longEdgeScreen > 0 ? TARGET_LONG_EDGE / longEdgeScreen : 3;
+        const dataUrl = stage.toDataURL({
+          mimeType: "image/png",
+          x: paSide.left * zoom,
+          y: paSide.top * zoom,
+          width: paSide.width * zoom,
+          height: paSide.height * zoom,
+          pixelRatio,
+        });
+        if (side === "front") result.printImageFront = dataUrl;
+        else result.printImageBack = dataUrl;
+      } catch (e) {
+        console.error(`[DesignStudio] Không export được ảnh in mặt ${side}:`, e);
+      } finally {
+        transformers.forEach((t) => t.show());
+        stage.batchDraw();
+      }
+    }
+
+    // Khôi phục lại đúng mặt khách đang xem trước khi bấm "Thêm vào giỏ hàng"
+    if (useDesignStore.getState().shirtView !== originalView) {
+      useDesignStore.setState({ shirtView: originalView, selectedId: null });
+    }
+
+    return result;
+  };
+
+  /* Mở modal thêm vào giỏ: chụp ảnh in (nếu có thiết kế) rồi mới mở */
+  const handleOpenCart = async () => {
+    setSelectedId(null);
+    if (elements.length > 0) {
+      showToast("Đang chuẩn bị ảnh in...");
+      const { printImageFront: front, printImageBack: back } = await capturePrintImages();
+      setPrintImageFront(front);
+      setPrintImageBack(back);
+    } else {
+      setPrintImageFront(undefined);
+      setPrintImageBack(undefined);
+    }
+    setIsCartModalOpen(true);
+  };
+
   /* ── Print area border color — black on light shirts, yellow on dark ── */
   const LIGHT_COLORS = ["#ffffff", "#f8fafc", "#f1f5f9", "#e2e8f0", "#fafafa", "#fff"];
   const isLightShirt = LIGHT_COLORS.includes(shirtColor.toLowerCase())
@@ -381,7 +494,7 @@ export default function DesignStudioApp() {
         onShowToast={showToast}
         onOpenMyDesigns={() => setIsMyDesignsOpen(true)}
         onNewDesign={handleNewDesign}
-        onAddToCart={() => setIsCartModalOpen(true)}
+        onAddToCart={handleOpenCart}
         onViewCart={() => setIsCartDrawerOpen(true)}
         isSaving={isSaving}
       />
@@ -608,6 +721,9 @@ export default function DesignStudioApp() {
         productId={urlProductId ?? SHIRT_TO_PRODUCT_ID[shirtType] ?? 1}
         shirtColor={colorName || shirtColor}
         designId={currentDesignId ?? undefined}
+        printImageFront={printImageFront}
+        printImageBack={printImageBack}
+        designPreviewUrl={printImageFront ?? printImageBack}
       />
 
       <CartDrawer

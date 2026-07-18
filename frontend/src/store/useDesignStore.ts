@@ -15,6 +15,17 @@ export interface DesignElement {
   height: number;
   rotation: number;
   locked?: boolean;
+  /**
+   * Phần tử này thuộc mặt trước hay mặt sau của áo. Trước đây tất cả phần tử
+   * dùng chung 1 mảng không phân biệt mặt, khiến thiết kế mặt trước bị "lẫn"
+   * sang mặt sau (2 vùng in gần trùng nhau trên màn hình). Field này cho phép
+   * lọc phần tử theo đúng mặt đang xem khi hiển thị/chụp ảnh in.
+   *
+   * Thiết kế cũ đã lưu trước khi có field này sẽ không có "side" trong dữ
+   * liệu — mọi nơi đọc field này phải tự coi giá trị rỗng là "front" (dùng
+   * `el.side ?? "front"`) để không làm mất nội dung thiết kế cũ.
+   */
+  side: "front" | "back";
 
   // Các thuộc tính chỉ dùng khi type === "image"
   src?: string;
@@ -50,13 +61,16 @@ export interface DesignState {
   /* Trạng thái liên quan tới thiết kế đã lưu trong DB */
   currentDesignId: number | null;
   designName: string;
+  /** Status (DRAFT/PENDING_REVIEW/NEEDS_REVISION/APPROVED) của thiết kế đang tải, nếu có. */
+  currentDesignStatus: string | null;
 
   /* Ngăn xếp Undo / Redo — mỗi phần tử là một bản snapshot của elements[] */
   undoStack: DesignElement[][];
   redoStack: DesignElement[][];
 
   /* Hành động thao tác với phần tử trên canvas */
-  addElement: (el: Omit<DesignElement, "id">) => void;
+  /** "side" KHÔNG cần truyền vào - store tự gắn theo shirtView đang xem lúc thêm. */
+  addElement: (el: Omit<DesignElement, "id" | "side">) => void;
   updateElement: (id: string, attrs: Partial<DesignElement>) => void;
   removeElement: (id: string) => void;
   setSelectedId: (id: string | null) => void;
@@ -73,6 +87,7 @@ export interface DesignState {
   /* Hành động cập nhật trạng thái lưu trữ (id/tên thiết kế) */
   setCurrentDesignId: (id: number | null) => void;
   setDesignName: (name: string) => void;
+  setCurrentDesignStatus: (status: string | null) => void;
 
   /* Hành động Undo / Redo */
   undo: () => void;
@@ -88,6 +103,7 @@ export const useDesignStore = create<DesignState>((set, get) => ({
   selectedId: null,
   currentDesignId: null,
   designName: "Thiết kế chưa đặt tên",
+  currentDesignStatus: null,
 
   shirtType: "tshirt",
   shirtColor: "#ffffff",
@@ -112,7 +128,9 @@ export const useDesignStore = create<DesignState>((set, get) => ({
   addElement: (el) => {
     const state = get();
     state.pushHistory();
-    const newEl: DesignElement = { ...el, id: uuidv4() };
+    // Gắn "side" theo mặt áo đang xem tại thời điểm thêm - đây là nơi DUY NHẤT
+    // quyết định 1 phần tử mới thuộc mặt trước hay mặt sau.
+    const newEl: DesignElement = { ...el, id: uuidv4(), side: state.shirtView };
     set({ elements: [...state.elements, newEl], selectedId: newEl.id });
   },
 
@@ -153,25 +171,56 @@ export const useDesignStore = create<DesignState>((set, get) => ({
     set({ elements: [...state.elements, dup], selectedId: dup.id });
   },
 
-  // Đưa phần tử lên trên 1 lớp (đổi vị trí với phần tử liền sau trong mảng)
+  // Đưa phần tử lên trên 1 lớp.
+  // LƯU Ý: "lớp trên" phải là phần tử TIẾP THEO CÙNG MẶT (front/back), không
+  // phải phần tử liền kề tuyệt đối trong mảng - vì mảng "elements" chứa chung
+  // phần tử của cả 2 mặt, phần tử của mặt kia có thể nằm xen giữa. Nếu chỉ
+  // đổi chỗ với phần tử liền kề tuyệt đối, thứ tự lớp có thể vô tình hoán đổi
+  // với 1 phần tử của mặt KHÁC (mặt đó không hề hiển thị cùng lúc nên việc
+  // đổi thứ tự đó vô nghĩa và gây rối dữ liệu).
   moveElementUp: (id) => {
     const state = get();
     const idx = state.elements.findIndex((e) => e.id === id);
-    if (idx < 0 || idx >= state.elements.length - 1) return;
+    if (idx < 0) return;
+    const side = state.elements[idx].side ?? "front";
+
+    // Tìm phần tử tiếp theo (index lớn hơn) cùng mặt với phần tử đang xét
+    let idxTiepTheoCungMat = -1;
+    for (let i = idx + 1; i < state.elements.length; i++) {
+      if ((state.elements[i].side ?? "front") === side) {
+        idxTiepTheoCungMat = i;
+        break;
+      }
+    }
+    if (idxTiepTheoCungMat === -1) return; // đã ở lớp trên cùng của mặt này
+
     state.pushHistory();
     const arr = [...state.elements];
-    [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]];
+    [arr[idx], arr[idxTiepTheoCungMat]] = [arr[idxTiepTheoCungMat], arr[idx]];
     set({ elements: arr });
   },
 
-  // Đưa phần tử xuống dưới 1 lớp (đổi vị trí với phần tử liền trước trong mảng)
+  // Đưa phần tử xuống dưới 1 lớp - cùng nguyên tắc "chỉ so với phần tử cùng mặt"
+  // như moveElementUp ở trên.
   moveElementDown: (id) => {
     const state = get();
     const idx = state.elements.findIndex((e) => e.id === id);
-    if (idx <= 0) return;
+    if (idx < 0) return;
+    const side = state.elements[idx].side ?? "front";
+
+    // Tìm phần tử phía trước (index nhỏ hơn) cùng mặt với phần tử đang xét
+    let idxTruocDoCungMat = -1;
+    for (let i = idx - 1; i >= 0; i--) {
+      if ((state.elements[i].side ?? "front") === side) {
+        idxTruocDoCungMat = i;
+        break;
+      }
+    }
+    if (idxTruocDoCungMat === -1) return; // đã ở lớp dưới cùng của mặt này
+
     state.pushHistory();
     const arr = [...state.elements];
-    [arr[idx], arr[idx - 1]] = [arr[idx - 1], arr[idx]];
+    [arr[idx], arr[idxTruocDoCungMat]] = [arr[idxTruocDoCungMat], arr[idx]];
     set({ elements: arr });
   },
 
@@ -190,13 +239,17 @@ export const useDesignStore = create<DesignState>((set, get) => ({
 
   // Đổi mặt áo (trước/sau) cũng cần lưu lịch sử vì layout các phần tử
   // in trên mỗi mặt là độc lập với nhau.
+  // Đồng thời BỎ CHỌN phần tử đang chọn (selectedId: null) - vì phần tử đó
+  // (nếu có) chỉ thuộc 1 trong 2 mặt, khi đổi sang mặt kia phần tử đó không
+  // còn hiển thị nữa nên không thể giữ trạng thái "đang chọn" nó được.
   setShirtView: (v) => {
     get().pushHistory();
-    set({ shirtView: v });
+    set({ shirtView: v, selectedId: null });
   },
 
   setCurrentDesignId: (id) => set({ currentDesignId: id }),
   setDesignName: (name) => set({ designName: name }),
+  setCurrentDesignStatus: (status) => set({ currentDesignStatus: status }),
 
   /* ───────────── Undo / Redo ───────────── */
 
@@ -234,6 +287,7 @@ export const useDesignStore = create<DesignState>((set, get) => ({
       selectedId: null,
       currentDesignId: null,
       designName: "Thiết kế chưa đặt tên",
+      currentDesignStatus: null,
     });
   },
 }));

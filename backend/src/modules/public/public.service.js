@@ -33,7 +33,30 @@ async function layDanhSachSanPhamCongKhai(search) {
      ORDER BY p.id ASC`,
     params
   );
-  return rows;
+
+  if (rows.length === 0) return rows;
+
+  // Lấy ảnh mặt trước theo từng màu (altText dạng "{Màu}-front") để FE có thể
+  // xoay vòng ảnh màu khác khi hover — ảnh chính (imageUrl) luôn đứng đầu danh sách.
+  const productIds = rows.map((r) => r.id);
+  const [frontImages] = await db.pool.query(
+    `SELECT productId, imageUrl, isPrimary
+     FROM ProductImage
+     WHERE productId IN (?) AND altText LIKE '%-front'
+     ORDER BY productId, isPrimary DESC, sortOrder ASC`,
+    [productIds]
+  );
+
+  const imagesByProduct = new Map();
+  for (const img of frontImages) {
+    if (!imagesByProduct.has(img.productId)) imagesByProduct.set(img.productId, []);
+    imagesByProduct.get(img.productId).push(img.imageUrl);
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    images: imagesByProduct.get(r.id) ?? (r.imageUrl ? [r.imageUrl] : []),
+  }));
 }
 
 // =====================================================================
@@ -104,6 +127,17 @@ async function layChiTietSanPhamCongKhai(id) {
     [id]
   );
 
+  // Lấy bảng ưu đãi số lượng (nếu có) - đúng các mốc dùng để tự động giảm giá
+  // khi tạo đơn (xem customer.order.service.js), hiển thị công khai để khách
+  // biết trước khi đặt hàng thay vì chỉ áp dụng ngầm.
+  const [bulkPricing] = await db.pool.query(
+    `SELECT minQty, discountPercent
+     FROM BulkPricing
+     WHERE productId = ?
+     ORDER BY minQty ASC`,
+    [id]
+  );
+
   return {
     id: p.id,
     name: p.name,
@@ -125,6 +159,10 @@ async function layChiTietSanPhamCongKhai(id) {
       url: img.imageUrl,
       altText: img.altText || p.name,
       isPrimary: img.isPrimary === 1,
+    })),
+    bulkPricing: bulkPricing.map((b) => ({
+      minQty: b.minQty,
+      discountPercent: Number(b.discountPercent),
     })),
   };
 }

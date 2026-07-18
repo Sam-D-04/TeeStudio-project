@@ -31,7 +31,7 @@ const ImageIcon = () => (
 // Các màu phải khớp colorHex của ProductVariant để thiết kế luôn gắn được
 // với một biến thể màu + size hợp lệ khi đưa vào đơn hàng.
 const TSHIRT_COLORS = ["#ffffff", "#000000"];
-const POLO_COLORS   = ["#ffffff", "#0066cc"];
+const POLO_COLORS = ["#ffffff", "#0066cc"];
 const HOODIE_COLORS = ["#000000", "#003153"];
 
 const StickerIcon = () => (
@@ -41,11 +41,19 @@ const StickerIcon = () => (
   </svg>
 );
 
-type TabId = "images" | "stickers" | "text" | "shirt" | "my-designs";
-type Sticker = { id?: number; ten: string; urlAnh: string; loai?: string };
+type TabId = "images" | "stickers" | "text" | "shirt" | "ai" | "my-designs";
+
+const AiIcon = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
+  </svg>
+);
 
 import FontSelectorPanel from "./FontSelectorPanel";
 import MyDesignsTab from "./MyDesignsTab";
+import AiAssistantPanel from "./AiAssistantPanel";
+import useAuthStore from "@/store/useAuthStore";
+import { userDesignService } from "@/services/userDesignService";
 
 interface SidebarProps {
   uploadedImages: string[];
@@ -65,7 +73,7 @@ export default function Sidebar({
   lockShirtOptions = false,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = React.useState<TabId>("images");
-  const [stickers, setStickers] = React.useState<Sticker[]>([]);
+  const [stickers, setStickers] = React.useState<any[]>([]);
   const [hasFetchedStickers, setHasFetchedStickers] = React.useState<boolean>(false);
   const [activeCategorySticker, setActiveCategorySticker] = React.useState<string>("Tất cả");
   const [searchStickerQuery, setSearchStickerQuery] = React.useState<string>("");
@@ -95,6 +103,19 @@ export default function Sidebar({
     addElement,
   } = useDesignStore();
 
+  /* Chấm đỏ trên tab "Của tôi" — báo có thiết kế bị admin yêu cầu chỉnh sửa */
+  const { isAuthenticated, accessToken } = useAuthStore();
+  const [needsRevisionCount, setNeedsRevisionCount] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!isAuthenticated || !accessToken) { setNeedsRevisionCount(0); return; }
+    userDesignService.getMyDesigns(accessToken)
+      .then((designs) => {
+        setNeedsRevisionCount(designs.filter((d) => d.status === "NEEDS_REVISION").length);
+      })
+      .catch(() => { /* im lặng bỏ qua — chỉ là chỉ báo phụ, không chặn UI */ });
+  }, [isAuthenticated, accessToken, activeTab]);
+
   const handleFileDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -110,9 +131,10 @@ export default function Sidebar({
     { id: "stickers", label: "Họa tiết", icon: <StickerIcon /> },
     { id: "text", label: "Văn bản", icon: <TypeIcon /> },
     { id: "shirt", label: "Phôi áo", icon: <ShirtIcon /> },
-    { 
-      id: "my-designs", 
-      label: "Của tôi", 
+    { id: "ai", label: "Trợ lý", icon: <AiIcon /> },
+    {
+      id: "my-designs",
+      label: "Của tôi",
       icon: (
         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
@@ -130,9 +152,25 @@ export default function Sidebar({
             key={tab.id}
             className={`ds-sidebar-tab ${activeTab === tab.id ? "ds-sidebar-tab--active" : ""}`}
             onClick={() => setActiveTab(tab.id)}
+            style={{ position: "relative" }}
           >
             {tab.icon}
             {tab.label}
+            {tab.id === "my-designs" && needsRevisionCount > 0 && (
+              <span
+                title={`${needsRevisionCount} thiết kế cần chỉnh sửa`}
+                style={{
+                  position: "absolute", top: 2, right: 2,
+                  minWidth: 15, height: 15, padding: "0 3px",
+                  borderRadius: 20, background: "#f97316",
+                  color: "#fff", fontSize: 9, fontWeight: 800,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  lineHeight: 1,
+                }}
+              >
+                {needsRevisionCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -378,6 +416,11 @@ export default function Sidebar({
             </div>
           </>
         )}
+        {/* ── Tab Trợ lý AI ── */}
+        {activeTab === "ai" && (
+          <AiAssistantPanel />
+        )}
+
         {/* ── Tab Thiết kế của tôi ── */}
         {activeTab === "my-designs" && (
           <MyDesignsTab />

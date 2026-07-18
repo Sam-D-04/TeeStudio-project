@@ -220,6 +220,7 @@ export default function CollectionsPage() {
           productId={cartDesign.productId}
           shirtColor={cartDesign.baseColor}
           designId={cartDesign.id}
+          designPreviewUrl={cartDesign.previewUrl}
         />
       )}
     </main>

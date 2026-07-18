@@ -10,6 +10,12 @@ export interface PublicVariant {
   stockQty: number;
 }
 
+// Một mốc ưu đãi số lượng: mua từ minQty trở lên được giảm discountPercent %
+export interface BulkPricingTier {
+  minQty: number;
+  discountPercent: number;
+}
+
 // Thông tin sản phẩm hiển thị công khai cho khách hàng (trang chi tiết sản phẩm, design studio...)
 export interface PublicProduct {
   id: number;
@@ -18,6 +24,7 @@ export interface PublicProduct {
   form: string;
   variants: PublicVariant[];
   images: Array<{ url: string; altText: string; isPrimary: boolean }>;
+  bulkPricing: BulkPricingTier[];
 }
 
 // Lấy thông tin chi tiết một sản phẩm theo id, dùng cho trang chi tiết sản phẩm và design studio

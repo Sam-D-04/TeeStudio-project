@@ -19,7 +19,10 @@
 
 import { useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
+
 import { useQuery } from "@tanstack/react-query";
+import { message } from "antd";
+
 import {
   HighlightOutlined,
   PrinterOutlined,
@@ -36,6 +39,7 @@ import useAuthStore from "@/store/useAuthStore";
 
 // Service gọi API
 import * as designService from "@/services/admin/designService";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 
 // Import các component con
 import DesignStatCard from "./DesignStatCard";
@@ -72,10 +76,15 @@ type DesignPageProps = {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function DesignPage({ initialFilters }: DesignPageProps) {
   const router = useRouter();
+
   const currentUser = useAuthStore((state) => state.user);
 
   // Thiết kế đang được mở trong modal chi tiết
   const [idThietKeDangXem, setIdThietKeDangXem] = useState<number | null>(null);
+
+  const [messageApi, messageContextHolder] = message.useMessage();
+  const [dangXuatExcel, setDangXuatExcel] = useState(false);
+
 
   // ── State điều hướng tab ──
   const [tabDangChon, setTabDangChon] = useState<TenTab>(
@@ -184,6 +193,26 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
     }
   }
 
+  // ─── Xuất file Excel "thông số in" cho xưởng in ───────────────────────
+  async function xuLyXuatThongSoIn() {
+    if (dangXuatExcel) return;
+    setDangXuatExcel(true);
+    try {
+      await designService.xuatDonCanIn({
+        trang_thai: locTrangThaiDonIn || undefined,
+        tu_ngay: khoangNgayDonIn.tuNgay || undefined,
+        den_ngay: khoangNgayDonIn.denNgay || undefined,
+      });
+      messageApi.success("Đã xuất file thông số in thành công.");
+    } catch (error) {
+      messageApi.error(
+        getApiErrorMessage(error, "Không thể xuất file. Vui lòng thử lại.")
+      );
+    } finally {
+      setDangXuatExcel(false);
+    }
+  }
+
   // ─── Xử lý xem chi tiết ────────────────────────────────────────────────
   function xuLyXemChiTiet(id: number) {
     setIdThietKeDangXem(id);
@@ -207,6 +236,7 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {messageContextHolder}
 
       <DesignDetailModal
         designId={idThietKeDangXem}
@@ -312,7 +342,8 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
 
           {/* Nút chính: Xuất thông số in */}
           <button
-            onClick={() => alert("Chức năng xuất thông số in sẽ sinh file PDF/Excel cho xưởng in")}
+            onClick={xuLyXuatThongSoIn}
+            disabled={dangXuatExcel}
             style={{
               height: 40,
               padding: "0 20px",
@@ -325,19 +356,21 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
               fontSize: 14,
               fontWeight: 600,
               color: "#ffffff",
-              cursor: "pointer",
+              cursor: dangXuatExcel ? "not-allowed" : "pointer",
+              opacity: dangXuatExcel ? 0.7 : 1,
               boxShadow: "0 1px 4px rgba(14,165,233,0.3)",
               transition: "background-color 0.15s ease",
             }}
             onMouseEnter={(e) => {
+              if (dangXuatExcel) return;
               (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0284c7";
             }}
             onMouseLeave={(e) => {
               (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0ea5e9";
             }}
           >
-            <DownloadOutlined style={{ fontSize: 16 }} />
-            Xuất thông số in
+            {dangXuatExcel ? <LoadingOutlined style={{ fontSize: 16 }} spin /> : <DownloadOutlined style={{ fontSize: 16 }} />}
+            {dangXuatExcel ? "Đang xuất..." : "Xuất thông số in"}
           </button>
         </div>
       </div>

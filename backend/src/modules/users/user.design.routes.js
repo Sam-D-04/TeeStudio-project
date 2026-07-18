@@ -6,5 +6,7 @@ router.get("/",     verifyToken, userDesignController.getMyDesigns);
 router.post("/",    verifyToken, userDesignController.createDesign);
 router.put("/:id",  verifyToken, userDesignController.updateDesign);
 router.delete("/:id", verifyToken, userDesignController.deleteDesign);
+router.patch("/:id/submitForReview", verifyToken, userDesignController.submitForReview);
+router.patch("/:id/variant", verifyToken, userDesignController.attachVariant);
 
 module.exports = router;

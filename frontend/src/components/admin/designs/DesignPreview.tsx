@@ -1,8 +1,14 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 /**
  * DesignPreview – Ô thumbnail hiển thị bản xem trước thiết kế.
  *
  * Trong giai đoạn phát triển (khi chưa có ảnh thật từ Cloudinary),
  * component tự vẽ mockup đơn giản dựa theo màu áo và mã thiết kế.
+ * Cùng một mockup này cũng được dùng làm ảnh dự phòng khi `urlAnh`
+ * trỏ tới một URL không tải được (ví dụ dữ liệu mẫu/demo dùng URL giả).
  *
  * Khi backend tích hợp Cloudinary, chỉ cần truyền prop `urlAnh` là đủ.
  *
@@ -13,15 +19,28 @@
 
 type DesignPreviewProps = {
   urlAnh?: string | null;      // URL ảnh thật từ Cloudinary (tùy chọn)
+  /**
+   * URL ảnh mặt sau (tùy chọn) - chỉ thiết kế có in cả 2 mặt mới có giá trị này.
+   * Khi có, hiển thị thêm 1 thumbnail nhỏ đè góc dưới-phải của ảnh chính để báo
+   * hiệu thiết kế có 2 mặt, thay vì chỉ luôn hiển thị 1 ảnh như trước đây.
+   */
+  urlAnhMatSau?: string | null;
   mauAo?: string;       // Màu hex của áo (dùng khi chưa có ảnh, ví dụ "#000000")
   maThietKe?: string;   // Mã thiết kế ngắn (2 ký tự đầu, ví dụ "TK")
 };
 
 export default function DesignPreview({
   urlAnh,
+  urlAnhMatSau,
   mauAo = "#e2e8f0",
   maThietKe = "TK",
 }: DesignPreviewProps) {
+  // Reset lại cờ lỗi mỗi khi đổi sang URL ảnh khác (chuyển trang, đổi đơn...)
+  const [loiTaiAnh, setLoiTaiAnh] = useState(false);
+  const [loiTaiAnhSau, setLoiTaiAnhSau] = useState(false);
+  useEffect(() => setLoiTaiAnh(false), [urlAnh]);
+  useEffect(() => setLoiTaiAnhSau(false), [urlAnhMatSau]);
+
   // Lấy 2 ký tự đầu của mã để hiển thị trong ô mockup
   const kyTuDau = maThietKe.replace(/[^A-Za-z]/g, "").slice(0, 2).toUpperCase() || "TK";
 
@@ -38,8 +57,8 @@ export default function DesignPreview({
     return doSang > 128 ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.6)";
   }
 
-  // Nếu có URL ảnh thật → hiển thị ảnh
-  if (urlAnh) {
+  // Nếu có URL ảnh thật và ảnh tải được → hiển thị ảnh
+  if (urlAnh && !loiTaiAnh) {
     return (
       <div
         style={{
@@ -49,13 +68,36 @@ export default function DesignPreview({
           border: "1px solid #e2e8f0",
           overflow: "hidden",
           flexShrink: 0,
+          position: "relative",
         }}
       >
         <img
           src={urlAnh}
           alt="Bản xem trước thiết kế"
           style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          onError={() => setLoiTaiAnh(true)}
         />
+
+        {/* Mini thumbnail mặt sau đè góc dưới-phải - chỉ hiện khi thiết kế có in cả 2 mặt */}
+        {urlAnhMatSau && !loiTaiAnhSau && (
+          <img
+            src={urlAnhMatSau}
+            alt="Bản xem trước mặt sau"
+            title="Thiết kế có mặt sau"
+            onError={() => setLoiTaiAnhSau(true)}
+            style={{
+              position: "absolute",
+              bottom: -2,
+              right: -2,
+              width: 22,
+              height: 22,
+              borderRadius: 5,
+              border: "1.5px solid #ffffff",
+              objectFit: "cover",
+              boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
+            }}
+          />
+        )}
       </div>
     );
   }

@@ -95,7 +95,7 @@ const FORM_LABEL: Record<string, string> = {
   hoodie: "Áo Hoodie",
 };
 
-const fmt = (n: any) => Number(n).toLocaleString("vi-VN") + "đ";
+const fmt = (n: any) => "từ " + Number(n).toLocaleString("vi-VN") + "đ";
 
 /* ─── Client Component ──────────────────────────────────────────────────── */
 interface Props {
@@ -228,11 +228,11 @@ export default function ProductShowcaseClient({ products }: Props) {
                 <div
                   style={{
                     background:     "#ffffff",
-                    height:         168,
+                    height:         198,
                     display:        "flex",
                     alignItems:     "center",
                     justifyContent: "center",
-                    padding:        "20px 32px",
+                    padding:        "16px 22px",
                     position:       "relative",
                   }}
                 >
@@ -263,7 +263,7 @@ export default function ProductShowcaseClient({ products }: Props) {
                           width: "100%",
                           height: "100%",
                           objectFit: "contain",
-                          filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.12))",
+                          filter: "drop-shadow(0 16px 22px rgba(15,23,42,0.28))",
                           borderRadius: 8,
                         }}
                         draggable={false}
@@ -279,7 +279,7 @@ export default function ProductShowcaseClient({ products }: Props) {
                             : "/images/mockups/Polo-White-Front.png"
                         }
                         alt={`${v.productName} ${firstColor}`}
-                        style={{ width: "100%", objectFit: "contain", filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.12))" }}
+                        style={{ width: "100%", objectFit: "contain", filter: "drop-shadow(0 16px 22px rgba(15,23,42,0.28))" }}
                         draggable={false}
                       />
                     ) : v.form === "hoodie" ? (
@@ -291,7 +291,7 @@ export default function ProductShowcaseClient({ products }: Props) {
                             : "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209405/Hoodie-Grey-Front_boebdz.png"
                         }
                         alt={`${v.productName} ${firstColor}`}
-                        style={{ width: "100%", objectFit: "contain", filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.12))" }}
+                        style={{ width: "100%", objectFit: "contain", filter: "drop-shadow(0 16px 22px rgba(15,23,42,0.28))" }}
                         draggable={false}
                       />
                     ) : (
@@ -318,18 +318,19 @@ export default function ProductShowcaseClient({ products }: Props) {
                   </p>
 
                   {/* Dot màu + tên màu tiếng Việt */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}>
                     {colorList.slice(0, 5).map((col) => (
                       <span
                         key={col}
                         title={col}
                         style={{
                           display:      "inline-block",
-                          width:        12,
-                          height:       12,
+                          width:        16,
+                          height:       16,
                           borderRadius: "50%",
                           background:   getHex(col),
-                          border:       "1px solid #e2e8f0",
+                          border:       "1px solid #cbd5e1",
+                          boxShadow:    "0 1px 2px rgba(15,23,42,0.12)",
                           flexShrink:   0,
                         }}
                       />

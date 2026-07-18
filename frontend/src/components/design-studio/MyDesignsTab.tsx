@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import useAuthStore from "@/store/useAuthStore";
 import { useDesignStore } from "@/store/useDesignStore";
 import { userDesignService, SavedDesign } from "@/services/userDesignService";
+import CustomerDesignStatusBadge from "./CustomerDesignStatusBadge";
 
 const CloudIcon = () => (
   <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -18,7 +19,7 @@ const TrashIcon = () => (
 export default function MyDesignsTab() {
   const { isAuthenticated, accessToken } = useAuthStore();
   const { currentDesignId, setCurrentDesignId } = useDesignStore();
-  
+
   const [designs, setDesigns] = useState<SavedDesign[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -45,7 +46,7 @@ export default function MyDesignsTab() {
     e.stopPropagation();
     if (!accessToken) return;
     if (!confirm("Bạn có chắc muốn xoá thiết kế này?")) return;
-    
+
     try {
       await userDesignService.deleteDesign(accessToken, id);
       setDesigns(designs.filter(d => d.id !== id));
@@ -65,6 +66,7 @@ export default function MyDesignsTab() {
       shirtView: d.canvasData.shirtView || "front",
       shirtColor: d.baseColor,
       currentDesignId: d.id,
+      currentDesignStatus: d.status,
       selectedId: null,
       undoStack: [],
       redoStack: []
@@ -87,8 +89,8 @@ export default function MyDesignsTab() {
     <div className="ds-sidebar-pane" style={{ padding: 12 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <h3 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "#cbd5e1" }}>Thiết kế của tôi</h3>
-        <button 
-          onClick={fetchDesigns} 
+        <button
+          onClick={fetchDesigns}
           style={{ background: "none", border: "none", color: "#38bdf8", cursor: "pointer", fontSize: 12 }}
         >
           Làm mới
@@ -105,45 +107,92 @@ export default function MyDesignsTab() {
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          {designs.map(d => (
-            <div 
-              key={d.id} 
-              style={{
-                background: "#1e293b",
-                borderRadius: 8,
-                overflow: "hidden",
-                cursor: "pointer",
-                border: currentDesignId === d.id ? "2px solid #38bdf8" : "2px solid transparent",
-                position: "relative"
-              }}
-              onClick={() => handleLoadDesign(d)}
-            >
-              <div style={{ width: "100%", height: 100, background: "#0f172a", position: "relative" }}>
-                {d.previewUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={d.previewUrl} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#334155" }}>
-                    <CloudIcon />
+          {designs.map(d => {
+            // Sửa canvas chỉ khả dụng khi DRAFT (đang soạn) hoặc NEEDS_REVISION (admin yêu cầu sửa)
+            const canEdit = d.status === "DRAFT" || d.status === "NEEDS_REVISION";
+            // Xóa chỉ khả dụng khi còn là bản nháp riêng tư, chưa gửi admin
+            const canDelete = d.status === "DRAFT";
+
+            return (
+              <div
+                key={d.id}
+                style={{
+                  background: "#1e293b",
+                  borderRadius: 8,
+                  overflow: "hidden",
+                  cursor: canEdit ? "pointer" : "default",
+                  border: currentDesignId === d.id ? "2px solid #38bdf8" : "2px solid transparent",
+                  position: "relative"
+                }}
+                onClick={() => canEdit && handleLoadDesign(d)}
+                title={canEdit ? "Nhấn để sửa" : undefined}
+              >
+                <div style={{ width: "100%", height: 100, background: "#0f172a", position: "relative" }}>
+                  {d.printFileUrlFront || d.printFileUrlBack ? (
+                    // Thiết kế đã từng đặt hàng nên có ảnh in thật (Cloudinary) - ưu
+                    // tiên hiển thị thay vì bản xem trước canvas, tách 2 nửa nếu có
+                    // cả 2 mặt.
+                    <div style={{ display: "flex", width: "100%", height: "100%" }}>
+                      {d.printFileUrlFront && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={d.printFileUrlFront}
+                          alt="Mặt trước"
+                          title="Mặt trước"
+                          style={{
+                            flex: 1, minWidth: 0, height: "100%", objectFit: "cover",
+                            borderRight: d.printFileUrlBack ? "1px solid #334155" : "none",
+                          }}
+                        />
+                      )}
+                      {d.printFileUrlBack && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={d.printFileUrlBack}
+                          alt="Mặt sau"
+                          title="Mặt sau"
+                          style={{ flex: 1, minWidth: 0, height: "100%", objectFit: "cover" }}
+                        />
+                      )}
+                    </div>
+                  ) : d.previewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={d.previewUrl} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#334155" }}>
+                      <CloudIcon />
+                    </div>
+                  )}
+                  {canDelete && (
+                    <button
+                      onClick={(e) => handleDelete(e, d.id)}
+                      style={{
+                        position: "absolute", top: 4, right: 4,
+                        background: "rgba(0,0,0,0.5)", border: "none", color: "#fff",
+                        padding: 4, borderRadius: 4, cursor: "pointer"
+                      }}
+                      title="Xoá"
+                    >
+                      <TrashIcon />
+                    </button>
+                  )}
+                </div>
+                <div style={{ padding: 8 }}>
+                  <div style={{ marginBottom: 4 }}>
+                    <CustomerDesignStatusBadge status={d.status} />
                   </div>
-                )}
-                <button 
-                  onClick={(e) => handleDelete(e, d.id)}
-                  style={{
-                    position: "absolute", top: 4, right: 4,
-                    background: "rgba(0,0,0,0.5)", border: "none", color: "#fff",
-                    padding: 4, borderRadius: 4, cursor: "pointer"
-                  }}
-                  title="Xoá"
-                >
-                  <TrashIcon />
-                </button>
+                  <div style={{ fontSize: 11, color: "#94a3b8" }}>
+                    {new Date(d.updatedAt).toLocaleDateString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                  {d.status === "NEEDS_REVISION" && d.adminNote && (
+                    <div style={{ marginTop: 6, fontSize: 11, color: "#fdba74", lineHeight: 1.4 }}>
+                      <strong>Admin yêu cầu sửa:</strong> {d.adminNote}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div style={{ padding: 8, fontSize: 11, color: "#94a3b8" }}>
-                {new Date(d.updatedAt).toLocaleDateString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

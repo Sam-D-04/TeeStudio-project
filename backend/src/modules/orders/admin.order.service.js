@@ -13,6 +13,7 @@ const {
   taoMaGiaoDichMomoMoi,
   layThoiDiemHetHanMomo,
 } = require("../payments/momo.service");
+const { uploadBase64Image } = require("../uploads/upload.service");
 
 const DEPOSIT_PERCENT = 50;
 const ONLINE_PAYMENT_METHODS = new Set(["VNPAY", "MOMO"]);
@@ -65,8 +66,8 @@ function tinhThongTinThanhToan(totalAmount, paymentMethod, paymentType) {
       ? Math.round(totalAmount * (DEPOSIT_PERCENT / 100))
       : 0;
   const codAmount =
-    (paymentMethod === "COD" || paymentType === "DEPOSIT") 
-      ? Math.max(0, totalAmount - depositAmount) 
+    (paymentMethod === "COD" || paymentType === "DEPOSIT")
+      ? Math.max(0, totalAmount - depositAmount)
       : 0;
   const paymentAmount =
     paymentType === "DEPOSIT"
@@ -1250,8 +1251,8 @@ async function huyDonHang(id, lyDo, actor) {
       const shouldReturnStock = isCustomDesignItem
         ? donHienTai.status === "PENDING"
         : ["PENDING", "CONFIRMED", "PROCESSING", "PRINTING", "READY_TO_SHIP"].includes(
-            donHienTai.status
-          );
+          donHienTai.status
+        );
 
       if (!shouldReturnStock) continue;
 
@@ -1932,6 +1933,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
       unitPrice,
       designId: item.designId || null,
       designFee: 0, // sẽ cập nhật nếu có designId
+      printImage: item.printImage || null, // ảnh in print-ready (base64) chờ upload
     });
   }
 
@@ -2004,340 +2006,360 @@ async function taoMoiDonHang(data, actor, ipAddress) {
       throw err;
     }
 
-    // Gán designFee từ DB
+    // Gán designFee và trạng thái thiết kế từ DB
     enriched.designFee = Number(design.designFee);
     enriched.designStatus = design.status;
+
+    // Upload ảnh in print-ready lên Cloudinary rồi lưu URL vào CustomDesign.printFileUrlFront.
+    // Làm ngoài transaction (bên dưới) vì đây là gọi mạng, không nên giữ transaction lâu.
+    // Lỗi upload không được chặn việc tạo đơn (canvasData vẫn là bản gốc dự phòng).
+    // Admin tạo đơn hiện chưa có luồng nào gửi kèm ảnh mặt sau (printImageBack)
+    // nên chỉ xử lý 1 ảnh (mặt trước) như trước đây, khớp với cột đã đổi tên.
+    if (enriched.printImage && enriched.printImage.startsWith("data:image")) {
+      try {
+        const printFileUrlFront = await uploadBase64Image(enriched.printImage, "print-files");
+        await db.pool.query(
+          "UPDATE CustomDesign SET printFileUrlFront = ? WHERE id = ?",
+          [printFileUrlFront, enriched.designId]
+        );
+      } catch (uploadErr) {
+        console.error(
+          `[taoMoiDonHang] Upload printFileUrlFront cho design ${enriched.designId} thất bại:`,
+          uploadErr
+        );
+      }
+    }
   }
 
-  const hasCustomDesign = itemsEnriched.some((item) => Boolean(item.designId));
-  if (hasCustomDesign && paymentMethod === "COD") {
-    const err = new Error(
-      "Đơn có sản phẩm Áo in POD / Thiết kế POD chỉ được thanh toán online bằng VNPAY hoặc MoMo"
+    const hasCustomDesign = itemsEnriched.some((item) => Boolean(item.designId));
+    if (hasCustomDesign && paymentMethod === "COD") {
+      const err = new Error(
+        "Đơn có sản phẩm Áo in POD / Thiết kế POD chỉ được thanh toán online bằng VNPAY hoặc MoMo"
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (!hasCustomDesign && paymentType === "DEPOSIT") {
+      const err = new Error("Chỉ đơn hàng POD mới được chọn hình thức đặt cọc");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // ─────────────────────────────────────────────
+    // BƯỚC 2: Tính giá tổng đơn hàng
+    // ─────────────────────────────────────────────
+
+    // subtotal = tổng (unitPrice * quantity) của tất cả items (không gồm designFee và shippingFee)
+    const subtotal = itemsEnriched.reduce(
+      (tong, item) => tong + item.unitPrice * item.quantity,
+      0
     );
-    err.statusCode = 400;
-    throw err;
-  }
 
-  if (!hasCustomDesign && paymentType === "DEPOSIT") {
-    const err = new Error("Chỉ đơn hàng POD mới được chọn hình thức đặt cọc");
-    err.statusCode = 400;
-    throw err;
-  }
+    // Tổng phí thiết kế (nếu là đơn POD)
+    const tongDesignFee = itemsEnriched.reduce(
+      (tong, item) => tong + item.designFee,
+      0
+    );
 
-  // ─────────────────────────────────────────────
-  // BƯỚC 2: Tính giá tổng đơn hàng
-  // ─────────────────────────────────────────────
+    let shippingFee = Math.max(0, Number(shippingFeeInput) || 0);
 
-  // subtotal = tổng (unitPrice * quantity) của tất cả items (không gồm designFee và shippingFee)
-  const subtotal = itemsEnriched.reduce(
-    (tong, item) => tong + item.unitPrice * item.quantity,
-    0
-  );
+    // Tính discountAmount từ promotion (nếu có)
+    let discountAmount = 0;
+    let promotionData = null;
 
-  // Tổng phí thiết kế (nếu là đơn POD)
-  const tongDesignFee = itemsEnriched.reduce(
-    (tong, item) => tong + item.designFee,
-    0
-  );
-
-  let shippingFee = Math.max(0, Number(shippingFeeInput) || 0);
-
-  // Tính discountAmount từ promotion (nếu có)
-  let discountAmount = 0;
-  let promotionData = null;
-
-  if (promotionId) {
-    const now = new Date();
-    const [rowsPromo] = await db.pool.query(
-      `SELECT id, code, discountType, discountValue, minOrderAmount,
+    if (promotionId) {
+      const now = new Date();
+      const [rowsPromo] = await db.pool.query(
+        `SELECT id, code, discountType, discountValue, minOrderAmount,
               usageLimit, usedCount, startDate, endDate, status, isNewCustomerOnly
        FROM Promotion
        WHERE id = ? LIMIT 1`,
-      [promotionId]
-    );
-
-    if (rowsPromo.length === 0) {
-      const err = new Error("Mã khuyến mãi không tồn tại");
-      err.statusCode = 400;
-      throw err;
-    }
-
-    const promo = rowsPromo[0];
-
-    // Kiểm tra ACTIVE
-    if (promo.status !== "ACTIVE") {
-      const err = new Error("Mã khuyến mãi không còn hiệu lực");
-      err.statusCode = 400;
-      throw err;
-    }
-
-    // Kiểm tra thời hạn
-    if (
-      new Date(promo.startDate) > now ||
-      (promo.endDate && new Date(promo.endDate) < now)
-    ) {
-      const err = new Error("Mã khuyến mãi đã hết hạn hoặc chưa đến ngày áp dụng");
-      err.statusCode = 400;
-      throw err;
-    }
-
-    // Kiểm tra số lượt dùng
-    if (promo.usageLimit !== null && promo.usedCount >= promo.usageLimit) {
-      const err = new Error("Mã khuyến mãi đã hết lượt sử dụng");
-      err.statusCode = 400;
-      throw err;
-    }
-
-    if (promo.isNewCustomerOnly) {
-      const [rowsExistingOrders] = await db.pool.query(
-        "SELECT id FROM CustomerOrder WHERE userId = ? LIMIT 1",
-        [userId]
-      );
-      if (rowsExistingOrders.length > 0) {
-        const err = new Error("Mã khuyến mãi này chỉ dành cho khách hàng chưa từng đặt hàng");
-        err.statusCode = 400;
-        throw err;
-      }
-    }
-
-    // Kiểm tra đơn hàng đạt minOrderAmount
-    // minOrderAmount tính trên subtotal (giá gốc sản phẩm), không gồm ship
-    const orderBaseAmount = subtotal + tongDesignFee;
-    if (orderBaseAmount < Number(promo.minOrderAmount)) {
-      const err = new Error(
-        `Đơn hàng cần tối thiểu ${Number(promo.minOrderAmount).toLocaleString("vi-VN")}₫ để áp dụng mã khuyến mãi này`
-      );
-      err.statusCode = 400;
-      throw err;
-    }
-
-    // Kiểm tra khách hàng đã dùng mã này chưa (unique constraint promotionId + userId)
-    const [rowsUsed] = await db.pool.query(
-      "SELECT id FROM PromotionUsage WHERE promotionId = ? AND userId = ? LIMIT 1",
-      [promotionId, userId]
-    );
-    if (rowsUsed.length > 0) {
-      const err = new Error(
-        `Khách hàng này đã sử dụng mã khuyến mãi "${promo.code}" trước đó. Mỗi khách chỉ được dùng mỗi mã 1 lần`
-      );
-      err.statusCode = 400;
-      throw err;
-    }
-
-    // Tính giá trị giảm
-    if (promo.discountType === "PERCENT") {
-      discountAmount = orderBaseAmount * (Number(promo.discountValue) / 100);
-    } else if (promo.discountType === "FIXED") {
-      discountAmount = Number(promo.discountValue);
-    } else if (promo.discountType === "FREE_SHIPPING") {
-      shippingFee = 0;
-    }
-    discountAmount = Math.min(discountAmount, orderBaseAmount); // không giảm quá tổng đơn
-    discountAmount = Math.round(discountAmount * 100) / 100;
-
-    promotionData = promo;
-  }
-
-  // Tổng tiền cuối cùng
-  const totalAmount = Math.max(
-    0,
-    Math.round((subtotal + tongDesignFee + shippingFee - discountAmount) * 100) / 100
-  );
-  const {
-    depositPercent,
-    depositAmount,
-    codAmount,
-    paymentAmount,
-  } = tinhThongTinThanhToan(totalAmount, paymentMethod, paymentType);
-
-  if (ONLINE_PAYMENT_METHODS.has(paymentMethod) && paymentAmount <= 0) {
-    const err = new Error(`Số tiền thanh toán ${paymentMethod} phải lớn hơn 0`);
-    err.statusCode = 400;
-    throw err;
-  }
-
-  const orderCode = taoMaDonHangMoi();
-  const onlinePayment = await taoThongTinThanhToanOnline({
-    paymentMethod,
-    orderCode,
-    amount: paymentAmount,
-    ipAddress,
-  });
-
-  // ─────────────────────────────────────────────
-  // BƯỚC 3-9: Thực hiện trong MySQL Transaction
-  // ─────────────────────────────────────────────
-
-  // Lấy connection riêng để dùng transaction
-  const conn = await db.pool.getConnection();
-
-  try {
-    await conn.beginTransaction();
-
-    // ── Bước 3.1.5: INSERT UserAddress để lấy addressId mới ──
-    const [resultAddress] = await conn.query(
-      `INSERT INTO UserAddress (userId, recipientName, phone, addressLine, city, district, ward)
-       VALUES (?, ?, ?, ?, '', '', '')`,
-      [userId, recipientName, phone, addressLine]
-    );
-    const addressId = resultAddress.insertId;
-
-
-    // ── Bước 3.2: INSERT CustomerOrder ──
-    const [resultOrder] = await conn.query(
-      `INSERT INTO CustomerOrder
-         (orderCode, userId, promotionId, addressId,
-          subtotal, discountAmount, shippingFee,
-          totalAmount, depositAmount, codAmount, paymentType, paymentStatus, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'PENDING')`,
-      [
-        orderCode,
-        userId,
-        promotionId || null,
-        addressId,
-        Math.round(subtotal * 100) / 100,
-        discountAmount,
-        shippingFee,
-        totalAmount,
-        depositAmount,
-        codAmount,
-        paymentType,
-      ]
-    );
-    const orderId = resultOrder.insertId;
-    const creationHistory = taoLichSuTaoDon(actor);
-
-    await ghiOrderHistory(conn, {
-      orderId,
-      fromStatus: null,
-      toStatus: "PENDING",
-      action: creationHistory.action,
-      actor,
-      note: creationHistory.note,
-    });
-
-    // ── Bước 3.3: INSERT OrderItem, OrderProduction và giữ tồn kho ──
-    for (const item of itemsEnriched) {
-      // lineTotal = (unitPrice * quantity) + designFee của item này
-      const lineTotal = Math.round(
-        (item.unitPrice * item.quantity + item.designFee) * 100
-      ) / 100;
-
-      await conn.query(
-        `INSERT INTO OrderItem
-           (orderId, variantId, designId, quantity,
-            unitPrice, designFee, lineTotal, productionStatus)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          orderId,
-          item.variantId,
-          item.designId,
-          item.quantity,
-          item.unitPrice,
-          item.designFee,
-          lineTotal,
-          "WAITING_DESIGN_APPROVAL",
-        ]
-      );
-
-      // Thiết kế chỉ được đưa xuống xưởng sau khi admin xác nhận đơn.
-      // Ở thời điểm tạo đơn, mọi thiết kế đều đang chờ kiểm tra.
-      if (item.designId && item.designStatus !== "APPROVED") {
-        await conn.query(
-          `UPDATE CustomDesign
-           SET status = 'PENDING_REVIEW', adminNote = NULL
-           WHERE id = ?`,
-          [item.designId]
-        );
-      }
-
-      const [stockResult] = await conn.query(
-        `UPDATE ProductVariant
-         SET stockQty = stockQty - ?
-         WHERE id = ? AND stockQty >= ?`,
-        [item.quantity, item.variantId, item.quantity]
-      );
-
-      if (stockResult.affectedRows === 0) {
-        const err = new Error(
-          `Sản phẩm "${item.tenSanPham}" (${item.color}/${item.size}) không còn đủ tồn kho để tạo đơn`
-        );
-        err.statusCode = 400;
-        throw err;
-      }
-
-      await conn.query(
-        `INSERT INTO InventoryTransaction
-           (variantId, orderId, supplierId, quantityChanged, transactionType, reason)
-         VALUES (?, ?, NULL, ?, 'EXPORT', ?)`,
-        [
-          item.variantId,
-          orderId,
-          -item.quantity,
-          `Tạo đơn hàng ${orderCode} - giữ tồn kho ngay khi tạo đơn`,
-        ]
-      );
-    }
-
-    // ── Bước 3.4: INSERT Payment ──
-    const paymentTypeDb =
-      paymentMethod === "COD"
-        ? "COD_FINAL"
-        : paymentType === "DEPOSIT"
-          ? "DEPOSIT"
-          : "FULL_PAYMENT";
-    await conn.query(
-      `INSERT INTO Payment
-         (orderId, amount, paymentMethod, paymentType, status, transactionId, gatewayResponse)
-       VALUES (?, ?, ?, ?, 'PENDING', ?, ?)`,
-      [
-        orderId,
-        paymentAmount,
-        paymentMethod,
-        paymentTypeDb,
-        onlinePayment?.transactionRef || null,
-        onlinePayment ? JSON.stringify(onlinePayment) : null,
-      ]
-    );
-
-    // ── Bước 3.5: Ghi nhận PromotionUsage và tăng usedCount ──
-    if (promotionId && promotionData) {
-      // INSERT PromotionUsage
-      await conn.query(
-        `INSERT INTO PromotionUsage (promotionId, userId, orderId)
-         VALUES (?, ?, ?)`,
-        [promotionId, userId, orderId]
-      );
-
-      // Tăng usedCount +1
-      await conn.query(
-        "UPDATE Promotion SET usedCount = usedCount + 1 WHERE id = ?",
         [promotionId]
       );
+
+      if (rowsPromo.length === 0) {
+        const err = new Error("Mã khuyến mãi không tồn tại");
+        err.statusCode = 400;
+        throw err;
+      }
+
+      const promo = rowsPromo[0];
+
+      // Kiểm tra ACTIVE
+      if (promo.status !== "ACTIVE") {
+        const err = new Error("Mã khuyến mãi không còn hiệu lực");
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // Kiểm tra thời hạn
+      if (
+        new Date(promo.startDate) > now ||
+        (promo.endDate && new Date(promo.endDate) < now)
+      ) {
+        const err = new Error("Mã khuyến mãi đã hết hạn hoặc chưa đến ngày áp dụng");
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // Kiểm tra số lượt dùng
+      if (promo.usageLimit !== null && promo.usedCount >= promo.usageLimit) {
+        const err = new Error("Mã khuyến mãi đã hết lượt sử dụng");
+        err.statusCode = 400;
+        throw err;
+      }
+
+      if (promo.isNewCustomerOnly) {
+        const [rowsExistingOrders] = await db.pool.query(
+          "SELECT id FROM CustomerOrder WHERE userId = ? LIMIT 1",
+          [userId]
+        );
+        if (rowsExistingOrders.length > 0) {
+          const err = new Error("Mã khuyến mãi này chỉ dành cho khách hàng chưa từng đặt hàng");
+          err.statusCode = 400;
+          throw err;
+        }
+      }
+
+      // Kiểm tra đơn hàng đạt minOrderAmount
+      // minOrderAmount tính trên subtotal (giá gốc sản phẩm), không gồm ship
+      const orderBaseAmount = subtotal + tongDesignFee;
+      if (orderBaseAmount < Number(promo.minOrderAmount)) {
+        const err = new Error(
+          `Đơn hàng cần tối thiểu ${Number(promo.minOrderAmount).toLocaleString("vi-VN")}₫ để áp dụng mã khuyến mãi này`
+        );
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // Kiểm tra khách hàng đã dùng mã này chưa (unique constraint promotionId + userId)
+      const [rowsUsed] = await db.pool.query(
+        "SELECT id FROM PromotionUsage WHERE promotionId = ? AND userId = ? LIMIT 1",
+        [promotionId, userId]
+      );
+      if (rowsUsed.length > 0) {
+        const err = new Error(
+          `Khách hàng này đã sử dụng mã khuyến mãi "${promo.code}" trước đó. Mỗi khách chỉ được dùng mỗi mã 1 lần`
+        );
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // Tính giá trị giảm
+      if (promo.discountType === "PERCENT") {
+        discountAmount = orderBaseAmount * (Number(promo.discountValue) / 100);
+      } else if (promo.discountType === "FIXED") {
+        discountAmount = Number(promo.discountValue);
+      } else if (promo.discountType === "FREE_SHIPPING") {
+        shippingFee = 0;
+      }
+      discountAmount = Math.min(discountAmount, orderBaseAmount); // không giảm quá tổng đơn
+      discountAmount = Math.round(discountAmount * 100) / 100;
+
+      promotionData = promo;
     }
 
-    // ── COMMIT ──
-    await conn.commit();
-
-    return {
-      id: orderId,
-      orderCode,
-      totalAmount,
+    // Tổng tiền cuối cùng
+    const totalAmount = Math.max(
+      0,
+      Math.round((subtotal + tongDesignFee + shippingFee - discountAmount) * 100) / 100
+    );
+    const {
       depositPercent,
       depositAmount,
       codAmount,
       paymentAmount,
+    } = tinhThongTinThanhToan(totalAmount, paymentMethod, paymentType);
+
+    if (ONLINE_PAYMENT_METHODS.has(paymentMethod) && paymentAmount <= 0) {
+      const err = new Error(`Số tiền thanh toán ${paymentMethod} phải lớn hơn 0`);
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const orderCode = taoMaDonHangMoi();
+    const onlinePayment = await taoThongTinThanhToanOnline({
       paymentMethod,
-      paymentUrl: onlinePayment?.paymentUrl || null,
-      qrCodeValue: onlinePayment?.qrCodeValue || onlinePayment?.paymentUrl || null,
-      paymentUrlExpiresAt: onlinePayment?.expiresAt || null,
-    };
-  } catch (error) {
-    // ── ROLLBACK nếu có lỗi ──
-    await conn.rollback();
-    throw error;
-  } finally {
-    // Trả connection về pool dù thành công hay thất bại
-    conn.release();
+      orderCode,
+      amount: paymentAmount,
+      ipAddress,
+    });
+
+    // ─────────────────────────────────────────────
+    // BƯỚC 3-9: Thực hiện trong MySQL Transaction
+    // ─────────────────────────────────────────────
+
+    // Lấy connection riêng để dùng transaction
+    const conn = await db.pool.getConnection();
+
+    try {
+      await conn.beginTransaction();
+
+      // ── Bước 3.1.5: INSERT UserAddress để lấy addressId mới ──
+      const [resultAddress] = await conn.query(
+        `INSERT INTO UserAddress (userId, recipientName, phone, addressLine, city, district, ward)
+       VALUES (?, ?, ?, ?, '', '', '')`,
+        [userId, recipientName, phone, addressLine]
+      );
+      const addressId = resultAddress.insertId;
+
+
+      // ── Bước 3.2: INSERT CustomerOrder ──
+      const [resultOrder] = await conn.query(
+        `INSERT INTO CustomerOrder
+         (orderCode, userId, promotionId, addressId,
+          subtotal, discountAmount, shippingFee,
+          totalAmount, depositAmount, codAmount, paymentType, paymentStatus, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'PENDING')`,
+        [
+          orderCode,
+          userId,
+          promotionId || null,
+          addressId,
+          Math.round(subtotal * 100) / 100,
+          discountAmount,
+          shippingFee,
+          totalAmount,
+          depositAmount,
+          codAmount,
+          paymentType,
+        ]
+      );
+      const orderId = resultOrder.insertId;
+      const creationHistory = taoLichSuTaoDon(actor);
+
+      await ghiOrderHistory(conn, {
+        orderId,
+        fromStatus: null,
+        toStatus: "PENDING",
+        action: creationHistory.action,
+        actor,
+        note: creationHistory.note,
+      });
+
+      // ── Bước 3.3: INSERT OrderItem, OrderProduction và giữ tồn kho ──
+      for (const item of itemsEnriched) {
+        // lineTotal = (unitPrice * quantity) + designFee của item này
+        const lineTotal = Math.round(
+          (item.unitPrice * item.quantity + item.designFee) * 100
+        ) / 100;
+
+        await conn.query(
+          `INSERT INTO OrderItem
+           (orderId, variantId, designId, quantity,
+            unitPrice, designFee, lineTotal, productionStatus)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            orderId,
+            item.variantId,
+            item.designId,
+            item.quantity,
+            item.unitPrice,
+            item.designFee,
+            lineTotal,
+            "WAITING_DESIGN_APPROVAL",
+          ]
+        );
+
+        // Thiết kế chỉ được đưa xuống xưởng sau khi admin xác nhận đơn.
+        // Ở thời điểm tạo đơn, mọi thiết kế đều đang chờ kiểm tra.
+        if (item.designId && item.designStatus !== "APPROVED") {
+          await conn.query(
+            `UPDATE CustomDesign
+           SET status = 'PENDING_REVIEW', adminNote = NULL
+           WHERE id = ?`,
+            [item.designId]
+          );
+        }
+
+        const [stockResult] = await conn.query(
+          `UPDATE ProductVariant
+         SET stockQty = stockQty - ?
+         WHERE id = ? AND stockQty >= ?`,
+          [item.quantity, item.variantId, item.quantity]
+        );
+
+        if (stockResult.affectedRows === 0) {
+          const err = new Error(
+            `Sản phẩm "${item.tenSanPham}" (${item.color}/${item.size}) không còn đủ tồn kho để tạo đơn`
+          );
+          err.statusCode = 400;
+          throw err;
+        }
+
+        await conn.query(
+          `INSERT INTO InventoryTransaction
+           (variantId, orderId, supplierId, quantityChanged, transactionType, reason)
+         VALUES (?, ?, NULL, ?, 'EXPORT', ?)`,
+          [
+            item.variantId,
+            orderId,
+            -item.quantity,
+            `Tạo đơn hàng ${orderCode} - giữ tồn kho ngay khi tạo đơn`,
+          ]
+        );
+      }
+
+      // ── Bước 3.4: INSERT Payment ──
+      const paymentTypeDb =
+        paymentMethod === "COD"
+          ? "COD_FINAL"
+          : paymentType === "DEPOSIT"
+            ? "DEPOSIT"
+            : "FULL_PAYMENT";
+      await conn.query(
+        `INSERT INTO Payment
+         (orderId, amount, paymentMethod, paymentType, status, transactionId, gatewayResponse)
+       VALUES (?, ?, ?, ?, 'PENDING', ?, ?)`,
+        [
+          orderId,
+          paymentAmount,
+          paymentMethod,
+          paymentTypeDb,
+          onlinePayment?.transactionRef || null,
+          onlinePayment ? JSON.stringify(onlinePayment) : null,
+        ]
+      );
+
+      // ── Bước 3.5: Ghi nhận PromotionUsage và tăng usedCount ──
+      if (promotionId && promotionData) {
+        // INSERT PromotionUsage
+        await conn.query(
+          `INSERT INTO PromotionUsage (promotionId, userId, orderId)
+         VALUES (?, ?, ?)`,
+          [promotionId, userId, orderId]
+        );
+
+        // Tăng usedCount +1
+        await conn.query(
+          "UPDATE Promotion SET usedCount = usedCount + 1 WHERE id = ?",
+          [promotionId]
+        );
+      }
+
+      // ── COMMIT ──
+      await conn.commit();
+
+      return {
+        id: orderId,
+        orderCode,
+        totalAmount,
+        depositPercent,
+        depositAmount,
+        codAmount,
+        paymentAmount,
+        paymentMethod,
+        paymentUrl: onlinePayment?.paymentUrl || null,
+        qrCodeValue: onlinePayment?.qrCodeValue || onlinePayment?.paymentUrl || null,
+        paymentUrlExpiresAt: onlinePayment?.expiresAt || null,
+      };
+    } catch (error) {
+      // ── ROLLBACK nếu có lỗi ──
+      await conn.rollback();
+      throw error;
+    } finally {
+      // Trả connection về pool dù thành công hay thất bại
+      conn.release();
+    }
   }
-}

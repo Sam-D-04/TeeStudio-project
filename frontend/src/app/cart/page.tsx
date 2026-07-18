@@ -22,15 +22,14 @@ function formatVND(value: number) {
   }).format(value);
 }
 
-const SHIPPING_FEE = 35_000;
 
 export default function CartPage() {
-  const items        = useCartStore((s) => s.items);
-  const totalPrice   = useCartStore((s) => s.totalPrice);
-  const totalItems   = useCartStore((s) => s.totalItems);
-  const removeItem   = useCartStore((s) => s.removeItem);
-  const updateQty    = useCartStore((s) => s.updateQuantity);
-  const clearCart    = useCartStore((s) => s.clearCart);
+  const items = useCartStore((s) => s.items);
+  const totalPrice = useCartStore((s) => s.totalPrice);
+  const totalItems = useCartStore((s) => s.totalItems);
+  const removeItem = useCartStore((s) => s.removeItem);
+  const updateQty = useCartStore((s) => s.updateQuantity);
+  const clearCart = useCartStore((s) => s.clearCart);
 
   /* Hydration guard — Zustand persist only works client-side */
   const [hydrated, setHydrated] = useState(false);
@@ -39,7 +38,8 @@ export default function CartPage() {
   if (!hydrated) return null;
 
   const subtotal = totalPrice();
-  const total    = subtotal + (subtotal > 0 ? SHIPPING_FEE : 0);
+  // Phí vận chuyển được tính ở bước thanh toán, không cộng vào giỏ hàng
+  const total = subtotal;
 
   return (
     <>
@@ -216,12 +216,12 @@ export default function CartPage() {
                       transition: "background 0.15s",
                     }}
                     onMouseEnter={(e) =>
-                      ((e.currentTarget as HTMLDivElement).style.background =
-                        "#f8fafc")
+                    ((e.currentTarget as HTMLDivElement).style.background =
+                      "#f8fafc")
                     }
                     onMouseLeave={(e) =>
-                      ((e.currentTarget as HTMLDivElement).style.background =
-                        "none")
+                    ((e.currentTarget as HTMLDivElement).style.background =
+                      "none")
                     }
                   >
                     {/* Product image */}
@@ -233,7 +233,9 @@ export default function CartPage() {
                         border: "1px solid #e2e8f0",
                         overflow: "hidden",
                         flexShrink: 0,
-                        background: "#f8fafc",
+                        // Sản phẩm có thiết kế riêng: dùng màu áo làm nền vì ảnh in
+                        // là PNG nền trong suốt, chỉ chứa nội dung đã in.
+                        background: item.designId ? item.color : "#f8fafc",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -244,7 +246,7 @@ export default function CartPage() {
                         <img
                           src={item.image}
                           alt={item.name}
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          style={{ width: "100%", height: "100%", objectFit: item.designId ? "contain" : "cover" }}
                         />
                       ) : (
                         <ShoppingCartOutlined
@@ -461,10 +463,9 @@ export default function CartPage() {
                     Tóm tắt đơn hàng
                   </h2>
 
-                  {/* Rows */}
+                  {/* Rows — phí vận chuyển tính khi thanh toán */}
                   {[
                     { label: "Tạm tính", value: formatVND(subtotal) },
-                    { label: "Phí vận chuyển", value: formatVND(SHIPPING_FEE) },
                   ].map((row) => (
                     <div
                       key={row.label}
@@ -516,6 +517,10 @@ export default function CartPage() {
                       {formatVND(total)}
                     </span>
                   </div>
+
+                  <p style={{ fontSize: 12, color: "#94a3b8", margin: "-14px 0 20px" }}>
+                    Phí vận chuyển sẽ được tính ở bước thanh toán.
+                  </p>
 
                   <Link href="/checkout">
                     <Button

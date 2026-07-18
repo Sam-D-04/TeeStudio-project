@@ -1,4 +1,5 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+import apiClient from "@/lib/apiClient";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 
 export interface CartItemFromAPI {
   id: number;
@@ -13,57 +14,61 @@ export interface CartItemFromAPI {
   image: string | null;
 }
 
-async function authFetch(path: string, token: string, options: RequestInit = {}) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(options.headers as Record<string, string>),
-    },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { message?: string }).message || "Lỗi giỏ hàng");
-  }
-  return res.json();
-}
+/*
+ * Dùng apiClient (axios): tự gắn access token mới nhất + tự refresh khi 401.
+ * Tham số `token` giữ lại cho tương thích chỗ gọi cũ, không cần dùng
+ * (auth do interceptor xử lý).
+ */
 
-export async function getCart(token: string): Promise<CartItemFromAPI[]> {
-  const json = await authFetch("/cart", token);
-  return (json.data?.items ?? []) as CartItemFromAPI[];
+export async function getCart(_token?: string): Promise<CartItemFromAPI[]> {
+  try {
+    const res = await apiClient.get("/cart");
+    return (res.data.data?.items ?? []) as CartItemFromAPI[];
+  } catch (err) {
+    throw new Error(getApiErrorMessage(err, "Lỗi giỏ hàng"));
+  }
 }
 
 export async function addToCart(
-  token: string,
+  _token: string | undefined,
   variantId: number,
   quantity: number,
   designId?: number
 ): Promise<{ id: number; quantity: number }> {
-  const json = await authFetch("/cart/items", token, {
-    method: "POST",
-    body: JSON.stringify({ variantId, quantity, designId }),
-  });
-  return json.data;
+  try {
+    const res = await apiClient.post("/cart/items", { variantId, quantity, designId });
+    return res.data.data;
+  } catch (err) {
+    throw new Error(getApiErrorMessage(err, "Lỗi giỏ hàng"));
+  }
 }
 
 export async function updateCartItem(
-  token: string,
+  _token: string | undefined,
   cartItemId: number,
   quantity: number
 ): Promise<void> {
-  await authFetch(`/cart/items/${cartItemId}`, token, {
-    method: "PUT",
-    body: JSON.stringify({ quantity }),
-  });
+  try {
+    await apiClient.put(`/cart/items/${cartItemId}`, { quantity });
+  } catch (err) {
+    throw new Error(getApiErrorMessage(err, "Lỗi giỏ hàng"));
+  }
 }
 
-export async function removeCartItem(token: string, cartItemId: number): Promise<void> {
-  await authFetch(`/cart/items/${cartItemId}`, token, { method: "DELETE" });
+export async function removeCartItem(_token: string | undefined, cartItemId: number): Promise<void> {
+  try {
+    await apiClient.delete(`/cart/items/${cartItemId}`);
+  } catch (err) {
+    throw new Error(getApiErrorMessage(err, "Lỗi giỏ hàng"));
+  }
 }
 
-export async function clearCartAPI(token: string): Promise<void> {
-  await authFetch("/cart", token, { method: "DELETE" });
+export async function clearCartAPI(_token?: string): Promise<void> {
+  try {
+    await apiClient.delete("/cart");
+  } catch (err) {
+    throw new Error(getApiErrorMessage(err, "Lỗi giỏ hàng"));
+  }
 }
 
 export interface SyncItem {
@@ -72,10 +77,11 @@ export interface SyncItem {
   designId?: number;
 }
 
-export async function syncCart(token: string, items: SyncItem[]): Promise<CartItemFromAPI[]> {
-  const json = await authFetch("/cart/sync", token, {
-    method: "POST",
-    body: JSON.stringify({ items }),
-  });
-  return (json.data?.items ?? []) as CartItemFromAPI[];
+export async function syncCart(_token: string | undefined, items: SyncItem[]): Promise<CartItemFromAPI[]> {
+  try {
+    const res = await apiClient.post("/cart/sync", { items });
+    return (res.data.data?.items ?? []) as CartItemFromAPI[];
+  } catch (err) {
+    throw new Error(getApiErrorMessage(err, "Lỗi giỏ hàng"));
+  }
 }

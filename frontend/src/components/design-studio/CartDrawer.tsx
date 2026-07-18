@@ -5,7 +5,6 @@ import { Drawer } from "antd";
 import Link from "next/link";
 import { useCartStore } from "@/store/useCartStore";
 
-const SHIPPING_FEE = 35_000;
 const fmt = (n: number) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(n);
 
 interface Props {
@@ -25,7 +24,6 @@ export default function CartDrawer({ open, onClose }: Props) {
   useEffect(() => setHydrated(true), []);
 
   const subtotal = hydrated ? totalPrice() : 0;
-  const total    = subtotal + (subtotal > 0 ? SHIPPING_FEE : 0);
 
   return (
     <Drawer
@@ -61,20 +59,15 @@ export default function CartDrawer({ open, onClose }: Props) {
       footer={
         items.length > 0 ? (
           <div>
-            {/* Tổng kết đơn hàng: tạm tính, phí ship, tổng cộng */}
+            {/* Tạm tính — phí vận chuyển sẽ tính ở bước thanh toán */}
             <div style={{ marginBottom: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#64748b", marginBottom: 6 }}>
-                <span>Tạm tính</span>
-                <span style={{ fontWeight: 600, color: "#0f172a" }}>{fmt(subtotal)}</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Tạm tính</span>
+                <span style={{ fontSize: 18, fontWeight: 800, color: "#0ea5e9" }}>{fmt(subtotal)}</span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#64748b", marginBottom: 10 }}>
-                <span>Phí vận chuyển</span>
-                <span style={{ fontWeight: 600, color: "#0f172a" }}>{fmt(SHIPPING_FEE)}</span>
-              </div>
-              <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 10, display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Tổng cộng</span>
-                <span style={{ fontSize: 18, fontWeight: 800, color: "#0ea5e9" }}>{fmt(total)}</span>
-              </div>
+              <p style={{ fontSize: 12, color: "#94a3b8", margin: "6px 0 0" }}>
+                Phí vận chuyển sẽ được tính ở bước thanh toán.
+              </p>
             </div>
             {/* Nút chuyển sang trang thanh toán */}
             <Link href="/checkout" onClick={onClose}>
@@ -120,12 +113,15 @@ export default function CartDrawer({ open, onClose }: Props) {
               <div style={{
                 width: 72, height: 72, borderRadius: 8,
                 border: "1px solid #e2e8f0", overflow: "hidden",
-                flexShrink: 0, background: "#f8fafc",
+                flexShrink: 0,
+                // Sản phẩm có thiết kế riêng: dùng màu áo làm nền vì ảnh in
+                // là PNG nền trong suốt, chỉ chứa nội dung đã in.
+                background: item.designId ? item.color : "#f8fafc",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
                 {item.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: item.designId ? "contain" : "cover" }} />
                 ) : (
                   <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#cbd5e1" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round"

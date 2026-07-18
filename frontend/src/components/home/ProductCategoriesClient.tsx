@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Button } from "antd";
 import { useRouter } from "next/navigation";
 import { ProductFromDB, SHIRT_UI_MAP } from "./ProductCategories";
+
+type RouterInstance = ReturnType<typeof useRouter>;
 
 /* ─────────────────────────────────────────
    SVG Vectors cho từng loại áo
@@ -78,8 +81,8 @@ function HoodieVector({ color = "#c7d2fe" }: { color?: string }) {
    Client Component
 ───────────────────────────────────────── */
 
-const fmt = (n: number) =>
-  "từ " + n.toLocaleString("vi-VN") + "đ";
+const fmt = (n: any) =>
+  "từ " + Number(n).toLocaleString("vi-VN") + "đ";
 
 interface Props {
   products: ProductFromDB[];
@@ -95,21 +98,21 @@ export default function ProductCategoriesClient({ products }: Props) {
         {/* ── Header Row ── */}
         <div
           style={{
-            display:        "flex",
-            alignItems:     "baseline",
+            display: "flex",
+            alignItems: "baseline",
             justifyContent: "space-between",
-            marginBottom:   32,
-            flexWrap:       "wrap",
-            gap:            12,
+            marginBottom: 32,
+            flexWrap: "wrap",
+            gap: 12,
           }}
         >
           <div>
             <h1
               style={{
-                fontSize:      28,
-                fontWeight:    800,
-                color:         "#0f172a",
-                marginBottom:  4,
+                fontSize: 28,
+                fontWeight: 800,
+                color: "#0f172a",
+                marginBottom: 4,
                 letterSpacing: "-0.5px",
               }}
             >
@@ -122,11 +125,11 @@ export default function ProductCategoriesClient({ products }: Props) {
           <Button
             type="text"
             style={{
-              color:       "#0ea5e9",
-              fontWeight:  600,
-              fontSize:    14,
-              padding:     "0 4px",
-              height:      "auto",
+              color: "#0ea5e9",
+              fontWeight: 600,
+              fontSize: 14,
+              padding: "0 4px",
+              height: "auto",
             }}
           >
             Xem tất cả →
@@ -136,166 +139,15 @@ export default function ProductCategoriesClient({ products }: Props) {
         {/* ── Category Cards ── */}
         <div
           style={{
-            display:             "grid",
+            display: "grid",
             gridTemplateColumns: "repeat(3, 1fr)",
-            gap:                 20,
+            gap: 20,
           }}
           className="category-grid"
         >
-          {products.map((product) => {
-            const ui = SHIRT_UI_MAP[product.form];
-            return (
-              <div
-                key={product.id}
-                onClick={() => router.push(`/product/${product.id}`)}
-                style={{
-                  background:   "#ffffff",
-                  borderRadius: 20,
-                  border:       "1px solid #e2e8f0",
-                  overflow:     "hidden",
-                  cursor:       "pointer",
-                  transition:   "all 0.25s ease",
-                  boxShadow:    "var(--shadow-sm)",
-                  display:      "flex",
-                  flexDirection:"column",
-                }}
-                onMouseEnter={(e) => {
-                  const el = e.currentTarget as HTMLDivElement;
-                  el.style.transform   = "translateY(-6px)";
-                  el.style.boxShadow   = "var(--shadow-hover)";
-                  el.style.borderColor = ui.accentColor + "40";
-                }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget as HTMLDivElement;
-                  el.style.transform   = "translateY(0)";
-                  el.style.boxShadow   = "var(--shadow-sm)";
-                  el.style.borderColor = "#e2e8f0";
-                }}
-              >
-                {/* ─ Visual area ─ */}
-                <div
-                  style={{
-                    background:     ui.accentBg,
-                    display:        "flex",
-                    alignItems:     "center",
-                    justifyContent: "center",
-                    padding:        "32px 24px 16px",
-                    minHeight:      196,
-                    position:       "relative",
-                  }}
-                >
-
-                  {/* Vector shirt or real mockup */}
-                  <div style={{ width: product.imageUrl ? "100%" : (ui.mockupImg ? "70%" : "80%"), maxWidth: product.imageUrl ? 180 : (ui.mockupImg ? 150 : 130), animation: "float 3.5s ease-in-out infinite" }}>
-                    {product.imageUrl ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={product.imageUrl}
-                        alt={product.name}
-                        style={{ width: "100%", height: 180, objectFit: "contain", display: "block", mixBlendMode: "multiply", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.18))" }}
-                        draggable={false}
-                      />
-                    ) : ui.mockupImg ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={ui.mockupImg}
-                        alt={product.name}
-                        style={{ width: "100%", objectFit: "contain", display: "block", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.18))" }}
-                        draggable={false}
-                      />
-                    ) : product.form === "hoodie" ? (
-                      <HoodieVector color={ui.svgColor} />
-                    ) : (
-                      <TshirtVector color={ui.svgColor} />
-                    )}
-                  </div>
-                </div>
-
-                {/* ─ Info area ─ */}
-                <div style={{ padding: "20px 22px 22px", flex: 1, display: "flex", flexDirection: "column" }}>
-                  <h3
-                    style={{
-                      fontSize:   18,
-                      fontWeight: 700,
-                      color:      "#0f172a",
-                      margin:     0,
-                    }}
-                  >
-                    {product.name}
-                  </h3>
-                  <p
-                    style={{
-                      fontSize:    13,
-                      color:       "#94a3b8",
-                      margin:      "4px 0 16px",
-                      lineHeight:  1.5,
-                    }}
-                  >
-                    {product.material}
-                  </p>
-
-                  <div
-                    style={{
-                      display:        "flex",
-                      alignItems:     "center",
-                      justifyContent: "space-between",
-                      marginTop:      "auto",
-                      gap:            8,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize:   14,
-                        fontWeight: 700,
-                        color:      ui.accentColor,
-                      }}
-                    >
-                      {fmt(product.basePrice)}
-                    </span>
-
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/product/${product.id}`);
-                        }}
-                        style={{
-                          border:       `1px solid ${ui.accentColor}40`,
-                          borderRadius: 8,
-                          fontWeight:   600,
-                          height:       36,
-                          fontSize:     12,
-                          padding:      "0 12px",
-                          color:        ui.accentColor,
-                          background:   "#ffffff",
-                        }}
-                      >
-                        Xem chi tiết
-                      </Button>
-                      <Button
-                        type="primary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/design-studio?shirt=${product.form}`);
-                        }}
-                        style={{
-                          background:   ui.accentColor,
-                          border:       "none",
-                          borderRadius: 8,
-                          fontWeight:   600,
-                          height:       36,
-                          fontSize:     12,
-                          padding:      "0 12px",
-                        }}
-                      >
-                        Thiết kế
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {products.map((product) => (
+            <ProductCard key={product.id} product={product} router={router} />
+          ))}
         </div>
       </div>
 
@@ -312,5 +164,196 @@ export default function ProductCategoriesClient({ products }: Props) {
         }
       `}</style>
     </section>
+  );
+}
+
+/* ─────────────────────────────────────────
+   Product Card – ảnh to hơn + xoay vòng ảnh
+   màu khác sau 3s hover (chỉ khi có >1 màu)
+───────────────────────────────────────── */
+
+const IMAGE_CYCLE_MS = 2000;
+
+function ProductCard({ product, router }: { product: ProductFromDB; router: RouterInstance }) {
+  const ui = SHIRT_UI_MAP[product.form];
+  const images = product.images && product.images.length > 0
+    ? product.images
+    : product.imageUrl ? [product.imageUrl] : [];
+
+  const [imgIndex, setImgIndex] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopCycle = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setImgIndex(0);
+  };
+
+  const startCycle = () => {
+    if (images.length <= 1 || intervalRef.current) return;
+    intervalRef.current = setInterval(() => {
+      setImgIndex((i) => (i + 1) % images.length);
+    }, IMAGE_CYCLE_MS);
+  };
+
+  // Dọn interval nếu component unmount trong lúc đang hover
+  useEffect(() => () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+  }, []);
+
+  const currentImage = images[imgIndex] ?? product.imageUrl;
+
+  return (
+    <div
+      onClick={() => router.push(`/product/${product.id}`)}
+      style={{
+        background: "#ffffff",
+        borderRadius: 20,
+        border: "1px solid #e2e8f0",
+        overflow: "hidden",
+        cursor: "pointer",
+        transition: "all 0.25s ease",
+        boxShadow: "var(--shadow-sm)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget as HTMLDivElement;
+        el.style.transform = "translateY(-6px)";
+        el.style.boxShadow = "var(--shadow-hover)";
+        el.style.borderColor = ui.accentColor + "40";
+        startCycle();
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget as HTMLDivElement;
+        el.style.transform = "translateY(0)";
+        el.style.boxShadow = "var(--shadow-sm)";
+        el.style.borderColor = "#e2e8f0";
+        stopCycle();
+      }}
+    >
+      {/* ─ Visual area ─ */}
+      <div
+        style={{
+          background: ui.accentBg,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "36px 24px 20px",
+          minHeight: 240,
+          position: "relative",
+        }}
+      >
+        {/* Vector shirt or real mockup */}
+        <div style={{ width: currentImage ? "100%" : (ui.mockupImg ? "70%" : "80%"), maxWidth: currentImage ? 210 : (ui.mockupImg ? 175 : 150), animation: "float 3.5s ease-in-out infinite" }}>
+          {currentImage ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={currentImage}
+              alt={product.name}
+              style={{ width: "100%", height: 210, objectFit: "contain", display: "block", mixBlendMode: "multiply", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.18))" }}
+              draggable={false}
+            />
+          ) : ui.mockupImg ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={ui.mockupImg}
+              alt={product.name}
+              style={{ width: "100%", objectFit: "contain", display: "block", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.18))" }}
+              draggable={false}
+            />
+          ) : product.form === "hoodie" ? (
+            <HoodieVector color={ui.svgColor} />
+          ) : (
+            <TshirtVector color={ui.svgColor} />
+          )}
+        </div>
+      </div>
+
+      {/* ─ Info area ─ */}
+      <div style={{ padding: "20px 22px 22px", flex: 1, display: "flex", flexDirection: "column" }}>
+        <h3
+          style={{
+            fontSize: 18,
+            fontWeight: 700,
+            color: "#0f172a",
+            margin: 0,
+          }}
+        >
+          {product.name}
+        </h3>
+        <p
+          style={{
+            fontSize: 13,
+            color: "#94a3b8",
+            margin: "4px 0 16px",
+            lineHeight: 1.5,
+          }}
+        >
+          {product.material}
+        </p>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginTop: "auto",
+            gap: 8,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: ui.accentColor,
+            }}
+          >
+            {fmt(product.basePrice)}
+          </span>
+
+          <div style={{ display: "flex", gap: 6 }}>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/product/${product.id}`);
+              }}
+              style={{
+                border: `1px solid ${ui.accentColor}40`,
+                borderRadius: 8,
+                fontWeight: 600,
+                height: 36,
+                fontSize: 12,
+                padding: "0 12px",
+                color: ui.accentColor,
+                background: "#ffffff",
+              }}
+            >
+              Xem chi tiết
+            </Button>
+            <Button
+              type="primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/design-studio?shirt=${product.form}`);
+              }}
+              style={{
+                background: ui.accentColor,
+                border: "none",
+                borderRadius: 8,
+                fontWeight: 600,
+                height: 36,
+                fontSize: 12,
+                padding: "0 12px",
+              }}
+            >
+              Thiết kế
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

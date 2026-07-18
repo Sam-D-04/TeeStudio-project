@@ -130,6 +130,23 @@ export default function PrintOrderTab({
     setTrangThaiMoi("");
   }
 
+  // Mở file in chuẩn (độ phân giải cao, đã cắt đúng vùng in) ở tab mới cho xưởng in tải về.
+  // Đơn cũ (đặt trước khi có tính năng lưu printFileUrl) sẽ chưa có file mặt trước
+  // này → tạm mở ảnh xem trước. Mặt sau chỉ tồn tại nếu thiết kế có in cả 2 mặt.
+  function xemFileIn(don: DonCanIn, mat: "truoc" | "sau") {
+    const urlFile = mat === "truoc" ? don.urlFileIn : don.urlFileInBack;
+    if (urlFile) {
+      window.open(urlFile, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (mat === "truoc" && don.urlPreview) {
+      messageApi.warning("Đơn này chưa có file in chuẩn, đang mở tạm ảnh xem trước.");
+      window.open(don.urlPreview, "_blank", "noopener,noreferrer");
+      return;
+    }
+    messageApi.warning("Đơn này chưa có ảnh thiết kế để xem.");
+  }
+
   const tuyChonTrangThai = donDangChinhSua?.trangThai === "cho_gui_xuong"
     ? [{ value: "dang_in", label: "Đang in" }]
     : donDangChinhSua?.trangThai === "dang_in"
@@ -475,6 +492,7 @@ export default function PrintOrderTab({
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                           <DesignPreview
                             urlAnh={don.urlPreview ?? undefined}
+                            urlAnhMatSau={don.urlFileInBack ?? undefined}
                             mauAo={don.mauAo}
                             maThietKe={don.maThietKe}
                           />
@@ -530,12 +548,10 @@ export default function PrintOrderTab({
                       {/* Thao tác */}
                       <td style={{ padding: "14px 16px", textAlign: "right", whiteSpace: "nowrap" }}>
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
-                          {/* Nút Xem */}
+                          {/* Nút Xem file in chuẩn - mặt trước (luôn có, kể cả đơn cũ chỉ 1 mặt) */}
                           <button
-                            title="Xem chi tiết đơn"
-                            onClick={() =>
-                              alert(`Xem chi tiết đơn ${don.maDon} – Sẽ mở drawer trong phiên bản tiếp theo`)
-                            }
+                            title={don.urlFileInBack ? "Xem file in mặt trước" : "Xem file in chuẩn"}
+                            onClick={() => xemFileIn(don, "truoc")}
                             style={{
                               width: 32,
                               height: 32,
@@ -559,6 +575,36 @@ export default function PrintOrderTab({
                           >
                             <EyeOutlined />
                           </button>
+
+                          {/* Nút Xem file in mặt sau - chỉ hiện khi thiết kế có in mặt sau */}
+                          {don.urlFileInBack && (
+                            <button
+                              title="Xem file in mặt sau"
+                              onClick={() => xemFileIn(don, "sau")}
+                              style={{
+                                width: 32,
+                                height: 32,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                borderRadius: 6,
+                                border: "1px solid #e2e8f0",
+                                background: "#f8fafc",
+                                color: "#475569",
+                                cursor: "pointer",
+                                fontSize: 14,
+                                transition: "all 0.15s ease",
+                              }}
+                              onMouseEnter={(e) => {
+                                (e.currentTarget as HTMLButtonElement).style.color = "#0ea5e9";
+                              }}
+                              onMouseLeave={(e) => {
+                                (e.currentTarget as HTMLButtonElement).style.color = "#475569";
+                              }}
+                            >
+                              <EyeOutlined rotate={180} />
+                            </button>
+                          )}
 
                           <button
                             title={don.trangThai === "da_in_xong"

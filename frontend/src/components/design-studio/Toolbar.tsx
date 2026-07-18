@@ -33,9 +33,19 @@ const TrashIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
   </svg>
 );
+const FolderIcon = () => (
+  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776" />
+  </svg>
+);
 const PlusIcon = () => (
   <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+  </svg>
+);
+const SendIcon = () => (
+  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.126A59.769 59.769 0 0 1 21.485 12 59.77 59.77 0 0 1 3.27 20.876L5.999 12Zm0 0h7.5" />
   </svg>
 );
 const CartIcon = () => (
@@ -71,7 +81,7 @@ const menuItemStyle: React.CSSProperties = {
   textAlign: "left", transition: "background 0.1s",
 };
 
-export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDesign, onAddToCart, onViewCart, isSaving }: ToolbarProps) {
+export default function Toolbar({ onSave, onDownloadImage, onShowToast, onOpenMyDesigns, onNewDesign, onAddToCart, onViewCart, isSaving }: ToolbarProps) {
   const { undo, redo, undoStack, redoStack, clearDesign, shirtType } = useDesignStore();
   const { isAuthenticated, user, clearSession, hydrate } = useAuthStore();
   const cartCount = useCartStore((s) => s.totalItems());
@@ -121,7 +131,7 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
         <span style={{ fontSize: 13, color: "#94a3b8" }}>Thiết kế {shirtLabel}</span>
       </div>
 
-      {/* Ở giữa: Hoàn tác / Làm lại / Tạo mới / Xoá hết */}
+      {/* Ở giữa: Hoàn tác / Làm lại / Tạo mới / Xoá / Tải ảnh */}
       <div className="ds-toolbar-center">
         <button className="ds-toolbar-btn ds-toolbar-btn--icon" onClick={undo}
           disabled={undoStack.length === 0} title="Hoàn tác (Ctrl+Z)">
@@ -135,6 +145,11 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
         <button className="ds-toolbar-btn" onClick={onNewDesign} title="Tạo thiết kế mới">
           <PlusIcon /> Tạo mới
         </button>
+        {isAuthenticated && (
+          <button className="ds-toolbar-btn" onClick={onOpenMyDesigns} title="Mở thiết kế đã lưu">
+            <FolderIcon /> Mở thiết kế
+          </button>
+        )}
         <button
           className="ds-toolbar-btn ds-toolbar-btn--icon"
           onClick={() => {
@@ -147,13 +162,25 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
         >
           <TrashIcon />
         </button>
-      </div>
-
-      {/* Bên phải: Tải ảnh + Giỏ hàng + Lưu + Khu vực tài khoản */}
-      <div className="ds-toolbar-right">
+        <div className="ds-toolbar-divider" />
         <button className="ds-toolbar-btn ds-toolbar-btn--outline" onClick={onDownloadImage} title="Tải xuống ảnh PNG">
           <DownloadIcon /> Tải ảnh
         </button>
+      </div>
+
+      {/* Bên phải: Lưu + Thêm giỏ + Giỏ hàng + Khu vực tài khoản */}
+      <div className="ds-toolbar-right">
+        <button className="ds-toolbar-btn ds-toolbar-btn--primary" onClick={onSave}
+          title="Lưu thiết kế (Ctrl+S)" disabled={isSaving}>
+          {isSaving ? (
+            <svg className="ds-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+            </svg>
+          ) : <SaveIcon />}
+          {isSaving ? "Đang lưu..." : "Lưu thiết kế"}
+        </button>
+
         {onAddToCart && (
           <button
             className="ds-toolbar-btn"
@@ -164,6 +191,7 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
             <CartIcon /> Thêm vào giỏ
           </button>
         )}
+
         <button
           className="ds-toolbar-btn ds-toolbar-btn--icon"
           onClick={onViewCart}
@@ -183,16 +211,6 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onNewDes
               {cartCount > 99 ? "99+" : cartCount}
             </span>
           )}
-        </button>
-        <button className="ds-toolbar-btn ds-toolbar-btn--primary" onClick={onSave}
-          title="Lưu thiết kế (Ctrl+S)" disabled={isSaving}>
-          {isSaving ? (
-            <svg className="ds-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
-            </svg>
-          ) : <SaveIcon />}
-          {isSaving ? "Đang lưu..." : "Lưu thiết kế"}
         </button>
 
         <div className="ds-toolbar-divider" />

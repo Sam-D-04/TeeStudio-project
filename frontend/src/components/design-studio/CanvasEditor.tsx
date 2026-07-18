@@ -24,7 +24,7 @@ function useLoadImage(src: string | undefined) {
     const img = new window.Image();
     img.crossOrigin = "anonymous";
     img.src = src;
-    img.onload  = () => setImage(img);
+    img.onload = () => setImage(img);
     img.onerror = () => setImage(null);
     return () => { img.onload = null; img.onerror = null; };
   }, [src]);
@@ -40,12 +40,12 @@ function SnapGuides({
   visible: boolean;
 }) {
   if (!visible) return null;
-  const pa       = printArea;
-  const nodeCX   = nodeX + nodeW / 2;
-  const nodeCY   = nodeY + nodeH / 2;
-  const paCX     = pa.x + pa.w / 2;
-  const paCY     = pa.y + pa.h / 2;
-  const THRESH   = 8;
+  const pa = printArea;
+  const nodeCX = nodeX + nodeW / 2;
+  const nodeCY = nodeY + nodeH / 2;
+  const paCX = pa.x + pa.w / 2;
+  const paCY = pa.y + pa.h / 2;
+  const THRESH = 8;
   const guides: React.ReactElement[] = [];
 
   const addLine = (key: string, points: number[]) =>
@@ -56,9 +56,9 @@ function SnapGuides({
 
   if (Math.abs(nodeCY - paCY) < THRESH) addLine("hc", [pa.x, paCY, pa.x + pa.w, paCY]);
   if (Math.abs(nodeCX - paCX) < THRESH) addLine("vc", [paCX, pa.y, paCX, pa.y + pa.h]);
-  if (Math.abs(nodeX - pa.x) < THRESH)              addLine("le", [pa.x, pa.y, pa.x, pa.y + pa.h]);
+  if (Math.abs(nodeX - pa.x) < THRESH) addLine("le", [pa.x, pa.y, pa.x, pa.y + pa.h]);
   if (Math.abs(nodeX + nodeW - (pa.x + pa.w)) < THRESH) addLine("re", [pa.x + pa.w, pa.y, pa.x + pa.w, pa.y + pa.h]);
-  if (Math.abs(nodeY - pa.y) < THRESH)              addLine("te", [pa.x, pa.y, pa.x + pa.w, pa.y]);
+  if (Math.abs(nodeY - pa.y) < THRESH) addLine("te", [pa.x, pa.y, pa.x + pa.w, pa.y]);
   if (Math.abs(nodeY + nodeH - (pa.y + pa.h)) < THRESH) addLine("be", [pa.x, pa.y + pa.h, pa.x + pa.w, pa.y + pa.h]);
 
   return <>{guides}</>;
@@ -128,14 +128,14 @@ function ExternalTransformer({
           anchor.offsetX(size / 2);
           anchor.offsetY(size / 2);
           anchor.cornerRadius(size / 2); // Bo tròn hoàn toàn
-          
+
           if (rotateIconImg && rotateIconImg.naturalWidth > 0) {
             anchor.fillPatternImage(rotateIconImg);
             anchor.fillPatternRepeat("no-repeat");
             // Tự động scale ảnh icon vừa khít
-            anchor.fillPatternScale({ 
-              x: size / rotateIconImg.naturalWidth, 
-              y: size / rotateIconImg.naturalHeight 
+            anchor.fillPatternScale({
+              x: size / rotateIconImg.naturalWidth,
+              y: size / rotateIconImg.naturalHeight
             });
           }
           anchor.strokeEnabled(true);
@@ -174,11 +174,11 @@ function ExternalTransformer({
           updateElement(el.id, { x: storeX, y: storeY, width: newW, height: newH, rotation: node.rotation() });
         } else if (el.type === "text") {
           const textNode = node as Konva.Text;
-          const scaleX   = textNode.scaleX();
-          const scaleY   = textNode.scaleY();
+          const scaleX = textNode.scaleX();
+          const scaleY = textNode.scaleY();
           textNode.scaleX(1);
           textNode.scaleY(1);
-          const newW        = Math.max(20, textNode.width() * scaleX);
+          const newW = Math.max(20, textNode.width() * scaleX);
           const newFontSize = Math.max(8, (el.fontSize || 28) * scaleY);
           textNode.width(newW);
           textNode.fontSize(newFontSize);
@@ -209,7 +209,7 @@ function ImageShape({
   onDragStateChange: (active: boolean, x: number, y: number, w: number, h: number) => void;
   onNodeReady: () => void;
 }) {
-  const image    = useLoadImage(el.src);
+  const image = useLoadImage(el.src);
   const shapeRef = useRef<Konva.Image>(null);
   const { updateElement, pushHistory } = useDesignStore();
 
@@ -220,14 +220,14 @@ function ImageShape({
       onNodeReady();
     }
     return () => { shapeRefs.current.delete(el.id); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [el.id, image]);
 
   if (!image) return null;
-  const elW   = el.width  ?? 100;
-  const elH   = el.height ?? 100;
-  const flipH = el.flipH  ?? false;
-  const flipV = el.flipV  ?? false;
+  const elW = el.width ?? 100;
+  const elH = el.height ?? 100;
+  const flipH = el.flipH ?? false;
+  const flipV = el.flipV ?? false;
 
   /* Khi flipH=true: dịch x sang phải bằng width, scaleX=-1 → ảnh vẫn nằm đúng chỗ */
   const konvaX = el.x + (flipH ? elW : 0);
@@ -286,10 +286,10 @@ function TextShape({
       onNodeReady();
     }
     return () => { shapeRefs.current.delete(el.id); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [el.id]);
 
-  const elW = el.width  ?? 150;
+  const elW = el.width ?? 150;
   const elH = el.height ?? 40;
 
   return (
@@ -298,10 +298,10 @@ function TextShape({
       text={el.textTransform === "uppercase" ? (el.text || "").toUpperCase() : (el.text || "")}
       x={el.x} y={el.y}
       width={elW}
-      fontSize={el.fontSize   || 28}
+      fontSize={el.fontSize || 28}
       fontFamily={el.fontFamily || "Arial"}
-      fill={el.fill            || "#000000"}
-      fontStyle={el.fontStyle  || "normal"}
+      fill={el.fill || "#000000"}
+      fontStyle={el.fontStyle || "normal"}
       textDecoration={el.textDecoration === "none" ? "" : el.textDecoration || ""}
       align={el.align || "left"}
       letterSpacing={el.letterSpacing || 0}
@@ -341,7 +341,15 @@ export default function CanvasEditor({
   zoom,
   clipPoints,
 }: CanvasEditorProps) {
-  const { elements, selectedId, setSelectedId } = useDesignStore();
+  const { elements, selectedId, setSelectedId, shirtView } = useDesignStore();
+
+  // "elements" trong store chứa CHUNG phần tử của cả mặt trước lẫn mặt sau.
+  // Chỉ vẽ lên canvas những phần tử thuộc đúng mặt đang xem - nếu không, thiết
+  // kế mặt trước sẽ bị "lộ" ra khi đang xem mặt sau (2 vùng in nằm gần trùng
+  // nhau trên màn hình nên trước đây rất dễ nhầm là cùng 1 thiết kế).
+  const phanTuMatDangXem = elements.filter(
+    (el) => (el.side ?? "front") === shirtView
+  );
 
   /* Map: elementId → Konva.Node — chia sẻ giữa shapes và Transformer */
   const shapeRefs = useRef<Map<string, Konva.Node>>(new Map());
@@ -388,29 +396,31 @@ export default function CanvasEditor({
         <Group
           {...(clipPoints && clipPoints.length > 2
             ? {
-                // Polygon clip: vẽ path đa giác trên canvas 2D
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                clipFunc: (ctx: any) => {
-                  ctx.beginPath();
-                  clipPoints.forEach(([x, y]: [number, number], i: number) => {
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                  });
-                  ctx.closePath();
-                },
-              }
+              // Polygon clip: vẽ path đa giác trên canvas 2D
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              clipFunc: (ctx: any) => {
+                ctx.beginPath();
+                clipPoints.forEach(([x, y]: [number, number], i: number) => {
+                  if (i === 0) ctx.moveTo(x, y);
+                  else ctx.lineTo(x, y);
+                });
+                ctx.closePath();
+              },
+            }
             : {
-                // Rectangle clip (mặc định)
-                clipX: printArea.x,
-                clipY: printArea.y,
-                clipWidth: printArea.w,
-                clipHeight: printArea.h,
-              })}
+              // Rectangle clip (mặc định)
+              clipX: printArea.x,
+              clipY: printArea.y,
+              clipWidth: printArea.w,
+              clipHeight: printArea.h,
+            })}
         >
-          {elements.map((el, index) => {
+
+          {phanTuMatDangXem.map((el) => {
+
             const commonProps = {
               el,
-              onSelect:  (e: Konva.KonvaEventObject<Event>) => {
+              onSelect: (e: Konva.KonvaEventObject<Event>) => {
                 e.cancelBubble = true;
                 if (!el.locked) setSelectedId(el.id);
               },
@@ -419,7 +429,7 @@ export default function CanvasEditor({
               onNodeReady: handleNodeReady,
             };
             if (el.type === "image") return <ImageShape key={el.id || index} {...commonProps} />;
-            if (el.type === "text")  return <TextShape  key={el.id || index} {...commonProps} />;
+            if (el.type === "text") return <TextShape key={el.id || index} {...commonProps} />;
             return null;
           })}
         </Group>
@@ -437,8 +447,8 @@ export default function CanvasEditor({
         {/* Đường gióng snap */}
         <SnapGuides
           printArea={printArea}
-          nodeX={dragInfo.x}  nodeY={dragInfo.y}
-          nodeW={dragInfo.w}  nodeH={dragInfo.h}
+          nodeX={dragInfo.x} nodeY={dragInfo.y}
+          nodeW={dragInfo.w} nodeH={dragInfo.h}
           visible={dragInfo.active}
         />
       </Layer>

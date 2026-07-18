@@ -8,6 +8,7 @@ import {
   Form,
   Input,
   Radio,
+  Select,
   message,
   Spin,
 } from "antd";
@@ -24,6 +25,7 @@ import {
   cartItemsToOrderItems,
   type CreateOrderPayload,
 } from "@/services/orderService";
+import { validatePromotionCode, type PromotionPreview } from "@/services/promotionService";
 import AppHeader from "@/components/layout/AppHeader";
 import AppFooter from "@/components/layout/AppFooter";
 
@@ -38,15 +40,41 @@ function formatVND(value: number) {
 
 const SHIPPING_FEE = 35_000;
 
-type PaymentMethod = "VNPAY" | "COD";
+type PaymentMethod = "VNPAY" | "MOMO" | "COD";
+/** Các phương thức thanh toán online — chuyển hướng sang cổng thanh toán sau khi tạo đơn */
+const ONLINE_PAYMENT_METHODS = new Set<PaymentMethod>(["VNPAY", "MOMO"]);
 
 interface CheckoutFormValues {
   recipientName: string;
   phone: string;
   email: string;
-  address: string;
+  provinceCode: string;
+  wardCode: string;
+  addressDetail: string;
   note?: string;
   paymentMethod: PaymentMethod;
+}
+
+/* ── Dữ liệu tỉnh/thành – phường/xã (VN, 2 cấp sau sáp nhập hành chính) ── */
+interface WardData {
+  Code: string;
+  Name: string;
+  ProvinceCode: string;
+}
+interface ProvinceData {
+  Code: string;
+  Name: string;
+  Wards: WardData[];
+}
+
+/** Bỏ dấu tiếng Việt để so khớp tìm kiếm không phân biệt dấu (vd "ha noi" ra "Hà Nội") */
+function stripDiacritics(str: string): string {
+  return str
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase();
 }
 
 /* ── Payment method options ── */
@@ -73,6 +101,27 @@ const paymentOptions: Array<{
           fontFamily="Arial"
         >
           VNPAY
+        </text>
+      </svg>
+    ),
+  },
+  {
+    value: "MOMO",
+    label: "Thanh toán qua Ví MoMo",
+    desc: "Quét mã QR hoặc ứng dụng MoMo",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <rect width="24" height="24" rx="6" fill="#A50064" />
+        <text
+          x="12"
+          y="16"
+          textAnchor="middle"
+          fill="#fff"
+          fontSize="11"
+          fontWeight="bold"
+          fontFamily="Arial"
+        >
+          M
         </text>
       </svg>
     ),
@@ -106,9 +155,30 @@ export default function CheckoutPage() {
   const token        = useAuthStore((s) => s.accessToken);
   const [loading, setLoading]         = useState(false);
   const [hydrated, setHydrated]       = useState(false);
+  const [provinces, setProvinces]     = useState<ProvinceData[]>([]);
+  const [addressLoading, setAddressLoading] = useState(true);
+  const provinceCode = Form.useWatch("provinceCode", form);
+
+  /* ── Mã khuyến mãi ── */
+  const [promoInput, setPromoInput]     = useState("");
+  const [promoApplying, setPromoApplying] = useState(false);
+  const [promoError, setPromoError]     = useState<string | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<PromotionPreview | null>(null);
 
   /* Hydration guard */
   useEffect(() => setHydrated(true), []);
+
+  /* Tải danh sách tỉnh/thành – phường/xã (file tĩnh, chỉ tải 1 lần) */
+  useEffect(() => {
+    fetch("/data/vn-address.json")
+      .then((res) => res.json())
+      .then((data: ProvinceData[]) => setProvinces(data))
+      .catch(() => message.error("Không tải được danh sách tỉnh/thành, phường/xã"))
+      .finally(() => setAddressLoading(false));
+  }, []);
+
+  const selectedProvince = provinces.find((p) => p.Code === provinceCode);
+  const wardsForProvince = selectedProvince?.Wards ?? [];
 
   /* Pre-fill user data */
   useEffect(() => {
@@ -123,7 +193,36 @@ export default function CheckoutPage() {
   if (!hydrated) return null;
 
   const subtotal = totalPrice();
-  const total    = subtotal + SHIPPING_FEE;
+  // Mã miễn phí vận chuyển thì trừ luôn phí ship; các loại giảm khác (PERCENT/FIXED)
+  // trừ vào discountAmount đã tính sẵn từ backend (validatePromotionCode) - không tự
+  // tính lại ở FE để tránh lệch công thức với backend.
+  const shippingFee   = appliedPromo?.mienPhiVanChuyen ? 0 : SHIPPING_FEE;
+  const discountAmount = appliedPromo?.discountAmount ?? 0;
+  const total = Math.max(0, subtotal + shippingFee - discountAmount);
+
+  /* ── Áp dụng mã khuyến mãi ── */
+  const handleApplyPromo = async () => {
+    const code = promoInput.trim();
+    if (!code) return;
+    setPromoApplying(true);
+    setPromoError(null);
+    try {
+      const result = await validatePromotionCode(code, subtotal);
+      setAppliedPromo(result);
+      message.success(`Đã áp dụng mã "${result.code}"`);
+    } catch (err) {
+      setAppliedPromo(null);
+      setPromoError(err instanceof Error ? err.message : "Không áp dụng được mã khuyến mãi");
+    } finally {
+      setPromoApplying(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoError(null);
+    setPromoInput("");
+  };
 
   /* Redirect if cart is empty */
   if (items.length === 0) {
@@ -166,19 +265,27 @@ export default function CheckoutPage() {
     }
     setLoading(true);
     try {
+      const province = provinces.find((p) => p.Code === values.provinceCode);
+      const ward = province?.Wards.find((w) => w.Code === values.wardCode);
+      const addressLine = [values.addressDetail, ward?.Name, province?.Name]
+        .filter(Boolean)
+        .join(", ");
+
       const payload: CreateOrderPayload = {
         recipientName: values.recipientName,
         phone: values.phone,
         email: values.email,
-        // Backend nhận field addressLine
-        addressLine: values.address,
+        addressLine,
+        city: province?.Name,
+        ward: ward?.Name,
         note: values.note,
         paymentMethod: values.paymentMethod,
         items: cartItemsToOrderItems(items),
         shippingFee: SHIPPING_FEE,
+        ...(appliedPromo ? { promotionId: appliedPromo.promotionId } : {}),
       };
       const result = await createOrder(payload, token);
-      if (values.paymentMethod === "VNPAY" && result.paymentUrl) {
+      if (ONLINE_PAYMENT_METHODS.has(values.paymentMethod) && result.paymentUrl) {
         clearCart();
         window.location.href = result.paymentUrl;
       } else {
@@ -329,15 +436,54 @@ export default function CheckoutPage() {
                     />
                   </Form.Item>
 
-                  <Form.Item
-                    name="address"
-                    label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Địa chỉ giao hàng *</span>}
-                    rules={[{ required: true, message: "Vui lòng nhập địa chỉ giao hàng" }]}
+                  <div
+                    style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}
+                    className="max-sm:grid-cols-1"
                   >
-                    <Input.TextArea
-                      placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố"
-                      rows={3}
-                      style={{ borderRadius: 8, resize: "none" }}
+                    <Form.Item
+                      name="provinceCode"
+                      label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Tỉnh/Thành phố *</span>}
+                      rules={[{ required: true, message: "Vui lòng chọn tỉnh/thành phố" }]}
+                    >
+                      <Select
+                        showSearch
+                        loading={addressLoading}
+                        placeholder="Tìm tỉnh/thành phố..."
+                        style={{ height: 40 }}
+                        options={provinces.map((p) => ({ value: p.Code, label: p.Name }))}
+                        filterOption={(input, option) =>
+                          stripDiacritics(option?.label ?? "").includes(stripDiacritics(input))
+                        }
+                        onChange={() => form.setFieldValue("wardCode", undefined)}
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      name="wardCode"
+                      label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Phường/Xã *</span>}
+                      rules={[{ required: true, message: "Vui lòng chọn phường/xã" }]}
+                    >
+                      <Select
+                        showSearch
+                        disabled={!provinceCode}
+                        placeholder={provinceCode ? "Tìm phường/xã..." : "Chọn tỉnh/thành phố trước"}
+                        style={{ height: 40 }}
+                        options={wardsForProvince.map((w) => ({ value: w.Code, label: w.Name }))}
+                        filterOption={(input, option) =>
+                          stripDiacritics(option?.label ?? "").includes(stripDiacritics(input))
+                        }
+                      />
+                    </Form.Item>
+                  </div>
+
+                  <Form.Item
+                    name="addressDetail"
+                    label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Số nhà, tên đường *</span>}
+                    rules={[{ required: true, message: "Vui lòng nhập số nhà, tên đường" }]}
+                  >
+                    <Input
+                      placeholder="Vd: 12 Nguyễn Trãi"
+                      style={{ height: 40, borderRadius: 8 }}
                     />
                   </Form.Item>
 
@@ -489,7 +635,9 @@ export default function CheckoutPage() {
                             height: 44,
                             borderRadius: 8,
                             border: "1px solid #e2e8f0",
-                            background: "#f8fafc",
+                            // Sản phẩm có thiết kế riêng: dùng màu áo làm nền vì ảnh in
+                            // là PNG nền trong suốt, chỉ chứa nội dung đã in.
+                            background: item.designId ? item.color : "#f8fafc",
                             flexShrink: 0,
                             overflow: "hidden",
                             display: "flex",
@@ -503,7 +651,7 @@ export default function CheckoutPage() {
                             <img
                               src={item.image}
                               alt={item.name}
-                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                              style={{ width: "100%", height: "100%", objectFit: item.designId ? "contain" : "cover" }}
                             />
                           ) : (
                             <ShoppingCartOutlined style={{ fontSize: 18, color: "#bec8d2" }} />
@@ -561,11 +709,58 @@ export default function CheckoutPage() {
                     ))}
                   </div>
 
+                  {/* Mã khuyến mãi */}
+                  <div style={{ padding: "16px 24px", borderTop: "1px solid #f1f5f9" }}>
+                    {appliedPromo ? (
+                      <div
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "10px 12px", background: "#f0fdf4",
+                          border: "1px solid #bbf7d0", borderRadius: 8,
+                        }}
+                      >
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "#16a34a" }}>
+                          🎉 Mã &quot;{appliedPromo.code}&quot; đã áp dụng
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleRemovePromo}
+                          style={{ background: "none", border: "none", color: "#16a34a", cursor: "pointer", fontSize: 12, fontWeight: 600, padding: 0 }}
+                        >
+                          Xoá
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <Input
+                            placeholder="Nhập mã khuyến mãi"
+                            value={promoInput}
+                            onChange={(e) => setPromoInput(e.target.value)}
+                            onPressEnter={() => void handleApplyPromo()}
+                            style={{ height: 40, borderRadius: 8 }}
+                          />
+                          <Button
+                            onClick={() => void handleApplyPromo()}
+                            loading={promoApplying}
+                            disabled={!promoInput.trim()}
+                            style={{ height: 40, borderRadius: 8, flexShrink: 0 }}
+                          >
+                            Áp dụng
+                          </Button>
+                        </div>
+                        {promoError && (
+                          <p style={{ margin: "8px 0 0", fontSize: 12, color: "#dc2626" }}>{promoError}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+
                   {/* Totals */}
                   <div style={{ padding: "16px 24px", borderTop: "1px solid #f1f5f9" }}>
                     {[
                       { label: "Tạm tính", value: formatVND(subtotal) },
-                      { label: "Phí vận chuyển", value: formatVND(SHIPPING_FEE) },
+                      { label: "Phí vận chuyển", value: formatVND(shippingFee) },
                     ].map((r) => (
                       <div
                         key={r.label}
@@ -581,6 +776,21 @@ export default function CheckoutPage() {
                         <span style={{ fontWeight: 600, color: "#0f172a" }}>{r.value}</span>
                       </div>
                     ))}
+
+                    {discountAmount > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: 13,
+                          color: "#16a34a",
+                          marginBottom: 10,
+                        }}
+                      >
+                        <span>Giảm giá ({appliedPromo?.code})</span>
+                        <span style={{ fontWeight: 600 }}>−{formatVND(discountAmount)}</span>
+                      </div>
+                    )}
 
                     <div
                       style={{

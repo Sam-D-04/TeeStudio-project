@@ -7,6 +7,7 @@ import {
   syncStoredUser,
 } from "@/lib/authStorage";
 import type { AuthSession, AuthUser } from "@/types/auth";
+import { useCartStore } from "@/store/useCartStore";
 
 interface AuthState {
   user: AuthUser | null;
@@ -42,6 +43,9 @@ const useAuthStore = create<AuthState>((set) => ({
 
   clearSession: () => {
     clearAuthSession();
+    // Xoá giỏ hàng khi đăng xuất — giỏ được lưu trong localStorage nên nếu không
+    // xoá sẽ còn lại sau khi đăng xuất (và lẫn sang tài khoản khác đăng nhập sau).
+    useCartStore.getState().clearCart();
     set({
       user: null,
       accessToken: null,

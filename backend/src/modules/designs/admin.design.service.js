@@ -12,7 +12,9 @@
  */
 
 const db = require("../../database/mysql");
+
 const { calculateBoundingBoxAreaFee } = require("../pricing/admin.pricing.service");
+
 
 // =====================================================================
 // MAP TRẠNG THÁI: DB → Frontend (snake_case tiếng Việt)
@@ -717,16 +719,16 @@ async function layDanhSachThietKe({
       lockReason: null,
     };
     return {
-    id: row.id,
-    maThietKe: `TK-${String(row.id).padStart(4, "0")}`,
-    urlPreview: row.urlPreview || null,
-    mauAo: chuanHoaMauAo(row.mauAoHex, row.mauAo, row.tenMauAo),
-    tenKhachHang: row.tenKhachHang || "Chưa gán khách",
-    soDienThoai: row.soDienThoai || null,
-    tenSanPham: row.tenSanPham || "Sản phẩm",
-    tenMauAo: row.tenMauAo || "Không rõ",
-    viTriIn: row.viTriIn || "Chưa xác định",
-    trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[row.status] || "cho_kiem_tra",
+      id: row.id,
+      maThietKe: `TK-${String(row.id).padStart(4, "0")}`,
+      urlPreview: row.urlPreview || null,
+      mauAo: chuanHoaMauAo(row.mauAoHex, row.mauAo, row.tenMauAo),
+      tenKhachHang: row.tenKhachHang || "Chưa gán khách",
+      soDienThoai: row.soDienThoai || null,
+      tenSanPham: row.tenSanPham || "Sản phẩm",
+      tenMauAo: row.tenMauAo || "Không rõ",
+      viTriIn: row.viTriIn || "Chưa xác định",
+      trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[row.status] || "cho_kiem_tra",
       ngayGui: formatNgay(row.ngayGui),
       coDonHang: quyenSua.hasOrder,
       duocPhepSua: quyenSua.canEdit,
@@ -1315,11 +1317,10 @@ async function yeuCauChinhSua(id, ghiChu) {
 //      Lý do: nhân viên xưởng in cần biết "hôm nay có bao nhiêu áo cần in
 //      để kịp giao cho khách" → họ quan tâm ngày khách bấm đặt hàng.
 // =====================================================================
-async function layDanhSachDonCanIn({ page, limit, tu_khoa, trang_thai, tu_ngay, den_ngay }) {
-  const trangHienTai = parseInt(page) || 1;
-  const soMoi = parseInt(limit) || 10;
-  const offset = (trangHienTai - 1) * soMoi;
-
+// Dựng mệnh đề WHERE + tham số dùng chung cho cả "lấy danh sách có phân trang"
+// (layDanhSachDonCanIn) và "xuất Excel toàn bộ" (xuatDonCanIn) - tách ra để 2
+// nơi luôn lọc giống hệt nhau, tránh lệch bộ lọc giữa màn hình xem và file xuất.
+function xayDungDieuKienDonCanIn({ tu_khoa, trang_thai, tu_ngay, den_ngay }) {
   const dieuKien = [];
   const thamSo = [];
 
@@ -1360,8 +1361,18 @@ async function layDanhSachDonCanIn({ page, limit, tu_khoa, trang_thai, tu_ngay, 
     dieuKien.push(`${BIEU_THUC_TRANG_THAI_DON_IN} IS NOT NULL`);
   }
 
-  const menh_de_where =
-    dieuKien.length > 0 ? "WHERE " + dieuKien.join(" AND ") : "";
+  const menhDeWhere = dieuKien.length > 0 ? "WHERE " + dieuKien.join(" AND ") : "";
+  return { menhDeWhere, thamSo };
+}
+
+async function layDanhSachDonCanIn({ page, limit, tu_khoa, trang_thai, tu_ngay, den_ngay }) {
+  const trangHienTai = parseInt(page) || 1;
+  const soMoi = parseInt(limit) || 10;
+  const offset = (trangHienTai - 1) * soMoi;
+
+  const { menhDeWhere: menh_de_where, thamSo } = xayDungDieuKienDonCanIn({
+    tu_khoa, trang_thai, tu_ngay, den_ngay,
+  });
 
   // OrderProduction.orderItemId là UNIQUE nên COUNT(*) chính là số dòng sản xuất.
   const sqlDem = `
@@ -1385,6 +1396,8 @@ async function layDanhSachDonCanIn({ page, limit, tu_khoa, trang_thai, tu_ngay, 
       oi.designId,
       cd.id                AS thietKeId,
       cd.previewUrl        AS urlPreview,
+      cd.printFileUrlFront AS urlFileIn,
+      cd.printFileUrlBack  AS urlFileInBack,
       cd.baseColor         AS mauAo,
       a.fullName           AS tenKhachHang,
       oi.quantity          AS soLuong,
@@ -1414,6 +1427,9 @@ async function layDanhSachDonCanIn({ page, limit, tu_khoa, trang_thai, tu_ngay, 
       ? `TK-${String(row.thietKeId).padStart(4, "0")}`
       : "Không có",
     urlPreview: row.urlPreview || null,
+    urlFileIn: row.urlFileIn || null,
+    // Ảnh in mặt sau (nếu thiết kế có in cả 2 mặt) - null nếu chỉ in 1 mặt.
+    urlFileInBack: row.urlFileInBack || null,
     mauAo: row.mauAo || "#ffffff",
     tenKhachHang: row.tenKhachHang || "Khách hàng",
     soLuong: row.soLuong || 1,
@@ -1429,6 +1445,84 @@ async function layDanhSachDonCanIn({ page, limit, tu_khoa, trang_thai, tu_ngay, 
     soTrangMoiTrang: soMoi,
     tongSoTrang: Math.ceil(tongSo / soMoi),
   };
+}
+
+// =====================================================================
+// SERVICE 5b: Xuất file Excel "thông số in" cho xưởng in
+// GET /api/admin/designs/don-can-in/xuat-excel
+//
+// Lọc giống hệt layDanhSachDonCanIn (dùng chung xayDungDieuKienDonCanIn) nhưng
+// KHÔNG phân trang - xuất toàn bộ các dòng khớp bộ lọc hiện tại của màn hình
+// "Đơn cần in", kèm link ảnh in cả 2 mặt (trước/sau) để xưởng in tải trực tiếp.
+// Giới hạn 5000 dòng để tránh sinh file quá lớn nếu bộ lọc quá rộng.
+// =====================================================================
+const GIOI_HAN_DONG_XUAT_EXCEL = 5000;
+
+async function xuatDonCanIn({ tu_khoa, trang_thai, tu_ngay, den_ngay }) {
+  const { menhDeWhere, thamSo } = xayDungDieuKienDonCanIn({
+    tu_khoa, trang_thai, tu_ngay, den_ngay,
+  });
+
+  const sql = `
+    SELECT
+      co.orderCode         AS maDon,
+      cd.id                AS thietKeId,
+      a.fullName           AS tenKhachHang,
+      a.phone              AS soDienThoai,
+      p.name               AS tenSanPham,
+      pv.sku               AS sku,
+      pv.color             AS mauSac,
+      pv.size              AS kichCo,
+      oi.quantity          AS soLuong,
+      (
+        SELECT GROUP_CONCAT(DISTINCT pp.name ORDER BY pp.id SEPARATOR ', ')
+        FROM DesignPrintPosition dpp
+        JOIN PrintPosition pp ON pp.id = dpp.printPositionId
+        WHERE dpp.designId = oi.designId
+      )                    AS viTriIn,
+      ${BIEU_THUC_TRANG_THAI_DON_IN} AS status,
+      co.createdAt         AS ngayDatDon,
+      cd.printFileUrlFront AS urlFileInTruoc,
+      cd.printFileUrlBack  AS urlFileInSau
+    FROM OrderProduction op
+    JOIN OrderItem oi ON oi.id = op.orderItemId
+    JOIN CustomerOrder co ON co.id = oi.orderId
+    JOIN Account a ON a.id = co.userId
+    JOIN ProductVariant pv ON pv.id = oi.variantId
+    JOIN Product p ON p.id = pv.productId
+    LEFT JOIN CustomDesign cd ON cd.id = oi.designId
+    ${menhDeWhere}
+    ORDER BY co.createdAt DESC, op.id DESC
+    LIMIT ${GIOI_HAN_DONG_XUAT_EXCEL}
+  `;
+  const [rows] = await db.pool.query(sql, thamSo);
+
+  return taoBaoCaoExcel(`don-can-in-${new Date().toISOString().slice(0, 10)}.xlsx`, [
+    {
+      name: "Đơn cần in",
+      headers: [
+        "Mã đơn", "Mã thiết kế", "Khách hàng", "Số điện thoại",
+        "Sản phẩm", "SKU", "Màu", "Size", "Số lượng", "Vị trí in",
+        "Trạng thái", "Ngày đặt đơn", "Link ảnh in mặt trước", "Link ảnh in mặt sau",
+      ],
+      rows: rows.map((row) => [
+        row.maDon,
+        row.thietKeId ? `TK-${String(row.thietKeId).padStart(4, "0")}` : "Không có",
+        row.tenKhachHang || "",
+        row.soDienThoai || "",
+        row.tenSanPham || "",
+        row.sku || "",
+        row.mauSac || "",
+        row.kichCo || "",
+        Number(row.soLuong),
+        row.viTriIn || "Chưa xác định",
+        MAP_TRANG_THAI_DON_IN_DB_FE[row.status] || "cho_gui_xuong",
+        formatNgay(row.ngayDatDon),
+        row.urlFileInTruoc || "",
+        row.urlFileInSau || "",
+      ]),
+    },
+  ]);
 }
 
 // =====================================================================
@@ -1624,6 +1718,7 @@ module.exports = {
   duyetThietKe,
   yeuCauChinhSua,
   layDanhSachDonCanIn,
+  xuatDonCanIn,
   capNhatTrangThaiDonIn,
   layDanhSachSticker,
   themSticker,
