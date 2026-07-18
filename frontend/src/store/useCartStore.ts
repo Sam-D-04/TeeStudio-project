@@ -126,7 +126,22 @@ export const useCartStore = create<CartState>()(
       clearCart: () => set({ items: [] }),
 
       loadFromBackend: (apiItems) => {
-        set({ items: apiItems.map(apiItemToCartItem) });
+        // Giữ lại printImageFront/Back đang có trong bộ nhớ (nếu khách vừa thêm từ
+        // Design Studio) - apiItemToCartItem không có 2 field này vì Cart lưu trên
+        // backend không có cột base64. Không merge thì mỗi lần đăng nhập/đăng ký
+        // (LoginForm, AuthModal) gọi loadFromBackend sẽ xoá mất ảnh in vừa chụp,
+        // trước khi kịp gửi kèm lúc tạo đơn.
+        set((s) => ({
+          items: apiItems.map((apiItem) => {
+            const cartItem = apiItemToCartItem(apiItem);
+            const existing = s.items.find((i) => i.cartItemId === cartItem.cartItemId);
+            return {
+              ...cartItem,
+              printImageFront: existing?.printImageFront ?? cartItem.printImageFront,
+              printImageBack: existing?.printImageBack ?? cartItem.printImageBack,
+            };
+          }),
+        }));
       },
 
       toSyncPayload: () =>
