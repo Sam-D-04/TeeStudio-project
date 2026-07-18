@@ -1,0 +1,72 @@
+@startuml
+title Sơ đồ Use Case chi tiết - Phân hệ Quản lý Đơn hàng
+
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam usecase {
+  BackgroundColor #F8FAFC
+  BorderColor #94A3B8
+  FontColor #0F172A
+  FontSize 13
+}
+skinparam rectangle {
+  BorderColor #000000
+}
+
+' --- TÁC NHÂN CHỦ ĐỘNG (BÊN TRÁI) ---
+actor "Quản trị viên\n(ADMIN)" as Admin
+actor "Nhân sự sản xuất\n(PRODUCTION)" as Production
+
+' --- TÁC NHÂN BỊ ĐỘNG (BÊN PHẢI) ---
+actor "Khách hàng" as Customer <<external>>
+actor "Cổng thanh toán\n(VNPAY/MOMO)" as Gateway <<external>>
+
+' --- RANH GIỚI HỆ THỐNG ---
+rectangle "Phân hệ Quản lý Đơn hàng" {
+  ' Các Use Case chính từ WBS
+  usecase "Tra cứu, lọc và\ntìm kiếm đơn hàng" as UC1
+  usecase "Xem chi tiết &\nlịch sử xử lý" as UC2
+  usecase "Tạo đơn hàng mới" as UC3
+  usecase "Cập nhật trạng thái\nđơn hàng" as UC4
+  usecase "Hủy đơn hàng" as UC5
+  usecase "Sửa địa chỉ\ngiao hàng" as UC6
+  usecase "Tạo QR thanh toán\nonline" as UC7
+  
+  ' Các Use Case phụ trợ (System Logic)
+  usecase "Ghi chú lý do hủy" as UC_CancelReason
+  usecase "Gửi thông báo\nđơn hàng" as UC_Notify
+}
+
+' --- KẾT NỐI ACTORS VỚI USE CASES ---
+Admin --> UC1
+Admin --> UC2
+Admin --> UC3
+Admin --> UC4
+Admin --> UC5
+Admin --> UC6
+Admin --> UC7
+
+Production --> UC1
+Production --> UC2
+Production --> UC4
+
+' --- QUAN HỆ INCLUDE / EXTEND ---
+' Hành động Xem chi tiết là một thao tác mở rộng từ danh sách tra cứu
+UC2 .up.> UC1 : <<extend>>
+
+' Khi hủy đơn bắt buộc phải nhập lý do
+UC5 ..> UC_CancelReason : <<include>>
+
+' Khi hủy đơn bắt buộc gửi thông báo cho khách
+UC5 ..> UC_Notify : <<include>>
+
+' Khi cập nhật trạng thái có thể (tùy chọn) gửi thông báo cho khách
+UC4 ..> UC_Notify : <<extend>>
+
+' --- KẾT NỐI HỆ THỐNG BÊN NGOÀI ---
+UC_Notify --> Customer
+UC7 --> Gateway
+
+@enduml
+
