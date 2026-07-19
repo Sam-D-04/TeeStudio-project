@@ -14,6 +14,7 @@
 const db = require("../../database/mysql");
 
 const { calculateBoundingBoxAreaFee } = require("../pricing/admin.pricing.service");
+const { taoBaoCaoExcel } = require("../../common/utils/excel-report");
 
 
 // =====================================================================
@@ -510,6 +511,40 @@ async function dongBoViTriInTheoMatAo(conn, designId, shirtView) {
   );
 }
 
+function layDanhSachMaViTriInTuCanvas(canvasData) {
+  const fallbackSide = canvasData?.shirtView === "back" ? "back" : "front";
+  const elements = Array.isArray(canvasData?.elements) ? canvasData.elements : [];
+  const sides = elements.length
+    ? new Set(elements.map((element) => (
+      element.side === "back" ? "back" : element.side === "front" ? "front" : fallbackSide
+    )))
+    : new Set([fallbackSide]);
+
+  return [...sides].map((side) => MAP_SHIRT_VIEW_PRINT_POSITION_CODE[side]);
+}
+
+async function dongBoViTriInTheoCanvas(conn, designId, canvasData) {
+  const codes = layDanhSachMaViTriInTuCanvas(canvasData);
+  const [positions] = await conn.query(
+    "SELECT id, code, extraCost FROM PrintPosition WHERE code IN (?) AND isActive = 1",
+    [codes]
+  );
+  if (positions.length !== codes.length) {
+    throw taoLoi("Khong tim thay vi tri in phu hop voi mat ao da chon", 400);
+  }
+
+  await conn.query(
+    "DELETE FROM DesignPrintPosition WHERE designId = ?",
+    [designId]
+  );
+  const values = positions.map((position) => [designId, position.id, position.extraCost || 0]);
+  await conn.query(
+    `INSERT INTO DesignPrintPosition (designId, printPositionId, extraCost)
+     VALUES ?`,
+    [values]
+  );
+}
+
 function kiemTraKhoangNgay(tuNgay, denNgay) {
   const dinhDangNgay = /^\d{4}-\d{2}-\d{2}$/;
   const laNgayHopLe = (giaTri) => {
@@ -974,7 +1009,10 @@ async function layCanvasDataThietKe(id) {
 // Lưu đè đồng thời canvasData MỚI + previewUrl MỚI, không tự động
 // chuyển status. Duyệt thiết kế vẫn là thao tác riêng qua /duyet.
 // =====================================================================
-async function suaThietKeChoKhach(id, { canvasData, previewUrl, shirtType, shirtColor, variantId }) {
+async function suaThietKeChoKhach(
+  id,
+  { canvasData, previewUrl, shirtType, shirtColor, variantId, printFileUrlFront, printFileUrlBack }
+) {
   let dataObj = canvasData;
   if (typeof dataObj === "string") {
     try {
@@ -1084,13 +1122,33 @@ async function suaThietKeChoKhach(id, { canvasData, previewUrl, shirtType, shirt
     const dataStr = JSON.stringify(dataObj);
     const designFee = calculateBoundingBoxAreaFee({ layers: dataObj.elements });
 
+    const setClauses = [
+      "productId = ?",
+      "variantId = ?",
+      "canvasData = ?",
+      "previewUrl = ?",
+      "designFee = ?",
+      "baseColor = ?",
+    ];
+    const params = [productId, selectedVariantId, dataStr, previewUrl || "", designFee, normalizedColor];
+
+    if (printFileUrlFront !== undefined) {
+      setClauses.push("printFileUrlFront = ?");
+      params.push(printFileUrlFront);
+    }
+    if (printFileUrlBack !== undefined) {
+      setClauses.push("printFileUrlBack = ?");
+      params.push(printFileUrlBack);
+    }
+
+    params.push(id);
     await conn.query(
       `UPDATE CustomDesign
-       SET productId = ?, variantId = ?, canvasData = ?, previewUrl = ?, designFee = ?, baseColor = ?
+       SET ${setClauses.join(", ")}
        WHERE id = ?`,
-      [productId, selectedVariantId, dataStr, previewUrl || "", designFee, normalizedColor, id]
+      params
     );
-    await dongBoViTriInTheoMatAo(conn, id, dataObj.shirtView);
+    await dongBoViTriInTheoCanvas(conn, id, dataObj);
   });
 
   return {
@@ -1163,7 +1221,17 @@ async function doiKhachHangThietKe(id, customerId) {
 // SERVICE 2.3: Admin tạo thiết kế nháp và gắn vào tài khoản khách hàng
 // POST /api/admin/designs/customer-drafts
 // =====================================================================
-async function taoThietKeChoKhach({ userId, name, shirtType, shirtColor, variantId, canvasData, previewUrl }) {
+async function taoThietKeChoKhach({
+  userId,
+  name,
+  shirtType,
+  shirtColor,
+  variantId,
+  canvasData,
+  previewUrl,
+  printFileUrlFront,
+  printFileUrlBack,
+}) {
   const hasCustomer = userId !== undefined && userId !== null && userId !== "";
   const customerId = hasCustomer ? Number(userId) : null;
   if (hasCustomer && (!Number.isInteger(customerId) || customerId <= 0)) {
@@ -1220,8 +1288,8 @@ async function taoThietKeChoKhach({ userId, name, shirtType, shirtColor, variant
   const result = await db.transaction(async (conn) => {
     const [insertResult] = await conn.query(
       `INSERT INTO CustomDesign
-         (userId, name, productId, variantId, baseColor, canvasData, previewUrl, status, designFee)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?)`,
+         (userId, name, productId, variantId, baseColor, canvasData, previewUrl, printFileUrlFront, printFileUrlBack, status, designFee)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?)`,
       [
         customerId,
         String(name).trim().slice(0, 100),
@@ -1230,10 +1298,12 @@ async function taoThietKeChoKhach({ userId, name, shirtType, shirtColor, variant
         normalizedColor,
         dataStr,
         previewUrl || "",
+        printFileUrlFront || null,
+        printFileUrlBack || null,
         designFee,
       ]
     );
-    await dongBoViTriInTheoMatAo(conn, insertResult.insertId, normalizedCanvas.shirtView);
+    await dongBoViTriInTheoCanvas(conn, insertResult.insertId, normalizedCanvas);
     return insertResult;
   });
 
@@ -1448,13 +1518,174 @@ async function layDanhSachDonCanIn({ page, limit, tu_khoa, trang_thai, tu_ngay, 
 }
 
 // =====================================================================
-// SERVICE 5b: Xuất file Excel "thông số in" cho xưởng in
+// SERVICE 5a.1: Lay chi tiet techpack cho mot dong "Don can in"
+// GET /api/admin/designs/don-can-in/:id/techpack
+//
+// Chi doc du lieu da co trong DB: link file in Cloudinary, canvasData va
+// thong tin don hang. Khong xu ly do hoa, khong upload anh.
+// =====================================================================
+async function layTechpackDonCanIn(id) {
+  const [rows] = await db.pool.query(
+    `SELECT
+      op.id                AS id,
+      oi.id                AS orderItemId,
+      co.id                AS orderId,
+      co.orderCode         AS maDon,
+      co.createdAt         AS ngayDatDon,
+      a.fullName           AS tenKhachHang,
+      a.email              AS emailKhachHang,
+      a.phone              AS soDienThoai,
+      oi.quantity          AS soLuong,
+      oi.designId          AS designId,
+      cd.id                AS thietKeId,
+      cd.name              AS tenThietKe,
+      cd.canvasData        AS canvasData,
+      cd.previewUrl        AS urlPreview,
+      cd.printFileUrlFront AS urlFileInTruoc,
+      cd.printFileUrlBack  AS urlFileInSau,
+      cd.baseColor         AS mauAo,
+      cd.status            AS designStatus,
+      p.id                 AS productId,
+      p.name               AS tenSanPham,
+      p.shirtType          AS shirtType,
+      pv.id                AS variantId,
+      pv.sku               AS sku,
+      pv.color             AS tenMauAo,
+      pv.colorHex          AS mauAoHex,
+      pv.size              AS sizeAo,
+      (
+        SELECT GROUP_CONCAT(DISTINCT pp.name ORDER BY pp.id SEPARATOR ', ')
+        FROM DesignPrintPosition dpp
+        JOIN PrintPosition pp ON pp.id = dpp.printPositionId
+        WHERE dpp.designId = oi.designId
+      )                    AS viTriIn,
+      ${BIEU_THUC_TRANG_THAI_DON_IN} AS status
+    FROM OrderProduction op
+    JOIN OrderItem oi ON oi.id = op.orderItemId
+    JOIN CustomerOrder co ON co.id = oi.orderId
+    JOIN Account a ON a.id = co.userId
+    JOIN ProductVariant pv ON pv.id = oi.variantId
+    JOIN Product p ON p.id = pv.productId
+    LEFT JOIN CustomDesign cd ON cd.id = oi.designId
+    WHERE op.id = ?
+      AND ${BIEU_THUC_TRANG_THAI_DON_IN} IS NOT NULL
+    LIMIT 1`,
+    [id]
+  );
+
+  if (!rows.length) {
+    throw taoLoi("Khong tim thay don can in", 404);
+  }
+
+  const row = rows[0];
+  let canvasData = null;
+  if (row.canvasData) {
+    try {
+      canvasData = typeof row.canvasData === "string"
+        ? JSON.parse(row.canvasData)
+        : row.canvasData;
+    } catch {
+      canvasData = null;
+    }
+  }
+
+  const [rowsViTri] = row.thietKeId
+    ? await db.pool.query(
+      `SELECT
+        pp.code,
+        pp.name,
+        pp.maxWidth,
+        pp.maxHeight,
+        pp.printAreaX,
+        pp.printAreaY,
+        pp.printAreaWidth,
+        pp.printAreaHeight
+       FROM DesignPrintPosition dpp
+       JOIN PrintPosition pp ON pp.id = dpp.printPositionId
+       WHERE dpp.designId = ?
+         AND pp.code IN ('MAT_TRUOC', 'MAT_SAU')
+       ORDER BY FIELD(pp.code, 'MAT_TRUOC', 'MAT_SAU')`,
+      [row.thietKeId]
+    )
+    : [[]];
+
+  const viTriTheoMat = rowsViTri.reduce((acc, item) => {
+    const side = item.code === "MAT_SAU" ? "back" : "front";
+    acc[side] = {
+      code: item.code,
+      ten: item.name,
+      maxWidthCm: item.maxWidth !== null ? Number(item.maxWidth) : null,
+      maxHeightCm: item.maxHeight !== null ? Number(item.maxHeight) : null,
+      printAreaX: item.printAreaX !== null ? Number(item.printAreaX) : null,
+      printAreaY: item.printAreaY !== null ? Number(item.printAreaY) : null,
+      printAreaWidth: item.printAreaWidth !== null ? Number(item.printAreaWidth) : null,
+      printAreaHeight: item.printAreaHeight !== null ? Number(item.printAreaHeight) : null,
+    };
+    return acc;
+  }, {});
+
+  const mauAo = chuanHoaMauAo(
+    canvasData?.shirtColor,
+    row.mauAo,
+    row.mauAoHex,
+    row.tenMauAo
+  );
+
+  return {
+    id: Number(row.id),
+    orderItemId: Number(row.orderItemId),
+    orderId: Number(row.orderId),
+    maDon: row.maDon || `DH-${String(row.orderId).padStart(4, "0")}`,
+    ngayDatDon: formatNgay(row.ngayDatDon),
+    khachHang: {
+      ten: row.tenKhachHang || "Khach hang",
+      email: row.emailKhachHang || null,
+      soDienThoai: row.soDienThoai || null,
+    },
+    sanPham: {
+      productId: Number(row.productId),
+      variantId: row.variantId ? Number(row.variantId) : null,
+      ten: row.tenSanPham || "San pham",
+      shirtType: row.shirtType || canvasData?.shirtType || "tshirt",
+      sku: row.sku || null,
+      size: row.sizeAo || null,
+      tenMau: row.tenMauAo || null,
+      mauAo,
+    },
+    thietKe: {
+      id: row.thietKeId ? Number(row.thietKeId) : null,
+      maThietKe: row.thietKeId ? `TK-${String(row.thietKeId).padStart(4, "0")}` : "Khong co",
+      ten: row.tenThietKe || "Thiet ke chua dat ten",
+      viTriIn: row.viTriIn || "Chua xac dinh",
+      trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[row.designStatus] || null,
+      urlPreview: row.urlPreview || null,
+      canvasData,
+    },
+    fileIn: {
+      front: {
+        side: "front",
+        tenMat: "Mat truoc",
+        url: row.urlFileInTruoc || null,
+        viTriIn: viTriTheoMat.front || null,
+      },
+      back: {
+        side: "back",
+        tenMat: "Mat sau",
+        url: row.urlFileInSau || null,
+        viTriIn: viTriTheoMat.back || null,
+      },
+    },
+    soLuong: Number(row.soLuong || 1),
+    trangThai: MAP_TRANG_THAI_DON_IN_DB_FE[row.status] || "cho_gui_xuong",
+  };
+}
+
+// =====================================================================
+// SERVICE 5b: Xuat file Excel "thong so in" cho xuong in
 // GET /api/admin/designs/don-can-in/xuat-excel
 //
-// Lọc giống hệt layDanhSachDonCanIn (dùng chung xayDungDieuKienDonCanIn) nhưng
-// KHÔNG phân trang - xuất toàn bộ các dòng khớp bộ lọc hiện tại của màn hình
-// "Đơn cần in", kèm link ảnh in cả 2 mặt (trước/sau) để xưởng in tải trực tiếp.
-// Giới hạn 5000 dòng để tránh sinh file quá lớn nếu bộ lọc quá rộng.
+// Loc giong het layDanhSachDonCanIn nhung khong phan trang, kem link anh in
+// ca 2 mat de xuong in tai truc tiep. Gioi han 5000 dong de tranh file qua lon.
 // =====================================================================
 const GIOI_HAN_DONG_XUAT_EXCEL = 5000;
 
@@ -1718,6 +1949,7 @@ module.exports = {
   duyetThietKe,
   yeuCauChinhSua,
   layDanhSachDonCanIn,
+  layTechpackDonCanIn,
   xuatDonCanIn,
   capNhatTrangThaiDonIn,
   layDanhSachSticker,

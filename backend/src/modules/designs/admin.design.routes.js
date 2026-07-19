@@ -84,6 +84,7 @@ router.get("/stats", verifyToken, requireAdmin, controller.getThongKe);
 // Danh sách đơn cần in – cũng phải khai báo trước /:id
 router.get("/don-can-in", verifyToken, requireAdmin, controller.getDanhSachDonCanIn);
 router.get("/don-can-in/xuat-excel", verifyToken, requireAdmin, controller.exportDonCanIn);
+router.get("/don-can-in/:id/techpack", verifyToken, requireAdmin, controller.getTechpackDonCanIn);
 router.patch("/don-can-in/:id/trang-thai", verifyToken, requireAdmin, controller.capNhatTrangThaiDonIn);
 
 // Sticker

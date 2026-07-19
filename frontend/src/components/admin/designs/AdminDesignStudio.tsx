@@ -28,6 +28,7 @@ import ShirtMockupImage, {
 import Sidebar from "@/components/design-studio/Sidebar";
 import StaticTextToolbar from "@/components/design-studio/StaticTextToolbar";
 import "@/app/design-studio/design-studio.css";
+import { captureAdminPrintImages } from "./adminPrintCapture";
 
 const CONTAINER_W = 500;
 const CONTAINER_H = 600;
@@ -231,6 +232,12 @@ export default function AdminDesignStudio() {
         boundaries.forEach((element) => { element.style.display = ""; });
       }
 
+      const { printImageFront, printImageBack } = await captureAdminPrintImages({
+        stage: stageRef.current,
+        shirtType,
+        zoom,
+      });
+
       const result = await designService.taoThietKeChoKhach({
         userId: customerId ?? null,
         name: designName.trim(),
@@ -246,6 +253,8 @@ export default function AdminDesignStudio() {
           elements: useDesignStore.getState().elements,
         },
         previewUrl,
+        printImageFront: printImageFront ?? null,
+        printImageBack: printImageBack ?? null,
       });
 
       modal.success({
@@ -265,7 +274,7 @@ export default function AdminDesignStudio() {
     } finally {
       setSaving(false);
     }
-  }, [customerId, designName, elements.length, message, modal, router, setSelectedId, shirtColor, shirtType, shirtView, variantId]);
+  }, [customerId, designName, elements.length, message, modal, router, setSelectedId, shirtColor, shirtType, shirtView, variantId, zoom]);
 
   const area = getPrintAreaBoundary(shirtType, shirtView, CONTAINER_W, CONTAINER_H);
   const printArea = { x: area.left, y: area.top, w: area.width, h: area.height };

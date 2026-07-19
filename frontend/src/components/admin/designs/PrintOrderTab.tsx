@@ -16,6 +16,8 @@ import { Modal, Select, message } from "antd";
 import {
   EditOutlined,
   EyeOutlined,
+  FileTextOutlined,
+  DownloadOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   LoadingOutlined,
@@ -28,6 +30,7 @@ import DateRangeFilter from "@/components/admin/common/DateRangeFilter";
 
 import * as designService from "@/services/admin/designService";
 import type { DonCanIn } from "@/services/admin/designService";
+import { tinhThongSoInCm } from "./printTechpackUtils";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cấu hình badge trạng thái đơn in
@@ -56,6 +59,35 @@ const CAU_HINH_TRANG_THAI: Record<
   },
 };
 
+function taoUrlTaiCloudinary(url: string, tenFile: string) {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.hostname.endsWith("cloudinary.com")) return null;
+
+    const uploadMarker = "/upload/";
+    const uploadIndex = parsed.pathname.indexOf(uploadMarker);
+    if (uploadIndex === -1) return null;
+
+    const tenFileKhongDuoi = tenFile
+      .replace(/\.[^.]+$/, "")
+      .replace(/[^a-zA-Z0-9_-]+/g, "_")
+      .slice(0, 80);
+    const downloadFlag = tenFileKhongDuoi
+      ? `fl_attachment:${tenFileKhongDuoi}`
+      : "fl_attachment";
+
+    parsed.pathname = [
+      parsed.pathname.slice(0, uploadIndex + uploadMarker.length),
+      downloadFlag,
+      parsed.pathname.slice(uploadIndex + uploadMarker.length),
+    ].join("");
+
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 type PrintOrderTabProps = {
   statusFilter: string;
   onStatusFilterChange: (status: string) => void;
@@ -80,6 +112,9 @@ export default function PrintOrderTab({
   const [tuKhoa, setTuKhoa] = useState("");
   const [donDangChinhSua, setDonDangChinhSua] = useState<DonCanIn | null>(null);
   const [trangThaiMoi, setTrangThaiMoi] = useState<"dang_in" | "da_in_xong" | "">("");
+  const [donDangXemPhieuIn, setDonDangXemPhieuIn] = useState<DonCanIn | null>(null);
+  const [matDangXem, setMatDangXem] = useState<"front" | "back">("front");
+  const [dangTaiFileIn, setDangTaiFileIn] = useState(false);
 
   // ─── Fetch danh sách đơn cần in ─────────────────────────────────────────
   const {
@@ -98,6 +133,17 @@ export default function PrintOrderTab({
         den_ngay: dateRange.denNgay || undefined,
       }),
     staleTime: 15_000,
+  });
+
+  const {
+    data: techpack,
+    isLoading: dangTaiTechpack,
+    isError: loiTechpack,
+  } = useQuery({
+    queryKey: ["don-can-in-techpack", donDangXemPhieuIn?.id],
+    queryFn: () => designService.layTechpackDonCanIn(donDangXemPhieuIn!.id),
+    enabled: Boolean(donDangXemPhieuIn),
+    staleTime: 30_000,
   });
 
   // ─── Mutation: Cập nhật một bước tiến độ in ──────────────────────────────
@@ -147,6 +193,60 @@ export default function PrintOrderTab({
     messageApi.warning("Đơn này chưa có ảnh thiết kế để xem.");
   }
 
+  function moPhieuIn(don: DonCanIn) {
+    setMatDangXem(don.urlFileIn ? "front" : don.urlFileInBack ? "back" : "front");
+    setDonDangXemPhieuIn(don);
+  }
+
+  function dongPhieuIn() {
+    setDonDangXemPhieuIn(null);
+    setMatDangXem("front");
+  }
+
+  async function taiFileIn(url: string | null | undefined, tenFile: string) {
+    if (!url) {
+      messageApi.warning("Chưa có file in chuẩn để tải.");
+      return;
+    }
+
+    setDangTaiFileIn(true);
+
+    try {
+      const response = await fetch(url, { mode: "cors" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = downloadUrl;
+      link.download = tenFile;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+      messageApi.success("Đã bắt đầu tải ảnh in.");
+    } catch (error) {
+      const cloudinaryDownloadUrl = taoUrlTaiCloudinary(url, tenFile);
+      if (cloudinaryDownloadUrl) {
+        const link = document.createElement("a");
+
+        link.href = cloudinaryDownloadUrl;
+        link.download = tenFile;
+        link.rel = "noopener noreferrer";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        messageApi.success("Đã gửi yêu cầu tải ảnh in.");
+      } else {
+        messageApi.error("Không thể tải ảnh in. Vui lòng thử mở ảnh rồi lưu thủ công.");
+      }
+      console.error("Không thể tải file in:", error);
+    } finally {
+      setDangTaiFileIn(false);
+    }
+  }
+
   const tuyChonTrangThai = donDangChinhSua?.trangThai === "cho_gui_xuong"
     ? [{ value: "dang_in", label: "Đang in" }]
     : donDangChinhSua?.trangThai === "dang_in"
@@ -161,11 +261,248 @@ export default function PrintOrderTab({
   const soChoGuiXuong = danhSach.filter((d) => d.trangThai === "cho_gui_xuong").length;
   const soDangIn = danhSach.filter((d) => d.trangThai === "dang_in").length;
   const soDaInXong = danhSach.filter((d) => d.trangThai === "da_in_xong").length;
+  const fileMatTruoc = techpack?.fileIn?.front ?? null;
+  const fileMatSau = techpack?.fileIn?.back ?? null;
+  const thongSoMatTruoc = techpack
+    ? tinhThongSoInCm(
+      techpack.thietKe.canvasData,
+      "front",
+      fileMatTruoc,
+      techpack.sanPham.shirtType
+    )
+    : null;
+  const thongSoMatSau = techpack
+    ? tinhThongSoInCm(
+      techpack.thietKe.canvasData,
+      "back",
+      fileMatSau,
+      techpack.sanPham.shirtType
+    )
+    : null;
+  const fileDangXem = matDangXem === "front" ? fileMatTruoc : fileMatSau;
+  const thongSoDangXem = matDangXem === "front" ? thongSoMatTruoc : thongSoMatSau;
+  const coMatTruoc = Boolean(fileMatTruoc?.url || thongSoMatTruoc);
+  const coMatSau = Boolean(fileMatSau?.url || thongSoMatSau);
 
   return (
     <>
       {messageContextHolder}
       {confirmModalContextHolder}
+      <Modal
+        open={Boolean(donDangXemPhieuIn)}
+        title={`Phiếu thông số in${donDangXemPhieuIn ? ` - ${donDangXemPhieuIn.maDon}` : ""}`}
+        footer={null}
+        width={980}
+        centered
+        onCancel={dongPhieuIn}
+      >
+        {dangTaiTechpack && (
+          <div style={{ padding: "44px 0", textAlign: "center", color: "#64748b" }}>
+            <LoadingOutlined style={{ fontSize: 24, marginBottom: 10, display: "block" }} />
+            Đang tải phiếu thông số...
+          </div>
+        )}
+
+        {loiTechpack && !dangTaiTechpack && (
+          <div style={{ padding: "44px 0", textAlign: "center", color: "#ef4444" }}>
+            <WarningOutlined style={{ fontSize: 24, marginBottom: 10, display: "block" }} />
+            Không thể tải phiếu thông số in.
+          </div>
+        )}
+
+        {techpack && !dangTaiTechpack && !loiTechpack && (
+          <div style={{ display: "grid", gap: 18 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+                gap: 10,
+                padding: 14,
+                border: "1px solid #e2e8f0",
+                borderRadius: 8,
+                background: "#f8fafc",
+              }}
+            >
+              {[
+                ["Mã đơn", techpack.maDon],
+                ["Mã thiết kế", techpack.thietKe.maThietKe],
+                ["Khách hàng", techpack.khachHang.ten],
+                ["Sản phẩm", techpack.sanPham.ten],
+                ["Size / màu", `${techpack.sanPham.size || "-"} / ${techpack.sanPham.tenMau || techpack.sanPham.mauAo}`],
+                ["Số lượng", `${techpack.soLuong} áo`],
+                ["SKU", techpack.sanPham.sku || "-"],
+                ["Vị trí in", techpack.thietKe.viTriIn],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <div style={{ fontSize: 12, color: "#64748b", marginBottom: 2 }}>{label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => setMatDangXem("front")}
+                style={{
+                  height: 34,
+                  padding: "0 14px",
+                  borderRadius: 6,
+                  border: matDangXem === "front" ? "1px solid #0ea5e9" : "1px solid #e2e8f0",
+                  background: matDangXem === "front" ? "#e0f2fe" : "#ffffff",
+                  color: matDangXem === "front" ? "#0369a1" : "#475569",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Mặt trước{coMatTruoc ? "" : " (trống)"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMatDangXem("back")}
+                style={{
+                  height: 34,
+                  padding: "0 14px",
+                  borderRadius: 6,
+                  border: matDangXem === "back" ? "1px solid #0ea5e9" : "1px solid #e2e8f0",
+                  background: matDangXem === "back" ? "#e0f2fe" : "#ffffff",
+                  color: matDangXem === "back" ? "#0369a1" : "#475569",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Mặt sau{coMatSau ? "" : " (trống)"}
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                gap: 16,
+              }}
+            >
+              <div
+                style={{
+                  minHeight: 360,
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 8,
+                  background: "#f8fafc",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                  padding: 16,
+                }}
+              >
+                {fileDangXem?.url ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={fileDangXem.url}
+                    alt={`File in ${matDangXem === "front" ? "mặt trước" : "mặt sau"}`}
+                    style={{
+                      maxWidth: "100%",
+                      maxHeight: 420,
+                      objectFit: "contain",
+                      display: "block",
+                    }}
+                  />
+                ) : (
+                  <div style={{ textAlign: "center", color: "#64748b", fontSize: 14 }}>
+                    <WarningOutlined style={{ fontSize: 24, marginBottom: 8, display: "block" }} />
+                    Chưa có file in chuẩn cho mặt này.
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: "grid", gap: 12, alignContent: "start" }}>
+                <div
+                  style={{
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 8,
+                    padding: 14,
+                    background: "#ffffff",
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>Thông số in</div>
+                  {thongSoDangXem ? (
+                    <>
+                      <div style={{ fontSize: 18, lineHeight: 1.35, color: "#0f172a", fontWeight: 800 }}>
+                        {thongSoDangXem.summary}
+                      </div>
+                      <div style={{ marginTop: 8, color: "#475569", fontSize: 13 }}>
+                        {thongSoDangXem.detail}
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ color: "#64748b", fontSize: 13 }}>
+                      Không có phần tử thiết kế trên mặt này để tính thông số.
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  style={{
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 8,
+                    padding: 14,
+                    background: "#ffffff",
+                    display: "grid",
+                    gap: 8,
+                    fontSize: 13,
+                    color: "#334155",
+                  }}
+                >
+                  <div><strong>Mặt in:</strong> {matDangXem === "front" ? "Mặt trước" : "Mặt sau"}</div>
+                  <div><strong>Kích thước vùng in:</strong> {fileDangXem?.viTriIn?.maxWidthCm || "-"}cm x {fileDangXem?.viTriIn?.maxHeightCm || "-"}cm</div>
+                  <div><strong>Số layer:</strong> {thongSoDangXem?.elementCount ?? 0}</div>
+                  <div><strong>Link ảnh:</strong> {fileDangXem?.url ? "Đã sẵn sàng" : "Chưa có"}</div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => fileDangXem?.url && window.open(fileDangXem.url, "_blank", "noopener,noreferrer")}
+                    disabled={!fileDangXem?.url}
+                    style={{
+                      height: 36,
+                      padding: "0 12px",
+                      borderRadius: 6,
+                      border: "1px solid #e2e8f0",
+                      background: fileDangXem?.url ? "#ffffff" : "#f1f5f9",
+                      color: fileDangXem?.url ? "#0f172a" : "#94a3b8",
+                      cursor: fileDangXem?.url ? "pointer" : "not-allowed",
+                      fontWeight: 700,
+                    }}
+                  >
+                    <EyeOutlined /> Mở ảnh
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => taiFileIn(
+                      fileDangXem?.url,
+                      `${techpack.maDon}-${matDangXem === "front" ? "mat-truoc" : "mat-sau"}.png`
+                    )}
+                    disabled={!fileDangXem?.url || dangTaiFileIn}
+                    style={{
+                      height: 36,
+                      padding: "0 12px",
+                      borderRadius: 6,
+                      border: "1px solid #0ea5e9",
+                      background: fileDangXem?.url && !dangTaiFileIn ? "#0ea5e9" : "#e2e8f0",
+                      color: "#ffffff",
+                      cursor: fileDangXem?.url && !dangTaiFileIn ? "pointer" : "not-allowed",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {dangTaiFileIn ? <LoadingOutlined /> : <DownloadOutlined />} Tải ảnh
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
       <Modal
         open={Boolean(donDangChinhSua)}
         title="Cập nhật trạng thái đơn cần in"
@@ -548,6 +885,27 @@ export default function PrintOrderTab({
                       {/* Thao tác */}
                       <td style={{ padding: "14px 16px", textAlign: "right", whiteSpace: "nowrap" }}>
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                          <button
+                            title="Phiếu thông số in"
+                            aria-label={`Phiếu thông số in ${don.maDon}`}
+                            onClick={() => moPhieuIn(don)}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: 6,
+                              border: "1px solid #bae6fd",
+                              background: "#e0f2fe",
+                              color: "#0284c7",
+                              cursor: "pointer",
+                              fontSize: 14,
+                              transition: "all 0.15s ease",
+                            }}
+                          >
+                            <FileTextOutlined />
+                          </button>
                           {/* Nút Xem file in chuẩn - mặt trước (luôn có, kể cả đơn cũ chỉ 1 mặt) */}
                           <button
                             title={don.urlFileInBack ? "Xem file in mặt trước" : "Xem file in chuẩn"}

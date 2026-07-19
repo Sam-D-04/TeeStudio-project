@@ -43,6 +43,7 @@ import ShirtMockupImage, {
 import Sidebar from "@/components/design-studio/Sidebar";
 import StaticTextToolbar from "@/components/design-studio/StaticTextToolbar";
 import "@/app/design-studio/design-studio.css";
+import { captureAdminPrintImages } from "./adminPrintCapture";
 
 const CONTAINER_W = 500;
 const CONTAINER_H = 600;
@@ -160,11 +161,12 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
         // (thiết kế cũ có thể được lưu mà không có id, hoặc id bị trùng)
         const seenIds = new Set<string>();
         const normalizedElements = cd.elements.map((el) => {
+          const side = el.side ?? cd.shirtView ?? "front";
           if (!el.id || seenIds.has(el.id)) {
-            return { ...el, id: uuidv4() };
+            return { ...el, id: uuidv4(), side };
           }
           seenIds.add(el.id);
-          return el;
+          return { ...el, side };
         });
 
         // Tái tạo toàn bộ trạng thái canvas từ JSON đã lưu
@@ -383,6 +385,12 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
         boundaries.forEach((element) => { element.style.display = ""; });
       }
 
+      const { printImageFront, printImageBack } = await captureAdminPrintImages({
+        stage: stageRef.current,
+        shirtType,
+        zoom,
+      });
+
       // Gọi API ghi đè (canvasData JSON mới + previewUrl Base64)
       await designService.suaThietKeChoKhach(designId, {
         shirtType,
@@ -397,6 +405,8 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
           elements: useDesignStore.getState().elements,
         },
         previewUrl,
+        printImageFront: printImageFront ?? null,
+        printImageBack: printImageBack ?? null,
       });
 
       modal.success({
@@ -415,7 +425,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     } finally {
       setSaving(false);
     }
-  }, [designId, elements.length, hasRelatedOrder, maThietKe, message, modal, router, setSelectedId, shirtColor, shirtType, shirtView, variantId]);
+  }, [designId, elements.length, hasRelatedOrder, maThietKe, message, modal, router, setSelectedId, shirtColor, shirtType, shirtView, variantId, zoom]);
 
   // ─── Hủy bỏ – quay về danh sách không lưu gì ─────────────────────────
   const handleCancel = useCallback(() => {

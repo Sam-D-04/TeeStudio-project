@@ -9,6 +9,7 @@
  */
 
 import apiClient from "@/lib/apiClient";
+import { downloadExcelReport } from "@/lib/downloadExcelReport";
 
 import type { DesignElement, ShirtType, ShirtView } from "@/store/useDesignStore";
 
@@ -114,6 +115,8 @@ export type SuaThietKeInput = {
   shirtColor?: string;
   variantId?: number;
   previewUrl: string;
+  printImageFront?: string | null;
+  printImageBack?: string | null;
 };
 
 /** Kết quả danh sách thiết kế có phân trang */
@@ -156,6 +159,72 @@ export type DonCanIn = {
   ngayDatDon: string;          // CustomerOrder.createdAt, format DD/MM/YYYY
 };
 
+/** Dữ liệu phiếu thông số in cho xưởng in. */
+export type TechpackPrintSide = "front" | "back";
+
+export type TechpackPrintArea = {
+  code: string;
+  ten: string;
+  maxWidthCm: number | null;
+  maxHeightCm: number | null;
+  printAreaX: number | null;
+  printAreaY: number | null;
+  printAreaWidth: number | null;
+  printAreaHeight: number | null;
+};
+
+export type TechpackFileIn = {
+  side: TechpackPrintSide;
+  tenMat: string;
+  url: string | null;
+  viTriIn: TechpackPrintArea | null;
+};
+
+export type TechpackCanvasData = {
+  version?: number;
+  shirtType?: ShirtType;
+  shirtColor?: string;
+  shirtView?: ShirtView;
+  logicalCanvas?: { width?: number; height?: number };
+  elements?: Array<Partial<DesignElement> & { side?: TechpackPrintSide | null }>;
+  layers?: Array<Partial<DesignElement> & { side?: TechpackPrintSide | null }>;
+} | null;
+
+export type TechpackDonCanIn = {
+  id: number;
+  orderItemId: number;
+  orderId: number;
+  maDon: string;
+  ngayDatDon: string | null;
+  khachHang: {
+    ten: string;
+    email: string | null;
+    soDienThoai: string | null;
+  };
+  sanPham: {
+    productId: number;
+    variantId: number | null;
+    ten: string;
+    shirtType: ShirtType;
+    sku: string | null;
+    size: string | null;
+    tenMau: string | null;
+    mauAo: string;
+  };
+  thietKe: {
+    id: number | null;
+    maThietKe: string;
+    ten: string;
+    viTriIn: string;
+    trangThai: TrangThaiThietKe | null;
+    urlPreview: string | null;
+    canvasData: TechpackCanvasData;
+  };
+  fileIn: Record<TechpackPrintSide, TechpackFileIn>;
+  soLuong: number;
+  trangThai: TrangThaiDonIn;
+};
+
 /** Kết quả danh sách đơn cần in có phân trang */
 export type KetQuaDonCanIn = {
   danhSach: DonCanIn[];
@@ -196,6 +265,8 @@ export type TaoThietKeChoKhachInput = {
     elements: DesignElement[];
   };
   previewUrl: string;
+  printImageFront?: string | null;
+  printImageBack?: string | null;
 };
 
 export type BienTheTaoThietKe = {
@@ -405,6 +476,14 @@ export async function layDanhSachDonCanIn(
   const res = await apiClient.get<{ success: boolean; data: KetQuaDonCanIn }>(
     "/admin/designs/don-can-in",
     { params }
+  );
+  return res.data.data;
+}
+
+/** Lay phieu thong so in cua mot dong "Don can in". */
+export async function layTechpackDonCanIn(id: number): Promise<TechpackDonCanIn> {
+  const res = await apiClient.get<{ success: boolean; data: TechpackDonCanIn }>(
+    `/admin/designs/don-can-in/${id}/techpack`
   );
   return res.data.data;
 }

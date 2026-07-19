@@ -8,6 +8,31 @@
 const designService = require("./admin.design.service");
 
 const uploadService = require("../uploads/upload.service");
+const { guiBaoCaoExcel } = require("../../common/utils/excel-report");
+
+async function uploadAnhInNeuCan(payload) {
+  if (payload.printImageFront?.startsWith("data:image")) {
+    payload.printFileUrlFront = await uploadService.uploadBase64Image(
+      payload.printImageFront,
+      "print-files"
+    );
+  } else if (payload.printImageFront === null) {
+    payload.printFileUrlFront = null;
+  }
+
+  if (payload.printImageBack?.startsWith("data:image")) {
+    payload.printFileUrlBack = await uploadService.uploadBase64Image(
+      payload.printImageBack,
+      "print-files"
+    );
+  } else if (payload.printImageBack === null) {
+    payload.printFileUrlBack = null;
+  }
+
+  delete payload.printImageFront;
+  delete payload.printImageBack;
+  return payload;
+}
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -102,6 +127,7 @@ const suaThietKeChoKhach = async (req, res, next) => {
         "user-designs"
       );
     }
+    await uploadAnhInNeuCan(payload);
 
     const data = await designService.suaThietKeChoKhach(id, payload);
     res.json({
@@ -175,6 +201,7 @@ const taoThietKeChoKhach = async (req, res, next) => {
         "user-designs"
       );
     }
+    await uploadAnhInNeuCan(payload);
 
     const data = await designService.taoThietKeChoKhach(payload);
     res.status(201).json({
@@ -263,6 +290,24 @@ const yeuCauChinhSua = async (req, res, next) => {
 const getDanhSachDonCanIn = async (req, res, next) => {
   try {
     const data = await designService.layDanhSachDonCanIn(req.query);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/admin/designs/don-can-in/:id/techpack
+ * Lay phieu thong so in cua mot dong san xuat de xuong in tai file va canh kich thuoc.
+ */
+const getTechpackDonCanIn = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id || id <= 0) {
+      return res.status(400).json({ success: false, message: "ID don in khong hop le" });
+    }
+
+    const data = await designService.layTechpackDonCanIn(id);
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -409,6 +454,7 @@ module.exports = {
   duyetThietKe,
   yeuCauChinhSua,
   getDanhSachDonCanIn,
+  getTechpackDonCanIn,
   exportDonCanIn,
   capNhatTrangThaiDonIn,
   getDanhSachSticker,
