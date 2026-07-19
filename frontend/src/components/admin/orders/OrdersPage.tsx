@@ -12,6 +12,7 @@ import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
+import useAuthStore from "@/store/useAuthStore";
 import AdminSearchInput from "../common/AdminSearchInput";
 import OrderFilterBar from "./OrderFilterBar";
 import OrderPagination from "./OrderPagination";
@@ -72,6 +73,8 @@ type OrdersPageProps = {
 
 export default function OrdersPage({ initialFilters }: OrdersPageProps) {
   const router = useRouter();
+  const currentUser = useAuthStore((state) => state.user);
+  const canCreateOrder = currentUser?.role === "ADMIN";
 
   // ---- State bộ lọc ----
   const [activeTab, setActiveTab] = useState(initialFilters?.status ?? "tat_ca");
@@ -281,14 +284,16 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => router.push("/admin/don-hang/tao-moi")}
-          className="flex h-control-h shrink-0 items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-4 text-button-text font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7]"
-        >
-          <PlusOutlined />
-          Tạo đơn mới
-        </button>
+        {canCreateOrder ? (
+          <button
+            type="button"
+            onClick={() => router.push("/admin/don-hang/tao-moi")}
+            className="flex h-control-h shrink-0 items-center gap-2 rounded-[10px] bg-[#0ea5e9] px-4 text-button-text font-semibold text-white shadow-sm transition-colors hover:bg-[#0284c7]"
+          >
+            <PlusOutlined />
+            Tạo đơn mới
+          </button>
+        ) : null}
       </section>
 
       {/* ======== 4 thẻ KPI thống kê ======== */}

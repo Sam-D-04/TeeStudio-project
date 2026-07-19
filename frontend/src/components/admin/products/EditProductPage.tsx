@@ -18,7 +18,7 @@ import {
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { message } from "antd";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import CreatableColorSelect from "@/components/admin/products/CreatableColorSelect";
@@ -30,6 +30,7 @@ import {
 import * as productService from "@/services/admin/productService";
 import type {
   BienTheSanPham,
+  LoaiAoThietKe,
   TrangThaiHienThi,
 } from "@/services/admin/productService";
 
@@ -50,6 +51,7 @@ type FormValues = {
   tenSanPham: string;
   danhMucId: string;
   giaNen: string;
+  shirtType: LoaiAoThietKe;
   chatLieu: string;
   formDang: string;
   xuatXu: string;
@@ -63,11 +65,28 @@ type EditProductPageProps = {
   productId: number;
 };
 
+type MatAnhPhoi = "front" | "back";
+
+type MauAnhPhoi = {
+  key: string;
+  name: string;
+  hex: string;
+};
+
 // =====================================================================
 // HẰNG SỐ
 // =====================================================================
 
 const DS_SIZE_GOI_Y = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+const DS_LOAI_AO: Array<{ value: LoaiAoThietKe; label: string }> = [
+  { value: "tshirt", label: "Áo thun" },
+  { value: "polo", label: "Áo polo" },
+  { value: "hoodie", label: "Áo hoodie" },
+];
+const DS_MAT_ANH: Array<{ key: MatAnhPhoi; label: string }> = [
+  { key: "front", label: "Mặt trước" },
+  { key: "back", label: "Mặt sau" },
+];
 
 // =====================================================================
 // HÀM TIỆN ÍCH
@@ -90,6 +109,10 @@ function goiYSKU(ten: string, mau: string, size: string): string {
   const sz = size.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 4);
   if (!t && !m && !sz) return "";
   return `${t}-${m}-${sz}`;
+}
+
+function taoKeyMau(mauSac: string, maMau: string) {
+  return `${mauSac.trim().toLocaleLowerCase("vi-VN")}|${maMau.trim().toLowerCase()}`;
 }
 
 // =====================================================================
@@ -152,6 +175,9 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
   const productIdHopLe = Number.isFinite(productId) && productId > 0;
 
   const [messageApi, contextHolder] = message.useMessage();
+  const [anhMoi, setAnhMoi] = useState<{ file?: File; previewUrl?: string }>({});
+  const [mauAnhMoiKey, setMauAnhMoiKey] = useState("");
+  const [matAnhMoi, setMatAnhMoi] = useState<MatAnhPhoi>("front");
 
   function hienThiThongBao(loai: "thanh_cong" | "loi", noi_dung: string) {
     if (loai === "thanh_cong") messageApi.success(noi_dung);
@@ -189,6 +215,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
       tenSanPham: "",
       danhMucId: "",
       giaNen: "",
+      shirtType: "tshirt",
       chatLieu: "",
       formDang: "",
       xuatXu: "",
@@ -215,6 +242,24 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
   const trangThaiHienThi = useWatch({ control, name: "displayStatus" });
   const tenSanPham = useWatch({ control, name: "tenSanPham" });
 
+  const danhSachMauAnh = useMemo<MauAnhPhoi[]>(() => {
+    const map = new Map<string, MauAnhPhoi>();
+
+    for (const variant of dsBienTheEdit ?? []) {
+      if (!variant.colorName?.trim() || !variant.colorHex?.trim()) continue;
+      const key = taoKeyMau(variant.colorName, variant.colorHex);
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          name: variant.colorName.trim(),
+          hex: variant.colorHex.trim(),
+        });
+      }
+    }
+
+    return Array.from(map.values());
+  }, [dsBienTheEdit]);
+
   const bangMau = mergeProductColors(
     dsBienTheEdit?.map((variant) => ({
       name: variant.colorName,
@@ -240,6 +285,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
       tenSanPham: chiTiet.name,
       danhMucId: catId,
       giaNen: String(chiTiet.basePrice),
+      shirtType: chiTiet.shirtType ?? "tshirt",
       chatLieu: chiTiet.material,
       formDang: chiTiet.fit,
       xuatXu: chiTiet.madeIn ?? "",
@@ -264,6 +310,84 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
       hienThiThongBao("loi", `Lỗi: ${msg}`);
     },
   });
+
+  const { mutate: uploadAnhMoi, isPending: dangUploadAnhMoi } = useMutation({
+    mutationFn: async () => {
+      if (!anhMoi.file) throw new Error("Vui lòng chọn ảnh phôi áo");
+      const selectedColorKey = mauAnhMoiKey || danhSachMauAnh[0]?.key || "";
+      const color = danhSachMauAnh.find((item) => item.key === selectedColorKey);
+      if (!color) throw new Error("Vui lòng chọn màu ảnh phôi áo");
+
+      return productService.uploadAnhSanPham(productId, [
+        {
+          file: anhMoi.file,
+          colorName: color.name,
+          colorHex: color.hex,
+          viewSide: matAnhMoi,
+          altText: `${color.name}-${matAnhMoi}`,
+          sortOrder: chiTiet?.images?.length ?? 0,
+          isPrimary: !chiTiet?.images?.some((img) => img.laChinh),
+        },
+      ]);
+    },
+    onSuccess: () => {
+      if (anhMoi.previewUrl) URL.revokeObjectURL(anhMoi.previewUrl);
+      setAnhMoi({});
+      queryClient.invalidateQueries({ queryKey: ["products", "detail", productId] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      hienThiThongBao("thanh_cong", "Đã tải ảnh phôi áo thành công");
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Không thể tải ảnh phôi áo";
+      hienThiThongBao("loi", `Lỗi: ${msg}`);
+    },
+  });
+
+  const { mutate: datAnhChinhMutate, isPending: dangDatAnhChinh } = useMutation({
+    mutationFn: (imageId: number) => productService.datAnhChinh(productId, imageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products", "detail", productId] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      hienThiThongBao("thanh_cong", "Đã đặt ảnh chính");
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Không thể đặt ảnh chính";
+      hienThiThongBao("loi", `Lỗi: ${msg}`);
+    },
+  });
+
+  const { mutate: xoaAnhMutate, isPending: dangXoaAnh } = useMutation({
+    mutationFn: (imageId: number) => productService.xoaAnhSanPham(productId, imageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products", "detail", productId] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      hienThiThongBao("thanh_cong", "Đã xóa ảnh phôi áo");
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Không thể xóa ảnh phôi áo";
+      hienThiThongBao("loi", `Lỗi: ${msg}`);
+    },
+  });
+
+  function chonAnhMoi(file?: File) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      hienThiThongBao("loi", "File phôi áo phải là hình ảnh");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      hienThiThongBao("loi", "Mỗi ảnh phôi áo không được vượt quá 5 MB");
+      return;
+    }
+
+    setAnhMoi((prev) => {
+      if (prev.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+      return {
+        file,
+        previewUrl: URL.createObjectURL(file),
+      };
+    });
+  }
 
   const onSubmit = (data: FormValues) => {
     for (const variant of data.existingVariants) {
@@ -291,6 +415,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
 
     const payload: productService.CapNhatSanPhamInput = {
       categoryId: Number(data.danhMucId),
+      shirtType: data.shirtType,
       name: data.tenSanPham.trim(),
       basePrice: Number(data.giaNen),
       material: data.chatLieu.trim(),
@@ -495,7 +620,7 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                 </div>
 
                 <div className="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2 xl:grid-cols-12">
-                  <div className="xl:col-span-5">
+                  <div className="xl:col-span-3">
                     <FormField label="Tên phôi áo" required error={errors.tenSanPham?.message}>
                       <input
                         type="text"
@@ -523,6 +648,22 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                         {danhSachDanhMuc.map((dm) => (
                           <option key={dm.id} value={dm.id}>
                             {dm.ten}
+                          </option>
+                        ))}
+                      </select>
+                    </FormField>
+                  </div>
+
+                  <div className="xl:col-span-2">
+                    <FormField label="Loại áo thiết kế" required>
+                      <select
+                        {...register("shirtType", { required: true })}
+                        disabled={isViewMode}
+                        className={`${inputClass} cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}
+                      >
+                        {DS_LOAI_AO.map((loai) => (
+                          <option key={loai.value} value={loai.value}>
+                            {loai.label}
                           </option>
                         ))}
                       </select>
@@ -729,6 +870,143 @@ export default function EditProductPage({ productId }: EditProductPageProps) {
                         })}
                       </tbody>
                     </table>
+                  </div>
+                )}
+              </section>
+
+              <section aria-labelledby="tieu-de-anh-phoi-ao" className="border-t border-border pt-5">
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h4 id="tieu-de-anh-phoi-ao" className="text-[15px] font-extrabold text-text-main">
+                      Ảnh phôi áo
+                    </h4>
+                    <p className="mt-0.5 text-[12px] text-text-muted">
+                      Quản lý các ảnh đã lưu trong cơ sở dữ liệu của phôi áo này.
+                    </p>
+                  </div>
+                  <span className="text-[12px] font-semibold text-text-secondary">
+                    {chiTiet.images?.length || 0} ảnh
+                  </span>
+                </div>
+
+                {chiTiet.images?.length ? (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {chiTiet.images.map((image) => (
+                      <div key={image.id} className="rounded-[10px] border border-border bg-surface-alt/40 p-3">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <span className="truncate text-[12px] font-semibold text-text-main" title={image.altText}>
+                            {image.altText}
+                          </span>
+                          {image.laChinh && (
+                            <span className="rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-semibold text-success">
+                              Chính
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex h-[140px] items-center justify-center overflow-hidden rounded-[8px] border border-border bg-surface">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={image.url}
+                            alt={image.altText}
+                            className="h-full w-full object-contain"
+                          />
+                        </div>
+                        {!isViewMode && (
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              disabled={image.laChinh || dangDatAnhChinh || dangXoaAnh}
+                              onClick={() => datAnhChinhMutate(image.id)}
+                              className="h-8 rounded-[7px] border border-border bg-surface px-2 text-[12px] font-semibold text-text-secondary transition-colors hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Đặt chính
+                            </button>
+                            <button
+                              type="button"
+                              disabled={dangDatAnhChinh || dangXoaAnh}
+                              onClick={() => {
+                                if (window.confirm("Xóa ảnh phôi áo này?")) {
+                                  xoaAnhMutate(image.id);
+                                }
+                              }}
+                              className="h-8 rounded-[7px] border border-error/30 bg-error/5 px-2 text-[12px] font-semibold text-error transition-colors hover:bg-error/10 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-[10px] border border-dashed border-border py-5 text-center text-[13px] italic text-text-muted">
+                    Chưa có ảnh phôi áo nào.
+                  </div>
+                )}
+
+                {!isViewMode && (
+                  <div className="mt-4 rounded-[12px] border border-primary-container/30 bg-primary-container/[0.03] p-4">
+                    <div className="mb-3 text-[13px] font-bold text-text-main">
+                      Tải thêm ảnh
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+                      <select
+                        value={mauAnhMoiKey || danhSachMauAnh[0]?.key || ""}
+                        onChange={(e) => setMauAnhMoiKey(e.target.value)}
+                        className="h-9 rounded-[7px] border border-border bg-surface px-3 text-[13px] outline-none focus:border-primary-container md:col-span-4"
+                      >
+                        {danhSachMauAnh.map((color) => (
+                          <option key={color.key} value={color.key}>
+                            {color.name} ({color.hex})
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={matAnhMoi}
+                        onChange={(e) => setMatAnhMoi(e.target.value as MatAnhPhoi)}
+                        className="h-9 rounded-[7px] border border-border bg-surface px-3 text-[13px] outline-none focus:border-primary-container md:col-span-2"
+                      >
+                        {DS_MAT_ANH.map((side) => (
+                          <option key={side.key} value={side.key}>
+                            {side.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      <label className="flex h-9 cursor-pointer items-center justify-center rounded-[7px] border border-dashed border-border bg-surface px-3 text-[13px] font-semibold text-text-secondary transition-colors hover:border-primary-container/50 hover:text-primary-container md:col-span-4">
+                        {anhMoi.file ? anhMoi.file.name : "Chọn file ảnh"}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                          className="hidden"
+                          onChange={(e) => {
+                            chonAnhMoi(e.target.files?.[0]);
+                            e.currentTarget.value = "";
+                          }}
+                        />
+                      </label>
+
+                      <button
+                        type="button"
+                        disabled={!anhMoi.file || danhSachMauAnh.length === 0 || dangUploadAnhMoi}
+                        onClick={() => uploadAnhMoi()}
+                        className="h-9 rounded-[7px] bg-[#0ea5e9] px-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#0284c7] disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2"
+                      >
+                        {dangUploadAnhMoi ? "Đang tải..." : "Tải lên"}
+                      </button>
+                    </div>
+
+                    {anhMoi.previewUrl && (
+                      <div className="mt-3 flex h-[150px] items-center justify-center overflow-hidden rounded-[8px] border border-border bg-surface">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={anhMoi.previewUrl}
+                          alt="preview"
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </section>

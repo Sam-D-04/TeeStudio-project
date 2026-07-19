@@ -4,6 +4,7 @@
  */
 
 const db = require("../../database/mysql");
+const uploadService = require("../uploads/upload.service");
 
 // =====================================================================
 // HẰNG SỐ
@@ -28,6 +29,7 @@ const RESERVED_STOCK_JOIN = `
 // stockQty đã được giảm khi tạo đơn; reservedQty chỉ dùng để tham khảo.
 const AVAILABLE_STOCK_SQL = "pv.stockQty";
 const DEFAULT_COLOR_HEX = "#94a3b8";
+const SHIRT_TYPES_HOP_LE = new Set(["tshirt", "polo", "hoodie"]);
 
 function chuanHoaMaMau(colorHex) {
   const value = String(colorHex || "").trim().toLowerCase();
@@ -38,6 +40,14 @@ function chuanHoaMaMauNhap(colorHex) {
   const value = String(colorHex || "").trim().toLowerCase();
   if (!/^#[0-9a-f]{6}$/.test(value)) {
     throw taoLoi("Mã màu phải có định dạng #RRGGBB");
+  }
+  return value;
+}
+
+function chuanHoaShirtType(shirtType) {
+  const value = String(shirtType || "").trim().toLowerCase();
+  if (!SHIRT_TYPES_HOP_LE.has(value)) {
+    throw taoLoi("Loai ao thiet ke phai la tshirt, polo hoac hoodie");
   }
   return value;
 }
@@ -289,6 +299,7 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
       p.id,
       p.name,
       p.slug,
+      p.shirtType,
       p.basePrice,
       p.material,
       p.form,
@@ -361,6 +372,7 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
       id: p.id,
       name: p.name,
       slug: p.slug,
+      shirtType: p.shirtType,
       category: p.categoryName || "",
       material: p.material,
       fit: p.form,
@@ -475,6 +487,7 @@ async function layChiTietSanPham(id) {
     slug: p.slug,
     category: p.categoryName || "",
     categoryId: p.categoryId,
+    shirtType: p.shirtType,
     material: p.material,
     fit: p.form,
     madeIn: p.madeIn,
@@ -504,6 +517,7 @@ async function layChiTietSanPham(id) {
       id: img.id,
       url: img.imageUrl,
       altText: img.altText,
+      sortOrder: img.sortOrder,
       laChinh: img.isPrimary === 1,
     })),
   };
@@ -512,7 +526,7 @@ async function layChiTietSanPham(id) {
 // =====================================================================
 // SERVICE 6: Tạo phôi áo mới
 // =====================================================================
-async function taoSanPham({ categoryId, name, basePrice, material, form, madeIn, description, slug }) {
+async function taoSanPham({ categoryId, shirtType, name, basePrice, material, form, madeIn, description, slug }) {
   // Kiểm tra danh mục tồn tại
   const [catRows] = await db.pool.query("SELECT id FROM Category WHERE id = ?", [categoryId]);
   if (!catRows || catRows.length === 0) {
@@ -523,6 +537,7 @@ async function taoSanPham({ categoryId, name, basePrice, material, form, madeIn,
 
   // Sinh slug nếu không có
   const finalSlug = slug || sinhSlug(name);
+  const normalizedShirtType = chuanHoaShirtType(shirtType);
 
   // Kiểm tra slug trùng
   const [slugRows] = await db.pool.query("SELECT id FROM Product WHERE slug = ?", [finalSlug]);
@@ -533,18 +548,162 @@ async function taoSanPham({ categoryId, name, basePrice, material, form, madeIn,
   }
 
   const result = await db.execute(
-    `INSERT INTO Product (categoryId, name, slug, basePrice, material, form, madeIn, description, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')`,
-    [categoryId, name, finalSlug, basePrice, material, form, madeIn, description]
+    `INSERT INTO Product (categoryId, shirtType, name, slug, basePrice, material, form, madeIn, description, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')`,
+    [categoryId, normalizedShirtType, name, finalSlug, basePrice, material, form, madeIn, description]
   );
 
   return { id: result.insertId, name, slug: finalSlug, trangThai: "dang_hien_thi" };
 }
 
+function taoAltTextAnhSanPham(meta = {}) {
+  const viewSide = String(meta.viewSide || "").trim().toLowerCase();
+  const normalizedSide = viewSide === "back" ? "back" : "front";
+  const colorLabel = String(meta.colorName || meta.colorHex || "mockup").trim();
+  return String(meta.altText || `${colorLabel}-${normalizedSide}`).trim().slice(0, 300);
+}
+
+function chuanHoaMetadataAnh(meta = {}, index = 0) {
+  const viewSide = String(meta.viewSide || "").trim().toLowerCase();
+  if (viewSide && viewSide !== "front" && viewSide !== "back") {
+    throw taoLoi("Mat anh phoi ao phai la front hoac back");
+  }
+
+  const sortOrder = Number.isFinite(Number(meta.sortOrder))
+    ? Number(meta.sortOrder)
+    : index;
+
+  return {
+    altText: taoAltTextAnhSanPham(meta),
+    sortOrder,
+    isPrimary: meta.isPrimary === true || meta.isPrimary === "true" || meta.isPrimary === 1,
+  };
+}
+
+async function damBaoSanPhamTonTai(productId) {
+  const [rows] = await db.pool.query("SELECT id FROM Product WHERE id = ?", [productId]);
+  if (!rows || rows.length === 0) {
+    throw taoLoi("Khong tim thay phoi ao", 404);
+  }
+}
+
+async function taiAnhSanPham(productId, files = [], metadataList = []) {
+  await damBaoSanPhamTonTai(productId);
+
+  const currentImages = await db.query(
+    "SELECT COUNT(*) AS total FROM ProductImage WHERE productId = ?",
+    [productId]
+  );
+  const hasExistingImages = Number(currentImages[0]?.total || 0) > 0;
+  const uploadedImages = [];
+
+  for (let i = 0; i < files.length; i += 1) {
+    const meta = chuanHoaMetadataAnh(metadataList[i] || {}, i);
+    const imageUrl = await uploadService.uploadImageBuffer(
+      files[i].buffer,
+      "product-mockups"
+    );
+
+    uploadedImages.push({
+      imageUrl,
+      ...meta,
+      isPrimary: meta.isPrimary || (!hasExistingImages && i === 0),
+    });
+  }
+
+  return db.transaction(async (connection) => {
+    if (uploadedImages.some((img) => img.isPrimary)) {
+      await connection.query("UPDATE ProductImage SET isPrimary = 0 WHERE productId = ?", [
+        productId,
+      ]);
+    }
+
+    const resultRows = [];
+    for (const img of uploadedImages) {
+      const [result] = await connection.query(
+        `INSERT INTO ProductImage (productId, variantId, imageUrl, altText, sortOrder, isPrimary)
+         VALUES (?, NULL, ?, ?, ?, ?)`,
+        [
+          productId,
+          img.imageUrl,
+          img.altText,
+          img.sortOrder,
+          img.isPrimary ? 1 : 0,
+        ]
+      );
+
+      resultRows.push({
+        id: result.insertId,
+        url: img.imageUrl,
+        altText: img.altText,
+        sortOrder: img.sortOrder,
+        laChinh: img.isPrimary,
+      });
+    }
+
+    return resultRows;
+  });
+}
+
+async function datAnhChinh(productId, imageId) {
+  await damBaoSanPhamTonTai(productId);
+  const [rows] = await db.pool.query(
+    "SELECT id FROM ProductImage WHERE id = ? AND productId = ?",
+    [imageId, productId]
+  );
+  if (!rows || rows.length === 0) {
+    throw taoLoi("Khong tim thay anh phoi ao", 404);
+  }
+
+  await db.transaction(async (connection) => {
+    await connection.query("UPDATE ProductImage SET isPrimary = 0 WHERE productId = ?", [
+      productId,
+    ]);
+    await connection.query(
+      "UPDATE ProductImage SET isPrimary = 1 WHERE id = ? AND productId = ?",
+      [imageId, productId]
+    );
+  });
+
+  return { id: imageId, productId, laChinh: true };
+}
+
+async function xoaAnhSanPham(productId, imageId) {
+  await damBaoSanPhamTonTai(productId);
+  const [rows] = await db.pool.query(
+    "SELECT id, isPrimary FROM ProductImage WHERE id = ? AND productId = ?",
+    [imageId, productId]
+  );
+  if (!rows || rows.length === 0) {
+    throw taoLoi("Khong tim thay anh phoi ao", 404);
+  }
+
+  await db.transaction(async (connection) => {
+    await connection.query("DELETE FROM ProductImage WHERE id = ? AND productId = ?", [
+      imageId,
+      productId,
+    ]);
+
+    if (rows[0].isPrimary === 1) {
+      const [remainingRows] = await connection.query(
+        "SELECT id FROM ProductImage WHERE productId = ? ORDER BY sortOrder ASC, id ASC LIMIT 1",
+        [productId]
+      );
+      if (remainingRows.length > 0) {
+        await connection.query("UPDATE ProductImage SET isPrimary = 1 WHERE id = ?", [
+          remainingRows[0].id,
+        ]);
+      }
+    }
+  });
+
+  return { id: imageId, productId };
+}
+
 // =====================================================================
 // SERVICE 7: Cập nhật phôi áo
 // =====================================================================
-async function capNhatSanPham(id, { categoryId, name, basePrice, material, form, madeIn, description, displayStatus, variants }) {
+async function capNhatSanPham(id, { categoryId, shirtType, name, basePrice, material, form, madeIn, description, displayStatus, variants }) {
   // Kiểm tra tồn tại
   const [rows] = await db.pool.query("SELECT id FROM Product WHERE id = ?", [id]);
   if (!rows || rows.length === 0) {
@@ -561,6 +720,7 @@ async function capNhatSanPham(id, { categoryId, name, basePrice, material, form,
       : undefined;
 
   if (categoryId !== undefined) { fields.push("categoryId = ?"); params.push(categoryId); }
+  if (shirtType !== undefined) { fields.push("shirtType = ?"); params.push(chuanHoaShirtType(shirtType)); }
   if (name !== undefined) { fields.push("name = ?"); params.push(name); }
   if (basePrice !== undefined) { fields.push("basePrice = ?"); params.push(basePrice); }
   if (material !== undefined) { fields.push("material = ?"); params.push(material); }
@@ -883,6 +1043,9 @@ module.exports = {
   layCanhBaoTonKho,
   layChiTietSanPham,
   taoSanPham,
+  taiAnhSanPham,
+  datAnhChinh,
+  xoaAnhSanPham,
   capNhatSanPham,
   capNhatTrangThai,
   xoaSanPham,

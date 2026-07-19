@@ -133,6 +133,93 @@ const taoSanPham = async (req, res, next) => {
   }
 };
 
+const taiAnhSanPham = async (req, res, next) => {
+  try {
+    const productId = parseInt(req.params.id);
+    if (!productId || productId < 1) {
+      return res
+        .status(400)
+        .json({ success: false, message: "ID san pham khong hop le" });
+    }
+
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (files.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Vui long chon it nhat 1 anh phoi ao" });
+    }
+
+    let metadata = [];
+    if (req.body.metadata) {
+      try {
+        metadata = JSON.parse(req.body.metadata);
+      } catch (error) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Metadata anh khong hop le" });
+      }
+    }
+
+    if (!Array.isArray(metadata) || metadata.length !== files.length) {
+      return res.status(400).json({
+        success: false,
+        message: "So luong metadata phai khop voi so luong anh",
+      });
+    }
+
+    const data = await productService.taiAnhSanPham(productId, files, metadata);
+    res.status(201).json({
+      success: true,
+      message: "Tai anh phoi ao thanh cong",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const datAnhChinh = async (req, res, next) => {
+  try {
+    const productId = parseInt(req.params.id);
+    const imageId = parseInt(req.params.imageId);
+    if (!productId || productId < 1 || !imageId || imageId < 1) {
+      return res
+        .status(400)
+        .json({ success: false, message: "ID khong hop le" });
+    }
+
+    const data = await productService.datAnhChinh(productId, imageId);
+    res.json({
+      success: true,
+      message: "Dat anh chinh thanh cong",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const xoaAnhSanPham = async (req, res, next) => {
+  try {
+    const productId = parseInt(req.params.id);
+    const imageId = parseInt(req.params.imageId);
+    if (!productId || productId < 1 || !imageId || imageId < 1) {
+      return res
+        .status(400)
+        .json({ success: false, message: "ID khong hop le" });
+    }
+
+    const data = await productService.xoaAnhSanPham(productId, imageId);
+    res.json({
+      success: true,
+      message: "Xoa anh phoi ao thanh cong",
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // =====================================================================
 // CẬP NHẬT SẢN PHẨM
 // =====================================================================
@@ -283,6 +370,9 @@ module.exports = {
   getDanhSachSanPham,
   getChiTietSanPham,
   taoSanPham,
+  taiAnhSanPham,
+  datAnhChinh,
+  xoaAnhSanPham,
   capNhatSanPham,
   capNhatTrangThai,
   xoaSanPham,

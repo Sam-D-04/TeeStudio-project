@@ -17,6 +17,7 @@ import type { ProductColor } from "@/lib/productColors";
 
 /** Trạng thái hiển thị của phôi áo */
 export type TrangThaiHienThi = "dang_hien_thi" | "dang_an";
+export type LoaiAoThietKe = "tshirt" | "polo" | "hoodie";
 
 /** Trạng thái tồn kho của biến thể */
 export type TrangThaiTonKho = "con_hang" | "sap_het" | "het_hang";
@@ -46,6 +47,14 @@ export type BienTheSanPham = {
   hasTransactions: boolean;
 };
 
+export type AnhSanPham = {
+  id: number;
+  url: string;
+  altText: string;
+  sortOrder?: number;
+  laChinh: boolean;
+};
+
 /** Một phôi áo (blank product) trong danh sách */
 export type SanPham = {
   id: number;
@@ -57,6 +66,8 @@ export type SanPham = {
   category: string;
   /** ID danh mục (chỉ có khi gọi layChiTietSanPham) */
   categoryId?: number;
+  /** Loai ao dung cho trang thiet ke tuy chinh */
+  shirtType?: LoaiAoThietKe;
   /** Chất liệu, ví dụ: "Cotton 100% 250gsm" */
   material: string;
   /** Form dáng, ví dụ: "Oversized fit" */
@@ -71,6 +82,8 @@ export type SanPham = {
   displayStatus: TrangThaiHienThi;
   /** Danh sách biến thể */
   variants: BienTheSanPham[];
+  /** Anh phoi ao luu trong bang ProductImage */
+  images?: AnhSanPham[];
 };
 
 /** 4 thẻ KPI thống kê đầu trang */
@@ -126,6 +139,7 @@ export type ThamSoLocSanPham = {
 /** Payload tạo phôi áo mới */
 export type TaoSanPhamInput = {
   categoryId: number;
+  shirtType: LoaiAoThietKe;
   name: string;
   basePrice: number;
   material: string;
@@ -151,6 +165,16 @@ export type ThemBienTheInput = {
 
 /** Payload cập nhật biến thể */
 export type CapNhatBienTheInput = Partial<ThemBienTheInput> & { status?: string };
+
+export type UploadAnhSanPhamInput = {
+  file: File;
+  colorName: string;
+  colorHex: string;
+  viewSide: "front" | "back";
+  altText?: string;
+  sortOrder?: number;
+  isPrimary?: boolean;
+};
 
 /** Kết quả thao tác xóa/ẩn phôi áo. */
 export type KetQuaXoaSanPham = {
@@ -334,5 +358,60 @@ export async function capNhatBienThe(
     message: string;
     data: BienTheSanPham;
   }>(`/admin/products/${productId}/variants/${variantId}`, payload);
+  return res.data.data;
+}
+
+export async function uploadAnhSanPham(
+  productId: number,
+  images: UploadAnhSanPhamInput[]
+): Promise<AnhSanPham[]> {
+  const formData = new FormData();
+  const metadata = images.map((image) => ({
+    colorName: image.colorName,
+    colorHex: image.colorHex,
+    viewSide: image.viewSide,
+    altText: image.altText,
+    sortOrder: image.sortOrder,
+    isPrimary: image.isPrimary,
+  }));
+
+  images.forEach((image) => {
+    formData.append("images", image.file);
+  });
+  formData.append("metadata", JSON.stringify(metadata));
+
+  const res = await apiClient.post<{
+    success: boolean;
+    message: string;
+    data: AnhSanPham[];
+  }>(`/admin/products/${productId}/images`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 60_000,
+  });
+
+  return res.data.data;
+}
+
+export async function datAnhChinh(
+  productId: number,
+  imageId: number
+): Promise<{ id: number; productId: number; laChinh: boolean }> {
+  const res = await apiClient.patch<{
+    success: boolean;
+    message: string;
+    data: { id: number; productId: number; laChinh: boolean };
+  }>(`/admin/products/${productId}/images/${imageId}/primary`);
+  return res.data.data;
+}
+
+export async function xoaAnhSanPham(
+  productId: number,
+  imageId: number
+): Promise<{ id: number; productId: number }> {
+  const res = await apiClient.delete<{
+    success: boolean;
+    message: string;
+    data: { id: number; productId: number };
+  }>(`/admin/products/${productId}/images/${imageId}`);
   return res.data.data;
 }

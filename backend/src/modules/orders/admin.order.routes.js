@@ -3,7 +3,7 @@
  *
  * Tất cả route đều đi qua:
  *   1. verifyToken  – xác thực JWT (bypass tạm thời)
- *   2. requireAdmin – kiểm tra quyền ADMIN
+ *   2. requireRoles – kiểm tra quyền theo từng nhóm chức năng
  *   3. validate     – kiểm tra dữ liệu đầu vào (nếu có)
  *   4. controller   – xử lý request
  *
@@ -26,7 +26,8 @@ const {
   requestDesignRevisionSchema,
 } = require("./order.validation");
 
-const requireAdmin = requireRoles(ROLES.ADMIN, ROLES.PRODUCTION);
+const requireOrderAccess = requireRoles(ROLES.ADMIN, ROLES.PRODUCTION);
+const requireOrderAdmin = requireRoles(ROLES.ADMIN);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTE HỖ TRỢ FORM TẠO ĐƠN MỚI
@@ -37,7 +38,7 @@ const requireAdmin = requireRoles(ROLES.ADMIN, ROLES.PRODUCTION);
 router.get(
   "/search/customers",
   verifyToken,
-  requireAdmin,
+  requireOrderAdmin,
   orderController.timKhachHang
 );
 
@@ -45,7 +46,7 @@ router.get(
 router.get(
   "/customers/:userId/addresses",
   verifyToken,
-  requireAdmin,
+  requireOrderAdmin,
   orderController.layDiaChi
 );
 
@@ -53,7 +54,7 @@ router.get(
 router.get(
   "/search/products",
   verifyToken,
-  requireAdmin,
+  requireOrderAdmin,
   orderController.timSanPham
 );
 
@@ -61,7 +62,7 @@ router.get(
 router.get(
   "/search/designs",
   verifyToken,
-  requireAdmin,
+  requireOrderAdmin,
   orderController.timThietKe
 );
 
@@ -69,7 +70,7 @@ router.get(
 router.get(
   "/promotions",
   verifyToken,
-  requireAdmin,
+  requireOrderAdmin,
   orderController.layKhuyenMai
 );
 
@@ -82,7 +83,7 @@ router.get(
 router.get(
   "/stats",
   verifyToken,
-  requireAdmin,
+  requireOrderAccess,
   orderController.getThongKe
 );
 
@@ -90,7 +91,7 @@ router.get(
 router.get(
   "/",
   verifyToken,
-  requireAdmin,
+  requireOrderAccess,
   orderController.getDanhSachDonHang
 );
 
@@ -98,7 +99,7 @@ router.get(
 router.post(
   "/",
   verifyToken,
-  requireAdmin,
+  requireOrderAdmin,
   validate(createOrderSchema),
   orderController.taoMoiDonHang
 );
@@ -107,7 +108,7 @@ router.post(
 router.post(
   "/:id/payment/recreate",
   verifyToken,
-  requireAdmin,
+  requireOrderAdmin,
   orderController.taoLaiMaThanhToanOnline
 );
 
@@ -119,7 +120,7 @@ router.post(
 router.get(
   "/:id",
   verifyToken,
-  requireAdmin,
+  requireOrderAccess,
   orderController.getChiTietDonHang
 );
 
@@ -127,7 +128,7 @@ router.get(
 router.patch(
   "/:id/status",
   verifyToken,
-  requireAdmin,
+  requireOrderAccess,
   validate(updateStatusSchema),
   orderController.capNhatTrangThai
 );
@@ -136,7 +137,7 @@ router.patch(
 router.patch(
   "/:id/design-revision",
   verifyToken,
-  requireAdmin,
+  requireOrderAdmin,
   validate(requestDesignRevisionSchema),
   orderController.yeuCauChinhSuaThietKe
 );
@@ -145,7 +146,7 @@ router.patch(
 router.patch(
   "/:id/cancel",
   verifyToken,
-  requireAdmin,
+  requireOrderAdmin,
   validate(cancelOrderSchema),
   orderController.huyDonHang
 );
@@ -154,7 +155,7 @@ router.patch(
 router.patch(
   "/:id/shipping-address",
   verifyToken,
-  requireAdmin,
+  requireOrderAdmin,
   validate(updateShippingAddressSchema),
   orderController.capNhatDiaChiGiaoHang
 );

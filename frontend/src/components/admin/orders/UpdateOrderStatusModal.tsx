@@ -7,6 +7,7 @@ import { isAxiosError } from "axios";
 import { isOrderStatusLockedByPayment } from "@/lib/paymentDisplay";
 import * as orderService from "@/services/admin/orderService";
 import type { ChiTietDonHang } from "@/services/admin/orderService";
+import useAuthStore from "@/store/useAuthStore";
 
 const ORDER_STATUS_OPTIONS = [
   { value: "cho_xac_nhan", label: "Chờ xác nhận" },
@@ -136,6 +137,7 @@ export default function UpdateOrderStatusModal({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const currentUser = useAuthStore((state) => state.user);
   const [messageApi, messageContextHolder] = message.useMessage();
   const [modal, modalContextHolder] = Modal.useModal();
   
@@ -156,8 +158,11 @@ export default function UpdateOrderStatusModal({
     status: order?.thanhToan.status,
   });
   const productionStatusBlockReason = getProductionStatusBlockReason(order);
+  const canManageDesignRevision = currentUser?.role === "ADMIN";
   const canRequestDesignRevision =
-    order?.trangThai === "cho_xac_nhan" && hasCustomDesignOrder(order);
+    canManageDesignRevision &&
+    order?.trangThai === "cho_xac_nhan" &&
+    hasCustomDesignOrder(order);
   const designIdToReview =
     order?.items?.find((item) => Boolean(item.designId))?.designId ?? null;
 

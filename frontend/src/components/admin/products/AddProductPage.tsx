@@ -24,7 +24,7 @@ import {
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import CreatableColorSelect from "@/components/admin/products/CreatableColorSelect";
 import {
   DEFAULT_PRODUCT_COLORS,
@@ -32,7 +32,7 @@ import {
   type ProductColor,
 } from "@/lib/productColors";
 import * as productService from "@/services/admin/productService";
-import type { ThemBienTheInput } from "@/services/admin/productService";
+import type { LoaiAoThietKe, ThemBienTheInput } from "@/services/admin/productService";
 
 // ===== KIỂU DỮ LIỆU NỘI BỘ =====
 
@@ -40,6 +40,7 @@ import type { ThemBienTheInput } from "@/services/admin/productService";
 type FormBuoc1 = {
   tenSanPham: string;
   danhMucId: string;
+  shirtType: LoaiAoThietKe | "";
   giaNen: string;
   chatLieu: string;
   formDang: string;
@@ -57,10 +58,37 @@ type HangBienThe = {
   maSKU: string;
 };
 
+type MatAnhPhoi = "front" | "back";
+
+type MauUploadAnh = {
+  key: string;
+  name: string;
+  hex: string;
+};
+
+type AnhPhoiTheoMau = Partial<
+  Record<
+    MatAnhPhoi,
+    {
+      file: File;
+      previewUrl: string;
+    }
+  >
+>;
+
 // ===== HẰNG SỐ =====
 
 /** Danh sách kích thước phổ biến để gợi ý nhanh */
 const DS_SIZE_GOI_Y = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+const DS_LOAI_AO: Array<{ value: LoaiAoThietKe; label: string }> = [
+  { value: "tshirt", label: "Áo thun" },
+  { value: "polo", label: "Áo polo" },
+  { value: "hoodie", label: "Áo hoodie" },
+];
+const DS_MAT_ANH: Array<{ key: MatAnhPhoi; label: string }> = [
+  { key: "front", label: "Mặt trước" },
+  { key: "back", label: "Mặt sau" },
+];
 
 // ===== COMPONENT HÀM TIỆN ÍCH =====
 
@@ -90,9 +118,18 @@ function goiYSKU(ten: string, mau: string, kichThuoc: string): string {
   return `${tenSlug}-${mauSlug}-${kichThuocSlug}`;
 }
 
+function taoKeyMau(mauSac: string, maMau: string) {
+  return `${mauSac.trim().toLocaleLowerCase("vi-VN")}|${maMau.trim().toLowerCase()}`;
+}
+
+function taoIdInputAnh(colorKey: string, side: MatAnhPhoi) {
+  return `add-product-image-${side}-${colorKey.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
+
 /** Kiểm tra phần thông tin cơ bản, trả về danh sách lỗi */
 function validateBuoc1(form: FormBuoc1): Partial<Record<keyof FormBuoc1, string>> {
   const loi: Partial<Record<keyof FormBuoc1, string>> = {};
+  if (!form.shirtType) loi.shirtType = "Vui lòng chọn loại áo thiết kế";
   if (!form.tenSanPham.trim()) loi.tenSanPham = "Vui lòng nhập tên phôi áo";
   else if (form.tenSanPham.trim().length < 2) loi.tenSanPham = "Tên phải có ít nhất 2 ký tự";
   if (!form.danhMucId) loi.danhMucId = "Vui lòng chọn danh mục";
@@ -150,11 +187,13 @@ export default function AddProductPage() {
 
   // ===== STATE =====
   const [idSanPhamMoi, setIdSanPhamMoi] = useState<number | null>(null);
+  const [idSanPhamDaLuuBienThe, setIdSanPhamDaLuuBienThe] = useState<number | null>(null);
 
   // Thông tin cơ bản
   const [formBuoc1, setFormBuoc1] = useState<FormBuoc1>({
     tenSanPham: "",
     danhMucId: "",
+    shirtType: "tshirt",
     giaNen: "",
     chatLieu: "",
     formDang: "",
@@ -168,6 +207,8 @@ export default function AddProductPage() {
     { key: taoKey(), mauSac: "", maMau: "", kichThuoc: "", maSKU: "" },
   ]);
   const [loiBuoc2Chung, setLoiBuoc2Chung] = useState<string>("");
+  const [anhPhoiTheoMau, setAnhPhoiTheoMau] = useState<Record<string, AnhPhoiTheoMau>>({});
+  const [loiAnhChung, setLoiAnhChung] = useState<string>("");
 
   // ===== LẤY DANH MỤC =====
   const { data: danhSachDanhMuc = [] } = useQuery({
@@ -191,6 +232,24 @@ export default function AddProductPage() {
     DEFAULT_PRODUCT_COLORS
   );
 
+  const danhSachMauUpload = useMemo<MauUploadAnh[]>(() => {
+    const map = new Map<string, MauUploadAnh>();
+
+    for (const variant of danhSachBienThe) {
+      if (!variant.mauSac.trim() || !variant.maMau.trim()) continue;
+      const key = taoKeyMau(variant.mauSac, variant.maMau);
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          name: variant.mauSac.trim(),
+          hex: variant.maMau.trim(),
+        });
+      }
+    }
+
+    return Array.from(map.values());
+  }, [danhSachBienThe]);
+
   // ===== MUTATION THÊM BIẾN THỂ =====
   const { mutate: luuBienThe, isPending: dangLuuBienThe } = useMutation({
     mutationFn: async ({
@@ -200,9 +259,17 @@ export default function AddProductPage() {
       productId: number;
       danhSach: ThemBienTheInput[];
     }) => {
-      // Gọi tuần tự, không song song để tránh lỗi unique constraint
-      for (const bt of danhSach) {
-        await productService.themBienThe(productId, bt);
+      if (idSanPhamDaLuuBienThe !== productId) {
+        // Gọi tuần tự, không song song để tránh lỗi unique constraint
+        for (const bt of danhSach) {
+          await productService.themBienThe(productId, bt);
+        }
+        setIdSanPhamDaLuuBienThe(productId);
+      }
+
+      const danhSachAnh = taoDanhSachAnhUpload();
+      if (danhSachAnh.length > 0) {
+        await productService.uploadAnhSanPham(productId, danhSachAnh);
       }
     },
     onSuccess: () => {
@@ -332,6 +399,82 @@ export default function AddProductPage() {
     }));
   }
 
+  function capNhatAnhPhoi(colorKey: string, side: MatAnhPhoi, file?: File) {
+    setLoiAnhChung("");
+
+    if (!file) {
+      setAnhPhoiTheoMau((prev) => {
+        const next = { ...prev };
+        const current = next[colorKey]?.[side];
+        if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl);
+        const colorImages = { ...(next[colorKey] ?? {}) };
+        delete colorImages[side];
+        next[colorKey] = colorImages;
+        return next;
+      });
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setLoiAnhChung("File phôi áo phải là hình ảnh");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setLoiAnhChung("Mỗi ảnh phôi áo không được vượt quá 5 MB");
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setAnhPhoiTheoMau((prev) => {
+      const current = prev[colorKey]?.[side];
+      if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl);
+      return {
+        ...prev,
+        [colorKey]: {
+          ...prev[colorKey],
+          [side]: { file, previewUrl },
+        },
+      };
+    });
+  }
+
+  function taoDanhSachAnhUpload(): productService.UploadAnhSanPhamInput[] {
+    const result: productService.UploadAnhSanPhamInput[] = [];
+
+    danhSachMauUpload.forEach((color, colorIndex) => {
+      DS_MAT_ANH.forEach((sideInfo, sideIndex) => {
+        const anh = anhPhoiTheoMau[color.key]?.[sideInfo.key];
+        if (!anh) return;
+        const sortOrder = colorIndex * 2 + sideIndex;
+
+        result.push({
+          file: anh.file,
+          colorName: color.name,
+          colorHex: color.hex,
+          viewSide: sideInfo.key,
+          altText: `${color.name}-${sideInfo.key}`,
+          sortOrder,
+          isPrimary: sortOrder === 0,
+        });
+      });
+    });
+
+    return result;
+  }
+
+  function kiemTraAnhPhoi(): string {
+    for (const color of danhSachMauUpload) {
+      for (const sideInfo of DS_MAT_ANH) {
+        if (!anhPhoiTheoMau[color.key]?.[sideInfo.key]) {
+          return `Vui lòng chọn ảnh ${sideInfo.label.toLowerCase()} cho màu ${color.name}`;
+        }
+      }
+    }
+
+    return "";
+  }
+
   function cuonDenLoiDauTien() {
     window.requestAnimationFrame(() => {
       const element = document.querySelector<HTMLElement>("[data-error-anchor='true']");
@@ -386,8 +529,10 @@ export default function AddProductPage() {
     }
 
     setLoiBuoc2Chung(tatCaLoi[0] ?? "");
+    const loiAnh = tatCaLoi.length > 0 ? "" : kiemTraAnhPhoi();
+    setLoiAnhChung(loiAnh);
 
-    if (Object.keys(loiThongTin).length > 0 || tatCaLoi.length > 0) {
+    if (Object.keys(loiThongTin).length > 0 || tatCaLoi.length > 0 || loiAnh) {
       cuonDenLoiDauTien();
       return;
     }
@@ -402,6 +547,7 @@ export default function AddProductPage() {
 
     taoPhoi({
       categoryId: Number(formBuoc1.danhMucId),
+      shirtType: formBuoc1.shirtType || "tshirt",
       name: formBuoc1.tenSanPham.trim(),
       basePrice: Number(formBuoc1.giaNen),
       material: formBuoc1.chatLieu.trim(),
@@ -499,7 +645,7 @@ export default function AddProductPage() {
                 </FormField>
 
               {/* Hàng 2: Danh mục + Giá nền */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <FormField
                   label="Danh mục"
                   required
@@ -515,6 +661,27 @@ export default function AddProductPage() {
                     {danhSachDanhMuc.map((dm) => (
                       <option key={dm.id} value={dm.id}>
                         {dm.ten}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+
+                <FormField
+                  label="Loại áo thiết kế"
+                  required
+                  error={loiBuoc1.shirtType}
+                >
+                  <select
+                    id="add-product-shirt-type"
+                    value={formBuoc1.shirtType}
+                    onChange={(e) =>
+                      capNhatBuoc1("shirtType", e.target.value as LoaiAoThietKe)
+                    }
+                    className={`${inputClass} cursor-pointer ${loiBuoc1.shirtType ? "border-error" : ""}`}
+                  >
+                    {DS_LOAI_AO.map((loai) => (
+                      <option key={loai.value} value={loai.value}>
+                        {loai.label}
                       </option>
                     ))}
                   </select>
@@ -761,6 +928,123 @@ export default function AddProductPage() {
                 Đã thêm <span className="font-semibold text-text-main">{danhSachBienThe.length}</span> biến thể
               </p>
             </div>
+          </section>
+
+          <section
+            aria-labelledby="tieu-de-anh-phoi-ao"
+            className="border-t border-border pt-8"
+          >
+            <div className="mb-5">
+              <h3
+                id="tieu-de-anh-phoi-ao"
+                className="text-[16px] font-extrabold text-text-main"
+              >
+                Ảnh phôi áo
+              </h3>
+              <p className="mt-1 text-[13px] text-text-secondary">
+                Chọn ảnh mặt trước và mặt sau cho từng màu. Ảnh sẽ được tải lên Cloudinary và lưu vào cơ sở dữ liệu.
+              </p>
+            </div>
+
+            {loiAnhChung && (
+              <div
+                data-error-anchor="true"
+                className="mb-4 flex items-center gap-2 rounded-[8px] border border-error/30 bg-error/5 px-4 py-2.5 text-[13px] text-error"
+              >
+                <span>!</span>
+                {loiAnhChung}
+              </div>
+            )}
+
+            {danhSachMauUpload.length === 0 ? (
+              <div className="rounded-[10px] border border-dashed border-border py-5 text-center text-[13px] italic text-text-muted">
+                Chọn màu biến thể trước để tải ảnh phôi áo.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {danhSachMauUpload.map((color) => (
+                  <div
+                    key={color.key}
+                    className="rounded-[12px] border border-border bg-surface-alt/40 p-4"
+                  >
+                    <div className="mb-3 flex items-center gap-2">
+                      <span
+                        className="h-5 w-5 rounded-full border border-border"
+                        style={{ backgroundColor: color.hex }}
+                      />
+                      <span className="text-[13px] font-semibold text-text-main">
+                        {color.name}
+                      </span>
+                      <span className="font-mono text-[12px] text-text-muted">
+                        {color.hex}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {DS_MAT_ANH.map((sideInfo) => {
+                        const selected = anhPhoiTheoMau[color.key]?.[sideInfo.key];
+                        const inputId = taoIdInputAnh(color.key, sideInfo.key);
+
+                        return (
+                          <div
+                            key={sideInfo.key}
+                            className="rounded-[10px] border border-border bg-surface p-3"
+                          >
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <span className="text-[12px] font-bold uppercase text-text-secondary">
+                                {sideInfo.label}
+                              </span>
+                              {selected && (
+                                <button
+                                  type="button"
+                                  onClick={() => capNhatAnhPhoi(color.key, sideInfo.key)}
+                                  className="text-[12px] font-semibold text-error hover:underline"
+                                >
+                                  Xóa
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="flex min-h-[150px] items-center justify-center overflow-hidden rounded-[8px] border border-dashed border-border bg-surface-alt">
+                              {selected ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={selected.previewUrl}
+                                  alt={`${color.name}-${sideInfo.key}`}
+                                  className="h-[150px] w-full object-contain"
+                                />
+                              ) : (
+                                <span className="text-[13px] text-text-muted">
+                                  Chưa chọn ảnh
+                                </span>
+                              )}
+                            </div>
+
+                            <input
+                              id={inputId}
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                capNhatAnhPhoi(color.key, sideInfo.key, file);
+                                e.currentTarget.value = "";
+                              }}
+                            />
+                            <label
+                              htmlFor={inputId}
+                              className="mt-3 flex h-9 cursor-pointer items-center justify-center rounded-[8px] border border-border bg-surface px-3 text-[13px] font-semibold text-text-secondary transition-colors hover:bg-surface-alt hover:text-primary-container"
+                            >
+                              {selected ? "Thay ảnh" : "Chọn ảnh"}
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         </div>
 

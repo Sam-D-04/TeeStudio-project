@@ -12,6 +12,12 @@ const ADMIN_PATHS_BY_ROLE: Record<Exclude<UserRole, "CUSTOMER">, string[]> = {
   PRODUCTION: ["/admin/don-hang", "/admin/thiet-ke"],
 };
 
+const ADMIN_DENIED_PATHS_BY_ROLE: Partial<
+  Record<Exclude<UserRole, "CUSTOMER">, string[]>
+> = {
+  PRODUCTION: ["/admin/don-hang/tao-moi"],
+};
+
 export const isInternalRole = (
   role: UserRole | null | undefined,
 ): role is Exclude<UserRole, "CUSTOMER"> => {
@@ -31,6 +37,16 @@ export const canAccessAdminPath = (
 ): boolean => {
   if (!isInternalRole(role)) return false;
   if (role === "ADMIN") return pathname.startsWith("/admin");
+
+  const deniedPaths = ADMIN_DENIED_PATHS_BY_ROLE[role] ?? [];
+  if (
+    deniedPaths.some(
+      (deniedPath) =>
+        pathname === deniedPath || pathname.startsWith(`${deniedPath}/`),
+    )
+  ) {
+    return false;
+  }
 
   return ADMIN_PATHS_BY_ROLE[role].some(
     (allowedPath) =>

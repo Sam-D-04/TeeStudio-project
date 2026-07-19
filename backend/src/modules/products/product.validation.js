@@ -16,6 +16,11 @@ const createProductSchema = {
       minLength: 2,
       maxLength: 300,
     },
+    shirtType: {
+      required: true,
+      type: "string",
+      enum: ["tshirt", "polo", "hoodie"],
+    },
     basePrice: {
       required: true,
       type: "number",

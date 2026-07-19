@@ -19,8 +19,46 @@
  */
 
 const router = require("express").Router();
+const multer = require("multer");
 const { verifyToken, requireAdmin } = require("../../common/middlewares/auth.middleware");
 const productController = require("./admin.product.controller");
+
+const productImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 20 },
+  fileFilter: (req, file, callback) => {
+    const acceptedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+      "image/svg+xml",
+    ];
+
+    if (!acceptedTypes.includes(file.mimetype)) {
+      const error = new Error("Anh phoi ao phai la JPG, PNG, WEBP, GIF hoac SVG");
+      error.statusCode = 400;
+      return callback(error);
+    }
+
+    callback(null, true);
+  },
+}).array("images", 20);
+
+const uploadProductImages = (req, res, next) => {
+  productImageUpload(req, res, (error) => {
+    if (!error) return next();
+
+    if (error.code === "LIMIT_FILE_SIZE") {
+      error.message = "Anh phoi ao khong duoc vuot qua 5 MB";
+    }
+    if (error.code === "LIMIT_FILE_COUNT") {
+      error.message = "Moi lan chi duoc tai len toi da 20 anh phoi ao";
+    }
+    error.statusCode = error.statusCode || 400;
+    next(error);
+  });
+};
 
 // ─── Tất cả routes đều yêu cầu đăng nhập + quyền Admin ───────────────────────
 router.use(verifyToken, requireAdmin);
@@ -47,6 +85,10 @@ router.get("/", productController.getDanhSachSanPham);
 // ─── Tạo phôi áo mới ──────────────────────────────────────────────────────────
 // POST /api/admin/products
 router.post("/", productController.taoSanPham);
+
+router.post("/:id/images", uploadProductImages, productController.taiAnhSanPham);
+router.patch("/:id/images/:imageId/primary", productController.datAnhChinh);
+router.delete("/:id/images/:imageId", productController.xoaAnhSanPham);
 
 // ─── Chi tiết 1 phôi áo ───────────────────────────────────────────────────────
 // GET /api/admin/products/:id

@@ -32,6 +32,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
 import type { ChiTietDonHang } from "@/services/admin/orderService";
+import useAuthStore from "@/store/useAuthStore";
 import {
   getOrderPaymentState,
   getOrderPaymentMethodLabel,
@@ -448,7 +449,13 @@ function OrderHistoryDrawer({ order }: { order: ChiTietDonHang }) {
   );
 }
 
-function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
+function OrderDetailContent({
+  order,
+  canManagePayment,
+}: {
+  order: ChiTietDonHang;
+  canManagePayment: boolean;
+}) {
   const isOnlinePayment = ["VNPAY", "MOMO"].includes(
     order.thanhToan.phuongThuc
   );
@@ -498,7 +505,8 @@ function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
               </span>
               <span className="text-text-muted">·</span>
               <span className={paymentState.className}>{paymentState.label}</span>
-              {isOnlinePayment &&
+              {canManagePayment &&
+              isOnlinePayment &&
               order.thanhToan.transactionStatus === "PENDING" &&
               !isPaid &&
               order.trangThai !== "da_huy" ? (
@@ -597,6 +605,7 @@ function OrderDetailContent({ order }: { order: ChiTietDonHang }) {
 export default function OrderDetailRouteClient() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const currentUser = useAuthStore((state) => state.user);
   const params = useParams<{ id: string }>();
   const orderId = Number(params.id);
   const [messageApi, messageContextHolder] = message.useMessage();
@@ -675,7 +684,9 @@ export default function OrderDetailRouteClient() {
     },
   });
 
+  const canManageOrder = currentUser?.role === "ADMIN";
   const canUpdateOrder = Boolean(
+    canManageOrder &&
     order && order.trangThai !== "da_huy" && order.trangThai !== "hoan_tat"
   );
   const canCancelOrder = Boolean(
@@ -743,14 +754,16 @@ export default function OrderDetailRouteClient() {
             </>
           ) : null}
 
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            className="h-9 rounded-[10px] font-semibold"
-            onClick={() => router.push("/admin/don-hang/tao-moi")}
-          >
-            Tạo đơn khác
-          </Button>
+          {canManageOrder ? (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              className="h-9 rounded-[10px] font-semibold"
+              onClick={() => router.push("/admin/don-hang/tao-moi")}
+            >
+              Tạo đơn khác
+            </Button>
+          ) : null}
         </Space>
       </section>
 
@@ -765,7 +778,9 @@ export default function OrderDetailRouteClient() {
         />
       ) : null}
 
-      {!isLoading && !isError && order ? <OrderDetailContent order={order} /> : null}
+      {!isLoading && !isError && order ? (
+        <OrderDetailContent order={order} canManagePayment={canManageOrder} />
+      ) : null}
 
 
       {/* Modal hủy đơn */}
