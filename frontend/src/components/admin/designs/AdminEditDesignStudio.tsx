@@ -35,7 +35,7 @@ import CanvasEditor from "@/components/design-studio/CanvasEditor";
 import FloatingToolbar from "@/components/design-studio/FloatingToolbar";
 import LayersPanel from "@/components/design-studio/LayersPanel";
 import PropertiesPanel from "@/components/design-studio/PropertiesPanel";
-import ShirtMockupImage, {
+import {
   getPoloFrontPolygon,
   getPrintAreaBoundary,
   hasPrintAreaPolygon,
@@ -43,6 +43,11 @@ import ShirtMockupImage, {
 import Sidebar from "@/components/design-studio/Sidebar";
 import StaticTextToolbar from "@/components/design-studio/StaticTextToolbar";
 import "@/app/design-studio/design-studio.css";
+import AdminShirtMockupImage from "./AdminShirtMockupImage";
+import {
+  normalizeAdminDesignElements,
+  normalizeAdminTextFill,
+} from "./adminDesignColorUtils";
 import { captureAdminPrintImages } from "./adminPrintCapture";
 
 const CONTAINER_W = 500;
@@ -98,10 +103,12 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
 
   const {
     elements,
+    selectedId,
     shirtType,
     shirtColor,
     shirtView,
     addElement,
+    updateElement,
     removeElement,
     setSelectedId,
     undo,
@@ -160,14 +167,14 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
         // Normalize ID: đảm bảo mọi element đều có UUID duy nhất
         // (thiết kế cũ có thể được lưu mà không có id, hoặc id bị trùng)
         const seenIds = new Set<string>();
-        const normalizedElements = cd.elements.map((el) => {
+        const normalizedElements = normalizeAdminDesignElements(cd.elements.map((el) => {
           const side = el.side ?? cd.shirtView ?? "front";
           if (!el.id || seenIds.has(el.id)) {
             return { ...el, id: uuidv4(), side };
           }
           seenIds.add(el.id);
           return { ...el, side };
-        });
+        }));
 
         // Tái tạo toàn bộ trạng thái canvas từ JSON đã lưu
         const loadedShirtType = cd.shirtType ?? "tshirt";
@@ -294,6 +301,16 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [redo, removeElement, setSelectedId, undo]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const selectedElement = elements.find((element) => element.id === selectedId);
+    if (!selectedElement || selectedElement.type !== "text") return;
+    const normalizedFill = normalizeAdminTextFill(selectedElement.fill);
+    if (selectedElement.fill !== normalizedFill) {
+      updateElement(selectedElement.id, { fill: normalizedFill });
+    }
+  }, [elements, selectedId, updateElement]);
 
   // ─── Upload ảnh từ Sidebar ─────────────────────────────────────────────
   const handleUploadImages = useCallback(async (files: FileList) => {
@@ -713,7 +730,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
               ref={shirtContainerRef}
               style={{ position: "relative", width: displayW, height: displayH, flexShrink: 0 }}
             >
-              <ShirtMockupImage
+              <AdminShirtMockupImage
                 type={shirtType}
                 view={shirtView}
                 color={shirtColor}

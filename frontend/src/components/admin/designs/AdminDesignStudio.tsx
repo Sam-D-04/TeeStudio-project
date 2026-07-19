@@ -20,7 +20,7 @@ import CanvasEditor from "@/components/design-studio/CanvasEditor";
 import FloatingToolbar from "@/components/design-studio/FloatingToolbar";
 import LayersPanel from "@/components/design-studio/LayersPanel";
 import PropertiesPanel from "@/components/design-studio/PropertiesPanel";
-import ShirtMockupImage, {
+import {
   getPoloFrontPolygon,
   getPrintAreaBoundary,
   hasPrintAreaPolygon,
@@ -28,6 +28,8 @@ import ShirtMockupImage, {
 import Sidebar from "@/components/design-studio/Sidebar";
 import StaticTextToolbar from "@/components/design-studio/StaticTextToolbar";
 import "@/app/design-studio/design-studio.css";
+import AdminShirtMockupImage from "./AdminShirtMockupImage";
+import { normalizeAdminTextFill } from "./adminDesignColorUtils";
 import { captureAdminPrintImages } from "./adminPrintCapture";
 
 const CONTAINER_W = 500;
@@ -54,10 +56,12 @@ export default function AdminDesignStudio() {
 
   const {
     elements,
+    selectedId,
     shirtType,
     shirtColor,
     shirtView,
     addElement,
+    updateElement,
     removeElement,
     setSelectedId,
     undo,
@@ -147,6 +151,16 @@ export default function AdminDesignStudio() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [redo, removeElement, setSelectedId, undo]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const selectedElement = elements.find((element) => element.id === selectedId);
+    if (!selectedElement || selectedElement.type !== "text") return;
+    const normalizedFill = normalizeAdminTextFill(selectedElement.fill);
+    if (selectedElement.fill !== normalizedFill) {
+      updateElement(selectedElement.id, { fill: normalizedFill });
+    }
+  }, [elements, selectedId, updateElement]);
 
   const handleUploadImages = useCallback(async (files: FileList) => {
     const validFiles = Array.from(files).filter((file) => {
@@ -375,7 +389,7 @@ export default function AdminDesignStudio() {
               </div>
             )}
             <div ref={shirtContainerRef} style={{ position: "relative", width: displayW, height: displayH, flexShrink: 0 }}>
-              <ShirtMockupImage type={shirtType} view={shirtView} color={shirtColor} width={displayW} height={displayH} />
+              <AdminShirtMockupImage type={shirtType} view={shirtView} color={shirtColor} width={displayW} height={displayH} />
               <CanvasEditor
                 stageRef={stageRef}
                 printArea={printArea}
