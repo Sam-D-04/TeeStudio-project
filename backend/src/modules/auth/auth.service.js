@@ -3,10 +3,20 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const db = require("../../database/mysql");
 const { ROLES } = require("../../common/constants/roles");
+const emailService = require("../../common/services/emailService");
 
 const ACCESS_TOKEN_TTL = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
 const REFRESH_TOKEN_TTL = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS || 12);
+const EMAIL_VERIFICATION_TOKEN_TTL_MS =
+  Number(process.env.EMAIL_VERIFICATION_TOKEN_TTL_HOURS || 24) * 60 * 60 * 1000;
+const PASSWORD_RESET_TOKEN_TTL_MS =
+  Number(process.env.PASSWORD_RESET_TOKEN_TTL_MINUTES || 60) * 60 * 1000;
+
+const TOKEN_PURPOSE = {
+  EMAIL_VERIFICATION: "EMAIL_VERIFICATION",
+  PASSWORD_RESET: "PASSWORD_RESET",
+};
 
 const createError = (message, statusCode) => {
   const error = new Error(message);
@@ -30,8 +40,9 @@ const getRefreshTokenSecret = () =>
 
 const normalizeEmail = (email) => email.trim().toLowerCase();
 const normalizeText = (value) => value.trim().replace(/\s+/g, " ");
-const hashRefreshToken = (token) =>
-  crypto.createHash("sha256").update(token).digest("hex");
+const sha256Hex = (value) =>
+  crypto.createHash("sha256").update(value).digest("hex");
+const hashRefreshToken = sha256Hex;
 
 const serializeUser = (account) => ({
   id: account.id,
@@ -40,11 +51,12 @@ const serializeUser = (account) => ({
   phone: account.phone,
   role: account.role,
   status: account.status,
+  emailVerified: Boolean(account.emailVerified),
 });
 
 const findAccountByEmail = async (email) => {
   const [rows] = await db.pool.query(
-    `SELECT id, email, passwordHash, fullName, phone, role, status
+    `SELECT id, email, passwordHash, fullName, phone, role, status, emailVerified
      FROM Account
      WHERE email = ?
      LIMIT 1`,
@@ -56,7 +68,7 @@ const findAccountByEmail = async (email) => {
 
 const findAccountById = async (id) => {
   const [rows] = await db.pool.query(
-    `SELECT id, email, passwordHash, fullName, phone, role, status
+    `SELECT id, email, passwordHash, fullName, phone, role, status, emailVerified
      FROM Account
      WHERE id = ?
      LIMIT 1`,
@@ -64,6 +76,47 @@ const findAccountById = async (id) => {
   );
 
   return rows[0] || null;
+};
+
+// Sinh token ngẫu nhiên (dùng cho xác minh email / đặt lại mật khẩu), chỉ lưu
+// hash SHA-256 trong DB — giống cách refresh token đang được lưu.
+const createActionToken = async (accountId, purpose, ttlMs, ip) => {
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + ttlMs);
+
+  await db.execute(
+    `DELETE FROM AccountActionToken
+     WHERE accountId = ? AND purpose = ? AND consumedAt IS NULL`,
+    [accountId, purpose]
+  );
+  await db.execute(
+    `INSERT INTO AccountActionToken (accountId, tokenHash, purpose, expiresAt, requestIp)
+     VALUES (?, ?, ?, ?, ?)`,
+    [accountId, sha256Hex(rawToken), purpose, expiresAt, ip || null]
+  );
+
+  return rawToken;
+};
+
+const consumeActionToken = async (rawToken, purpose) => {
+  const [rows] = await db.pool.query(
+    `SELECT id, accountId FROM AccountActionToken
+     WHERE tokenHash = ? AND purpose = ? AND consumedAt IS NULL AND expiresAt > NOW()
+     LIMIT 1`,
+    [sha256Hex(rawToken), purpose]
+  );
+  const tokenRow = rows[0];
+
+  if (!tokenRow) {
+    return null;
+  }
+
+  await db.execute(
+    `UPDATE AccountActionToken SET consumedAt = NOW() WHERE id = ?`,
+    [tokenRow.id]
+  );
+
+  return tokenRow;
 };
 
 const buildTokens = (account) => {
@@ -127,6 +180,30 @@ const createSession = async (account, metadata) => {
   };
 };
 
+const getFrontendUrl = () =>
+  (process.env.FRONTEND_URL || "http://localhost:3000").split(",")[0].trim();
+
+// Gửi email xác minh là "best-effort": lỗi gửi mail chỉ được log lại, không
+// được throw tiếp, vì tài khoản lúc gọi hàm này đã tạo thành công trong DB rồi
+// (giống nguyên tắc đang áp dụng cho sendOrderConfirmationEmail).
+const dispatchVerificationEmail = async (account, ip) => {
+  try {
+    const rawToken = await createActionToken(
+      account.id,
+      TOKEN_PURPOSE.EMAIL_VERIFICATION,
+      EMAIL_VERIFICATION_TOKEN_TTL_MS,
+      ip
+    );
+    await emailService.sendVerificationEmail({
+      to: account.email,
+      fullName: account.fullName,
+      verifyUrl: `${getFrontendUrl()}/xac-minh-email?token=${rawToken}`,
+    });
+  } catch (error) {
+    console.error("Không thể gửi email xác minh:", error.message);
+  }
+};
+
 const register = async (data, metadata) => {
   const email = normalizeEmail(data.email);
   const existingAccount = await findAccountByEmail(email);
@@ -150,7 +227,9 @@ const register = async (data, metadata) => {
       ]
     );
     const account = await findAccountById(result.insertId);
-    return createSession(account, metadata);
+    const session = await createSession(account, metadata);
+    await dispatchVerificationEmail(account, metadata?.ipAddress);
+    return session;
   } catch (error) {
     if (error.code === "ER_DUP_ENTRY") {
       throw createError("Email đã được sử dụng", 409);
@@ -245,10 +324,96 @@ const getProfile = async (userId) => {
   return serializeUser(account);
 };
 
+const verifyEmailToken = async (rawToken) => {
+  const tokenRow = await consumeActionToken(
+    rawToken,
+    TOKEN_PURPOSE.EMAIL_VERIFICATION
+  );
+
+  if (!tokenRow) {
+    // Có thể tài khoản đã xác minh từ trước (bấm lại link cũ) — coi là thành
+    // công để tránh báo lỗi khó hiểu cho người dùng.
+    throw createError("Liên kết xác minh không hợp lệ hoặc đã hết hạn", 400);
+  }
+
+  await db.execute(
+    `UPDATE Account SET emailVerified = 1, emailVerifiedAt = NOW() WHERE id = ?`,
+    [tokenRow.accountId]
+  );
+};
+
+const resendVerification = async (userId, ip) => {
+  const account = await findAccountById(userId);
+  if (!account) {
+    throw createError("Không tìm thấy tài khoản", 404);
+  }
+
+  if (account.emailVerified) {
+    return { alreadyVerified: true };
+  }
+
+  await dispatchVerificationEmail(account, ip);
+  return { alreadyVerified: false };
+};
+
+const forgotPassword = async (email, ip) => {
+  const account = await findAccountByEmail(email);
+
+  // Luôn "thành công" về mặt phản hồi bất kể email có tồn tại hay không, để
+  // không lộ thông tin tài khoản nào đã đăng ký (chống email enumeration).
+  if (!account) {
+    return;
+  }
+
+  try {
+    const rawToken = await createActionToken(
+      account.id,
+      TOKEN_PURPOSE.PASSWORD_RESET,
+      PASSWORD_RESET_TOKEN_TTL_MS,
+      ip
+    );
+    await emailService.sendPasswordResetEmail({
+      to: account.email,
+      fullName: account.fullName,
+      resetUrl: `${getFrontendUrl()}/dat-lai-mat-khau?token=${rawToken}`,
+    });
+  } catch (error) {
+    console.error("Không thể gửi email đặt lại mật khẩu:", error.message);
+  }
+};
+
+const resetPassword = async (rawToken, newPassword) => {
+  const tokenRow = await consumeActionToken(
+    rawToken,
+    TOKEN_PURPOSE.PASSWORD_RESET
+  );
+
+  if (!tokenRow) {
+    throw createError("Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn", 400);
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+
+  await db.transaction(async (connection) => {
+    await connection.query(
+      `UPDATE Account SET passwordHash = ? WHERE id = ?`,
+      [passwordHash, tokenRow.accountId]
+    );
+    // Đổi mật khẩu xong thì ép đăng xuất khỏi mọi thiết bị/phiên đang mở.
+    await connection.query(`DELETE FROM UserToken WHERE userId = ?`, [
+      tokenRow.accountId,
+    ]);
+  });
+};
+
 module.exports = {
   register,
   login,
   refresh,
+  verifyEmailToken,
+  resendVerification,
+  forgotPassword,
+  resetPassword,
   logout,
   logoutAll,
   getProfile,

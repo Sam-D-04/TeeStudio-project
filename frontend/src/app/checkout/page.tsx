@@ -15,11 +15,14 @@ import {
 import {
   ArrowLeftOutlined,
   LockOutlined,
+  MailOutlined,
   SafetyCertificateOutlined,
   ShoppingCartOutlined,
 } from "@ant-design/icons";
 import { useCartStore } from "@/store/useCartStore";
 import useAuthStore from "@/store/useAuthStore";
+import { authService } from "@/services/authService";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import {
   createOrder,
   cartItemsToOrderItems,
@@ -160,6 +163,7 @@ export default function CheckoutPage() {
   const token        = useAuthStore((s) => s.accessToken);
   const [loading, setLoading]         = useState(false);
   const [hydrated, setHydrated]       = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
   const [provinces, setProvinces]     = useState<ProvinceData[]>([]);
   const [addressLoading, setAddressLoading] = useState(true);
   const provinceCode = Form.useWatch("provinceCode", form);
@@ -269,6 +273,59 @@ export default function CheckoutPage() {
                 Khám phá sản phẩm
               </Button>
             </Link>
+          </div>
+        </main>
+        <AppFooter />
+      </>
+    );
+  }
+
+  /* Chặn đặt hàng nếu tài khoản chưa xác minh email — mirror check 403 phía
+     backend (requireEmailVerified) để khách không điền hết form rồi mới báo lỗi. */
+  if (user && !user.emailVerified) {
+    const handleResend = async () => {
+      setResendingVerification(true);
+      try {
+        const responseMessage = await authService.resendVerification();
+        message.success(responseMessage || "Đã gửi lại email xác minh");
+      } catch (err) {
+        message.error(getApiErrorMessage(err, "Không thể gửi lại email xác minh."));
+      } finally {
+        setResendingVerification(false);
+      }
+    };
+
+    return (
+      <>
+        <AppHeader />
+        <main
+          style={{
+            minHeight: "100vh",
+            background: "#f1f5f9",
+            paddingTop: 80,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div style={{ textAlign: "center", maxWidth: 420 }}>
+            <MailOutlined style={{ fontSize: 56, color: "#bec8d2" }} />
+            <p style={{ margin: "16px 0 8px", fontSize: 16, color: "#475569", fontWeight: 600 }}>
+              Vui lòng xác minh email trước khi đặt hàng
+            </p>
+            <p style={{ margin: "0 0 24px", fontSize: 14, color: "#64748b" }}>
+              Chúng tôi đã gửi liên kết xác minh tới {user.email}. Kiểm tra hộp thư hoặc gửi lại
+              nếu bạn chưa nhận được.
+            </p>
+            <Button
+              type="primary"
+              size="large"
+              loading={resendingVerification}
+              onClick={() => void handleResend()}
+              style={{ borderRadius: 10 }}
+            >
+              Gửi lại email xác minh
+            </Button>
           </div>
         </main>
         <AppFooter />

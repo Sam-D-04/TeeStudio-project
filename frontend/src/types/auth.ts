@@ -8,6 +8,7 @@ export interface AuthUser {
   phone: string;
   role: UserRole;
   status: AccountStatus;
+  emailVerified: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -15,9 +16,7 @@ export interface AuthUser {
 export interface AuthSession {
   user: AuthUser;
   accessToken: string;
-  refreshToken: string;
   accessTokenExpiresAt: string;
-  refreshTokenExpiresAt: string;
 }
 
 export interface LoginPayload {

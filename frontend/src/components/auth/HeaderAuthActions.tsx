@@ -1,10 +1,11 @@
 "use client";
 
-import { Button } from "antd";
+import { Button, message, Tag } from "antd";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import AuthModal from "@/components/design-studio/AuthModal";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import { getDefaultRouteForRole } from "@/lib/authorization";
 import { authService } from "@/services/authService";
 import useAuthStore from "@/store/useAuthStore";
@@ -25,10 +26,23 @@ export default function HeaderAuthActions({
     open: false,
     tab: "login",
   });
+  const [isResending, setIsResending] = useState(false);
 
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  const resendVerification = async () => {
+    setIsResending(true);
+    try {
+      const responseMessage = await authService.resendVerification();
+      message.success(responseMessage || "Đã gửi lại email xác minh");
+    } catch (error) {
+      message.error(getApiErrorMessage(error, "Không thể gửi lại email xác minh."));
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   const logout = async () => {
     try {
@@ -48,6 +62,15 @@ export default function HeaderAuthActions({
   if (user) {
     return (
       <div className={mobile ? "flex flex-col gap-2" : "hidden items-center gap-2 md:flex"}>
+        {user.role === "CUSTOMER" && !user.emailVerified ? (
+          <Tag
+            color="warning"
+            className="cursor-pointer"
+            onClick={() => !isResending && void resendVerification()}
+          >
+            {isResending ? "Đang gửi..." : "Chưa xác minh email — gửi lại"}
+          </Tag>
+        ) : null}
         {user.role !== "CUSTOMER" ? (
           <Link href={getDefaultRouteForRole(user.role)} onClick={onNavigate}>
             <Button block={mobile}>{user.fullName}</Button>

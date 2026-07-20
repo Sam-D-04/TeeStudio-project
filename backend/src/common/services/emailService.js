@@ -92,6 +92,102 @@ const sendAccountCredentialsEmail = async ({
   }
 };
 
+const sendVerificationEmail = async ({ to, fullName, verifyUrl }) => {
+  try {
+    const { transporter: gmailTransporter, user } = getTransporter();
+    const safeName = escapeHtml(fullName);
+    const safeUrl = escapeHtml(verifyUrl);
+
+    return await gmailTransporter.sendMail({
+      from: { name: "TeeStudio", address: user },
+      to,
+      subject: "Xác minh email tài khoản TeeStudio",
+      text: [
+        `Xin chào ${fullName},`,
+        "",
+        "Cảm ơn bạn đã đăng ký tài khoản TeeStudio. Vui lòng xác minh email bằng liên kết sau:",
+        verifyUrl,
+        "",
+        "Liên kết có hiệu lực trong 24 giờ. Bạn cần xác minh email trước khi đặt hàng.",
+        "",
+        "Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.",
+        "Đây là email tự động, vui lòng không trả lời email này.",
+      ].join("\n"),
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#0f172a;line-height:1.6">
+          <h2 style="color:#0284c7">Xác minh email của bạn</h2>
+          <p>Xin chào <strong>${safeName}</strong>,</p>
+          <p>Cảm ơn bạn đã đăng ký tài khoản TeeStudio. Vui lòng bấm nút bên dưới để xác minh email:</p>
+          <p style="text-align:center;margin:24px 0">
+            <a href="${safeUrl}" style="display:inline-block;padding:12px 24px;background:#0284c7;color:#ffffff;border-radius:8px;text-decoration:none;font-weight:bold">Xác minh email</a>
+          </p>
+          <p style="color:#64748b;font-size:13px">Hoặc dán liên kết sau vào trình duyệt: <br>${safeUrl}</p>
+          <div style="margin-top:16px">
+            Liên kết có hiệu lực trong 24 giờ. Bạn cần xác minh email trước khi đặt hàng.<br><br>
+            Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.<br>
+            Đây là email tự động, vui lòng không trả lời email này.
+          </div>
+        </div>
+      `,
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      throw error;
+    }
+
+    console.error("Không thể gửi email xác minh:", error.message);
+    throw createServiceError("Không thể gửi email xác minh.", 502);
+  }
+};
+
+const sendPasswordResetEmail = async ({ to, fullName, resetUrl }) => {
+  try {
+    const { transporter: gmailTransporter, user } = getTransporter();
+    const safeName = escapeHtml(fullName);
+    const safeUrl = escapeHtml(resetUrl);
+
+    return await gmailTransporter.sendMail({
+      from: { name: "TeeStudio", address: user },
+      to,
+      subject: "Đặt lại mật khẩu tài khoản TeeStudio",
+      text: [
+        `Xin chào ${fullName},`,
+        "",
+        "Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản TeeStudio của bạn. Bấm liên kết sau để đặt mật khẩu mới:",
+        resetUrl,
+        "",
+        "Liên kết có hiệu lực trong 60 phút.",
+        "",
+        "Nếu bạn không yêu cầu điều này, vui lòng bỏ qua email — mật khẩu của bạn sẽ không bị thay đổi.",
+        "Đây là email tự động, vui lòng không trả lời email này.",
+      ].join("\n"),
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#0f172a;line-height:1.6">
+          <h2 style="color:#0284c7">Đặt lại mật khẩu</h2>
+          <p>Xin chào <strong>${safeName}</strong>,</p>
+          <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản TeeStudio của bạn.</p>
+          <p style="text-align:center;margin:24px 0">
+            <a href="${safeUrl}" style="display:inline-block;padding:12px 24px;background:#0284c7;color:#ffffff;border-radius:8px;text-decoration:none;font-weight:bold">Đặt lại mật khẩu</a>
+          </p>
+          <p style="color:#64748b;font-size:13px">Hoặc dán liên kết sau vào trình duyệt: <br>${safeUrl}</p>
+          <div style="margin-top:16px">
+            Liên kết có hiệu lực trong 60 phút.<br><br>
+            Nếu bạn không yêu cầu điều này, vui lòng bỏ qua email — mật khẩu của bạn sẽ không bị thay đổi.<br>
+            Đây là email tự động, vui lòng không trả lời email này.
+          </div>
+        </div>
+      `,
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      throw error;
+    }
+
+    console.error("Không thể gửi email đặt lại mật khẩu:", error.message);
+    throw createServiceError("Không thể gửi email đặt lại mật khẩu.", 502);
+  }
+};
+
 // Định dạng số tiền theo kiểu Việt Nam, vd 120000 -> "120.000₫"
 const formatVND = (value) => `${Number(value || 0).toLocaleString("vi-VN")}₫`;
 
@@ -253,4 +349,6 @@ const sendOrderConfirmationEmail = async ({
 module.exports = {
   sendAccountCredentialsEmail,
   sendOrderConfirmationEmail,
+  sendVerificationEmail,
+  sendPasswordResetEmail,
 };
