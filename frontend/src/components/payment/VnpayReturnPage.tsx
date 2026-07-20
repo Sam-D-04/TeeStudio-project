@@ -82,6 +82,11 @@ export default function OnlinePaymentReturnPage() {
     (detectedGateway === "MOMO"
       ? !searchParams.get("signature") || !searchParams.get("orderId")
       : !searchParams.get("vnp_SecureHash"));
+  // Đơn COD (thanh toán khi nhận hàng) không đi qua cổng VNPAY/MoMo nên không
+  // có chữ ký để xác minh — checkout.tsx redirect thẳng về đây với method=COD,
+  // phải nhận diện riêng để không rơi vào nhánh "thiếu dữ liệu xác minh".
+  const isCodOrder = searchParams.get("method") === "COD";
+  const codOrderCode = searchParams.get("orderCode");
   const [result, setResult] = useState<OnlinePaymentReturnResult | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [hasConnectionError, setHasConnectionError] = useState(false);
@@ -89,7 +94,7 @@ export default function OnlinePaymentReturnPage() {
   useEffect(() => {
     let active = true;
 
-    if (missingRequiredParams) return;
+    if (missingRequiredParams || isCodOrder) return;
 
     xacThucKetQuaThanhToan(detectedGateway, queryString)
       .then((data) => {
@@ -111,7 +116,56 @@ export default function OnlinePaymentReturnPage() {
     return () => {
       active = false;
     };
-  }, [detectedGateway, missingRequiredParams, queryString]);
+  }, [detectedGateway, missingRequiredParams, isCodOrder, queryString]);
+
+  if (isCodOrder) {
+    return (
+      <div className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-white p-6 shadow-lg md:p-8">
+        <div className="text-center">
+          <CheckCircleFilled className="text-6xl text-success" />
+          <h1 className="mt-5 text-2xl font-extrabold text-text-main md:text-3xl">
+            Đặt hàng thành công!
+          </h1>
+          <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-text-secondary">
+            TeeStudio đã ghi nhận đơn hàng của quý khách và sẽ xử lý trong thời
+            gian sớm nhất. Quý khách vui lòng thanh toán khi nhận được hàng
+            (COD).
+          </p>
+        </div>
+
+        {codOrderCode ? (
+          <div className="mt-6 rounded-xl border border-border bg-surface-alt px-4">
+            <PaymentInfoRow label="Mã đơn hàng" value={codOrderCode} />
+            <PaymentInfoRow
+              label="Phương thức thanh toán"
+              value="Thanh toán khi nhận hàng (COD)"
+            />
+            <PaymentInfoRow
+              label="Trạng thái"
+              value={
+                <Tag color="green" className="m-0">
+                  Chờ xác nhận
+                </Tag>
+              }
+            />
+          </div>
+        ) : null}
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <Button
+            type="primary"
+            href="/tai-khoan/don-hang"
+            className="h-10 rounded-lg font-semibold"
+          >
+            Xem đơn hàng của tôi
+          </Button>
+          <Button href="/" className="h-10 rounded-lg font-semibold">
+            Về trang chủ
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const displayedErrorMessage = missingRequiredParams
     ? `Đường dẫn thanh toán không có đủ dữ liệu xác minh từ ${gatewayName}.`

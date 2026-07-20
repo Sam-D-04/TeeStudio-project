@@ -21,6 +21,8 @@ export interface CreateOrderPayload {
   note?: string;
   /** Phương thức thanh toán: VNPAY, MOMO hoặc COD */
   paymentMethod: "VNPAY" | "MOMO" | "COD";
+  /** Loại thanh toán: FULL (toàn bộ) hoặc DEPOSIT (cọc 50%, chỉ áp dụng đơn có thiết kế POD) */
+  paymentType?: "FULL" | "DEPOSIT";
   /** Các sản phẩm: dùng variantId (ID trong bảng ProductVariant của DB) */
   items: Array<{
     variantId: number;

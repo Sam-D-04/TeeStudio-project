@@ -52,6 +52,10 @@ const customerCheckoutSchema = {
       type: "string",
       enum: ["COD", "VNPAY", "MOMO"],
     },
+    paymentType: {
+      type: "string",
+      enum: ["FULL", "DEPOSIT"],
+    },
     items: {
       required: true,
       type: "array",

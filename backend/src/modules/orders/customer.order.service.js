@@ -95,6 +95,7 @@ function tinhThongTinThanhToan(
     result.depositAmount = Math.round(
       (totalAmount * DEPOSIT_PERCENT) / 100 * 100
     ) / 100;
+    result.codAmount = Math.max(0, totalAmount - result.depositAmount);
     result.paymentAmount = result.depositAmount;
   } else if (paymentMethod === "COD") {
     result.codAmount = totalAmount;

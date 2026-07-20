@@ -44,6 +44,10 @@ type PaymentMethod = "VNPAY" | "MOMO" | "COD";
 /** Các phương thức thanh toán online — chuyển hướng sang cổng thanh toán sau khi tạo đơn */
 const ONLINE_PAYMENT_METHODS = new Set<PaymentMethod>(["VNPAY", "MOMO"]);
 
+type PaymentType = "FULL" | "DEPOSIT";
+/** % cọc khi khách chọn đặt cọc — khớp DEPOSIT_PERCENT bên backend (customer.order.service.js) */
+const DEPOSIT_PERCENT = 50;
+
 interface CheckoutFormValues {
   recipientName: string;
   phone: string;
@@ -53,6 +57,7 @@ interface CheckoutFormValues {
   addressDetail: string;
   note?: string;
   paymentMethod: PaymentMethod;
+  paymentType: PaymentType;
 }
 
 /* ── Dữ liệu tỉnh/thành – phường/xã (VN, 2 cấp sau sáp nhập hành chính) ── */
@@ -158,6 +163,15 @@ export default function CheckoutPage() {
   const [provinces, setProvinces]     = useState<ProvinceData[]>([]);
   const [addressLoading, setAddressLoading] = useState(true);
   const provinceCode = Form.useWatch("provinceCode", form);
+  const watchedPaymentType = Form.useWatch("paymentType", form);
+
+  /** Đơn có ít nhất 1 sản phẩm thiết kế riêng (POD) → áp dụng luật thanh toán
+   *  hẳn/cọc 50% và không cho COD toàn phần, khớp guardrail backend
+   *  (customer.order.service.js: hasCustomDesign). */
+  const hasCustomDesign = items.some((item) => Boolean(item.designId));
+  const paymentOptionsVisible = hasCustomDesign
+    ? paymentOptions.filter((opt) => opt.value !== "COD")
+    : paymentOptions;
 
   /* ── Mã khuyến mãi ── */
   const [promoInput, setPromoInput]     = useState("");
@@ -199,6 +213,12 @@ export default function CheckoutPage() {
   const shippingFee   = appliedPromo?.mienPhiVanChuyen ? 0 : SHIPPING_FEE;
   const discountAmount = appliedPromo?.discountAmount ?? 0;
   const total = Math.max(0, subtotal + shippingFee - discountAmount);
+
+  // Preview số tiền cọc/COD còn lại khi khách chọn đặt cọc — chỉ để hiển thị
+  // trước cho khách, số tiền thật do backend tính lại và trả về khi tạo đơn.
+  const isDepositSelected = hasCustomDesign && watchedPaymentType === "DEPOSIT";
+  const depositPreview = isDepositSelected ? Math.round(total * (DEPOSIT_PERCENT / 100)) : 0;
+  const codPreview = isDepositSelected ? Math.max(0, total - depositPreview) : 0;
 
   /* ── Áp dụng mã khuyến mãi ── */
   const handleApplyPromo = async () => {
@@ -280,6 +300,7 @@ export default function CheckoutPage() {
         ward: ward?.Name,
         note: values.note,
         paymentMethod: values.paymentMethod,
+        paymentType: hasCustomDesign ? values.paymentType : "FULL",
         items: cartItemsToOrderItems(items),
         shippingFee: SHIPPING_FEE,
         ...(appliedPromo ? { promotionId: appliedPromo.promotionId } : {}),
@@ -349,7 +370,7 @@ export default function CheckoutPage() {
             form={form}
             layout="vertical"
             onFinish={(v) => void onFinish(v)}
-            initialValues={{ paymentMethod: "VNPAY" }}
+            initialValues={{ paymentMethod: "VNPAY", paymentType: "FULL" }}
             requiredMark={false}
           >
             {/* ── 2-column grid ── */}
@@ -524,9 +545,74 @@ export default function CheckoutPage() {
                     Phương thức thanh toán
                   </h2>
 
+                  {/* Loại thanh toán (toàn bộ / cọc 50%) — chỉ áp dụng đơn có
+                      sản phẩm thiết kế riêng (POD), khớp guardrail backend */}
+                  {hasCustomDesign && (
+                    <div style={{ marginBottom: 20 }}>
+                      <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                        Loại thanh toán
+                      </p>
+                      <Form.Item
+                        name="paymentType"
+                        style={{ margin: 0 }}
+                        rules={[{ required: true, message: "Chọn loại thanh toán" }]}
+                      >
+                        <Radio.Group style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
+                          {(
+                            [
+                              {
+                                value: "FULL" as const,
+                                label: "Thanh toán toàn bộ",
+                                desc: "Thanh toán 100% giá trị đơn hàng ngay bây giờ",
+                              },
+                              {
+                                value: "DEPOSIT" as const,
+                                label: `Đặt cọc ${DEPOSIT_PERCENT}%`,
+                                desc: "Trả trước 50% online, phần còn lại thanh toán khi nhận hàng (COD)",
+                              },
+                            ]
+                          ).map((opt) => (
+                            <label key={opt.value} htmlFor={`payment_type_${opt.value}`} style={{ cursor: "pointer" }}>
+                              <Radio id={`payment_type_${opt.value}`} value={opt.value} style={{ display: "none" }} />
+                              <Form.Item noStyle shouldUpdate={(prev, next) => prev.paymentType !== next.paymentType}>
+                                {({ getFieldValue }) => {
+                                  const selected = getFieldValue("paymentType") === opt.value;
+                                  return (
+                                    <div
+                                      onClick={() => form.setFieldValue("paymentType", opt.value)}
+                                      style={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 2,
+                                        padding: "10px 14px",
+                                        borderRadius: 10,
+                                        border: selected ? "2px solid #0ea5e9" : "1.5px solid #e2e8f0",
+                                        background: selected ? "#f0f9ff" : "#ffffff",
+                                        cursor: "pointer",
+                                        transition: "all 0.15s",
+                                      }}
+                                    >
+                                      <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{opt.label}</span>
+                                      <span style={{ fontSize: 12, color: "#94a3b8" }}>{opt.desc}</span>
+                                    </div>
+                                  );
+                                }}
+                              </Form.Item>
+                            </label>
+                          ))}
+                        </Radio.Group>
+                      </Form.Item>
+                      <p style={{ margin: "10px 0 0", fontSize: 12, color: "#94a3b8", lineHeight: 1.5 }}>
+                        Đơn có sản phẩm thiết kế riêng cần thanh toán online trước — chọn thanh
+                        toán toàn bộ hoặc đặt cọc {DEPOSIT_PERCENT}%, phần còn lại thu COD khi
+                        giao hàng.
+                      </p>
+                    </div>
+                  )}
+
                   <Form.Item name="paymentMethod" style={{ margin: 0 }}>
                     <Radio.Group style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
-                      {paymentOptions.map((opt) => (
+                      {paymentOptionsVisible.map((opt) => (
                         <label
                           key={opt.value}
                           htmlFor={`payment_${opt.value}`}
@@ -807,6 +893,27 @@ export default function CheckoutPage() {
                         {formatVND(total)}
                       </span>
                     </div>
+
+                    {isDepositSelected && (
+                      <div
+                        style={{
+                          marginBottom: 20,
+                          padding: "12px 14px",
+                          background: "#f0f9ff",
+                          border: "1px solid #bae6fd",
+                          borderRadius: 10,
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
+                          <span style={{ color: "#475569" }}>Đặt cọc ({DEPOSIT_PERCENT}%) — thanh toán ngay</span>
+                          <strong style={{ color: "#0ea5e9" }}>{formatVND(depositPreview)}</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                          <span style={{ color: "#475569" }}>Còn lại — thanh toán khi nhận hàng (COD)</span>
+                          <strong style={{ color: "#0f172a" }}>{formatVND(codPreview)}</strong>
+                        </div>
+                      </div>
+                    )}
 
                     <Button
                       type="primary"
