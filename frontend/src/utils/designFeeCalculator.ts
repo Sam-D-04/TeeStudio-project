@@ -13,9 +13,10 @@
  *   - Trong Konva, `x` và `y` của phần tử là GÓC TRÊN-TRÁI (khác Fabric.js dùng tâm).
  *   - Góc phải-dưới = (x + width, y + height).
  *
- * Bậc giá:
- *   - Mức 1: Bao phủ <= 100 cm²  → 0đ       (Cụm logo/chữ nhỏ)
- *   - Mức 2: Bao phủ <= 600 cm²  → 30.000đ  (Hình in cỡ A4)
+ * Bậc giá (khớp với backend, xem admin.pricing.service.js):
+ *   - Không có phần tử nào: 0đ (miễn phí)
+ *   - Mức 1: Bao phủ <= 100 cm²  → 20.000đ  (Logo nhỏ)
+ *   - Mức 2: Bao phủ <= 600 cm²  → 40.000đ  (Hình tầm trung)
  *   - Mức 3: Bao phủ >  600 cm²  → 60.000đ  (Hình in tràn áo)
  */
 
@@ -24,10 +25,10 @@ import type { DesignElement } from "@/store/useDesignStore";
 /** Tỷ lệ quy đổi: 1 cm = 4.67 pixels trên canvas (Dựa trên vùng in 200x240px tương đương 45x49cm) */
 export const PIXELS_PER_CM = 4.67;
 
-/** Bậc giá theo diện tích (cm²) */
+/** Bậc giá theo diện tích (cm²) - khớp với backend (admin.pricing.service.js) */
 export const FEE_TIERS = [
-  { maxAreaCm2: 100, fee: 0,     label: "Miễn phí" },
-  { maxAreaCm2: 600, fee: 30000, label: "30.000đ"  },
+  { maxAreaCm2: 100, fee: 20000, label: "20.000đ" },
+  { maxAreaCm2: 600, fee: 40000, label: "40.000đ" },
 ] as const;
 
 export const FEE_MAX    = 60000;
@@ -72,6 +73,12 @@ export function calcDesignFee(elements: DesignElement[]): {
   label: string;
   areaCm2: number;
 } {
+  // Canvas trống (chưa thiết kế gì) luôn miễn phí - phải chặn riêng vì bậc giá
+  // đầu tiên giờ đã > 0đ, không còn tự nhiên trả về 0 khi areaCm2 = 0.
+  if (!elements || elements.length === 0) {
+    return { fee: 0, label: "Miễn phí", areaCm2: 0 };
+  }
+
   const areaCm2 = calcBoundingBoxAreaCm2(elements);
 
   for (const tier of FEE_TIERS) {

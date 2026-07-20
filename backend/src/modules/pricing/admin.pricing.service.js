@@ -140,8 +140,11 @@ const calculateDesignQuote = async ({
  *
  * Thuật toán:
  *   - Vẽ 1 hình chữ nhật ảo bao quanh tất cả các item (kể cả đè chồng lên nhau).
- *   - Chuyển đổi diện tích đó từ px² sang cm² (tỷ lệ: 1 cm = 15 px).
+ *   - Chuyển đổi diện tích đó từ px² sang cm² (tỷ lệ: 1 cm = 4.67 px).
  *   - Đối chiếu với 3 bậc giá để trả về designFee.
+ *
+ * Toạ độ: (x, y) của mỗi item là GÓC TRÁI-TRÊN (quy ước Konva, khớp với
+ * DesignElement ở frontend) => góc phải-dưới = (x + width, y + height).
  *
  * Bậc giá:
  *   - Không in gì: 0đ
@@ -172,8 +175,9 @@ const calculateBoundingBoxAreaFee = (canvasData) => {
     // Hỗ trợ cả dạng string JSON và object
     const data = typeof canvasData === 'string' ? JSON.parse(canvasData) : canvasData;
 
-    // Tự nhận diện cấu trúc: ưu tiên 'objects' (Fabric.js chuẩn), fallback sang 'layers'
-    const items = data.objects || data.layers || [];
+    // Tự nhận diện cấu trúc: 'objects' (Fabric.js chuẩn), 'layers' (admin wrap),
+    // hoặc 'elements' (canvasData thật của Design Studio, xem useDesignStore.ts)
+    const items = data.objects || data.layers || data.elements || [];
 
     if (!items || items.length === 0) return 0;
 
@@ -182,20 +186,17 @@ const calculateBoundingBoxAreaFee = (canvasData) => {
     let maxX = -Infinity, maxY = -Infinity;
 
     items.forEach((item) => {
-      // Lấy tọa độ và kích thước thực tế sau khi scale
-      const left   = item.left   ?? item.x ?? 0;
-      const top    = item.top    ?? item.y ?? 0;
+      // Lấy kích thước thực tế sau khi scale
       const scaleX = item.scaleX ?? 1;
       const scaleY = item.scaleY ?? 1;
       const w      = (item.width  ?? item.w ?? 0) * scaleX;
       const h      = (item.height ?? item.h ?? 0) * scaleY;
 
-      // Fabric.js: tọa độ (left, top) là điểm trung tâm của object theo mặc định
-      // => Góc trái-trên = left - w/2, góc phải-dưới = left + w/2
-      const x1 = left - w / 2;
-      const y1 = top  - h / 2;
-      const x2 = left + w / 2;
-      const y2 = top  + h / 2;
+      // (x, y)/(left, top) là góc trái-trên => góc phải-dưới = (x+w, y+h)
+      const x1 = item.left ?? item.x ?? 0;
+      const y1 = item.top  ?? item.y ?? 0;
+      const x2 = x1 + w;
+      const y2 = y1 + h;
 
       if (x1 < minX) minX = x1;
       if (y1 < minY) minY = y1;

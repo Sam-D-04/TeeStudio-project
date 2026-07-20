@@ -667,7 +667,7 @@ export default function DesignStudioApp() {
                 color:
                   designFeeInfo.fee === 0
                     ? "#4ade80"
-                    : designFeeInfo.fee === 30000
+                    : designFeeInfo.fee === 40000
                     ? "#facc15"
                     : "#f87171",
               }}
