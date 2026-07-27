@@ -40,6 +40,70 @@ const getDanhMuc = async (req, res, next) => {
 };
 
 /**
+ * GET /api/admin/products/categories/all
+ * Lấy toàn bộ danh mục kèm số lượng sản phẩm (dùng cho trang quản lý).
+ */
+const getDanhSachDanhMuc = async (req, res, next) => {
+  try {
+    const data = await productService.layDanhSachDanhMuc();
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/admin/products/categories
+ * Tạo danh mục mới.
+ * Body: { ten }
+ */
+const taoDanhMuc = async (req, res, next) => {
+  try {
+    const { ten } = req.body;
+    const data = await productService.taoDanhMuc(ten);
+    res.status(201).json({ success: true, message: "Tạo danh mục thành công", data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PUT /api/admin/products/categories/:categoryId
+ * Cập nhật tên danh mục.
+ * Body: { ten }
+ */
+const capNhatDanhMuc = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.categoryId);
+    if (!id || id < 1) {
+      return res.status(400).json({ success: false, message: "ID danh mục không hợp lệ" });
+    }
+    const { ten } = req.body;
+    const data = await productService.capNhatDanhMuc(id, ten);
+    res.json({ success: true, message: "Cập nhật danh mục thành công", data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * DELETE /api/admin/products/categories/:categoryId
+ * Xóa danh mục.
+ */
+const xoaDanhMuc = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.categoryId);
+    if (!id || id < 1) {
+      return res.status(400).json({ success: false, message: "ID danh mục không hợp lệ" });
+    }
+    const data = await productService.xoaDanhMuc(id);
+    res.json({ success: true, message: "Xóa danh mục thành công", data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * GET /api/admin/products/colors
  * Lấy các màu đã dùng để tái sử dụng trong Creatable Select.
  */
@@ -378,4 +442,9 @@ module.exports = {
   xoaSanPham,
   themBienThe,
   capNhatBienThe,
+  // CRUD danh mục
+  getDanhSachDanhMuc,
+  taoDanhMuc,
+  capNhatDanhMuc,
+  xoaDanhMuc,
 };

@@ -71,6 +71,16 @@ router.get("/stats", productController.getThongKe);
 // GET /api/admin/products/categories
 router.get("/categories", productController.getDanhMuc);
 
+// ─── Quản lý danh mục (CRUD) ──────────────────────────────────────────────────
+// GET  /api/admin/products/categories/all  – Danh sách kèm số sản phẩm
+router.get("/categories/all", productController.getDanhSachDanhMuc);
+// POST /api/admin/products/categories      – Tạo mới
+router.post("/categories", productController.taoDanhMuc);
+// PUT  /api/admin/products/categories/:categoryId – Cập nhật
+router.put("/categories/:categoryId", productController.capNhatDanhMuc);
+// DELETE /api/admin/products/categories/:categoryId – Xóa
+router.delete("/categories/:categoryId", productController.xoaDanhMuc);
+
 // GET /api/admin/products/colors
 router.get("/colors", productController.getBangMau);
 
