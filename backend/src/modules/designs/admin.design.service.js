@@ -1689,6 +1689,119 @@ async function layTechpackDonCanIn(id) {
 // =====================================================================
 const GIOI_HAN_DONG_XUAT_EXCEL = 5000;
 
+// ── Hàm tính thông số in (port từ printTechpackUtils.ts) ─────────────
+const DEFAULT_CANVAS = { width: 500, height: 600 };
+const DEFAULT_REAL_SIZE_CM = {
+  front: { width: 30, height: 40 },
+  back:  { width: 35, height: 45 },
+};
+const PRINT_AREA_CONFIG = {
+  tshirt:  { front: { top: 0.31, left: 0.3,  width: 0.4,  height: 0.4  }, back: { top: 0.28, left: 0.28, width: 0.44, height: 0.46 } },
+  polo:    { front: { top: 0.45, left: 0.27, width: 0.46, height: 0.4  }, back: { top: 0.27, left: 0.28, width: 0.44, height: 0.46 } },
+  hoodie:  { front: { top: 0.34, left: 0.3,  width: 0.4,  height: 0.26 }, back: { top: 0.3,  left: 0.26, width: 0.48, height: 0.46 } },
+};
+
+function _toNum(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+function _formatCm(value) {
+  const r = Math.round(value * 10) / 10;
+  return Number.isInteger(r) ? `${r}cm` : `${r.toFixed(1)}cm`;
+}
+function _estimateTextWidth(item) {
+  const w = _toNum(item.width, 0);
+  if (w > 0) return w;
+  const fs = _toNum(item.fontSize, 28);
+  const len = String(item.text || "").length || 8;
+  return Math.max(fs * len * 0.55, fs * 2);
+}
+function _elementBox(item) {
+  const x = _toNum(item.x, NaN), y = _toNum(item.y, NaN);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  const fs = _toNum(item.fontSize, 28);
+  const w = item.type === "text" ? _estimateTextWidth(item) : _toNum(item.width, 0);
+  const h = _toNum(item.height, item.type === "text" ? fs * 1.25 : 0);
+  if (w <= 0 || h <= 0) return null;
+  return { x, y, width: w, height: h, rotation: _toNum(item.rotation, 0) };
+}
+function _rotatedBounds(box) {
+  if (!box.rotation) return box;
+  const rad = (box.rotation * Math.PI) / 180;
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  const corners = [
+    [box.x, box.y], [box.x + box.width, box.y],
+    [box.x + box.width, box.y + box.height], [box.x, box.y + box.height],
+  ].map(([px, py]) => ({
+    x: cx + (px - cx) * Math.cos(rad) - (py - cy) * Math.sin(rad),
+    y: cy + (px - cx) * Math.sin(rad) + (py - cy) * Math.cos(rad),
+  }));
+  const minX = Math.min(...corners.map(p => p.x));
+  const minY = Math.min(...corners.map(p => p.y));
+  return { x: minX, y: minY,
+    width: Math.max(...corners.map(p => p.x)) - minX,
+    height: Math.max(...corners.map(p => p.y)) - minY, rotation: box.rotation };
+}
+function _mergeBoxes(boxes) {
+  if (!boxes.length) return null;
+  return {
+    x: Math.min(...boxes.map(b => b.x)),
+    y: Math.min(...boxes.map(b => b.y)),
+    width: Math.max(...boxes.map(b => b.x + b.width)) - Math.min(...boxes.map(b => b.x)),
+    height: Math.max(...boxes.map(b => b.y + b.height)) - Math.min(...boxes.map(b => b.y)),
+    rotation: 0,
+  };
+}
+
+/**
+ * Tính thông số in (summary + detail) từ canvasData, tương đương tinhThongSoInCm trên FE.
+ * @param {object|null} canvasData
+ * @param {"front"|"back"} side
+ * @param {object|null} viTriIn  - { maxWidthCm, maxHeightCm } từ PrintPosition
+ * @param {string} shirtTypeFallback
+ * @returns {{ summary: string, detail: string } | null}
+ */
+function tinhThongSoInCm(canvasData, side, viTriIn, shirtTypeFallback) {
+  if (!canvasData) return null;
+  const rawItems = Array.isArray(canvasData.elements)
+    ? canvasData.elements
+    : Array.isArray(canvasData.layers) ? canvasData.layers : [];
+
+  const sideItems = rawItems.filter(item => {
+    const s = item.side;
+    if (s === "back") return side === "back";
+    if (s === "front") return side === "front";
+    return (canvasData.shirtView === "back" ? "back" : "front") === side;
+  });
+
+  const boxes = sideItems
+    .map(_elementBox)
+    .filter(Boolean)
+    .map(_rotatedBounds);
+  const boundingBox = _mergeBoxes(boxes);
+  if (!boundingBox) return null;
+
+  const cw = _toNum(canvasData?.logicalCanvas?.width, DEFAULT_CANVAS.width);
+  const ch = _toNum(canvasData?.logicalCanvas?.height, DEFAULT_CANVAS.height);
+  const rawShirt = String(canvasData?.shirtType || shirtTypeFallback || "tshirt");
+  const shirtType = (rawShirt === "polo" || rawShirt === "hoodie") ? rawShirt : "tshirt";
+  const cfg = PRINT_AREA_CONFIG[shirtType][side];
+  const printAreaPx = { top: cfg.top * ch, left: cfg.left * cw, width: cfg.width * cw, height: cfg.height * ch };
+  const def = DEFAULT_REAL_SIZE_CM[side];
+  const realW = (viTriIn && viTriIn.maxWidthCm) || def.width;
+  const realH = (viTriIn && viTriIn.maxHeightCm) || def.height;
+  const scaleX = realW / printAreaPx.width;
+  const scaleY = realH / printAreaPx.height;
+  const widthCm  = boundingBox.width  * scaleX;
+  const heightCm = boundingBox.height * scaleY;
+  const topCm    = (boundingBox.y - printAreaPx.top)  * scaleY;
+  const leftCm   = (boundingBox.x - printAreaPx.left) * scaleX;
+  return {
+    summary: `In cách cổ ${_formatCm(topCm)}, chiều rộng hình ${_formatCm(widthCm)}`,
+    detail:  `Cách mép trái vùng in ${_formatCm(leftCm)}, chiều cao hình ${_formatCm(heightCm)}`,
+  };
+}
+
 async function xuatDonCanIn({ tu_khoa, trang_thai, tu_ngay, den_ngay }) {
   const { menhDeWhere, thamSo } = xayDungDieuKienDonCanIn({
     tu_khoa, trang_thai, tu_ngay, den_ngay,
@@ -1701,6 +1814,7 @@ async function xuatDonCanIn({ tu_khoa, trang_thai, tu_ngay, den_ngay }) {
       a.fullName           AS tenKhachHang,
       a.phone              AS soDienThoai,
       p.name               AS tenSanPham,
+      p.shirtType          AS shirtType,
       pv.sku               AS sku,
       pv.color             AS mauSac,
       pv.size              AS kichCo,
@@ -1714,7 +1828,36 @@ async function xuatDonCanIn({ tu_khoa, trang_thai, tu_ngay, den_ngay }) {
       ${BIEU_THUC_TRANG_THAI_DON_IN} AS status,
       co.createdAt         AS ngayDatDon,
       cd.printFileUrlFront AS urlFileInTruoc,
-      cd.printFileUrlBack  AS urlFileInSau
+      cd.printFileUrlBack  AS urlFileInSau,
+      cd.canvasData        AS canvasData,
+      (
+        SELECT pp2.maxWidth
+        FROM DesignPrintPosition dpp2
+        JOIN PrintPosition pp2 ON pp2.id = dpp2.printPositionId
+        WHERE dpp2.designId = oi.designId AND pp2.code = 'MAT_TRUOC'
+        LIMIT 1
+      )                    AS maxWidthFront,
+      (
+        SELECT pp2.maxHeight
+        FROM DesignPrintPosition dpp2
+        JOIN PrintPosition pp2 ON pp2.id = dpp2.printPositionId
+        WHERE dpp2.designId = oi.designId AND pp2.code = 'MAT_TRUOC'
+        LIMIT 1
+      )                    AS maxHeightFront,
+      (
+        SELECT pp2.maxWidth
+        FROM DesignPrintPosition dpp2
+        JOIN PrintPosition pp2 ON pp2.id = dpp2.printPositionId
+        WHERE dpp2.designId = oi.designId AND pp2.code = 'MAT_SAU'
+        LIMIT 1
+      )                    AS maxWidthBack,
+      (
+        SELECT pp2.maxHeight
+        FROM DesignPrintPosition dpp2
+        JOIN PrintPosition pp2 ON pp2.id = dpp2.printPositionId
+        WHERE dpp2.designId = oi.designId AND pp2.code = 'MAT_SAU'
+        LIMIT 1
+      )                    AS maxHeightBack
     FROM OrderProduction op
     JOIN OrderItem oi ON oi.id = op.orderItemId
     JOIN CustomerOrder co ON co.id = oi.orderId
@@ -1734,24 +1877,65 @@ async function xuatDonCanIn({ tu_khoa, trang_thai, tu_ngay, den_ngay }) {
       headers: [
         "Mã đơn", "Mã thiết kế", "Khách hàng", "Số điện thoại",
         "Sản phẩm", "SKU", "Màu", "Size", "Số lượng", "Vị trí in",
+        "Thông số in",
         "Trạng thái", "Ngày đặt đơn", "Link ảnh in mặt trước", "Link ảnh in mặt sau",
       ],
-      rows: rows.map((row) => [
-        row.maDon,
-        row.thietKeId ? `TK-${String(row.thietKeId).padStart(4, "0")}` : "Không có",
-        row.tenKhachHang || "",
-        row.soDienThoai || "",
-        row.tenSanPham || "",
-        row.sku || "",
-        row.mauSac || "",
-        row.kichCo || "",
-        Number(row.soLuong),
-        row.viTriIn || "Chưa xác định",
-        MAP_TRANG_THAI_DON_IN_DB_FE[row.status] || "cho_gui_xuong",
-        formatNgay(row.ngayDatDon),
-        row.urlFileInTruoc || "",
-        row.urlFileInSau || "",
-      ]),
+      //           [0]  [1]  [2]  [3]  [4]  [5]  [6]  [7] [8]  [9]  [10] [11] [12]  [13] [14]
+      columnWidths: [16,  14,  22,  16,  26,  18,  14,   8,  10,  20,  46,  18,  15,  42,  42],
+      wrapCols: [10],  // "Thông số in" – nhiều dòng
+      rows: rows.map((row) => {
+        // Parse canvasData
+        let canvasData = null;
+        if (row.canvasData) {
+          try {
+            canvasData = typeof row.canvasData === "string"
+              ? JSON.parse(row.canvasData)
+              : row.canvasData;
+          } catch { canvasData = null; }
+        }
+
+        // Tính thông số in mặt trước
+        const viTriFront = row.maxWidthFront != null ? {
+          maxWidthCm: Number(row.maxWidthFront),
+          maxHeightCm: Number(row.maxHeightFront),
+        } : null;
+        const viTriBack = row.maxWidthBack != null ? {
+          maxWidthCm: Number(row.maxWidthBack),
+          maxHeightCm: Number(row.maxHeightBack),
+        } : null;
+
+        const frontSpec = tinhThongSoInCm(canvasData, "front", viTriFront, row.shirtType);
+        const backSpec  = tinhThongSoInCm(canvasData, "back",  viTriBack,  row.shirtType);
+
+        const thongSoInParts = [];
+        if (frontSpec) {
+          thongSoInParts.push(`[Mặt trước] ${frontSpec.summary}`);
+          thongSoInParts.push(frontSpec.detail);
+        }
+        if (backSpec) {
+          thongSoInParts.push(`[Mặt sau] ${backSpec.summary}`);
+          thongSoInParts.push(backSpec.detail);
+        }
+        const thongSoIn = thongSoInParts.join("\n") || "";
+
+        return [
+          row.maDon,
+          row.thietKeId ? `TK-${String(row.thietKeId).padStart(4, "0")}` : "Không có",
+          row.tenKhachHang || "",
+          row.soDienThoai || "",
+          row.tenSanPham || "",
+          row.sku || "",
+          row.mauSac || "",
+          row.kichCo || "",
+          Number(row.soLuong),
+          row.viTriIn || "Chưa xác định",
+          thongSoIn,
+          MAP_TRANG_THAI_DON_IN_DB_FE[row.status] || "cho_gui_xuong",
+          formatNgay(row.ngayDatDon),
+          row.urlFileInTruoc || "",
+          row.urlFileInSau || "",
+        ];
+      }),
     },
   ]);
 }
