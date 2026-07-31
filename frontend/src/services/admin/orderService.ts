@@ -219,17 +219,6 @@ export async function capNhatTrangThaiDonHang({
   return res.data.data;
 }
 
-/** Yêu cầu khách chỉnh sửa toàn bộ thiết kế thuộc đơn đang chờ xác nhận. */
-export async function yeuCauChinhSuaThietKeDonHang(
-  id: number,
-  ghiChu: string
-): Promise<{ id: number; designIds: number[]; designStatus: "NEEDS_REVISION" }> {
-  const res = await apiClient.patch<{
-    success: boolean;
-    data: { id: number; designIds: number[]; designStatus: "NEEDS_REVISION" };
-  }>(`/admin/orders/${id}/design-revision`, { ghiChu });
-  return res.data.data;
-}
 
 /**
  * Hủy đơn hàng kèm lý do.

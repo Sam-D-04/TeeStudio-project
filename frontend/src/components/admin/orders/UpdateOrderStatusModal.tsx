@@ -33,8 +33,8 @@ function hasCustomDesignOrder(order?: ChiTietDonHang | null) {
 
   return Boolean(
     order.items?.some((item) => item.loai === "custom_design" || Boolean(item.designId)) ||
-      order.sanPham?.loai === "custom_design" ||
-      order.anhXemTruocThietKe
+    order.sanPham?.loai === "custom_design" ||
+    order.anhXemTruocThietKe
   );
 }
 
@@ -103,8 +103,8 @@ function getApiErrorMessage(error: unknown) {
 function isCodWaitingForDeliveryReconciliation(order?: ChiTietDonHang | null) {
   return Boolean(
     order &&
-      order.thanhToan.phuongThuc === "COD" &&
-      order.thanhToan.status === "PENDING"
+    order.thanhToan.phuongThuc === "COD" &&
+    order.thanhToan.status === "PENDING"
   );
 }
 
@@ -142,12 +142,10 @@ export default function UpdateOrderStatusModal({
   const currentUser = useAuthStore((state) => state.user);
   const [messageApi, messageContextHolder] = message.useMessage();
   const [modal, modalContextHolder] = Modal.useModal();
-  
+
   const [newStatus, setNewStatus] = useState("");
   const [shippingCarrier, setShippingCarrier] = useState<string | undefined>(undefined);
   const [trackingCode, setTrackingCode] = useState("");
-  const [showRevisionInput, setShowRevisionInput] = useState(false);
-  const [revisionNote, setRevisionNote] = useState("");
 
   const { data: order, isLoading } = useQuery({
     queryKey: ["admin-order-detail", orderId],
@@ -200,26 +198,6 @@ export default function UpdateOrderStatusModal({
     },
   });
 
-  const requestRevisionMutation = useMutation({
-    mutationFn: () =>
-      orderService.yeuCauChinhSuaThietKeDonHang(orderId!, revisionNote.trim()),
-    onSuccess: async () => {
-      setRevisionNote("");
-      setShowRevisionInput(false);
-      messageApi.success("Đã gửi yêu cầu khách chỉnh sửa thiết kế");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["admin-order-detail", orderId] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["thiet-ke-danh-sach"] }),
-        queryClient.invalidateQueries({ queryKey: ["thiet-ke-thong-ke"] }),
-      ]);
-      onClose();
-    },
-    onError: (mutationError) => {
-      messageApi.error(getApiErrorMessage(mutationError));
-    },
-  });
-
   return (
     <>
       {messageContextHolder}
@@ -230,14 +208,12 @@ export default function UpdateOrderStatusModal({
         okText="Xác nhận"
         cancelText="Đóng"
         confirmLoading={updateStatusMutation.isPending || isLoading}
-        okButtonProps={{ disabled: !newStatus || isLoading || isStateLocked || showRevisionInput }}
+        okButtonProps={{ disabled: !newStatus || isLoading || isStateLocked }}
         mask={{ closable: true }}
         onCancel={() => {
           setNewStatus("");
           setShippingCarrier(undefined);
           setTrackingCode("");
-          setShowRevisionInput(false);
-          setRevisionNote("");
           onClose();
         }}
         onOk={() => {
@@ -329,7 +305,6 @@ export default function UpdateOrderStatusModal({
                 />
                 {designIdToReview ? (
                   <Button
-                    className="mb-3"
                     type="primary"
                     icon={<EyeOutlined />}
                     onClick={() =>
@@ -339,46 +314,6 @@ export default function UpdateOrderStatusModal({
                     Xem thiết kế
                   </Button>
                 ) : null}
-                {!showRevisionInput ? (
-                  <Button danger onClick={() => setShowRevisionInput(true)}>
-                    Yêu cầu chỉnh sửa thiết kế
-                  </Button>
-                ) : (
-                  <div className="space-y-3">
-                    <div>
-                      <p className="mb-1 text-sm font-semibold text-text-main">
-                        Ghi chú cho khách hàng <span className="text-red-500">*</span>
-                      </p>
-                      <Input.TextArea
-                        value={revisionNote}
-                        rows={4}
-                        maxLength={1000}
-                        showCount
-                        placeholder="Mô tả cụ thể nội dung khách hàng cần chỉnh sửa..."
-                        onChange={(event) => setRevisionNote(event.target.value)}
-                      />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        onClick={() => {
-                          setShowRevisionInput(false);
-                          setRevisionNote("");
-                        }}
-                      >
-                        Hủy
-                      </Button>
-                      <Button
-                        danger
-                        type="primary"
-                        loading={requestRevisionMutation.isPending}
-                        disabled={revisionNote.trim().length < 5}
-                        onClick={() => requestRevisionMutation.mutate()}
-                      >
-                        Gửi yêu cầu
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
             ) : null}
             <p className="mb-2 text-sm font-semibold text-text-main">Trạng thái mới</p>

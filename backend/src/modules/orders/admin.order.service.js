@@ -1124,122 +1124,6 @@ async function capNhatTrangThai(id, trangThaiFE, actor, shippingInfo = {}) {
   return { id: Number(id), trangThai: trangThaiFE };
 }
 
-// =====================================================================
-// SERVICE 4.1: Yêu cầu chỉnh sửa thiết kế của đơn đang chờ xác nhận
-// =====================================================================
-async function yeuCauChinhSuaThietKeDonHang(id, ghiChu, actor) {
-  const noiDung = String(ghiChu || "").trim();
-  if (noiDung.length < 5) {
-    throw taoLoiCoStatus("Ghi chú yêu cầu chỉnh sửa phải có ít nhất 5 ký tự", 400);
-  }
-
-  // --- TRANSACTION: cập nhật DB (giữ nguyên logic hiện tại) ---
-  const result = await db.transaction(async (conn) => {
-    const [rowsDonHang] = await conn.query(
-      `SELECT id, status
-       FROM CustomerOrder
-       WHERE id = ?
-       LIMIT 1
-       FOR UPDATE`,
-      [id]
-    );
-    if (rowsDonHang.length === 0) {
-      throw taoLoiCoStatus("Không tìm thấy đơn hàng", 404);
-    }
-    if (rowsDonHang[0].status !== "PENDING") {
-      throw taoLoiCoStatus(
-        "Chỉ có thể yêu cầu chỉnh sửa thiết kế khi đơn đang ở trạng thái Chờ xác nhận",
-        400
-      );
-    }
-
-    const [rowsThietKe] = await conn.query(
-      `SELECT cd.id
-       FROM OrderItem oi
-       JOIN CustomDesign cd ON cd.id = oi.designId
-       WHERE oi.orderId = ?
-       FOR UPDATE`,
-      [id]
-    );
-    if (rowsThietKe.length === 0) {
-      throw taoLoiCoStatus("Đơn hàng không có thiết kế để yêu cầu chỉnh sửa", 400);
-    }
-
-    const designIds = [...new Set(rowsThietKe.map((row) => row.id))];
-    await conn.query(
-      `UPDATE CustomDesign
-       SET status = 'NEEDS_REVISION', adminNote = ?
-       WHERE id IN (?)`,
-      [noiDung, designIds]
-    );
-    await conn.query(
-      `UPDATE OrderItem
-       SET productionStatus = 'WAITING_DESIGN_APPROVAL'
-       WHERE orderId = ? AND designId IS NOT NULL`,
-      [id]
-    );
-    // Dữ liệu cũ có thể đã tạo hàng chờ in sớm. Loại bỏ để đơn PENDING
-    // không xuất hiện trong danh sách sản xuất.
-    await conn.query(
-      `DELETE op
-       FROM OrderProduction op
-       JOIN OrderItem oi ON oi.id = op.orderItemId
-       WHERE oi.orderId = ?`,
-      [id]
-    );
-
-    await ghiOrderHistory(conn, {
-      orderId: Number(id),
-      fromStatus: "PENDING",
-      toStatus: "PENDING",
-      action: "DESIGN_REVISION_REQUESTED",
-      actor,
-      note: `Yêu cầu khách chỉnh sửa thiết kế: ${noiDung}`,
-    });
-
-    return {
-      id: Number(id),
-      trangThai: "cho_xac_nhan",
-      designIds,
-      designStatus: "NEEDS_REVISION",
-      ghiChu: noiDung,
-    };
-  });
-
-  // --- GỬi EMAIL (ngoài transaction, sau khi commit thành công) ---
-  // Không dùng await ở đây để không block response; lỗi ghi ra console, không throw.
-  try {
-    const [rowsKhach] = await db.pool.query(
-      `SELECT a.email, a.fullName
-       FROM CustomerOrder co
-       JOIN Account a ON a.id = co.userId
-       WHERE co.id = ?
-       LIMIT 1`,
-      [id]
-    );
-    const emailKhach = rowsKhach[0]?.email;
-    const tenKhach = rowsKhach[0]?.fullName || "Khách hàng";
-
-    if (emailKhach && result.designIds?.length > 0) {
-      for (const designId of result.designIds) {
-        const maThietKe = `TK-${String(designId).padStart(4, "0")}`;
-        sendDesignRevisionEmail({
-          to: emailKhach,
-          fullName: tenKhach,
-          maThietKe,
-          ghiChu: noiDung,
-        }).catch((err) =>
-          console.error("Lỗi gửi email yêu cầu chỉnh sửa thiết kế (đơn hàng):", err?.message)
-        );
-      }
-    }
-  } catch (emailQueryErr) {
-    // Lỗi query lấy email không được làm hỏng kết quả nghiệp vụ đã hoàn thành
-    console.error("Lỗi khi truy vấn email để gửi thông báo chỉnh sửa:", emailQueryErr.message);
-  }
-
-  return result;
-}
 
 // =====================================================================
 // SERVICE 5: Hủy đơn hàng
@@ -1568,7 +1452,6 @@ module.exports = {
   layDanhSachDonHang,
   layChiTietDonHang,
   capNhatTrangThai,
-  yeuCauChinhSuaThietKeDonHang,
   huyDonHang,
   capNhatDiaChiGiaoHang,
   taoLaiMaThanhToanOnline,
