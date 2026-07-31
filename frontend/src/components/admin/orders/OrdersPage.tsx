@@ -372,6 +372,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
               orders={danhSachOrder}
               onViewDetail={handleViewDetail}
               onEditStatus={handleEditStatus}
+              userRole={currentUser?.role}
             />
           </div>
         )}
