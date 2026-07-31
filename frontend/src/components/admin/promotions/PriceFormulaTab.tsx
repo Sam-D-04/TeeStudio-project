@@ -43,10 +43,10 @@ export default function PriceFormulaTab() {
   const form: FormState = {
     ...(value
       ? {
-          defaultShippingFee: String(value.defaultShippingFee),
-          freeShippingThreshold: String(value.freeShippingThreshold),
-          vatPercent: String(value.vatPercent),
-        }
+        defaultShippingFee: String(value.defaultShippingFee),
+        freeShippingThreshold: String(value.freeShippingThreshold),
+        vatPercent: String(value.vatPercent),
+      }
       : EMPTY_FORM),
     ...formChanges,
   };
@@ -59,7 +59,7 @@ export default function PriceFormulaTab() {
         vatPercent: Number(form.vatPercent),
       }),
     onSuccess: (data) => {
-      message.success("Đã lưu công thức báo giá");
+      message.success("Đã lưu báo giá");
       queryClient.setQueryData(["admin-promotions", "pricing-formula"], data);
       setFormChanges({});
     },
@@ -119,7 +119,6 @@ export default function PriceFormulaTab() {
     );
   }
 
-  const preview = query.data?.xemTruoc;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 20, overflow: "hidden" }}>
@@ -170,30 +169,8 @@ export default function PriceFormulaTab() {
               cursor: mutation.isPending ? "wait" : "pointer",
             }}
           >
-            <SaveOutlined /> {mutation.isPending ? "Đang lưu..." : "Lưu công thức"}
+            <SaveOutlined /> {mutation.isPending ? "Đang lưu..." : "Lưu"}
           </button>
-        </div>
-      </div>
-
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 20, overflow: "hidden" }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
-          <h3 style={{ margin: 0, fontSize: 15, color: "#0f172a" }}>Xem trước do hệ thống tính</h3>
-          <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>
-            Ví dụ một áo giá 80.000đ và phụ phí in 30.000đ.
-          </p>
-        </div>
-        <div style={{ padding: 20, fontSize: 13, lineHeight: 2, color: "#334155" }}>
-          <div>Giá phôi mẫu: {preview?.giaPhoiMau.toLocaleString("vi-VN")}đ</div>
-          <div>Phụ phí in mẫu: {preview?.phuPhiInMau.toLocaleString("vi-VN")}đ</div>
-          <div>Tạm tính: {preview?.tamTinh.toLocaleString("vi-VN")}đ</div>
-          <div>Thuế VAT: {preview?.thueVat.toLocaleString("vi-VN")}đ</div>
-          <div>Phí vận chuyển: {preview?.phiVanChuyen.toLocaleString("vi-VN")}đ</div>
-          <div style={{ borderTop: "1px solid #e2e8f0", marginTop: 8, paddingTop: 8 }}>
-            Tổng sau làm tròn:{" "}
-            <strong style={{ color: "#0284c7", fontSize: 17 }}>
-              {preview?.tongCong.toLocaleString("vi-VN")}đ
-            </strong>
-          </div>
         </div>
       </div>
     </div>
