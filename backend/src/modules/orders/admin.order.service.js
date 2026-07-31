@@ -14,6 +14,7 @@ const {
   layThoiDiemHetHanMomo,
 } = require("../payments/momo.service");
 const { uploadBase64Image } = require("../uploads/upload.service");
+const { sendDesignRevisionEmail } = require("../../common/services/emailService");
 
 const DEPOSIT_PERCENT = 50;
 const ONLINE_PAYMENT_METHODS = new Set(["VNPAY", "MOMO"]);
@@ -1132,7 +1133,8 @@ async function yeuCauChinhSuaThietKeDonHang(id, ghiChu, actor) {
     throw taoLoiCoStatus("Ghi chú yêu cầu chỉnh sửa phải có ít nhất 5 ký tự", 400);
   }
 
-  return db.transaction(async (conn) => {
+  // --- TRANSACTION: cập nhật DB (giữ nguyên logic hiện tại) ---
+  const result = await db.transaction(async (conn) => {
     const [rowsDonHang] = await conn.query(
       `SELECT id, status
        FROM CustomerOrder
@@ -1203,6 +1205,40 @@ async function yeuCauChinhSuaThietKeDonHang(id, ghiChu, actor) {
       ghiChu: noiDung,
     };
   });
+
+  // --- GỬi EMAIL (ngoài transaction, sau khi commit thành công) ---
+  // Không dùng await ở đây để không block response; lỗi ghi ra console, không throw.
+  try {
+    const [rowsKhach] = await db.pool.query(
+      `SELECT a.email, a.fullName
+       FROM CustomerOrder co
+       JOIN Account a ON a.id = co.userId
+       WHERE co.id = ?
+       LIMIT 1`,
+      [id]
+    );
+    const emailKhach = rowsKhach[0]?.email;
+    const tenKhach = rowsKhach[0]?.fullName || "Khách hàng";
+
+    if (emailKhach && result.designIds?.length > 0) {
+      for (const designId of result.designIds) {
+        const maThietKe = `TK-${String(designId).padStart(4, "0")}`;
+        sendDesignRevisionEmail({
+          to: emailKhach,
+          fullName: tenKhach,
+          maThietKe,
+          ghiChu: noiDung,
+        }).catch((err) =>
+          console.error("Lỗi gửi email yêu cầu chỉnh sửa thiết kế (đơn hàng):", err?.message)
+        );
+      }
+    }
+  } catch (emailQueryErr) {
+    // Lỗi query lấy email không được làm hỏng kết quả nghiệp vụ đã hoàn thành
+    console.error("Lỗi khi truy vấn email để gửi thông báo chỉnh sửa:", emailQueryErr.message);
+  }
+
+  return result;
 }
 
 // =====================================================================

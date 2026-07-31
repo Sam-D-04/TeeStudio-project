@@ -15,6 +15,7 @@ const db = require("../../database/mysql");
 
 const { calculateBoundingBoxAreaFee } = require("../pricing/admin.pricing.service");
 const { taoBaoCaoExcel } = require("../../common/utils/excel-report");
+const { sendDesignRevisionEmail } = require("../../common/services/emailService");
 
 
 // =====================================================================
@@ -1356,9 +1357,12 @@ async function duyetThietKe(id) {
 // PATCH /api/admin/designs/:id/yeu-cau-chinh-sua
 // =====================================================================
 async function yeuCauChinhSua(id, ghiChu) {
-  // Kiểm tra tồn tại
+  // Kiểm tra tồn tại + lấy email khách hàng để gửi thông báo
   const [rows] = await db.pool.query(
-    "SELECT id, status FROM CustomDesign WHERE id = ?",
+    `SELECT cd.id, cd.status, a.email, a.fullName
+     FROM CustomDesign cd
+     LEFT JOIN Account a ON a.id = cd.userId
+     WHERE cd.id = ?`,
     [id]
   );
   if (!rows || rows.length === 0) {
@@ -1370,6 +1374,20 @@ async function yeuCauChinhSua(id, ghiChu) {
     "UPDATE CustomDesign SET status = 'NEEDS_REVISION', adminNote = ? WHERE id = ?",
     [ghiChu || null, id]
   );
+
+  // Gửi email thông báo cho khách hàng (fire-and-forget, lỗi mail không block response)
+  const { email, fullName } = rows[0];
+  const maThietKe = `TK-${String(id).padStart(4, "0")}`;
+  if (email) {
+    sendDesignRevisionEmail({
+      to: email,
+      fullName: fullName || "Khách hàng",
+      maThietKe,
+      ghiChu: ghiChu || "",
+    }).catch((err) =>
+      console.error("Lỗi gửi email yêu cầu chỉnh sửa thiết kế:", err?.message)
+    );
+  }
 
   return {
     id: Number(id),
