@@ -67,10 +67,12 @@ function getProductionStatusBlockReason(order?: ChiTietDonHang | null) {
   return `Chưa thể chuyển sang Chờ giao vì còn sản phẩm chưa in xong (${chiTiet}). Hãy cập nhật tiến độ tại Thiết kế & In ấn → Đơn cần in. Trạng thái Chờ giao sẽ được mở khóa khi tất cả áo đã in xong.`;
 }
 
-function getAllowedNextStatuses(order?: ChiTietDonHang | null) {
+function getAllowedNextStatuses(order?: ChiTietDonHang | null, isAdmin = false) {
   if (!order) return [];
 
+  // ADMIN luôn được chuyển trạng thái, bỏ qua kiểm tra khoá thanh toán
   if (
+    !isAdmin &&
     isOrderStatusLockedByPayment({
       method: order.thanhToan.phuongThuc,
       paymentType: order.thanhToan.loai,
@@ -152,13 +154,14 @@ export default function UpdateOrderStatusModal({
     queryFn: () => orderService.layChiTietDonHang(orderId!),
     enabled: Boolean(orderId) && open,
   });
-  const isStateLocked = isOrderStatusLockedByPayment({
+  const isAdmin = currentUser?.role === "ADMIN";
+  const isStateLocked = !isAdmin && isOrderStatusLockedByPayment({
     method: order?.thanhToan.phuongThuc,
     paymentType: order?.thanhToan.loai,
     status: order?.thanhToan.status,
   });
   const productionStatusBlockReason = getProductionStatusBlockReason(order);
-  const canManageDesignRevision = currentUser?.role === "ADMIN";
+  const canManageDesignRevision = isAdmin;
   const canRequestDesignRevision =
     canManageDesignRevision &&
     order?.trangThai === "cho_xac_nhan" &&
@@ -388,7 +391,7 @@ export default function UpdateOrderStatusModal({
               disabled={isStateLocked || Boolean(productionStatusBlockReason)}
               notFoundContent={productionStatusBlockReason || "Không có trạng thái tiếp theo phù hợp"}
               options={ORDER_STATUS_OPTIONS.filter(
-                (status) => getAllowedNextStatuses(order).includes(status.value)
+                (status) => getAllowedNextStatuses(order, isAdmin).includes(status.value)
               )}
               onChange={setNewStatus}
             />

@@ -910,7 +910,8 @@ async function capNhatTrangThai(id, trangThaiFE, actor, shippingInfo = {}) {
 
     // State Lock: đơn thanh toán online/đặt cọc chưa trả chỉ được phép hủy
     // (qua API hủy riêng), không được đi tiếp trong quy trình sản xuất/giao hàng.
-    if (thanhToanOnlineDangCho) {
+    // ADMIN có toàn quyền bỏ qua ràng buộc này.
+    if (thanhToanOnlineDangCho && actor?.role !== "ADMIN") {
       const err = new Error(
         "Không thể cập nhật trạng thái đơn hàng khi khoản thanh toán online hoặc tiền cọc vẫn đang chờ thanh toán. Chỉ có thể hủy đơn hàng."
       );
