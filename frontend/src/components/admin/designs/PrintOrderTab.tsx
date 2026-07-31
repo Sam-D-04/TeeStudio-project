@@ -257,10 +257,7 @@ export default function PrintOrderTab({
   const tongSo = ketQua?.tongSo ?? 0;
   const tongSoTrang = ketQua?.tongSoTrang ?? 1;
 
-  // Thống kê nhanh từ dữ liệu đang hiển thị
-  const soChoGuiXuong = danhSach.filter((d) => d.trangThai === "cho_gui_xuong").length;
-  const soDangIn = danhSach.filter((d) => d.trangThai === "dang_in").length;
-  const soDaInXong = danhSach.filter((d) => d.trangThai === "da_in_xong").length;
+
   const fileMatTruoc = techpack?.fileIn?.front ?? null;
   const fileMatSau = techpack?.fileIn?.back ?? null;
   const thongSoMatTruoc = techpack
@@ -583,69 +580,17 @@ export default function PrintOrderTab({
         </div>
       </Modal>
       <div style={{ padding: 24 }}>
-      {/* ── Thanh lọc + Thống kê nhanh ── */}
+      {/* ── Thanh lọc ── */}
       <div
         style={{
           display: "flex",
-          justifyContent: "space-between",
+          justifyContent: "flex-start",
           alignItems: "center",
           gap: 16,
           marginBottom: 20,
           flexWrap: "wrap",
         }}
       >
-        {/* Thống kê nhanh */}
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 16px",
-              background: "#e0f2fe",
-              borderRadius: 8,
-              fontSize: 13,
-              color: "#0284c7",
-              fontWeight: 600,
-            }}
-          >
-            <ClockCircleOutlined />
-            {soChoGuiXuong} đơn chờ gửi xưởng
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 16px",
-              background: "#dcfce7",
-              borderRadius: 8,
-              fontSize: 13,
-              color: "#10b981",
-              fontWeight: 600,
-            }}
-          >
-            <CheckCircleOutlined />
-            {soDangIn} đơn đang in tại xưởng
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 16px",
-              background: "#f1f5f9",
-              borderRadius: 8,
-              fontSize: 13,
-              color: "#64748b",
-              fontWeight: 600,
-            }}
-          >
-            <CheckCircleOutlined />
-            {soDaInXong} đơn đã in xong
-          </div>
-        </div>
-
         {/* Bộ lọc ngày và trạng thái */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <div style={{ position: "relative", minWidth: 220, width: 260 }}>
