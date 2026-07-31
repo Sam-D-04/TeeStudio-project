@@ -177,13 +177,23 @@ const updateStaff = async (staffId, data, actorId) => {
   }
 
   const [accounts] = await db.pool.query(
-    "SELECT id, role FROM Account WHERE id = ? LIMIT 1",
+    "SELECT id, role, email FROM Account WHERE id = ? LIMIT 1",
     [staffId]
   );
   const account = accounts[0];
 
   if (!account || !INTERNAL_ROLES.includes(account.role)) {
     throw createError("Không tìm thấy tài khoản nội bộ", 404);
+  }
+
+  const rootAdminEmail = process.env.ROOT_ADMIN_EMAIL;
+  if (rootAdminEmail && account.email === rootAdminEmail) {
+    if (data.role !== undefined || data.status !== undefined) {
+      throw createError(
+        "Lỗi bảo mật: Không thể khóa, xóa hoặc thay đổi quyền của Tài khoản Gốc (Root Admin)!",
+        403
+      );
+    }
   }
 
   const fields = [];
