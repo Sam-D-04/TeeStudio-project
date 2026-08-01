@@ -31,7 +31,7 @@ import ProductTable from "./ProductTable";
 
 // ===== HẰNG SỐ =====
 const SO_MOI_TRANG = 10;
-const NGUONG_SAP_HET = 10;
+const NGUONG_SAP_HET = 50;
 
 function tinhTrangThaiTheoKhaDung(khaDung: number) {
   if (khaDung <= 0) return "het_hang" as const;

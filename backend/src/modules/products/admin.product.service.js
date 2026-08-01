@@ -10,7 +10,7 @@ const uploadService = require("../uploads/upload.service");
 // HẰNG SỐ
 // =====================================================================
 /** Ngưỡng cảnh báo sắp hết hàng */
-const NGUONG_SAP_HET = 10;
+const NGUONG_SAP_HET = 50;
 const TRANG_THAI_DON_GIU_HANG =
   "'PENDING','CONFIRMED','PROCESSING','PRINTING','READY_TO_SHIP'";
 const TRANG_THAI_DON_CHAN_XOA_AN =

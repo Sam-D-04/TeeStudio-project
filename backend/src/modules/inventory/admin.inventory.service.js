@@ -19,7 +19,7 @@ const db = require("../../database/mysql");
 // ────────────────────────────────────────────────────────────────────────────
 
 /** Số lượng ≤ ngưỡng này → trạng thái "sap_het" */
-const NGUONG_SAP_HET = 20;
+const NGUONG_SAP_HET = 50;
 const NGUONG_TON_THAP_DASHBOARD = 15;
 
 const RESERVED_STOCK_JOIN = `

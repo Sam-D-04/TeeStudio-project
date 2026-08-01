@@ -108,7 +108,9 @@ export default function InventoryTransactionModal({
       loi.nhaCungCap = "Vui lòng chọn nhà cung cấp";
     }
 
-    if (!lyDo.trim() || lyDo.trim().length < 3) {
+    if (loaiGiaoDich !== "IMPORT" && !lyDo.trim()) {
+      loi.lyDo = "Vui lòng nhập lý do";
+    } else if (lyDo.trim() && lyDo.trim().length < 3) {
       loi.lyDo = "Lý do phải có ít nhất 3 ký tự";
     } else if (lyDo.trim().length > 300) {
       loi.lyDo = "Lý do không được vượt quá 300 ký tự";
@@ -276,7 +278,7 @@ export default function InventoryTransactionModal({
         {/* Trường: Lý do / Ghi chú */}
         <div className="mb-6">
           <label className="mb-1.5 block text-sm font-semibold text-text-main">
-            Lý do / Ghi chú <span className="text-[#b91c1c]">*</span>
+            Lý do / Ghi chú {loaiGiaoDich !== "IMPORT" && <span className="text-[#b91c1c]">*</span>}
           </label>
           <textarea
             rows={3}
