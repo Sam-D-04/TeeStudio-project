@@ -238,6 +238,16 @@ export default function UpdateOrderStatusModal({
             return;
           }
 
+          if (newStatus === "da_xac_nhan") {
+            const hasNeedsRevisionDesign = order?.items?.some(
+              (item) => item.designStatus === "NEEDS_REVISION"
+            );
+            if (hasNeedsRevisionDesign) {
+              messageApi.error("Không thể duyệt nhanh. Có bản thiết kế đang chờ khách sửa.");
+              return;
+            }
+          }
+
           const performUpdate = () => {
             updateStatusMutation.mutate({
               trangThai: newStatus,
