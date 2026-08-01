@@ -38,6 +38,9 @@ type OrderFilterBarProps = {
   paymentFilter: string;
   onPaymentFilterChange: (value: string) => void;
 
+  paymentMethodFilter: string;
+  onPaymentMethodFilterChange: (value: string) => void;
+
   onDateChange: (startDate: string, endDate: string) => void;
   onDateClear: () => void;
   initialStartDate?: string;
@@ -55,6 +58,8 @@ export default function OrderFilterBar({
   onTabChange,
   paymentFilter,
   onPaymentFilterChange,
+  paymentMethodFilter,
+  onPaymentMethodFilterChange,
   onDateChange,
   onDateClear,
   initialStartDate,
@@ -109,6 +114,23 @@ export default function OrderFilterBar({
             <option value="can_doi_soat">Chờ đối soát COD</option>
           </select>
           {/* Icon mũi tên xuống */}
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary">
+            ▾
+          </span>
+        </div>
+
+        {/* Select lọc theo phương thức thanh toán */}
+        <div className="relative shrink-0">
+          <select
+            value={paymentMethodFilter}
+            onChange={(e) => onPaymentMethodFilterChange(e.target.value)}
+            className="h-control-h appearance-none rounded-lg border border-border bg-surface pl-3 pr-9 text-sm text-text-main outline-none focus:border-primary-container"
+          >
+            <option value="tat_ca">Phương thức: Tất cả</option>
+            <option value="VNPAY">VNPAY</option>
+            <option value="MOMO">MoMo</option>
+            <option value="COD">COD</option>
+          </select>
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary">
             ▾
           </span>

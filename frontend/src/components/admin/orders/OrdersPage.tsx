@@ -60,6 +60,7 @@ const SO_MOI_TRANG = 10;
 export type OrdersInitialFilters = {
   status?: string;
   payment?: string;
+  paymentMethod?: string;
   startDate?: string;
   endDate?: string;
   dateField?: "created" | "completed";
@@ -80,6 +81,9 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
   const [activeTab, setActiveTab] = useState(initialFilters?.status ?? "tat_ca");
   const [paymentFilter, setPaymentFilter] = useState(
     initialFilters?.payment ?? "tat_ca"
+  );
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState(
+    initialFilters?.paymentMethod ?? "tat_ca"
   );
   const [tuNgay, setTuNgay] = useState(initialFilters?.startDate ?? "");
   const [denNgay, setDenNgay] = useState(initialFilters?.endDate ?? "");
@@ -134,6 +138,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
       currentPage,
       activeTab,
       paymentFilter,
+      paymentMethodFilter,
       tuNgay,
       denNgay,
       dateField,
@@ -148,6 +153,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
         soMoiTrang: SO_MOI_TRANG,
         trangThai: activeTab,
         thanhToan: paymentFilter,
+        phuongThucThanhToan: paymentMethodFilter,
         tuNgay,
         denNgay,
         kieuNgay: dateField === "completed" ? "ngay_hoan_tat" : "ngay_tao",
@@ -184,6 +190,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
     }
   }
   function handlePaymentChange(v: string) { setPaymentFilter(v); setCurrentPage(1); }
+  function handlePaymentMethodChange(v: string) { setPaymentMethodFilter(v); setCurrentPage(1); }
   function handleDateChange(startDate: string, endDate: string) {
     setTuNgay(startDate);
     setDenNgay(endDate);
@@ -203,6 +210,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
   function handleResetFilters() {
     setActiveTab("tat_ca");
     setPaymentFilter("tat_ca");
+    setPaymentMethodFilter("tat_ca");
     setTypeFilter("tat_ca");
     setTuKhoa("");
     setTuNgay("");
@@ -322,6 +330,8 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
           onTabChange={handleTabChange}
           paymentFilter={paymentFilter}
           onPaymentFilterChange={handlePaymentChange}
+          paymentMethodFilter={paymentMethodFilter}
+          onPaymentMethodFilterChange={handlePaymentMethodChange}
           onDateChange={handleDateChange}
           onDateClear={handleDateClear}
           initialStartDate={tuNgay || undefined}

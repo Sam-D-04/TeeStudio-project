@@ -423,6 +423,7 @@ async function layDanhSachDonHang({
   loai,
   tuKhoa,
   excludeStatus,
+  phuongThucThanhToan,
 }) {
   const trangHienTai = parseInt(trang) || 1;
   const soMoi = parseInt(soMoiTrang) || 10;
@@ -461,6 +462,16 @@ async function layDanhSachDonHang({
     dieuKien.push(
       "EXISTS (SELECT 1 FROM Payment pReconcile WHERE pReconcile.orderId = co.id AND pReconcile.status = 'PENDING_RECONCILIATION')"
     );
+  }
+
+  // Lọc theo phương thức thanh toán
+  if (phuongThucThanhToan && phuongThucThanhToan !== "tat_ca") {
+    if (phuongThucThanhToan === "COD") {
+      dieuKien.push("(p.paymentMethod = 'COD' OR p.paymentMethod IS NULL)");
+    } else {
+      dieuKien.push("p.paymentMethod = ?");
+      thamSo.push(phuongThucThanhToan);
+    }
   }
 
   // Lọc theo thời gian. Ưu tiên khoảng ngày cụ thể từ RangePicker.
