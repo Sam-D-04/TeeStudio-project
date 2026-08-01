@@ -480,7 +480,7 @@ function mapReconciliationRows(rows) {
       reconciliationStatus,
       paymentPolicy: row.paymentType || "",
       paymentChannel,
-      cancelReason: row.cancelReason || "",
+      cancelReason: row.cancelReason ? row.cancelReason.replace("[TECH_ADJUST]", "").trim() : "",
     };
   });
 }

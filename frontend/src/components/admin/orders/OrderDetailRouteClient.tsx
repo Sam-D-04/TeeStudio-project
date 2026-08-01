@@ -21,6 +21,7 @@ import {
   Input,
   Modal,
   QRCode,
+  Radio,
   Skeleton,
   Space,
   Tag,
@@ -535,12 +536,28 @@ function OrderDetailContent({
       {/* ── Lý do hủy (nếu có) ── */}
       {order.lyDoHuy ? (
         <div className="px-4 pt-3">
-          <Alert
-            showIcon
-            type="warning"
-            title="Lý do hủy đơn"
-            description={order.lyDoHuy}
-          />
+          {order.lyDoHuy.startsWith("[TECH_ADJUST]") ? (
+            <Alert
+              showIcon
+              type="error"
+              title={
+                <div className="flex items-center gap-2">
+                  <span>Lý do hủy đơn</span>
+                  <Tag color="magenta" className="m-0 border-0 font-bold">
+                    Điều chỉnh kỹ thuật
+                  </Tag>
+                </div>
+              }
+              description={order.lyDoHuy.replace("[TECH_ADJUST]", "").trim()}
+            />
+          ) : (
+            <Alert
+              showIcon
+              type="warning"
+              title="Lý do hủy đơn"
+              description={order.lyDoHuy}
+            />
+          )}
         </div>
       ) : null}
 
@@ -611,6 +628,7 @@ export default function OrderDetailRouteClient() {
   const [messageApi, messageContextHolder] = message.useMessage();
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelType, setCancelType] = useState<"NORMAL" | "TECH_ADJUST">("NORMAL");
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [addrRecipientName, setAddrRecipientName] = useState("");
   const [addrPhone, setAddrPhone] = useState("");
@@ -663,6 +681,7 @@ export default function OrderDetailRouteClient() {
     onSuccess: async () => {
       setIsCancelModalOpen(false);
       setCancelReason("");
+      setCancelType("NORMAL");
       messageApi.success("Đã hủy đơn hàng thành công");
       await Promise.all([refreshOrderData(), refreshStockData()]);
     },
@@ -798,14 +817,31 @@ export default function OrderDetailRouteClient() {
         onCancel={() => {
           setIsCancelModalOpen(false);
           setCancelReason("");
+          setCancelType("NORMAL");
         }}
         onOk={() => {
           if (trimmedCancelReason.length >= 5) {
-            cancelOrderMutation.mutate(trimmedCancelReason);
+            const finalReason =
+              cancelType === "TECH_ADJUST"
+                ? `[TECH_ADJUST] ${trimmedCancelReason}`
+                : trimmedCancelReason;
+            cancelOrderMutation.mutate(finalReason);
           }
         }}
       >
-        <p className="mb-2 text-sm font-semibold text-text-main">Lý do hủy</p>
+        <p className="mb-2 text-sm font-semibold text-text-main">Phân loại hủy</p>
+        <Radio.Group
+          className="mb-4"
+          value={cancelType}
+          onChange={(e) => setCancelType(e.target.value)}
+        >
+          <div className="flex flex-col gap-3">
+            <Radio value="NORMAL">Hủy do khách hàng / Thông thường</Radio>
+            <Radio value="TECH_ADJUST">Nhập lỗi / Điều chỉnh kỹ thuật</Radio>
+          </div>
+        </Radio.Group>
+        
+        <p className="mb-2 text-sm font-semibold text-text-main">Lý do hủy chi tiết</p>
         <div className="pb-6">
           <Input.TextArea
             value={cancelReason}

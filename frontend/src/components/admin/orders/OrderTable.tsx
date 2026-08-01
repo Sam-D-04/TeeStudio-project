@@ -222,7 +222,7 @@ export default function OrderTable({ orders, onViewDetail, onEditStatus, userRol
                   </button>
 
                   {/* Nút cập nhật trạng thái */}
-                  {onEditStatus && (
+                  {onEditStatus && order.status !== "hoan_tat" && (
                     <button
                       type="button"
                       title={

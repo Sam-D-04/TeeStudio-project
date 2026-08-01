@@ -127,7 +127,7 @@ async function _queryMetrics(batDau, ketThuc) {
       [batDau, ketThuc]
     ),
     db.pool.query(
-      `SELECT COUNT(*) AS soDon
+      `SELECT SUM(CASE WHEN status != 'CANCELLED' OR cancelReason IS NULL OR cancelReason NOT LIKE '[TECH_ADJUST]%' THEN 1 ELSE 0 END) AS soDon
        FROM CustomerOrder
        WHERE DATE(createdAt) >= ? AND DATE(createdAt) <= ?`,
       [batDau, ketThuc]
@@ -156,7 +156,7 @@ async function _queryMetrics(batDau, ketThuc) {
 async function _queryDoiSoatBaoCao(batDau, ketThuc) {
   const [rows] = await db.pool.query(
     `SELECT
-       COUNT(*) AS tongSoDon,
+       SUM(CASE WHEN co.status != 'CANCELLED' OR co.cancelReason IS NULL OR co.cancelReason NOT LIKE '[TECH_ADJUST]%' THEN 1 ELSE 0 END) AS tongSoDon,
        COALESCE(SUM(co.totalAmount), 0) AS tongGiaTriDonHang,
        COALESCE(SUM(COALESCE(paymentSummary.totalPaidAmount, 0)), 0) AS tienDaThu,
        COALESCE(SUM(COALESCE(paymentSummary.pendingCodAmount, 0)), 0) AS codDangTreo,
@@ -186,7 +186,7 @@ async function _queryDoiSoatBaoCao(batDau, ketThuc) {
            ELSE 0
          END
        ) AS soDonChoDoiSoatCod,
-       SUM(CASE WHEN co.status = 'CANCELLED' THEN 1 ELSE 0 END) AS soDonDaHuy
+       SUM(CASE WHEN co.status = 'CANCELLED' AND (co.cancelReason IS NULL OR co.cancelReason NOT LIKE '[TECH_ADJUST]%') THEN 1 ELSE 0 END) AS soDonDaHuy
      FROM CustomerOrder co
      LEFT JOIN (
        SELECT orderId,
@@ -440,7 +440,7 @@ async function layPhanBoTrangThai(tuNgay, denNgay) {
          SUM(CASE WHEN status IN ('PENDING','CONFIRMED','PROCESSING','PRINTING') THEN 1 ELSE 0 END) AS dangXuLy,
          SUM(CASE WHEN status IN ('READY_TO_SHIP','SHIPPING','DELIVERING')       THEN 1 ELSE 0 END) AS dangGiao,
          SUM(CASE WHEN status = 'COMPLETED'                                      THEN 1 ELSE 0 END) AS hoanTat,
-         SUM(CASE WHEN status = 'CANCELLED'                                      THEN 1 ELSE 0 END) AS daHuy
+         SUM(CASE WHEN status = 'CANCELLED' AND (cancelReason IS NULL OR cancelReason NOT LIKE '[TECH_ADJUST]%') THEN 1 ELSE 0 END) AS daHuy
        FROM CustomerOrder
        WHERE DATE(createdAt) >= ? AND DATE(createdAt) <= ?`,
       [batDau, ketThuc]
@@ -453,7 +453,7 @@ async function layPhanBoTrangThai(tuNgay, denNgay) {
       `SELECT
          SUM(CASE WHEN status = 'COMPLETED'                            THEN 1 ELSE 0 END) AS daThanhToan,
          SUM(CASE WHEN status NOT IN ('COMPLETED','CANCELLED')         THEN 1 ELSE 0 END) AS choThanhToan,
-         SUM(CASE WHEN status = 'CANCELLED'                            THEN 1 ELSE 0 END) AS thatBaiHuy
+         SUM(CASE WHEN status = 'CANCELLED' AND (cancelReason IS NULL OR cancelReason NOT LIKE '[TECH_ADJUST]%') THEN 1 ELSE 0 END) AS thatBaiHuy
        FROM CustomerOrder
        WHERE DATE(createdAt) >= ? AND DATE(createdAt) <= ?`,
       [batDau, ketThuc]

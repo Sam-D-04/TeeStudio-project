@@ -29,6 +29,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
+import * as promotionService from "@/services/admin/promotionService";
 import type {
   BienTheSanPham,
   KhachHang,
@@ -546,7 +547,7 @@ function DesignPicker({
                 ) : null}
                 <div className="min-w-0">
                   <div className="truncate font-semibold text-text-main">
-                    Thiết kế #{design.id} · {design.tenSanPham}
+                    TK-{String(design.id).padStart(4, "0")} · {design.tenSanPham}
                   </div>
                   <div className="text-xs text-text-secondary">
                     Màu {getDesignColor(design, design.sanPham) || "Không rõ"} · Phí thiết kế{" "}
@@ -1339,6 +1340,17 @@ export default function CreateOrderPage() {
     queryKey: ["admin-order-promotions"],
     queryFn: orderService.layDanhSachKhuyenMai,
   });
+
+  const { data: pricingFormula } = useQuery({
+    queryKey: ["admin-pricing-formula"],
+    queryFn: promotionService.layCongThucBaoGia,
+  });
+
+  useEffect(() => {
+    if (pricingFormula?.cauHinh && !form.isFieldTouched("shippingFee")) {
+      form.setFieldValue("shippingFee", pricingFormula.cauHinh.defaultShippingFee);
+    }
+  }, [pricingFormula, form]);
 
   const preview = useMemo(
     () => buildPreview(values, productById, designById, promotions),
