@@ -134,6 +134,7 @@ export default function DesignDetailModal({
         queryClient.invalidateQueries({ queryKey: ["thiet-ke-chi-tiet", designId] }),
         queryClient.invalidateQueries({ queryKey: ["thiet-ke-danh-sach"] }),
         queryClient.invalidateQueries({ queryKey: ["thiet-ke-thong-ke"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-order-detail"] }),
       ]);
     },
     onError: (error) => {
@@ -150,6 +151,7 @@ export default function DesignDetailModal({
         queryClient.invalidateQueries({ queryKey: ["thiet-ke-chi-tiet", designId] }),
         queryClient.invalidateQueries({ queryKey: ["thiet-ke-danh-sach"] }),
         queryClient.invalidateQueries({ queryKey: ["thiet-ke-thong-ke"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-order-detail"] }),
       ]);
     },
     onError: (error) => {
