@@ -346,9 +346,75 @@ const sendOrderConfirmationEmail = async ({
   }
 };
 
+/**
+ * sendDesignRevisionEmail – Gửi email thông báo yêu cầu khách chỉnh sửa thiết kế.
+ *
+ * Hàm này KHÔNG throw lỗi ra ngoài khi gửi thất bại (chỉ log console.error).
+ * Lý do: trạng thái thiết kế đã được cập nhật trong DB trước khi hàm này được gọi;
+ * không nên vì lỗi gửi mail mà báo lỗi ngược lại cho admin.
+ */
+const sendDesignRevisionEmail = async ({
+  to,        // email khách hàng
+  fullName,  // tên khách hàng
+  maThietKe, // ví dụ: "TK-0042"
+  ghiChu,    // nội dung ghi chú admin nhập
+}) => {
+  try {
+    const { transporter: gmailTransporter, user } = getTransporter();
+    const safeName = escapeHtml(fullName);
+    const safeMa = escapeHtml(maThietKe);
+    const safeGhiChu = escapeHtml(ghiChu || "");
+
+    return await gmailTransporter.sendMail({
+      from: { name: "TeeStudio", address: user },
+      to,
+      subject: `TeeStudio – Yêu cầu chỉnh sửa thiết kế ${maThietKe}`,
+      text: [
+        `Xin chào ${fullName},`,
+        "",
+        `Thiết kế ${maThietKe} của bạn cần được chỉnh sửa trước khi tiếp tục xử lý đơn hàng.`,
+        "",
+        "Lý do / Ghi chú từ TeeStudio:",
+        `"${ghiChu || ""}"`,
+        "",
+        "Vui lòng đăng nhập vào tài khoản TeeStudio để xem và chỉnh sửa thiết kế của bạn.",
+        "",
+        "Đây là email tự động, vui lòng không trả lời email này.",
+        "Trân trọng,",
+        "Đội ngũ TeeStudio",
+      ].join("\n"),
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#0f172a;line-height:1.6">
+          <h2 style="color:#ea580c">Yêu cầu chỉnh sửa thiết kế</h2>
+          <p>Xin chào <strong>${safeName}</strong>,</p>
+          <p>
+            Thiết kế <strong>${safeMa}</strong> của bạn cần được chỉnh sửa
+            trước khi tiếp tục xử lý đơn hàng.
+          </p>
+          <div style="padding:16px 20px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;margin:16px 0">
+            <p style="margin:0 0 8px;font-weight:bold;color:#9a3412">Lý do / Ghi chú từ TeeStudio:</p>
+            <p style="margin:0;white-space:pre-wrap">${safeGhiChu}</p>
+          </div>
+          <p>Vui lòng đăng nhập vào tài khoản TeeStudio để xem và chỉnh sửa thiết kế của bạn.</p>
+          <div style="margin-top:16px;color:#64748b;font-size:13px">
+            Đây là email tự động, vui lòng không trả lời email này.<br>
+            Trân trọng,<br>
+            Đội ngũ TeeStudio
+          </div>
+        </div>
+      `,
+    });
+  } catch (error) {
+    if (error.statusCode) throw error;
+    console.error("Không thể gửi email yêu cầu chỉnh sửa thiết kế:", error.message);
+    // KHÔNG throw tiếp – lỗi gửi mail không được làm hỏng luồng nghiệp vụ đã hoàn thành
+  }
+};
+
 module.exports = {
   sendAccountCredentialsEmail,
   sendOrderConfirmationEmail,
   sendVerificationEmail,
   sendPasswordResetEmail,
+  sendDesignRevisionEmail,
 };

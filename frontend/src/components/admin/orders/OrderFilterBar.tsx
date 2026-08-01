@@ -114,19 +114,6 @@ export default function OrderFilterBar({
           </span>
         </div>
 
-        {/* Lọc theo thời gian */}
-        <DateRangeFilter
-          initialPreset={initialStartDate && initialEndDate ? "custom" : "all"}
-          initialStartDate={initialStartDate}
-          initialEndDate={initialEndDate}
-          allowClear
-          onChange={onDateChange}
-          onClear={onDateClear}
-          className="w-full shrink-0 sm:w-auto"
-          selectClassName="h-control-h"
-          rangePickerClassName="h-control-h min-w-[240px] sm:w-[280px]"
-        />
-
         {/* Select lọc theo loại đơn */}
         <div className="relative shrink-0">
           <select
@@ -142,6 +129,19 @@ export default function OrderFilterBar({
             ▾
           </span>
         </div>
+
+        {/* Lọc theo thời gian */}
+        <DateRangeFilter
+          initialPreset={initialStartDate && initialEndDate ? "custom" : "all"}
+          initialStartDate={initialStartDate}
+          initialEndDate={initialEndDate}
+          allowClear
+          onChange={onDateChange}
+          onClear={onDateClear}
+          className="w-full shrink-0 sm:w-auto"
+          selectClassName="h-control-h"
+          rangePickerClassName="h-control-h min-w-[240px] sm:w-[280px]"
+        />
 
         {/* Nút Đặt lại */}
         {onResetFilters && (

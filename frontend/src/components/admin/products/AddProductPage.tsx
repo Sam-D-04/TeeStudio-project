@@ -156,11 +156,14 @@ function FormField({
   label,
   required,
   error,
+  labelAction,
   children,
 }: {
   label: string;
   required?: boolean;
   error?: string;
+  /** Node hiển thị kèm label (ví dụ: nút '+') */
+  labelAction?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -168,9 +171,10 @@ function FormField({
       data-error-anchor={error ? "true" : undefined}
       className="flex flex-col gap-1"
     >
-      <label className="text-[13px] font-semibold text-text-secondary">
+      <label className="flex items-center gap-1.5 text-[13px] font-semibold text-text-secondary">
         {label}
-        {required && <span className="ml-0.5 text-error">*</span>}
+        {required && <span className="text-error">*</span>}
+        {labelAction}
       </label>
       {children}
       {error && (
@@ -650,6 +654,16 @@ export default function AddProductPage() {
                   label="Danh mục"
                   required
                   error={loiBuoc1.danhMucId}
+                  labelAction={
+                    <button
+                      type="button"
+                      onClick={() => router.push("/admin/san-pham-phoi-ao/danh-muc")}
+                      title="Quản lý danh mục"
+                      className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface text-[11px] text-text-secondary transition-colors hover:border-primary-container hover:text-primary-container"
+                    >
+                      +
+                    </button>
+                  }
                 >
                   <select
                     id="add-product-danh-muc"

@@ -57,6 +57,8 @@ type OrderTableProps = {
   orders: Order[];
   onViewDetail: (order: Order) => void;
   onEditStatus?: (order: Order) => void;
+  /** Role của người dùng hiện tại. ADMIN luôn được phép cập nhật trạng thái. */
+  userRole?: string;
 };
 
 // Hàm định dạng số tiền VND: 429000 → "429.000đ"
@@ -93,7 +95,7 @@ function isStatusUpdateLocked(order: Order): boolean {
   });
 }
 
-export default function OrderTable({ orders, onViewDetail, onEditStatus }: OrderTableProps) {
+export default function OrderTable({ orders, onViewDetail, onEditStatus, userRole }: OrderTableProps) {
   return (
     // Wrapper cho phép cuộn ngang trên màn hình nhỏ
     <div className="overflow-x-auto">
@@ -224,11 +226,11 @@ export default function OrderTable({ orders, onViewDetail, onEditStatus }: Order
                     <button
                       type="button"
                       title={
-                        isStatusUpdateLocked(order)
+                        isStatusUpdateLocked(order) && userRole !== "ADMIN"
                           ? "Đơn đang chờ thanh toán online hoặc tiền cọc; chỉ có thể hủy đơn"
                           : "Cập nhật trạng thái"
                       }
-                      disabled={isStatusUpdateLocked(order)}
+                      disabled={isStatusUpdateLocked(order) && userRole !== "ADMIN"}
                       onClick={(e) => {
                         e.stopPropagation();
                         onEditStatus(order);

@@ -83,5 +83,16 @@ adminRouter.patch(
   paymentController.luuGhiChu
 );
 
+//"Hãy tạo một API để XÓA giao dịch", bạn chỉ cần copy một block code và dùng adminRouter.delete("/:id", ...) là xong!
+// POST /api/admin/payments/:id/delete - Xóa giao dịch
+// adminRouter.delete(
+//   "/:id",
+//   verifyToken,
+//   requireAdmin,
+//   paymentController.deleteThanhToan
+// );
+
 module.exports = publicRouter;
 module.exports.adminRouter = adminRouter;
+
+

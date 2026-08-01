@@ -1035,6 +1035,94 @@ async function capNhatBienThe(productId, variantId, payload = {}) {
     inventoryStatus: tinhTrangThaiTonKho(available),
   };
 }
+// =====================================================================
+// CRUD DANH MỤC
+// =====================================================================
+
+/**
+ * Lấy danh sách toàn bộ danh mục (kèm số lượng sản phẩm).
+ */
+async function layDanhSachDanhMuc() {
+  const [rows] = await db.pool.query(
+    `SELECT c.id, c.name, c.createdAt,
+       COUNT(p.id) AS soSanPham
+     FROM Category c
+     LEFT JOIN Product p ON p.categoryId = c.id
+     GROUP BY c.id, c.name, c.createdAt
+     ORDER BY c.name ASC`
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    ten: r.name,
+    soSanPham: Number(r.soSanPham),
+    ngayTao: r.createdAt,
+  }));
+}
+
+/**
+ * Tạo danh mục mới.
+ */
+async function taoDanhMuc(ten) {
+  const tenChuan = String(ten || "").trim();
+  if (!tenChuan) throw taoLoi("Tên danh mục không được để trống");
+  if (tenChuan.length > 200) throw taoLoi("Tên danh mục tối đa 200 ký tự");
+
+  const [existing] = await db.pool.query(
+    "SELECT id FROM Category WHERE name = ?",
+    [tenChuan]
+  );
+  if (existing.length > 0) throw taoLoi("Tên danh mục đã tồn tại", 409);
+
+  const result = await db.execute(
+    "INSERT INTO Category (name) VALUES (?)",
+    [tenChuan]
+  );
+  return { id: result.insertId, ten: tenChuan, soSanPham: 0 };
+}
+
+/**
+ * Cập nhật tên danh mục.
+ */
+async function capNhatDanhMuc(id, ten) {
+  const tenChuan = String(ten || "").trim();
+  if (!tenChuan) throw taoLoi("Tên danh mục không được để trống");
+  if (tenChuan.length > 200) throw taoLoi("Tên danh mục tối đa 200 ký tự");
+
+  const [rows] = await db.pool.query("SELECT id FROM Category WHERE id = ?", [id]);
+  if (!rows || rows.length === 0) throw taoLoi("Không tìm thấy danh mục", 404);
+
+  const [existing] = await db.pool.query(
+    "SELECT id FROM Category WHERE name = ? AND id != ?",
+    [tenChuan, id]
+  );
+  if (existing.length > 0) throw taoLoi("Tên danh mục đã tồn tại", 409);
+
+  await db.execute("UPDATE Category SET name = ? WHERE id = ?", [tenChuan, id]);
+  return { id, ten: tenChuan };
+}
+
+/**
+ * Xóa danh mục (chỉ được xóa nếu không có sản phẩm nào dùng).
+ */
+async function xoaDanhMuc(id) {
+  const [rows] = await db.pool.query("SELECT id FROM Category WHERE id = ?", [id]);
+  if (!rows || rows.length === 0) throw taoLoi("Không tìm thấy danh mục", 404);
+
+  const [products] = await db.pool.query(
+    "SELECT COUNT(*) AS so_luong FROM Product WHERE categoryId = ?",
+    [id]
+  );
+  if (Number(products[0].so_luong) > 0) {
+    throw taoLoi(
+      "Không thể xóa danh mục vì đang có sản phẩm thuộc danh mục này",
+      409
+    );
+  }
+
+  await db.execute("DELETE FROM Category WHERE id = ?", [id]);
+  return { id };
+}
+
 module.exports = {
   layThongKe,
   layDanhMuc,
@@ -1051,4 +1139,9 @@ module.exports = {
   xoaSanPham,
   themBienThe,
   capNhatBienThe,
+  // CRUD danh mục
+  layDanhSachDanhMuc,
+  taoDanhMuc,
+  capNhatDanhMuc,
+  xoaDanhMuc,
 };

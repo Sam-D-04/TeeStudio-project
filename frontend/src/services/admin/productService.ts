@@ -415,3 +415,73 @@ export async function xoaAnhSanPham(
   }>(`/admin/products/${productId}/images/${imageId}`);
   return res.data.data;
 }
+
+// =====================================================================
+// CRUD DANH MỤC
+// =====================================================================
+
+/** Danh mục kèm số sản phẩm (dùng cho trang quản lý) */
+export type DanhMucChiTiet = {
+  id: number;
+  ten: string;
+  soSanPham: number;
+  ngayTao: string;
+};
+
+/**
+ * Lấy danh sách toàn bộ danh mục kèm số sản phẩm.
+ * GET /api/admin/products/categories/all
+ */
+export async function layDanhSachDanhMuc(): Promise<DanhMucChiTiet[]> {
+  const res = await apiClient.get<{ success: boolean; data: DanhMucChiTiet[] }>(
+    "/admin/products/categories/all"
+  );
+  return res.data.data;
+}
+
+/**
+ * Tạo danh mục mới.
+ * POST /api/admin/products/categories
+ */
+export async function taoDanhMuc(
+  ten: string
+): Promise<DanhMucChiTiet> {
+  const res = await apiClient.post<{
+    success: boolean;
+    message: string;
+    data: DanhMucChiTiet;
+  }>("/admin/products/categories", { ten });
+  return res.data.data;
+}
+
+/**
+ * Cập nhật tên danh mục.
+ * PUT /api/admin/products/categories/:id
+ */
+export async function capNhatDanhMuc(
+  id: number,
+  ten: string
+): Promise<{ id: number; ten: string }> {
+  const res = await apiClient.put<{
+    success: boolean;
+    message: string;
+    data: { id: number; ten: string };
+  }>(`/admin/products/categories/${id}`, { ten });
+  return res.data.data;
+}
+
+/**
+ * Xóa danh mục.
+ * DELETE /api/admin/products/categories/:id
+ */
+export async function xoaDanhMucService(
+  id: number
+): Promise<{ id: number }> {
+  const res = await apiClient.delete<{
+    success: boolean;
+    message: string;
+    data: { id: number };
+  }>(`/admin/products/categories/${id}`);
+  return res.data.data;
+}
+

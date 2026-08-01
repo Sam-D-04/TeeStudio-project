@@ -2,23 +2,27 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CloseOutlined, EditOutlined, LoadingOutlined, SaveOutlined } from "@ant-design/icons";
-import { App } from "antd";
+import { LoadingOutlined } from "@ant-design/icons";
+import { App, Button, Input, InputNumber, Modal, Space } from "antd";
 import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import * as promotionService from "@/services/admin/promotionService";
 
 function PrintSurchargeContent() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
-  const [dangSua, setDangSua] = useState<{ loai: promotionService.LoaiPhuPhi; id: number } | null>(
-    null,
-  );
-  const [giaTri, setGiaTri] = useState("");
+
+  // State cho modal chỉnh sửa
+  const [editItem, setEditItem] = useState<promotionService.PhuPhiBaoGia | null>(null);
+  const [giaTri, setGiaTri] = useState<number>(0);
+
+  // State cho modal xác nhận tắt/bật
+  const [toggleItem, setToggleItem] = useState<promotionService.PhuPhiBaoGia | null>(null);
 
   const query = useQuery({
     queryKey: ["admin-promotions", "surcharges"],
     queryFn: promotionService.layDanhSachPhuPhi,
   });
+
   const mutation = useMutation({
     mutationFn: ({
       item,
@@ -36,7 +40,8 @@ function PrintSurchargeContent() {
       }),
     onSuccess: () => {
       message.success("Đã cập nhật phụ phí");
-      setDangSua(null);
+      setEditItem(null);
+      setToggleItem(null);
       queryClient.invalidateQueries({ queryKey: ["admin-promotions", "surcharges"] });
     },
     onError: (error) => message.error(getApiErrorMessage(error)),
@@ -46,122 +51,68 @@ function PrintSurchargeContent() {
     <section>
       <h4 style={{ margin: "0 0 10px", fontSize: 13, color: "#475569" }}>{title}</h4>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {items.map((item) => {
-          const isEditing = dangSua?.id === item.id && dangSua.loai === item.loai;
-          return (
-            <div
-              key={`${item.loai}-${item.id}`}
-              style={{
-                border: "1px solid #e2e8f0",
-                borderRadius: 12,
-                padding: 16,
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 16,
-                opacity: item.dangBat ? 1 : 0.65,
-                background: item.dangBat ? "#fff" : "#f8fafc",
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 220 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <strong style={{ fontSize: 14, color: "#0f172a" }}>{item.ten}</strong>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: "2px 8px",
-                      borderRadius: 999,
-                      background: item.dangBat ? "#dcfce7" : "#e2e8f0",
-                      color: item.dangBat ? "#059669" : "#64748b",
-                    }}
-                  >
-                    {item.dangBat ? "ĐANG ÁP DỤNG" : "ĐÃ TẮT"}
-                  </span>
-                </div>
-                <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>
-                  {item.moTa}
-                </p>
-              </div>
-
+        {items.map((item) => (
+          <div
+            key={`${item.loai}-${item.id}`}
+            style={{
+              border: "1px solid #e2e8f0",
+              borderRadius: 12,
+              padding: 16,
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+              opacity: item.dangBat ? 1 : 0.65,
+              background: item.dangBat ? "#fff" : "#f8fafc",
+            }}
+          >
+            {/* Tên & trạng thái */}
+            <div style={{ flex: 1, minWidth: 220 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {isEditing ? (
-                  <>
-                    <input
-                      type="number"
-                      min={0}
-                      value={giaTri}
-                      onChange={(event) => setGiaTri(event.target.value)}
-                      style={{
-                        width: 120,
-                        height: 34,
-                        padding: "0 8px",
-                        border: "1px solid #0ea5e9",
-                        borderRadius: 6,
-                        textAlign: "right",
-                      }}
-                    />
-                    <span style={{ fontSize: 12, color: "#64748b" }}>VNĐ/áo</span>
-                    <button
-                      title="Lưu"
-                      onClick={() =>
-                        mutation.mutate({
-                          item,
-                          extraCost: Number(giaTri),
-                          isActive: item.dangBat,
-                        })
-                      }
-                    >
-                      <SaveOutlined />
-                    </button>
-                    <button title="Hủy" onClick={() => setDangSua(null)}>
-                      <CloseOutlined />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <strong style={{ color: "#0284c7" }}>
-                      +{item.giaTri.toLocaleString("vi-VN")}đ/áo
-                    </strong>
-                    <button
-                      title="Chỉnh sửa phụ phí"
-                      onClick={() => {
-                        setDangSua({ id: item.id, loai: item.loai });
-                        setGiaTri(String(item.giaTri));
-                      }}
-                    >
-                      <EditOutlined />
-                    </button>
-                  </>
-                )}
-                <button
-                  title={item.dangBat ? "Tắt phụ phí" : "Bật phụ phí"}
-                  disabled={mutation.isPending}
-                  onClick={() =>
-                    mutation.mutate({
-                      item,
-                      extraCost: item.giaTri,
-                      isActive: !item.dangBat,
-                    })
-                  }
+                <strong style={{ fontSize: 14, color: "#0f172a" }}>{item.ten}</strong>
+                <span
                   style={{
-                    width: 44,
-                    height: 24,
-                    border: "none",
-                    borderRadius: 12,
-                    background: item.dangBat ? "#0ea5e9" : "#cbd5e1",
-                    color: "#fff",
-                    cursor: "pointer",
                     fontSize: 10,
+                    fontWeight: 700,
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                    background: item.dangBat ? "#dcfce7" : "#e2e8f0",
+                    color: item.dangBat ? "#059669" : "#64748b",
                   }}
                 >
-                  {item.dangBat ? "Tắt" : "Bật"}
-                </button>
+                  {item.dangBat ? "ĐANG ÁP DỤNG" : "ĐÃ TẮT"}
+                </span>
               </div>
             </div>
-          );
-        })}
+
+            {/* Giá trị & hành động */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <strong style={{ color: "#0284c7" }}>
+                +{item.giaTri.toLocaleString("vi-VN")}đ/áo
+              </strong>
+
+              <Button
+                size="small"
+                onClick={() => {
+                  setEditItem(item);
+                  setGiaTri(item.giaTri);
+                }}
+              >
+                Chỉnh sửa
+              </Button>
+
+              <Button
+                size="small"
+                danger={item.dangBat}
+                onClick={() => setToggleItem(item)}
+                loading={mutation.isPending && toggleItem?.id === item.id}
+              >
+                {item.dangBat ? "Tắt phụ phí" : "Bật phụ phí"}
+              </Button>
+            </div>
+          </div>
+        ))}
         {items.length === 0 && (
           <div style={{ padding: 24, textAlign: "center", color: "#94a3b8" }}>
             Chưa có dữ liệu cấu hình.
@@ -180,12 +131,15 @@ function PrintSurchargeContent() {
         overflow: "hidden",
       }}
     >
+      {/* Header */}
       <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
-        <h3 style={{ margin: 0, fontSize: 15, color: "#0f172a" }}>Phụ phí in & thiết kế</h3>
+        <h3 style={{ margin: 0, fontSize: 15, color: "#0f172a" }}>Phụ phí in &amp; thiết kế</h3>
         <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>
           Quản lý trực tiếp phụ phí của vị trí in và phương pháp in đang dùng trong Design Studio.
         </p>
       </div>
+
+      {/* Nội dung */}
       {query.isLoading ? (
         <div style={{ padding: 48, textAlign: "center", color: "#475569" }}>
           <LoadingOutlined /> Đang tải phụ phí...
@@ -200,6 +154,58 @@ function PrintSurchargeContent() {
           {renderGroup("Phương pháp in", query.data?.phuongPhapIn ?? [])}
         </div>
       )}
+
+      {/* Modal chỉnh sửa phụ phí */}
+      <Modal
+        title={`Chỉnh sửa phụ phí: ${editItem?.ten}`}
+        open={!!editItem}
+        onOk={() => {
+          if (!editItem) return;
+          mutation.mutate({ item: editItem, extraCost: giaTri, isActive: editItem.dangBat });
+        }}
+        onCancel={() => setEditItem(null)}
+        okText="Lưu"
+        cancelText="Hủy"
+        confirmLoading={mutation.isPending}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16 }}>
+          <span>Giá trị phụ phí:</span>
+          <Space.Compact>
+            <InputNumber
+              min={0}
+              value={giaTri}
+              onChange={(val) => setGiaTri(val ?? 0)}
+              style={{ width: 150 }}
+            />
+            <Input style={{ width: 80 }} value="VNĐ/áo" readOnly />
+          </Space.Compact>
+        </div>
+      </Modal>
+
+      {/* Modal xác nhận tắt/bật phụ phí */}
+      <Modal
+        title={toggleItem?.dangBat ? "Xác nhận tắt phụ phí" : "Xác nhận bật phụ phí"}
+        open={!!toggleItem}
+        onOk={() => {
+          if (!toggleItem) return;
+          mutation.mutate({
+            item: toggleItem,
+            extraCost: toggleItem.giaTri,
+            isActive: !toggleItem.dangBat,
+          });
+        }}
+        onCancel={() => setToggleItem(null)}
+        okText={toggleItem?.dangBat ? "Tắt" : "Bật"}
+        okButtonProps={{ danger: toggleItem?.dangBat }}
+        cancelText="Hủy"
+        confirmLoading={mutation.isPending}
+      >
+        <p>
+          Bạn có chắc muốn{" "}
+          <strong>{toggleItem?.dangBat ? "tắt" : "bật"}</strong> phụ phí{" "}
+          <strong>{toggleItem?.ten}</strong> không?
+        </p>
+      </Modal>
     </div>
   );
 }
