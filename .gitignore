@@ -26,6 +26,7 @@ yarn-error.log*
 # Tài liệu/ghi chú nội bộ, không phải source code
 docs/
 .claude/
+.prompts/
 
 # File dữ liệu dump lớn, không phải source code
 Database_main.sql
