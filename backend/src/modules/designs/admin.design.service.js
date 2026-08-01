@@ -1973,7 +1973,7 @@ async function xuatDonCanIn({ tu_khoa, trang_thai, tu_ngay, den_ngay }) {
 // SERVICE 6: Cập nhật tiến độ in theo đúng thứ tự
 // PATCH /api/admin/designs/don-can-in/:id/trang-thai
 // =====================================================================
-async function capNhatTrangThaiDonIn(id, trangThaiMoi) {
+async function capNhatTrangThaiDonIn(id, trangThaiMoi, actor) {
   const TRANG_THAI_TIEP_THEO = {
     READY_TO_PRINT: "PRINTING",
     PRINTING: "PRINTED",
@@ -2041,12 +2041,52 @@ async function capNhatTrangThaiDonIn(id, trangThaiMoi) {
       );
     }
 
+    let autoTransitionOrderId = null;
+    if (statusMoiDB === "PRINTED") {
+      const [rowsAoChuaInXong] = await conn.query(
+        `SELECT COUNT(*) AS soLuong
+         FROM OrderItem
+         WHERE orderId = (SELECT orderId FROM OrderItem WHERE id = ?)
+           AND designId IS NOT NULL
+           AND (productionStatus IS NULL OR productionStatus NOT IN ('PRINTED', 'PACKED'))`,
+        [donHienTai.orderItemId]
+      );
+      console.log(`[Auto-Transition Check] Items remaining unprinted:`, rowsAoChuaInXong[0].soLuong);
+      
+      if (Number(rowsAoChuaInXong[0].soLuong) === 0) {
+        const [orderRows] = await conn.query(
+          `SELECT id, status FROM CustomerOrder WHERE id = (SELECT orderId FROM OrderItem WHERE id = ?)`,
+          [donHienTai.orderItemId]
+        );
+        console.log(`[Auto-Transition Check] Parent order status:`, orderRows[0]?.status);
+        // Tự động chuyển nếu đơn hàng đang ở trạng thái hợp lệ
+        if (orderRows.length > 0 && ["CONFIRMED", "PROCESSING", "PRINTING"].includes(orderRows[0].status)) {
+          autoTransitionOrderId = orderRows[0].id;
+        }
+      }
+    }
+
     return {
       id: Number(id),
       trangThai: trangThaiMoi,
       productionStatus: statusMoiDB,
+      autoTransitionOrderId,
     };
   });
+
+  if (result.autoTransitionOrderId) {
+    try {
+      console.log(`[Auto-Transition] Triggering capNhatTrangThai for order ${result.autoTransitionOrderId} to cho_giao`);
+      const orderService = require("../orders/admin.order.service");
+      await orderService.capNhatTrangThai(result.autoTransitionOrderId, "cho_giao", actor);
+      console.log(`[Auto-Transition] Success for order ${result.autoTransitionOrderId}`);
+    } catch (err) {
+      console.error(`[Auto-Transition] Failed to transition order ${result.autoTransitionOrderId} to cho_giao:`, err.message);
+    }
+  }
+
+  delete result.autoTransitionOrderId;
+  return result;
 }
 
 // =====================================================================

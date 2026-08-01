@@ -1005,7 +1005,7 @@ async function capNhatTrangThai(id, trangThaiFE, actor, shippingInfo = {}) {
       }
     }
 
-    if (trangThaiDB === "READY_TO_SHIP") {
+    if (trangThaiDB === "READY_TO_SHIP" && actor?.role !== "ADMIN") {
       const [rowsAoChuaInXong] = await conn.query(
         `SELECT COUNT(*) AS soLuong
          FROM OrderItem

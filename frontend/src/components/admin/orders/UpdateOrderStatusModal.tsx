@@ -45,8 +45,9 @@ function areAllCustomItemsPrinted(order?: ChiTietDonHang | null) {
   );
 }
 
-function getProductionStatusBlockReason(order?: ChiTietDonHang | null) {
+function getProductionStatusBlockReason(order?: ChiTietDonHang | null, isAdmin = false) {
   if (!order || order.trangThai !== "dang_xu_ly_in") return null;
+  if (isAdmin) return null; // Admin được quyền bypass chặn trạng thái in ấn
 
   const itemsChuaInXong = order.items?.filter(
     (item) => Boolean(item.designId) && !["PRINTED", "PACKED"].includes(item.productionStatus || "")
@@ -86,7 +87,7 @@ function getAllowedNextStatuses(order?: ChiTietDonHang | null, isAdmin = false) 
     return ["cho_giao"];
   }
 
-  if (order.trangThai === "dang_xu_ly_in" && !areAllCustomItemsPrinted(order)) {
+  if (order.trangThai === "dang_xu_ly_in" && !areAllCustomItemsPrinted(order) && !isAdmin) {
     return [];
   }
 
@@ -158,7 +159,7 @@ export default function UpdateOrderStatusModal({
     paymentType: order?.thanhToan.loai,
     status: order?.thanhToan.status,
   });
-  const productionStatusBlockReason = getProductionStatusBlockReason(order);
+  const productionStatusBlockReason = getProductionStatusBlockReason(order, isAdmin);
   const canManageDesignRevision = isAdmin;
   const canRequestDesignRevision =
     canManageDesignRevision &&

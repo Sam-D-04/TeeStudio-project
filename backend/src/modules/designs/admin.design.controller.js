@@ -342,7 +342,7 @@ const capNhatTrangThaiDonIn = async (req, res, next) => {
     }
 
     const { trangThai } = req.body || {};
-    const data = await designService.capNhatTrangThaiDonIn(id, trangThai);
+    const data = await designService.capNhatTrangThaiDonIn(id, trangThai, req.user);
     res.json({
       success: true,
       message: trangThai === "da_in_xong"
