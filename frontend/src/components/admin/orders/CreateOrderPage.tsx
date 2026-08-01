@@ -1154,7 +1154,7 @@ function OrderSummary({
       <div className="mb-3">
         <h3 className="text-sm font-bold text-text-main">Tóm tắt giá (preview)</h3>
         <p className="mt-0.5 text-xs text-text-secondary">
-          Backend sẽ tính lại chính xác từ database.
+
         </p>
       </div>
 
