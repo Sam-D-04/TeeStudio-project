@@ -164,8 +164,8 @@ export default function UpdateOrderStatusModal({
     canManageDesignRevision &&
     order?.trangThai === "cho_xac_nhan" &&
     hasCustomDesignOrder(order);
-  const designIdToReview =
-    order?.items?.find((item) => Boolean(item.designId))?.designId ?? null;
+  const hasDesignRecords =
+    order?.items?.some((item) => Boolean(item.designId)) ?? false;
 
   const updateStatusMutation = useMutation({
     mutationFn: (payload: { trangThai: string; shippingCarrier?: string; trackingCode?: string }) =>
@@ -303,12 +303,12 @@ export default function UpdateOrderStatusModal({
                   title="Đơn hàng có thiết kế khách hàng"
                   description="Khi chuyển đơn sang Đã xác nhận, hệ thống sẽ tự duyệt thiết kế và đưa sản phẩm vào hàng chờ in. Nếu mẫu chưa đạt, hãy yêu cầu khách chỉnh sửa trước."
                 />
-                {designIdToReview ? (
+                {hasDesignRecords ? (
                   <Button
                     type="primary"
                     icon={<EyeOutlined />}
                     onClick={() =>
-                      router.push(`/admin/thiet-ke?designId=${designIdToReview}`)
+                      router.push(`/admin/thiet-ke?orderId=${orderId}`)
                     }
                   >
                     Xem thiết kế

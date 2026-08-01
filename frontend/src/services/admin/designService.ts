@@ -128,11 +128,11 @@ export type KetQuaThietKe = {
   tongSoTrang: number;
 };
 
-/** Tham số lọc bảng thiết kế */
 export type ThamSoLocThietKe = {
   page?: number;
   limit?: number;
   design_id?: number;
+  order_id?: number;
   tu_khoa?: string;
   trang_thai?: string;
   vi_tri_in?: string;
@@ -323,6 +323,7 @@ export async function layDanhSachThietKe(
   if (thamSo.page) params.page = thamSo.page;
   if (thamSo.limit) params.limit = thamSo.limit;
   if (thamSo.design_id) params.design_id = thamSo.design_id;
+  if (thamSo.order_id) params.order_id = thamSo.order_id;
   if (thamSo.trang_thai) params.trang_thai = thamSo.trang_thai;
   if (thamSo.vi_tri_in) params.vi_tri_in = thamSo.vi_tri_in;
   if (thamSo.tu_khoa?.trim()) params.tu_khoa = thamSo.tu_khoa.trim();

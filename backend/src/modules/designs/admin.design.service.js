@@ -618,7 +618,7 @@ async function layThongKe() {
 // GET /api/admin/designs
 // =====================================================================
 async function layDanhSachThietKe({
-  page, limit, design_id, tu_khoa, trang_thai, vi_tri_in, tu_ngay, den_ngay,
+  page, limit, design_id, tu_khoa, trang_thai, vi_tri_in, tu_ngay, den_ngay, order_id
 }) {
   const trangHienTai = parseInt(page) || 1;
   const soMoi = parseInt(limit) || 10;
@@ -638,6 +638,17 @@ async function layDanhSachThietKe({
     }
     dieuKien.push("cd.id = ?");
     thamSo.push(designId);
+    coTuKhoaHayId = true;
+  }
+  if (order_id !== undefined && order_id !== "") {
+    const orderId = Number(order_id);
+    if (!Number.isInteger(orderId) || orderId <= 0) {
+      throw taoLoi("ID đơn hàng không hợp lệ.");
+    }
+    dieuKien.push(`EXISTS (
+      SELECT 1 FROM OrderItem oi WHERE oi.designId = cd.id AND oi.orderId = ?
+    )`);
+    thamSo.push(orderId);
     coTuKhoaHayId = true;
   }
   if (tu_ngay) {
