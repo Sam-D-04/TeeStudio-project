@@ -181,6 +181,8 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
 
   // 1c. Validate từng item: variant tồn tại + đủ tồn kho
   const itemsEnriched = []; // sẽ chứa thông tin đầy đủ để tính giá
+  const qtyByProductId = {};
+  const variantDataMap = new Map();
 
   for (const item of items) {
     const [rowsVariant] = await db.pool.query(
@@ -211,14 +213,22 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
       throw err;
     }
 
+    qtyByProductId[variant.productId] = (qtyByProductId[variant.productId] || 0) + item.quantity;
+    variantDataMap.set(item, variant);
+  }
+
+  for (const item of items) {
+    const variant = variantDataMap.get(item);
+
     // ── Tính đơn giá theo BulkPricing ──
+    const totalProductQty = qtyByProductId[variant.productId];
     const [rowsBulk] = await db.pool.query(
       `SELECT discountPercent
        FROM BulkPricing
        WHERE productId = ? AND minQty <= ?
        ORDER BY minQty DESC
        LIMIT 1`,
-      [variant.productId, item.quantity]
+      [variant.productId, totalProductQty]
     );
 
     let unitPrice;
@@ -251,6 +261,7 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
   // lúc (xem AddToCartModal), các item đó mang chung 1 base64 giống hệt nhau nên
   // chỉ cần upload 1 lần, tránh sinh file trùng lặp trên Cloudinary.
   const designIdsDaUploadAnh = new Set();
+  const uniqueDesignIdsFee = new Set();
   for (const enriched of itemsEnriched) {
     if (!enriched.designId) continue;
 
@@ -308,7 +319,12 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
       throw err;
     }
 
-    enriched.designFee = Number(design.designFee);
+    if (!uniqueDesignIdsFee.has(enriched.designId)) {
+      enriched.designFee = Number(design.designFee);
+      uniqueDesignIdsFee.add(enriched.designId);
+    } else {
+      enriched.designFee = 0;
+    }
 
     // Upload ảnh in print-ready lên Cloudinary - tối đa 2 ảnh (mặt trước/sau),
     // mỗi mặt upload + lưu độc lập nên lỗi ở mặt này không ảnh hưởng mặt kia.

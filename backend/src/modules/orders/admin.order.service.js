@@ -1790,6 +1790,8 @@ async function taoMoiDonHang(data, actor, ipAddress) {
 
   // 1c. Validate từng item: variant tồn tại + đủ tồn kho
   const itemsEnriched = []; // sẽ chứa thông tin đầy đủ để tính giá
+  const qtyByProductId = {};
+  const variantDataMap = new Map();
 
   for (const item of items) {
     const [rowsVariant] = await db.pool.query(
@@ -1820,15 +1822,23 @@ async function taoMoiDonHang(data, actor, ipAddress) {
       throw err;
     }
 
+    qtyByProductId[variant.productId] = (qtyByProductId[variant.productId] || 0) + item.quantity;
+    variantDataMap.set(item, variant);
+  }
+
+  for (const item of items) {
+    const variant = variantDataMap.get(item);
+
     // ── Tính đơn giá theo BulkPricing ──
-    // Chọn mức BulkPricing có minQty lớn nhất nhưng <= quantity của item này
+    // Chọn mức BulkPricing dựa trên tổng số lượng của sản phẩm trong đơn
+    const totalProductQty = qtyByProductId[variant.productId];
     const [rowsBulk] = await db.pool.query(
       `SELECT discountPercent
        FROM BulkPricing
        WHERE productId = ? AND minQty <= ?
        ORDER BY minQty DESC
        LIMIT 1`,
-      [variant.productId, item.quantity]
+      [variant.productId, totalProductQty]
     );
 
     let unitPrice;
@@ -1862,6 +1872,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
   // admin thêm nhiều dòng cùng trỏ tới 1 designId (VD: tách theo size), tránh
   // upload trùng ảnh giống hệt nhau lên Cloudinary.
   const designIdsDaUploadAnh = new Set();
+  const uniqueDesignIdsFee = new Set();
   for (const enriched of itemsEnriched) {
     if (!enriched.designId) continue;
 
@@ -1931,7 +1942,12 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     }
 
     // Gán designFee và trạng thái thiết kế từ DB
-    enriched.designFee = Number(design.designFee);
+    if (!uniqueDesignIdsFee.has(enriched.designId)) {
+      enriched.designFee = Number(design.designFee);
+      uniqueDesignIdsFee.add(enriched.designId);
+    } else {
+      enriched.designFee = 0;
+    }
     enriched.designStatus = design.status;
 
     // Upload ảnh in print-ready lên Cloudinary rồi lưu URL vào CustomDesign.printFileUrlFront.

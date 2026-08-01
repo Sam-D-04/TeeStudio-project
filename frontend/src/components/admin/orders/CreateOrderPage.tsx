@@ -299,6 +299,16 @@ function buildPreview(
   designById: Record<number, ThietKe>,
   promotions: KhuyenMai[]
 ): OrderPreview {
+  const qtyByProductId: Record<number, number> = {};
+  values.items?.forEach((item) => {
+    const qty = Math.max(1, Number(item.quantity) || 1);
+    if (item.productId) {
+      qtyByProductId[item.productId] = (qtyByProductId[item.productId] || 0) + qty;
+    }
+  });
+
+  const uniqueDesignIds = new Set<number>();
+
   const lines =
     values.items?.map((item) => {
       const productType = getItemProductType(item);
@@ -309,12 +319,19 @@ function buildPreview(
         productType === "CUSTOM" && item?.designId
           ? designById[item.designId]
           : undefined;
+
+      const totalProductQty = item?.productId ? (qtyByProductId[item.productId] || quantity) : quantity;
       const { unitPrice, discountPercent, bulkMinQty } = tinhDonGiaPreview(
         product,
-        quantity
+        totalProductQty
       );
       const lineProductTotal = unitPrice * quantity;
-      const designFee = design?.phiThietKe ?? 0;
+
+      let designFee = 0;
+      if (design && !uniqueDesignIds.has(design.id)) {
+        designFee = design.phiThietKe ?? 0;
+        uniqueDesignIds.add(design.id);
+      }
 
       return {
         productType,
@@ -817,12 +834,23 @@ function ProductItemRow({
           <Tag className="m-0">Chưa đạt mức giá sỉ</Tag>
         ) : null}
 
-        <span className="ml-auto font-semibold text-text-main">
-          Đơn giá preview: {formatCurrency(previewLine?.unitPrice ?? 0)}
-        </span>
-        <span className="font-semibold text-primary-container">
-          Dòng: {formatCurrency(previewLine?.lineTotal ?? 0)}
-        </span>
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-text-main">
+            Đơn giá áo: <span className="font-semibold">{formatCurrency(previewLine?.unitPrice ?? 0)}</span>
+          </span>
+          {previewLine?.designFee ? (
+            <>
+              <span className="text-border">•</span>
+              <span className="text-text-main">
+                Phí thiết kế: <span className="font-semibold text-orange-600">{formatCurrency(previewLine.designFee)}</span>
+              </span>
+            </>
+          ) : null}
+          <span className="text-border">•</span>
+          <span className="text-primary-container">
+            Thành tiền: <span className="font-bold">{formatCurrency(previewLine?.lineTotal ?? 0)}</span>
+          </span>
+        </div>
       </div>
     </div>
   );
