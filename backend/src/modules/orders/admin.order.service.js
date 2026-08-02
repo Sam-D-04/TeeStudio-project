@@ -1339,7 +1339,7 @@ async function taoLaiMaThanhToanOnline(id, actor, ipAddress) {
     const [rows] = await conn.query(
       `SELECT
          co.id,
-         co.orderCode,
+         co.orderCode AS orderCode,
          co.status AS orderStatus,
          p.id AS paymentId,
          p.amount,

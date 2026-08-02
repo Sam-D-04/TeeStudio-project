@@ -86,7 +86,7 @@ function formatVnpayConnectionError(cause) {
 }
 
 function taoMaGiaoDichVnpayMoi(orderCode) {
-  const orderRef = String(orderCode).replace(/[^a-zA-Z0-9]/g, "").slice(0, 50);
+  const orderRef = String(orderCode || "ORDER").replace(/[^a-zA-Z0-9]/g, "").slice(0, 50);
   const timeRef = Date.now().toString(36).toUpperCase();
   const randomRef = crypto.randomBytes(4).toString("hex").toUpperCase();
 

@@ -21,7 +21,7 @@ function signaturesMatch(receivedSignature, expectedSignature) {
 }
 
 function taoMaGiaoDichMomoMoi(orderCode) {
-  const normalizedOrderCode = String(orderCode)
+  const normalizedOrderCode = String(orderCode || "ORDER")
     .replace(/[^a-zA-Z0-9_.-]/g, "")
     .slice(0, 80);
   const timestamp = Date.now().toString(36).toUpperCase();

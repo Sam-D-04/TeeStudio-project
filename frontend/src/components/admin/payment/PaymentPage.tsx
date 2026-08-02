@@ -153,9 +153,11 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
       if (selectedPaymentId) {
         queryClient.invalidateQueries({ queryKey: ["admin-payment-detail", selectedPaymentId] });
       }
+      messageApi.success("Đã lưu ghi chú kế toán thành công.");
       setActionLoading(false);
     },
-    onError: () => {
+    onError: (error) => {
+      messageApi.error(getApiErrorMessage(error, "Không thể lưu ghi chú."));
       setActionLoading(false);
     },
   });
