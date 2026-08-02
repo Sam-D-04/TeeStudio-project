@@ -118,22 +118,7 @@ export default function AccountFormModal({
           />
         )}
 
-        {mode === "sua" && (
-          <Alert
-            title="Lưu ý bảo mật"
-            description="Admin không được phép xem hoặc thay đổi mật khẩu khách hàng. Nếu khách quên mật khẩu, hướng dẫn họ dùng tính năng Quên mật khẩu."
-            type="info"
-            icon={<InfoCircleOutlined />}
-            showIcon
-            style={{
-              marginBottom: 24,
-              borderRadius: 10,
-              border: "1px solid #bae6fd",
-              background: "#f0f9ff",
-              fontSize: 13,
-            }}
-          />
-        )}
+
 
         <Form
           form={form}

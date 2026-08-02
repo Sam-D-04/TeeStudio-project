@@ -170,7 +170,7 @@ const login = async (data, metadata) => {
   }
 
   if (account.status !== "ACTIVE") {
-    throw createError("Tài khoản đã bị vô hiệu hóa", 403);
+    throw createError("Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ với chúng tôi qua email để biết lý do.", 403);
   }
 
   return createSession(account, metadata);
@@ -193,7 +193,7 @@ const refresh = async (refreshToken, metadata) => {
 
   const account = await findAccountById(Number(payload.sub));
   if (!account || account.status !== "ACTIVE") {
-    throw createError("Tài khoản không tồn tại hoặc đã bị vô hiệu hóa", 401);
+    throw createError("Tài khoản không tồn tại hoặc đã bị vô hiệu hóa. Vui lòng liên hệ với chúng tôi qua email để biết lý do.", 401);
   }
 
   const nextTokens = buildTokens(account);
