@@ -18,6 +18,7 @@ import {
   Button,
   Descriptions,
   Drawer,
+  Image,
   Input,
   Modal,
   QRCode,
@@ -166,11 +167,12 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
                   <div className="flex items-center gap-2">
                     <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-border bg-surface-alt">
                       {imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <Image
                           src={imageUrl}
                           alt={item.tenSanPham}
                           className="h-full w-full object-cover"
+                          rootClassName="h-full w-full"
+                          preview={{ mask: "Xem ảnh" }}
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-xs text-text-muted">
