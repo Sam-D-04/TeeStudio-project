@@ -6,6 +6,7 @@ import { App, Tabs } from "antd";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 import AccountFormModal from "./AccountFormDrawer";
+import AccountDetailModal from "./AccountDetailModal";
 import AccountStaffTable from "./AccountStaffTable";
 import AccountStatCards from "./AccountStatCards";
 import AccountsTable from "./AccountsTable";
@@ -41,6 +42,11 @@ export default function AccountsPage() {
     mode: "them" | "sua";
     taiKhoan: TaiKhoanKhachHang | null;
   }>({ open: false, mode: "them", taiKhoan: null });
+
+  const [detailModal, setDetailModal] = useState<{
+    open: boolean;
+    customerId: number | null;
+  }>({ open: false, customerId: null });
 
   const queryKey = ["admin", "accounts", "customers", thamSoLoc];
   const { data, isFetching } = useQuery({
@@ -155,8 +161,16 @@ export default function AccountsPage() {
     setAccountModal({ open: true, mode: "sua", taiKhoan });
   };
 
+  const handleMoModalXem = (taiKhoan: TaiKhoanKhachHang) => {
+    setDetailModal({ open: true, customerId: taiKhoan.id });
+  };
+
   const handleDongModal = () => {
     setAccountModal({ open: false, mode: "them", taiKhoan: null });
+  };
+
+  const handleDongDetailModal = () => {
+    setDetailModal({ open: false, customerId: null });
   };
 
   const handleSubmitForm = (values: TaoTaiKhoanInput | CapNhatTaiKhoanInput) => {
@@ -255,6 +269,7 @@ export default function AccountsPage() {
             onDoiLoc={handleDoiLoc}
             onThem={handleMoModalThem}
             onSua={handleMoModalSua}
+            onXem={handleMoModalXem}
             onVoHieuHoa={(taiKhoan) => mutationVoHieu.mutate(taiKhoan.id)}
             onKhoiPhuc={(taiKhoan) => mutationKhoiPhuc.mutate(taiKhoan.id)}
           />
@@ -270,6 +285,12 @@ export default function AccountsPage() {
         dangTai={dangLuuForm}
         onClose={handleDongModal}
         onSubmit={handleSubmitForm}
+      />
+
+      <AccountDetailModal
+        open={detailModal.open}
+        customerId={detailModal.customerId}
+        onClose={handleDongDetailModal}
       />
     </div>
   );

@@ -206,7 +206,6 @@ export default function AccountFormModal({
                 options={[
                   { value: "ACTIVE", label: "Đang hoạt động" },
                   { value: "INACTIVE", label: "Đã vô hiệu hóa" },
-                  { value: "SUSPENDED", label: "Đình chỉ" },
                 ]}
               />
             </Form.Item>

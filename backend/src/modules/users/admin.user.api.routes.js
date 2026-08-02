@@ -73,6 +73,7 @@ router.patch(
   validate(softDeleteCustomerSchema),
   userController.softDeleteCustomer
 );
+router.get("/admin/customers/:id", verifyToken, requireAdmin, userController.getCustomerDetails);
 
 module.exports = router;
 

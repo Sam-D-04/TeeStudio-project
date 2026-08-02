@@ -373,6 +373,31 @@ const softDeleteCustomer = async (customerId, targetStatus = "INACTIVE") => {
   return getProfile(customerId);
 };
 
+/**
+ * Lấy chi tiết thông tin khách hàng, bao gồm danh sách địa chỉ.
+ */
+const getCustomerDetails = async (customerId) => {
+  const account = await getProfile(customerId);
+
+  if (account.role !== CUSTOMER_ROLE) {
+    throw createError("Tài khoản không phải là khách hàng", 400);
+  }
+
+  const [addresses] = await db.pool.query(
+    `SELECT id, recipientName, phone, addressLine, city, district, ward
+     FROM UserAddress
+     WHERE userId = ? AND isDefault = 1
+     ORDER BY id DESC
+     LIMIT 1`,
+    [customerId]
+  );
+
+  return {
+    ...account,
+    addresses,
+  };
+};
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -383,4 +408,5 @@ module.exports = {
   createCustomer,
   updateCustomer,
   softDeleteCustomer,
+  getCustomerDetails,
 };

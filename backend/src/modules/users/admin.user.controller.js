@@ -99,6 +99,15 @@ const softDeleteCustomer = async (req, res, next) => {
   }
 };
 
+const getCustomerDetails = async (req, res, next) => {
+  try {
+    const data = await userService.getCustomerDetails(Number(req.params.id));
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -109,4 +118,5 @@ module.exports = {
   createCustomer,
   updateCustomer,
   softDeleteCustomer,
+  getCustomerDetails,
 };
