@@ -1632,7 +1632,7 @@ async function timKiemThietKe(userId, keyword) {
 
   const [rows] = await db.pool.query(
     `SELECT cd.id, cd.productId, cd.variantId, cd.baseColor,
-            cd.previewUrl, cd.designFee, cd.status, cd.createdAt,
+            cd.previewUrl, cd.designFee, cd.status, cd.createdAt, cd.name AS tenThietKe,
             p.name AS tenSanPham, p.basePrice, p.material, p.form,
             pi.imageUrl AS anhUrl,
             pv.color AS mauSanPham
@@ -1677,6 +1677,7 @@ async function timKiemThietKe(userId, keyword) {
     productId: r.productId,
     variantId: r.variantId,
     tenSanPham: r.tenSanPham,
+    tenThietKe: r.tenThietKe,
     mauNen: r.baseColor,
     mauSanPham: r.mauSanPham || r.baseColor,
     anhXemTruoc: r.previewUrl,

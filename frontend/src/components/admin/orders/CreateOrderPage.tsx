@@ -547,7 +547,7 @@ function DesignPicker({
                 ) : null}
                 <div className="min-w-0">
                   <div className="truncate font-semibold text-text-main">
-                    TK-{String(design.id).padStart(4, "0")} · {design.tenSanPham}
+                    TK-{String(design.id).padStart(4, "0")} · {design.tenThietKe || design.tenSanPham}
                   </div>
                   <div className="text-xs text-text-secondary">
                     Màu {getDesignColor(design, design.sanPham) || "Không rõ"} · Phí thiết kế{" "}

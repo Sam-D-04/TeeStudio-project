@@ -340,6 +340,7 @@ export type ThietKe = {
   id: number;
   productId: number;
   variantId: number | null;
+  tenThietKe?: string;
   tenSanPham: string;
   mauNen: string;
   mauSanPham: string;
