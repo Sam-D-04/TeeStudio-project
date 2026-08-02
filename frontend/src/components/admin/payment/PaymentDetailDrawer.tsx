@@ -152,7 +152,9 @@ export default function PaymentDetailDrawer({
 
                 <span className="text-text-secondary">Chính sách ban đầu:</span>
                 <span className="text-right font-semibold text-text-main">
-                  {PAYMENT_TYPE_LABEL[payment.orderPaymentType]}
+                  {payment.orderPaymentType === "DEPOSIT"
+                    ? "Thanh toán cọc"
+                    : "Thanh toán toàn bộ"}
                 </span>
 
                 <span className="text-text-secondary">Tiến độ thanh toán:</span>
