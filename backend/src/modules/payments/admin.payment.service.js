@@ -549,6 +549,7 @@ async function layChiTietThanhToan(id) {
        co.orderCode,
        co.totalAmount,
        co.codAmount,
+       co.deliveredAt,
        co.createdAt AS orderCreatedAt,
        co.paymentType AS orderPaymentType,
        co.paymentStatus AS orderPaymentStatus,
@@ -675,6 +676,19 @@ function buildIpnHistory(paymentRow) {
         isSuccess,
       });
     }
+  }
+
+  // Lịch sử chờ đối soát cho COD
+  if (
+    paymentRow.paymentMethod === PAYMENT_METHOD.COD &&
+    (paymentRow.status === PAYMENT_STATUS.PENDING_RECONCILIATION || paymentRow.status === PAYMENT_STATUS.COMPLETED)
+  ) {
+    steps.push({
+      description: "Chờ kế toán đối soát COD",
+      time: formatDateVn(paymentRow.deliveredAt) || "",
+      note: "Shipper đã giao hàng thành công",
+      isSuccess: false,
+    });
   }
 
   // Nếu đã thanh toán thành công
