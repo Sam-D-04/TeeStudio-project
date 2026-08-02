@@ -17,7 +17,7 @@ function taoBoLocThanhToan(queryParams = {}) {
   } else if (trangThai === "da_dat_coc") {
     conditions.push("p.status = 'COMPLETED' AND p.paymentType = 'DEPOSIT'");
   } else if (trangThai === "cho_thanh_toan") {
-    conditions.push("p.status = 'PENDING' AND p.paymentMethod IN ('VNPAY', 'MOMO')");
+    conditions.push("p.status = 'PENDING'");
   } else if (trangThai === "da_thanh_toan") {
     conditions.push("p.status = 'COMPLETED' AND p.paymentType <> 'DEPOSIT'");
   } else if (trangThai === "that_bai") {
