@@ -244,7 +244,7 @@ function BulkPricingContent() {
         okText={dangSuaId ? "Cập nhật" : "Thêm"}
         cancelText="Hủy"
         confirmLoading={saveMutation.isPending}
-        destroyOnHidden
+        forceRender
       >
         <Form
           form={form}

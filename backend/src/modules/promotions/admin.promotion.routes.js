@@ -30,6 +30,11 @@ router.delete(
 );
 
 router.get("/surcharges", controller.layPhuPhi);
+router.post(
+  "/surcharges/print-method",
+  validate(validation.createPrintMethodSchema),
+  controller.taoPhuongPhapIn
+);
 router.put(
   "/surcharges/:id",
   validate(validation.updateSurchargeSchema),

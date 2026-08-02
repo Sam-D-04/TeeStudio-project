@@ -172,6 +172,32 @@ const updateSurchargeSchema = {
   },
 };
 
+const createPrintMethodSchema = {
+  body: {
+    name: {
+      label: "Tên phương pháp in",
+      required: true,
+      type: "string",
+      minLength: 2,
+      maxLength: 100,
+    },
+    code: {
+      label: "Mã phương pháp in",
+      required: true,
+      type: "string",
+      minLength: 2,
+      maxLength: 50,
+      pattern: /^[A-Za-z0-9_]+$/,
+    },
+    extraCost: {
+      label: "Phụ phí",
+      required: true,
+      type: "number",
+      min: 0,
+    },
+  },
+};
+
 const updatePricingFormulaSchema = {
   body: {
     defaultShippingFee: {
@@ -206,5 +232,6 @@ module.exports = {
   createBulkPricingSchema,
   updateBulkPricingSchema,
   updateSurchargeSchema,
+  createPrintMethodSchema,
   updatePricingFormulaSchema,
 };

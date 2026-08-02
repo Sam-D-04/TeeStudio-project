@@ -211,6 +211,15 @@ export async function layDanhSachPhuPhi(): Promise<DanhSachPhuPhi> {
   return response.data.data;
 }
 
+export async function taoPhuongPhapIn(payload: {
+  name: string;
+  code: string;
+  extraCost: number;
+}) {
+  const response = await apiClient.post("/admin/promotions/surcharges/print-method", payload);
+  return response.data.data;
+}
+
 export async function capNhatPhuPhi(
   id: number,
   payload: { loai: LoaiPhuPhi; extraCost: number; isActive: boolean },
