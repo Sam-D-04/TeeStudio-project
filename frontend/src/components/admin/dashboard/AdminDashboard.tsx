@@ -286,7 +286,7 @@ export default function AdminDashboard() {
       {/* ── Tồn kho & 3 Sản phẩm bán chạy nhất ── */}
       <section className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
         <InventoryWarningCard items={inventoryItems} />
-        <BestSellingProductsCard products={bestSellingProducts} />
+        <BestSellingProductsCard products={bestSellingProducts} dateRange={hasDateRange ? dateRange : undefined} />
       </section>
     </>
   );

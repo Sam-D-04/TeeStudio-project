@@ -42,6 +42,8 @@ function tinhTrangThaiTheoKhaDung(khaDung: number) {
 export type ProductsInitialFilters = {
   status?: string;
   stock?: "tat_ca" | "ban_chay" | "con_hang" | "sap_het" | "het_hang";
+  from?: string;
+  to?: string;
 };
 
 type ProductsPageProps = {
@@ -61,6 +63,8 @@ export default function ProductsPage({ initialFilters }: ProductsPageProps) {
   const [stockFilter, setStockFilter] = useState<
     "tat_ca" | "ban_chay" | "con_hang" | "sap_het" | "het_hang"
   >(initialFilters?.stock ?? "tat_ca");
+  const [fromDate, setFromDate] = useState(initialFilters?.from ?? "");
+  const [toDate, setToDate] = useState(initialFilters?.to ?? "");
 
   // ===== STATE PHÂN TRANG =====
   const [currentPage, setCurrentPage] = useState(1);
@@ -91,6 +95,8 @@ export default function ProductsPage({ initialFilters }: ProductsPageProps) {
       categoryFilter,
       statusFilter,
       stockFilter,
+      fromDate,
+      toDate,
     ],
     queryFn: () =>
       productService.layDanhSachSanPham({
@@ -100,6 +106,8 @@ export default function ProductsPage({ initialFilters }: ProductsPageProps) {
         danhMuc: categoryFilter,
         trangThai: statusFilter,
         tonKho: stockFilter,
+        tuNgay: fromDate,
+        denNgay: toDate,
       }),
     staleTime: 15_000,
     placeholderData: (previousData) => previousData,
@@ -147,11 +155,19 @@ export default function ProductsPage({ initialFilters }: ProductsPageProps) {
     setCurrentPage(1);
   }
 
+  function handleDateChange(from: string, to: string) {
+    setFromDate(from);
+    setToDate(to);
+    setCurrentPage(1);
+  }
+
   function handleResetFilters() {
     setSearchKeyword("");
     setCategoryFilter("");
     setStatusFilter("");
     setStockFilter("tat_ca");
+    setFromDate("");
+    setToDate("");
     setCurrentPage(1);
     router.replace("/admin/san-pham-phoi-ao");
   }
@@ -167,6 +183,8 @@ export default function ProductsPage({ initialFilters }: ProductsPageProps) {
     setCategoryFilter("");
     setStatusFilter(status);
     setStockFilter(stock);
+    setFromDate("");
+    setToDate("");
     setCurrentPage(1);
   }
 
@@ -225,7 +243,9 @@ export default function ProductsPage({ initialFilters }: ProductsPageProps) {
     searchKeyword.trim() !== "" ||
     categoryFilter !== "" ||
     statusFilter !== "" ||
-    stockFilter !== "tat_ca";
+    stockFilter !== "tat_ca" ||
+    fromDate !== "" ||
+    toDate !== "";
   const dangCoBoLocKhac =
     searchKeyword.trim() !== "" ||
     categoryFilter !== "" ||
@@ -350,6 +370,9 @@ export default function ProductsPage({ initialFilters }: ProductsPageProps) {
                 onStatusChange={handleStatusChange}
                 stockFilter={stockFilter}
                 onStockFilterChange={handleStockFilterChange}
+                fromDate={fromDate}
+                toDate={toDate}
+                onDateChange={handleDateChange}
                 onResetFilters={handleResetFilters}
               />
 

@@ -12,7 +12,11 @@
 
 import { SearchOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
+import { DatePicker } from "antd";
+import dayjs from "dayjs";
 import * as productService from "@/services/admin/productService";
+
+const { RangePicker } = DatePicker;
 
 // ===== KIỂU DỮ LIỆU CHO FILTER =====
 // Mỗi pill filter kho có giá trị (value) và nhãn hiển thị (label)
@@ -43,6 +47,14 @@ type ProductFilterBarProps = {
   stockFilter: StockPillFilter;
   /** Hàm cập nhật bộ lọc tồn kho */
   onStockFilterChange: (value: StockPillFilter) => void;
+  
+  /** Từ ngày (YYYY-MM-DD) */
+  fromDate?: string;
+  /** Đến ngày (YYYY-MM-DD) */
+  toDate?: string;
+  /** Hàm thay đổi khoảng thời gian lọc */
+  onDateChange?: (from: string, to: string) => void;
+
   /** Hàm đặt lại tất cả bộ lọc */
   onResetFilters?: () => void;
 };
@@ -65,6 +77,9 @@ export default function ProductFilterBar({
   onStatusChange,
   stockFilter,
   onStockFilterChange,
+  fromDate,
+  toDate,
+  onDateChange,
   onResetFilters,
 }: ProductFilterBarProps) {
   // Lấy danh sách danh mục từ API để hiển thị trong dropdown
@@ -150,6 +165,31 @@ export default function ProductFilterBar({
           <option value="dang_hien_thi">Đang hiển thị</option>
           <option value="dang_an">Đang ẩn</option>
         </select>
+
+        {/* Date Picker (Chỉ hiện khi lọc Bán chạy) */}
+        {stockFilter === "ban_chay" && onDateChange && (
+          <div className="flex h-control-h items-center rounded-[10px] bg-surface-alt px-1">
+            <RangePicker
+              variant="borderless"
+              placeholder={["Từ ngày", "Đến ngày"]}
+              format="DD/MM/YYYY"
+              value={[
+                fromDate ? dayjs(fromDate) : null,
+                toDate ? dayjs(toDate) : null,
+              ]}
+              onChange={(dates) => {
+                if (dates && dates[0] && dates[1]) {
+                  onDateChange(
+                    dates[0].format("YYYY-MM-DD"),
+                    dates[1].format("YYYY-MM-DD")
+                  );
+                } else {
+                  onDateChange("", "");
+                }
+              }}
+            />
+          </div>
+        )}
 
         {/* Nút Đặt lại */}
         {onResetFilters && (

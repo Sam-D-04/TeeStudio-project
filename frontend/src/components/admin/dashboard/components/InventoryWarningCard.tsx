@@ -32,7 +32,7 @@ export default function InventoryWarningCard({
           <span>Tồn kho cần chú ý</span>
         </h3>
         <Link
-          href="/admin/kho-hang"
+          href="/admin/kho-hang?stock=low_stock"
           className="text-sm font-medium text-primary-container hover:underline"
         >
           Xem tất cả

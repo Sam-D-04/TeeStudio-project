@@ -57,6 +57,8 @@ export default async function ProductsAdminPage({
   const initialFilters = {
     status: chuyenTrangThai(layGiaTriDauTien(params.status)),
     stock: chuyenTonKho(layGiaTriDauTien(params.stock)),
+    from: layGiaTriDauTien(params.from),
+    to: layGiaTriDauTien(params.to),
   };
 
   return (
