@@ -34,6 +34,7 @@ export type GiaoDich = {
   codReconciliationPaymentId?: number | null;
   id: number;
   payCode: string;
+  orderId: number;
   orderCode: string;
   customerName: string;
   amountVnd: number;

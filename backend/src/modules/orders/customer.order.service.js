@@ -573,7 +573,7 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
        VALUES (?, ?, ?, ?, 'PENDING', ?, ?)`,
       [
         orderId,
-        paymentAmount,
+        paymentMethod === 'COD' ? codAmount : paymentAmount,
         paymentMethod,
         paymentTypeDb,
         onlinePayment?.transactionRef || null,

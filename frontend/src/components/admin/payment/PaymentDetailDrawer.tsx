@@ -212,7 +212,7 @@ export default function PaymentDetailDrawer({
                 <div>
                   {/* Link đến đơn hàng – chữ xanh, gạch chân khi hover */}
                   <a
-                    href={`/admin/don-hang`}
+                    href={`/admin/don-hang/${payment.orderId}`}
                     className="block font-medium text-[#0ea5e9] hover:underline"
                   >
                     {payment.orderCode}

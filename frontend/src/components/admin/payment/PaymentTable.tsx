@@ -51,6 +51,7 @@ export type Payment = {
   codReconciliationPaymentId?: number | null;
   id: number;
   payCode: string;           // Mã GD nội bộ, ví dụ "PAY-000128"
+  orderId: number;
   orderCode: string;         // Mã đơn hàng liên kết, ví dụ "ORD-20260602-001"
   customerName: string;      // Tên khách hàng
   amountVnd: number;         // Số tiền (đơn vị VNĐ)

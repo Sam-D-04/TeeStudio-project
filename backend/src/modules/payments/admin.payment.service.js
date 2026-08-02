@@ -499,6 +499,7 @@ async function layDanhSachThanhToan(queryParams) {
   const danhSach = rows.map((row) => ({
     id: row.id,
     payCode: formatPayCode(row.id),
+    orderId: row.orderId,
     orderCode: row.orderCode,
     customerName: row.customerName,
     amountVnd: Number(row.amount),
@@ -575,6 +576,7 @@ async function layChiTietThanhToan(id) {
   return {
     id: row.id,
     payCode: formatPayCode(row.id),
+    orderId: row.orderId,
     orderCode: row.orderCode,
     customerName: row.customerName,
     customerPhone: row.customerPhone || null,
