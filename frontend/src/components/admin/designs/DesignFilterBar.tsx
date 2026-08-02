@@ -65,7 +65,7 @@ export default function DesignFilterBar({ boDuc, onThayDoi, onDatLai }: DesignFi
         />
         <input
           type="text"
-          placeholder="Tìm mã TK, tên khách..."
+          placeholder="Tìm mã, tên TK, tên khách..."
           value={boDuc.tuKhoa}
           onChange={(e) => {
             const tuKhoaMoi = e.target.value;

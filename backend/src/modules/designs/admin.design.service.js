@@ -705,8 +705,9 @@ async function layDanhSachThietKe({
       CONCAT('TK-', LPAD(cd.id, 4, '0')) LIKE ?
       OR CAST(cd.id AS CHAR) LIKE ?
       OR a.fullName LIKE ?
+      OR cd.name LIKE ?
     )`);
-    thamSo.push(`%${tk}%`, `%${tk}%`, `%${tk}%`);
+    thamSo.push(`%${tk}%`, `%${tk}%`, `%${tk}%`, `%${tk}%`);
   }
 
   const menh_de_where =
