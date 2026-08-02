@@ -62,8 +62,8 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
   );
   const [tuNgay, setTuNgay] = useState(initialFilters?.startDate ?? "");
   const [denNgay, setDenNgay] = useState(initialFilters?.endDate ?? "");
-  const [dateField, setDateField] = useState(
-    initialFilters?.dateField ?? "created"
+  const [dateField, setDateField] = useState<"created" | "paid">(
+    initialFilters?.dateField ?? "paid"
   );
   const [dateFilterKey, setDateFilterKey] = useState(0);
 
@@ -227,7 +227,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
     setSearchValue("");
     setStatusFilter("tat_ca");
     setMethodFilter("tat_ca");
-    setDateField("created");
+    setDateField("paid");
     setTuNgay("");
     setDenNgay("");
     setCurrentPage(1);
@@ -480,6 +480,11 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
           initialEndDate={denNgay || undefined}
           onDateChange={handleDateChange}
           onDateClear={handleDateClear}
+          dateField={dateField}
+          onDateFieldChange={(val) => {
+            setDateField(val);
+            setCurrentPage(1);
+          }}
           onReset={handleReset}
         />
 
