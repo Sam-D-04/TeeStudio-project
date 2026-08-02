@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import PromotionStatCard from "./PromotionStatCard";
 import PromotionFilterBar, { type BoDucMaKhuyenMai } from "./PromotionFilterBar";
 import PromotionTable from "./PromotionTable";
+import PromotionPagination from "./PromotionPagination";
 import PromotionDrawer, { type FormMaKhuyenMai } from "./PromotionDrawer";
 import BulkPricingTab from "./BulkPricingTab";
 import PrintSurchargeTab from "./PrintSurchargeTab";
@@ -346,43 +347,13 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
                 }}
               />
             )}
-            <div
-              style={{
-                padding: "12px 16px",
-                borderTop: "1px solid #e2e8f0",
-                backgroundColor: "#f8fafc",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span style={{ fontSize: 12, color: "#475569" }}>
-                Tổng cộng {listQuery.data?.tongSo ?? 0} mã khuyến mãi
-              </span>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button
-                  disabled={trang <= 1}
-                  onClick={() => setTrang((value) => value - 1)}
-                  style={{ padding: "5px 10px", cursor: trang <= 1 ? "not-allowed" : "pointer" }}
-                >
-                  Trước
-                </button>
-                <span style={{ fontSize: 12 }}>
-                  Trang {trang}/{listQuery.data?.tongSoTrang ?? 1}
-                </span>
-                <button
-                  disabled={trang >= (listQuery.data?.tongSoTrang ?? 1)}
-                  onClick={() => setTrang((value) => value + 1)}
-                  style={{
-                    padding: "5px 10px",
-                    cursor:
-                      trang >= (listQuery.data?.tongSoTrang ?? 1) ? "not-allowed" : "pointer",
-                  }}
-                >
-                  Sau
-                </button>
-              </div>
-            </div>
+            <PromotionPagination
+              currentPage={trang}
+              totalPages={listQuery.data?.tongSoTrang ?? 1}
+              totalItems={listQuery.data?.tongSo ?? 0}
+              itemsPerPage={SO_MOI_TRANG}
+              onPageChange={setTrang}
+            />
           </div>
         )}
 
