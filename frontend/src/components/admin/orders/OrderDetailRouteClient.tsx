@@ -241,9 +241,11 @@ function OnlinePaymentQrButton({ order }: { order: ChiTietDonHang }) {
   const gatewayName = payment.phuongThuc === "MOMO" ? "MoMo" : "VNPAY";
   const expiresAtMs = Date.parse(payment.expiresAt || "");
   const isCancelled = order.trangThai === "da_huy";
-  const isPaid = payment.status === "COMPLETED";
-  const isPending = payment.status === "PENDING";
-  const isFailed = payment.status === "FAILED";
+  // isPaid: dùng paymentStatus cấp đơn hàng (PAID = đơn đã thanh toán đủ)
+  const isPaid = order.thanhToan.status === "PAID";
+  const isPending = payment.transactionStatus === "PENDING";
+  // isFailed: dùng transactionStatus cấp giao dịch (FAILED hoặc CANCELLED)
+  const isFailed = payment.transactionStatus === "FAILED" || payment.transactionStatus === "CANCELLED";
   const isLegacyMomoPayment =
     payment.phuongThuc === "MOMO" && payment.requestType !== "payWithMethod";
   const qrCodeContent =
@@ -508,9 +510,11 @@ function OrderDetailContent({
               </span>
               <span className="text-text-muted">·</span>
               <span className={paymentState.className}>{paymentState.label}</span>
+              {/* Hiển thị nút QR khi: online payment, chưa thanh toán đủ, đơn chưa hủy.
+                  Bỏ điều kiện transactionStatus === PENDING vì component bên trong
+                  tự xử lý mọi trường hợp (PENDING→QR, FAILED/CANCELLED→nút tạo lại). */}
               {canManagePayment &&
               isOnlinePayment &&
-              order.thanhToan.transactionStatus === "PENDING" &&
               !isPaid &&
               order.trangThai !== "da_huy" ? (
                 <OnlinePaymentQrButton order={order} />

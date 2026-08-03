@@ -7,7 +7,7 @@ import {
   SafetyCertificateOutlined,
   WarningFilled,
 } from "@ant-design/icons";
-import { Alert, Button, Spin, Tag } from "antd";
+import { Alert, Button, Spin, Tag, Modal } from "antd";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -85,6 +85,7 @@ export default function OnlinePaymentReturnPage() {
   const [result, setResult] = useState<OnlinePaymentReturnResult | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [hasConnectionError, setHasConnectionError] = useState(false);
+  const [modal, contextHolder] = Modal.useModal();
 
   useEffect(() => {
     let active = true;
@@ -147,9 +148,9 @@ export default function OnlinePaymentReturnPage() {
     result?.isValidChecksum &&
     (detectedGateway === "MOMO"
       ? Boolean(responseCode) &&
-        !["0", "9000"].includes(responseCode) &&
-        !isCancelled &&
-        !isSuccessful
+      !["0", "9000"].includes(responseCode) &&
+      !isCancelled &&
+      !isSuccessful
       : BANK_REJECT_CODES.has(responseCode))
   );
   const canRetry = isCancelled || isBankRejected;
@@ -165,9 +166,9 @@ export default function OnlinePaymentReturnPage() {
   const description = isSuccessful
     ? "TeeStudio đã ghi nhận giao dịch. Chúng tôi sẽ tiếp tục xử lý đơn hàng của quý khách."
     : isCancelled
-      ? "Giao dịch đã được hủy theo yêu cầu của quý khách. Quý khách có thể thực hiện thanh toán lại."
+      ? "Giao dịch đã được hủy theo yêu cầu của quý khách. Quý khách vui lòng liên hệ TeeStudio để được tạo lại mã thanh toán."
       : isBankRejected
-        ? "Vui lòng kiểm tra số dư, hạn mức hoặc sử dụng thẻ và tài khoản ngân hàng khác."
+        ? "Vui lòng liên hệ TeeStudio để được hỗ trợ tạo lại mã thanh toán bằng thẻ/tài khoản khác."
         : isUncertain
           ? "TeeStudio chưa thể kết luận giao dịch thất bại và sẽ tiếp tục kiểm tra tự động."
           : "Dữ liệu giao dịch chưa thể được xác minh. Quý khách vui lòng liên hệ TeeStudio để được hỗ trợ.";
@@ -179,9 +180,29 @@ export default function OnlinePaymentReturnPage() {
         ? "Đã hủy"
         : "Thất bại";
 
+  const showContact = () => {
+    modal.info({
+      title: "Liên hệ bộ phận hỗ trợ TeeStudio",
+      content: (
+        <div className="mt-3">
+          <p className="mb-2 text-sm">Quý khách vui lòng liên hệ qua các kênh sau để được hỗ trợ xử lý giao dịch:</p>
+          <ul className="ml-4 list-disc space-y-1 text-sm">
+            <li><strong>Hotline / Zalo:</strong> 0901 234 567</li>
+            <li><strong>Email:</strong> teestudiocompany@gmail.com</li>
+            <li><strong>Fanpage:</strong> TeeStudio Official</li>
+          </ul>
+        </div>
+      ),
+      okText: "Đóng",
+      centered: true,
+    });
+  };
+
   return (
-    <div className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-white p-6 shadow-lg md:p-8">
-      <div className="text-center">
+    <>
+      {contextHolder}
+      <div className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-white p-6 shadow-lg md:p-8">
+        <div className="text-center">
         {isSuccessful ? (
           <CheckCircleFilled className="text-6xl text-success" />
         ) : isUncertain ? (
@@ -301,31 +322,22 @@ export default function OnlinePaymentReturnPage() {
       </div>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-        {canRetry ? (
-          <Button
-            type="primary"
-            onClick={() => window.history.back()}
-            className="h-10 rounded-lg font-semibold"
-          >
-            Thanh toán lại
-          </Button>
-        ) : null}
         <Button
-          type={isUncertain ? "primary" : canRetry ? "default" : "primary"}
-          href={isUncertain ? "mailto:hello@teestudio.vn" : "/"}
+          type={isSuccessful ? "default" : "primary"}
+          onClick={showContact}
           className="h-10 rounded-lg font-semibold"
         >
-          {isUncertain ? "Liên hệ hỗ trợ" : "Về trang chủ"}
+          Liên hệ hỗ trợ
         </Button>
-        {!isUncertain && !canRetry ? (
-          <Button
-            href="mailto:hello@teestudio.vn"
-            className="h-10 rounded-lg font-semibold"
-          >
-            Liên hệ hỗ trợ
-          </Button>
-        ) : null}
+        <Button
+          type={isSuccessful ? "primary" : "default"}
+          href="/"
+          className="h-10 rounded-lg font-semibold"
+        >
+          Về trang chủ
+        </Button>
       </div>
     </div>
+    </>
   );
 }
