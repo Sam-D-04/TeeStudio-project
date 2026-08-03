@@ -51,6 +51,8 @@ export type ChiTietThietKe = ThietKe & {
   skuAo: string | null;
   tonKhoBienThe: number | null;
   phiViTriIn: number;
+  phuongPhapIn: string;
+  phiPhuongPhapIn: number;
   phiThietKe: number;
   ngayCapNhat: string | null;
   maDonHang: string | null;
@@ -91,6 +93,8 @@ export type CanvasDataThietKe = {
   coDonHang?: boolean;
   duocPhepSua?: boolean;
   lyDoKhoaSua?: string | null;
+  designFee?: number;
+  printMethodId?: number | null;
   canvasData: {
     version: number;
     shirtType: ShirtType;
@@ -117,6 +121,8 @@ export type SuaThietKeInput = {
   previewUrl: string;
   printImageFront?: string | null;
   printImageBack?: string | null;
+  designFeeOverride?: number | null;
+  printMethodId?: number | null;
 };
 
 /** Kết quả danh sách thiết kế có phân trang */
@@ -267,6 +273,15 @@ export type TaoThietKeChoKhachInput = {
   previewUrl: string;
   printImageFront?: string | null;
   printImageBack?: string | null;
+  designFeeOverride?: number | null;
+  printMethodId?: number | null;
+};
+
+export type PhuongPhapIn = {
+  id: number;
+  code: string;
+  ten: string;
+  phiInThem: number;
 };
 
 export type BienTheTaoThietKe = {
@@ -414,6 +429,14 @@ export async function suaThietKeChoKhach(
     success: boolean;
     data: { id: number; maThietKe: string; trangThai: TrangThaiThietKe };
   }>(`/admin/designs/${id}/sua`, payload);
+  return res.data.data;
+}
+
+/** Lấy danh sách phương pháp in đang hoạt động. */
+export async function layDanhSachPhuongPhapIn(): Promise<PhuongPhapIn[]> {
+  const res = await apiClient.get<{ success: boolean; data: PhuongPhapIn[] }>(
+    "/admin/designs/print-methods"
+  );
   return res.data.data;
 }
 

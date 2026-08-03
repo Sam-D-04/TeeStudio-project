@@ -834,6 +834,18 @@ async function layChiTietThietKe(id) {
          WHERE dpp.designId = cd.id
        ) AS phiViTriIn,
        (
+         SELECT pm.name
+         FROM DesignPrintMethod dpm
+         JOIN PrintMethod pm ON pm.id = dpm.printMethodId
+         WHERE dpm.designId = cd.id
+         LIMIT 1
+       ) AS phuongPhapIn,
+       (
+         SELECT COALESCE(SUM(dpm.extraCost), 0)
+         FROM DesignPrintMethod dpm
+         WHERE dpm.designId = cd.id
+       ) AS phiPhuongPhapIn,
+       (
          SELECT co.orderCode
          FROM OrderItem oi
          JOIN CustomerOrder co ON co.id = oi.orderId
@@ -901,6 +913,8 @@ async function layChiTietThietKe(id) {
       : null,
     viTriIn: row.viTriIn || "Chưa xác định",
     phiViTriIn: Number(row.phiViTriIn || 0),
+    phuongPhapIn: row.phuongPhapIn || "Chưa chọn",
+    phiPhuongPhapIn: Number(row.phiPhuongPhapIn || 0),
     phiThietKe: Number(row.phiThietKe || 0),
     trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[row.status] || "cho_kiem_tra",
     ngayGui: formatNgay(row.ngayGui),
@@ -938,6 +952,7 @@ async function layCanvasDataThietKe(id) {
        cd.id,
        cd.canvasData,
        cd.baseColor AS mauAo,
+       cd.designFee,
        cd.status,
        cd.name      AS tenThietKe,
        cd.productId,
@@ -965,9 +980,17 @@ async function layCanvasDataThietKe(id) {
 
   const row = rows[0];
 
+  // Lấy printMethodId của thiết kế (nếu có)
+  const [pmRows] = await db.pool.query(
+    "SELECT printMethodId FROM DesignPrintMethod WHERE designId = ? LIMIT 1",
+    [id]
+  );
+  const printMethodId = pmRows.length ? Number(pmRows[0].printMethodId) : null;
+
   // Parse canvasData từ chuỗi JSON → object (trả về null nếu lỗi)
   const quyenSua = await layTrangThaiLienQuanThietKe(db.pool, id);
   chanSuaThietKeNeuBiKhoa(quyenSua);
+
 
   let canvasData = null;
   if (row.canvasData) {
@@ -1011,6 +1034,8 @@ async function layCanvasDataThietKe(id) {
     sizeAo: row.sizeAo || null,
     tenSanPham: row.tenSanPham || "Sản phẩm",
     trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[row.status] || "cho_kiem_tra",
+    designFee: Number(row.designFee || 0),
+    printMethodId: printMethodId,
     canvasData, // object đã parse, hoặc null
   };
 }
@@ -1024,7 +1049,7 @@ async function layCanvasDataThietKe(id) {
 // =====================================================================
 async function suaThietKeChoKhach(
   id,
-  { canvasData, previewUrl, shirtType, shirtColor, variantId, printFileUrlFront, printFileUrlBack }
+  { canvasData, previewUrl, shirtType, shirtColor, variantId, printFileUrlFront, printFileUrlBack, designFeeOverride, printMethodId }
 ) {
   let dataObj = canvasData;
   if (typeof dataObj === "string") {
@@ -1133,7 +1158,9 @@ async function suaThietKeChoKhach(
     };
 
     const dataStr = JSON.stringify(dataObj);
-    const designFee = calculateBoundingBoxAreaFee({ layers: dataObj.elements });
+    const designFee = (designFeeOverride != null && designFeeOverride >= 0)
+      ? Number(designFeeOverride)
+      : calculateBoundingBoxAreaFee({ layers: dataObj.elements });
 
     const setClauses = [
       "productId = ?",
@@ -1161,6 +1188,26 @@ async function suaThietKeChoKhach(
        WHERE id = ?`,
       params
     );
+
+    // Cập nhật phương pháp in nếu có truyền vào
+    if (printMethodId != null) {
+      const pmId = Number(printMethodId);
+      const [pmRows] = await conn.query(
+        "SELECT id, extraCost FROM PrintMethod WHERE id = ? AND isActive = 1 LIMIT 1",
+        [pmId]
+      );
+      if (pmRows.length) {
+        await conn.query(
+          "DELETE FROM DesignPrintMethod WHERE designId = ?",
+          [id]
+        );
+        await conn.query(
+          "INSERT INTO DesignPrintMethod (designId, printMethodId, extraCost) VALUES (?, ?, ?)",
+          [id, pmId, pmRows[0].extraCost || 0]
+        );
+      }
+    }
+
     await dongBoViTriInTheoCanvas(conn, id, dataObj);
   });
 
@@ -1244,6 +1291,8 @@ async function taoThietKeChoKhach({
   previewUrl,
   printFileUrlFront,
   printFileUrlBack,
+  designFeeOverride,
+  printMethodId,
 }) {
   const hasCustomer = userId !== undefined && userId !== null && userId !== "";
   const customerId = hasCustomer ? Number(userId) : null;
@@ -1296,7 +1345,9 @@ async function taoThietKeChoKhach({
     shirtColor: normalizedColor,
   };
   const dataStr = JSON.stringify(normalizedCanvas);
-  const designFee = calculateBoundingBoxAreaFee({ layers: normalizedCanvas.elements });
+  const designFee = (designFeeOverride != null && designFeeOverride >= 0)
+    ? Number(designFeeOverride)
+    : calculateBoundingBoxAreaFee({ layers: normalizedCanvas.elements });
 
   const result = await db.transaction(async (conn) => {
     const [insertResult] = await conn.query(
@@ -1316,6 +1367,22 @@ async function taoThietKeChoKhach({
         designFee,
       ]
     );
+
+    // Gán phương pháp in nếu có
+    if (printMethodId != null) {
+      const pmId = Number(printMethodId);
+      const [pmRows] = await conn.query(
+        "SELECT id, extraCost FROM PrintMethod WHERE id = ? AND isActive = 1 LIMIT 1",
+        [pmId]
+      );
+      if (pmRows.length) {
+        await conn.query(
+          "INSERT INTO DesignPrintMethod (designId, printMethodId, extraCost) VALUES (?, ?, ?)",
+          [insertResult.insertId, pmId, pmRows[0].extraCost || 0]
+        );
+      }
+    }
+
     await dongBoViTriInTheoCanvas(conn, insertResult.insertId, normalizedCanvas);
     return insertResult;
   });
@@ -2190,6 +2257,22 @@ async function layDanhSachViTriIn({ chiLayDangBat = false } = {}) {
   }));
 }
 
+// =====================================================================
+// SERVICE 11: Lấy danh sách phương pháp in
+// GET /api/admin/designs/print-methods
+// =====================================================================
+async function layDanhSachPhuongPhapIn() {
+  const [rows] = await db.pool.query(
+    "SELECT id, code, name, extraCost FROM PrintMethod WHERE isActive = 1 ORDER BY id ASC"
+  );
+  return rows.map((row) => ({
+    id: Number(row.id),
+    code: row.code,
+    ten: row.name,
+    phiInThem: Number(row.extraCost || 0),
+  }));
+}
+
 module.exports = {
   layThongKe,
   layDanhSachThietKe,
@@ -2210,4 +2293,5 @@ module.exports = {
   themSticker,
   xoaSticker,
   layDanhSachViTriIn,
+  layDanhSachPhuongPhapIn,
 };

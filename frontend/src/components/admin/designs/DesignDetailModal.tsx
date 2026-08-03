@@ -291,9 +291,10 @@ export default function DesignDetailModal({
 
                 <Section title="Sản phẩm và biến thể">
                   <div className="grid gap-x-5 gap-y-3 sm:grid-cols-3">
-                    <Field label="Sản phẩm" value={data.tenSanPham} wide />
+                    <Field label="Sản phẩm" value={data.tenSanPham} />
                     <Field label="ID sản phẩm" value={data.productId || data.sanPhamId} />
                     <Field label="ID biến thể" value={data.variantId || <EmptyValue />} />
+                    <Field label="SKU" value={data.skuAo || <EmptyValue />} />
                     <Field label="Size" value={data.sizeAo || <EmptyValue />} />
                     <Field
                       label="Màu áo"
@@ -309,7 +310,6 @@ export default function DesignDetailModal({
                         </span>
                       }
                     />
-                    <Field label="SKU" value={data.skuAo || <EmptyValue />} />
                     <Field
                       label="Tồn biến thể"
                       value={
@@ -320,6 +320,8 @@ export default function DesignDetailModal({
                     />
                     <Field label="Vị trí in" value={data.viTriIn || <EmptyValue />} />
                     <Field label="Phí vị trí" value={formatCurrency(data.phiViTriIn)} />
+                    <Field label="Phương pháp in" value={data.phuongPhapIn || <EmptyValue />} />
+                    <Field label="Phí PP in" value={formatCurrency(data.phiPhuongPhapIn)} />
                     <Field label="Phí thiết kế" value={formatCurrency(data.phiThietKe)} />
                   </div>
                 </Section>

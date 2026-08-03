@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { App, Button, Modal, Select, Spin, ConfigProvider, theme } from "antd";
+import { App, Button, InputNumber, Modal, Select, Spin, ConfigProvider, theme } from "antd";
 import {
   ArrowLeftOutlined,
   DeleteOutlined,
@@ -100,6 +100,9 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     key: string;
     variants: designService.BienTheTaoThietKe[];
   }>({ key: "", variants: [] });
+  const [designFee, setDesignFee] = useState<number | null>(null);
+  const [selectedPrintMethodId, setSelectedPrintMethodId] = useState<number | undefined>();
+  const [printMethods, setPrintMethods] = useState<designService.PhuongPhapIn[]>([]);
 
   const {
     elements,
@@ -157,6 +160,10 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
         });
 
         setHasRelatedOrder(Boolean(data.coDonHang));
+
+        // Load phí thiết kế và phương pháp in hiện tại
+        if (data.designFee != null) setDesignFee(data.designFee);
+        if (data.printMethodId != null) setSelectedPrintMethodId(data.printMethodId);
 
         const cd = data.canvasData;
         if (!cd || !Array.isArray(cd.elements)) {
@@ -230,6 +237,10 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
       .finally(() => {
         if (active) setLoadingCustomers(false);
       });
+
+    designService.layDanhSachPhuongPhapIn()
+      .then((data) => { if (active) setPrintMethods(data); })
+      .catch(() => { if (active) message.warning("Không thể tải danh sách phương pháp in"); });
 
     return () => {
       active = false;
@@ -378,6 +389,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
   const saveDesign = useCallback(async () => {
     if (!elements.length) return message.warning("Thiết kế cần có ít nhất một hình ảnh hoặc văn bản");
     if (!hasRelatedOrder && !variantId) return message.warning("Vui lòng chọn size áo");
+    if (!selectedPrintMethodId) return message.warning("Vui lòng chọn phương pháp in");
     if (!shirtContainerRef.current) return;
 
     try {
@@ -424,6 +436,8 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
         previewUrl,
         printImageFront: printImageFront ?? null,
         printImageBack: printImageBack ?? null,
+        designFeeOverride: designFee != null ? designFee : 0,
+        printMethodId: selectedPrintMethodId,
       });
 
       modal.success({
@@ -442,7 +456,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     } finally {
       setSaving(false);
     }
-  }, [designId, elements.length, hasRelatedOrder, maThietKe, message, modal, router, setSelectedId, shirtColor, shirtType, shirtView, variantId, zoom]);
+  }, [designFee, designId, elements.length, hasRelatedOrder, maThietKe, message, modal, router, selectedPrintMethodId, setSelectedId, shirtColor, shirtType, shirtView, variantId, zoom]);
 
   // ─── Hủy bỏ – quay về danh sách không lưu gì ─────────────────────────
   const handleCancel = useCallback(() => {
@@ -606,11 +620,12 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
           </div>
 
           {/* Phải: Undo/Redo + Xóa + Lưu thay đổi */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, paddingLeft: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span
               title={ownerCustomer.label}
               style={{
-                maxWidth: 260,
+                maxWidth: 400,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -673,6 +688,32 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
                 notFoundContent={loadingSizes ? <Spin size="small" /> : "Khong co size phu hop"}
               />
             )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <InputNumber
+              value={designFee}
+              onChange={(value) => setDesignFee(value)}
+              placeholder="Phí thiết kế (để trống = 0đ)"
+              min={0}
+              step={10000}
+              formatter={(value) => value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : ""}
+              parser={(value) => Number((value ?? "").replace(/[^\d]/g, ""))}
+              style={{ width: 220 }}
+              suffix="₫"
+            />
+            <Select
+              allowClear
+              value={selectedPrintMethodId}
+              onChange={setSelectedPrintMethodId}
+              placeholder="Phương pháp in"
+              style={{ width: 200 }}
+              options={printMethods.map((pm) => ({
+                value: pm.id,
+                label: `${pm.ten}${pm.phiInThem > 0 ? ` (+${pm.phiInThem.toLocaleString("vi-VN")}₫)` : ""}`,
+              }))}
+              notFoundContent="Không có phương pháp in"
+            />
+            </div>
           </div>
 
           <div className="ds-toolbar-right">

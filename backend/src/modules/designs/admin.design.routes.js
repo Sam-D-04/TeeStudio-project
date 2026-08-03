@@ -96,6 +96,7 @@ router.delete("/stickers/:id", verifyToken, requireAdmin, controller.xoaSticker)
 router.post("/assets", verifyToken, requireDesignCreator, uploadDesignAsset, controller.taiAnhThietKe);
 router.get("/customer-draft-variants", verifyToken, requireDesignCreator, controller.getBienTheTaoThietKe);
 router.post("/customer-drafts", verifyToken, requireDesignCreator, controller.taoThietKeChoKhach);
+router.get("/print-methods", verifyToken, requireDesignCreator, controller.getDanhSachPhuongPhapIn);
 
 // Danh sách thiết kế khách hàng
 router.get("/", verifyToken, requireAdmin, controller.getDanhSachThietKe);
