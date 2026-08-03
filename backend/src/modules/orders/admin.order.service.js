@@ -1633,6 +1633,7 @@ async function timKiemThietKe(userId, keyword) {
   const [rows] = await db.pool.query(
     `SELECT cd.id, cd.productId, cd.variantId, cd.baseColor,
             cd.previewUrl, cd.designFee, cd.status, cd.createdAt, cd.name AS tenThietKe,
+            (SELECT IFNULL(SUM(extraCost), 0) FROM DesignPrintMethod dpm WHERE dpm.designId = cd.id) AS phiInAn,
             p.name AS tenSanPham, p.basePrice, p.material, p.form,
             pi.imageUrl AS anhUrl,
             pv.color AS mauSanPham
@@ -1682,6 +1683,7 @@ async function timKiemThietKe(userId, keyword) {
     mauSanPham: r.mauSanPham || r.baseColor,
     anhXemTruoc: r.previewUrl,
     phiThietKe: Number(r.designFee),
+    phiInAn: Number(r.phiInAn || 0),
     trangThai: r.status,
     ngayTao: r.createdAt,
     sanPham: {
@@ -1891,6 +1893,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     const [rowsDesign] = await db.pool.query(
       `SELECT cd.id, cd.userId AS designUserId, cd.productId, cd.variantId,
               cd.baseColor, cd.designFee, cd.status, cd.previewUrl,
+              (SELECT IFNULL(SUM(extraCost), 0) FROM DesignPrintMethod dpm WHERE dpm.designId = cd.id) AS phiInAn,
               pv.color AS designColor
        FROM CustomDesign cd
        LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
@@ -1960,6 +1963,9 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     } else {
       enriched.designFee = 0;
     }
+    enriched.printFee = Number(design.phiInAn || 0);
+    // Tính printFee vào unitPrice để lưu vào OrderItem và tính lineTotal, subtotal tự động
+    enriched.unitPrice += enriched.printFee;
     enriched.designStatus = design.status;
 
     // Upload ảnh in print-ready lên Cloudinary rồi lưu URL vào CustomDesign.printFileUrlFront.

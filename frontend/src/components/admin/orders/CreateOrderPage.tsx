@@ -67,6 +67,7 @@ type OrderPreviewLine = {
   quantity: number;
   design?: ThietKe;
   unitPrice: number;
+  printFee: number;
   lineProductTotal: number;
   designFee: number;
   lineTotal: number;
@@ -326,7 +327,8 @@ function buildPreview(
         product,
         totalProductQty
       );
-      const lineProductTotal = unitPrice * quantity;
+      const printFee = design?.phiInAn ?? 0;
+      const lineProductTotal = (unitPrice + printFee) * quantity;
 
       let designFee = 0;
       if (design && !uniqueDesignIds.has(design.id)) {
@@ -341,6 +343,7 @@ function buildPreview(
         quantity,
         design,
         unitPrice,
+        printFee,
         lineProductTotal,
         designFee,
         lineTotal: lineProductTotal + designFee,
@@ -839,6 +842,14 @@ function ProductItemRow({
           <span className="text-text-main">
             Đơn giá áo: <span className="font-semibold">{formatCurrency(previewLine?.unitPrice ?? 0)}</span>
           </span>
+          {previewLine?.printFee ? (
+            <>
+              <span className="text-border">•</span>
+              <span className="text-text-main">
+                Phí in ấn: <span className="font-semibold text-blue-600">{formatCurrency(previewLine.printFee)}</span>
+              </span>
+            </>
+          ) : null}
           {previewLine?.designFee ? (
             <>
               <span className="text-border">•</span>
