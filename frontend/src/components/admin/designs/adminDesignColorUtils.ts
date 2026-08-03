@@ -70,15 +70,39 @@ export function getAdminMockupSrc(type: ShirtType, view: ShirtView, color: strin
       : beigeColors.has(normalized)
         ? "Beige"
         : "White";
-    return colorKey === "Navy" && viewKey === "Back"
-      ? "/images/mockups/Polo-Navy-Backt.png"
-      : `/images/mockups/Polo-${colorKey}-${viewKey}.png`;
+        
+    const POLO_URLS: Record<string, Record<string, string>> = {
+      White: {
+        Front: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782026481/Polo-White-Front_b11fvx.png",
+        Back: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782026481/Polo-White-Back_vr6uas.png",
+      },
+      Beige: {
+        Front: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782026484/Polo-Beige-Front_ulxjri.png",
+        Back: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782026480/Polo-Beige-Back_d4sp14.png",
+      },
+      Navy: {
+        Front: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782026480/Polo-Navy-Front_rc2pvr.png",
+        Back: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782026480/Polo-Navy-Backt_uvfyjg.png",
+      }
+    };
+    return POLO_URLS[colorKey]?.[viewKey] || POLO_URLS.White.Front;
   }
 
   if (type === "hoodie") {
     const brownColors = new Set(["#8b4513", "#92400e", "#78350f", "#b45309", "#d97706"]);
     const colorKey = brownColors.has(normalized) ? "Brown" : "Grey";
-    return `/images/mockups/Hoodie-${colorKey}-${viewKey}.png`;
+    
+    const HOODIE_URLS: Record<string, Record<string, string>> = {
+      Brown: {
+        Front: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209409/Hoodie-Brown-Front_ab4bha.png",
+        Back: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209411/Hoodie-Brown-Back_echgn5.png",
+      },
+      Grey: {
+        Front: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209405/Hoodie-Grey-Front_boebdz.png",
+        Back: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209405/Hoodie-Grey-Back_ntgcoc.png",
+      }
+    };
+    return HOODIE_URLS[colorKey]?.[viewKey] || HOODIE_URLS.Grey.Front;
   }
 
   const navyColors = new Set(["#0066cc", "#003153", "#1d4ed8", "#1e40af", "#2563eb"]);
@@ -88,7 +112,22 @@ export function getAdminMockupSrc(type: ShirtType, view: ShirtView, color: strin
     : darkColors.has(normalized)
       ? "Black"
       : "White";
-  return `/images/mockups/TShirt-${colorKey}-${viewKey}.png`;
+      
+  const TSHIRT_URLS: Record<string, Record<string, string>> = {
+    White: {
+      Front: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782026489/TShirt-White-Front_sjhjg8.png",
+      Back: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782026488/TShirt-White-Back_w0ezzy.png",
+    },
+    Navy: {
+      Front: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782026488/TShirt-Navy-Front_wc2lhf.png",
+      Back: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782026484/TShirt-Navy-Back_phdkvi.png",
+    },
+    Black: {
+      Front: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782026483/TShirt-Black-Front_f0ljkq.png",
+      Back: "https://res.cloudinary.com/dwol6aarv/image/upload/v1782026481/TShirt-Black-Back_bc88nk.png",
+    }
+  };
+  return TSHIRT_URLS[colorKey]?.[viewKey] || TSHIRT_URLS.White.Front;
 }
 
 export function getAdminMockupFilter(type: ShirtType, color: string): string | undefined {

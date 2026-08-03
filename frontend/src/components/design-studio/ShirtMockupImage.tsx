@@ -26,19 +26,19 @@ function resolveHoodieColor(hexColor: string): "Brown" | "Grey" {
 function resolveTShirtColor(hexColor: string): "Black" | "White" | "Navy" {
   const dark = ["#000000", "#1e293b", "#374151", "#0f172a", "#111827", "#1f2937"];
   const navy = ["#4a90d9", "#0ea5e9", "#0284c7", "#1d4ed8", "#1e40af", "#2563eb", "#3b82f6", "#1a56db"];
-  const hex  = hexColor.toLowerCase();
+  const hex = hexColor.toLowerCase();
   if (dark.includes(hex)) return "Black";
   if (navy.includes(hex)) return "Navy";
   return "White";
 }
 
 function resolvePoloColor(hexColor: string): "Beige" | "White" | "Navy" {
-  const navy  = ["#4a90d9", "#0ea5e9", "#0284c7", "#1d4ed8", "#1e40af", "#2563eb", "#3b82f6", "#1a56db"];
+  const navy = ["#4a90d9", "#0ea5e9", "#0284c7", "#1d4ed8", "#1e40af", "#2563eb", "#3b82f6", "#1a56db"];
   const beige = ["#000000", "#1e293b", "#374151", "#0f172a", "#111827", "#1f2937",
-                 "#92400e", "#78350f", "#b45309", "#d97706", "#374151", "#4b5563",
-                 "#6b7280", "#9ca3af", "#d1d5db", "#f5f5dc"];
-  const hex   = hexColor.toLowerCase();
-  if (navy.includes(hex))  return "Navy";
+    "#92400e", "#78350f", "#b45309", "#d97706", "#374151", "#4b5563",
+    "#6b7280", "#9ca3af", "#d1d5db", "#f5f5dc"];
+  const hex = hexColor.toLowerCase();
+  if (navy.includes(hex)) return "Navy";
   if (beige.includes(hex)) return "Beige";
   // Light / white-ish colors → White mockup
   return "White";
@@ -94,25 +94,25 @@ export function getPrintAreaBoundary(
   const configs: Record<ShirtType, Record<ShirtView, { top: number; left: number; w: number; h: number }>> = {
     tshirt: {
       front: { top: 0.31, left: 0.30, w: 0.40, h: 0.4 },
-      back:  { top: 0.28, left: 0.28, w: 0.44, h: 0.46 },
+      back: { top: 0.28, left: 0.28, w: 0.44, h: 0.46 },
     },
     polo: {
       // bounding box của polygon polo front
       front: { top: 0.45, left: 0.27, w: 0.46, h: 0.40 },
-      back:  { top: 0.27, left: 0.28, w: 0.44, h: 0.46 },
+      back: { top: 0.27, left: 0.28, w: 0.44, h: 0.46 },
     },
     hoodie: {
       front: { top: 0.34, left: 0.30, w: 0.40, h: 0.26 },
-      back:  { top: 0.3, left: 0.26, w: 0.48, h: 0.46 },
+      back: { top: 0.3, left: 0.26, w: 0.48, h: 0.46 },
     },
   };
 
   const cfg = configs[type][view];
   return {
-    top:    cfg.top  * containerH,
-    left:   cfg.left * containerW,
-    width:  cfg.w    * containerW,
-    height: cfg.h    * containerH,
+    top: cfg.top * containerH,
+    left: cfg.left * containerW,
+    width: cfg.w * containerW,
+    height: cfg.h * containerH,
   };
 }
 
