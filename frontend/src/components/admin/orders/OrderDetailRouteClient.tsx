@@ -31,6 +31,7 @@ import {
 } from "antd";
 import { isAxiosError } from "axios";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
 import type { ChiTietDonHang } from "@/services/admin/orderService";
@@ -124,26 +125,26 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
   const items = order.items?.length
     ? order.items
     : [
-        {
-          id: order.id,
-          productId: 0,
-          variantId: 0,
-          designId: null,
-          tenSanPham: order.sanPham.ten,
-          mauSac: "",
-          kichCo: order.sanPham.sizes,
-          sku: "",
-          soLuong: 1,
-          donGiaVnd: order.tamTinhVnd,
-          phiThietKeVnd: order.phiThietKeVnd,
-          thanhTienVnd: order.tamTinhVnd + order.phiThietKeVnd,
-          loai: order.sanPham.loai,
-          anhUrl: order.sanPham.anhUrl,
-          anhXemTruocThietKe: order.anhXemTruocThietKe,
-          viTriIn: order.viTriIn,
-          phuongPhapIn: order.phuongPhapIn,
-        },
-      ];
+      {
+        id: order.id,
+        productId: 0,
+        variantId: 0,
+        designId: null,
+        tenSanPham: order.sanPham.ten,
+        mauSac: "",
+        kichCo: order.sanPham.sizes,
+        sku: "",
+        soLuong: 1,
+        donGiaVnd: order.tamTinhVnd,
+        phiThietKeVnd: order.phiThietKeVnd,
+        thanhTienVnd: order.tamTinhVnd + order.phiThietKeVnd,
+        loai: order.sanPham.loai,
+        anhUrl: order.sanPham.anhUrl,
+        anhXemTruocThietKe: order.anhXemTruocThietKe,
+        viTriIn: order.viTriIn,
+        phuongPhapIn: order.phuongPhapIn,
+      },
+    ];
 
   return (
     <div className="overflow-x-auto">
@@ -182,7 +183,17 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
                     </div>
                     <div className="min-w-0">
                       <div className="truncate font-semibold text-text-main leading-tight">
-                        {item.tenSanPham}
+                        {item.loai === "custom_design" && item.designId ? (
+                          <Link
+                            href={`/admin/thiet-ke?designId=${item.designId}`}
+                            className="hover:text-primary-container hover:underline transition-colors"
+                            title="Xem chi tiết thiết kế của sản phẩm này"
+                          >
+                            {item.tenSanPham}
+                          </Link>
+                        ) : (
+                          item.tenSanPham
+                        )}
                       </div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-1">
                         {item.loai === "custom_design" ? (
@@ -430,11 +441,10 @@ function OrderHistoryDrawer({ order }: { order: ChiTietDonHang }) {
             <div key={`${step.thoiGian}-${index}`} className="flex gap-3">
               <div className="flex flex-col items-center">
                 <span
-                  className={`mt-1 h-3 w-3 shrink-0 rounded-full border-2 ${
-                    step.laDangHienTai
+                  className={`mt-1 h-3 w-3 shrink-0 rounded-full border-2 ${step.laDangHienTai
                       ? "border-primary-container bg-primary-container"
                       : "border-border bg-white"
-                  }`}
+                    }`}
                 />
                 {index < order.thoiGianXuLy.length - 1 && (
                   <span className="mt-1 w-0.5 flex-1 bg-border" />
@@ -514,9 +524,9 @@ function OrderDetailContent({
                   Bỏ điều kiện transactionStatus === PENDING vì component bên trong
                   tự xử lý mọi trường hợp (PENDING→QR, FAILED/CANCELLED→nút tạo lại). */}
               {canManagePayment &&
-              isOnlinePayment &&
-              !isPaid &&
-              order.trangThai !== "da_huy" ? (
+                isOnlinePayment &&
+                !isPaid &&
+                order.trangThai !== "da_huy" ? (
                 <OnlinePaymentQrButton order={order} />
               ) : null}
               {isPaid ? (
@@ -736,7 +746,7 @@ export default function OrderDetailRouteClient() {
             Quay lại danh sách
           </Button>
           <p className="text-xs text-text-secondary">
-            Xem thông tin đơn hàng hoặc tiếp tục thao tác.
+
           </p>
         </div>
 
@@ -846,7 +856,7 @@ export default function OrderDetailRouteClient() {
             <Radio value="TECH_ADJUST">Nhập lỗi / Điều chỉnh kỹ thuật</Radio>
           </div>
         </Radio.Group>
-        
+
         <p className="mb-2 text-sm font-semibold text-text-main">Lý do hủy chi tiết</p>
         <div className="pb-6">
           <Input.TextArea
