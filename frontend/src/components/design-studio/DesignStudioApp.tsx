@@ -44,7 +44,7 @@ export default function DesignStudioApp() {
   const shirtContainerRef = useRef<HTMLDivElement>(null);
 
   const {
-    shirtType, shirtColor, shirtView, mockupImages,
+    shirtType, shirtColor, shirtView, mockupImages, availableColors,
     addElement, removeElement,
     undo, redo,
     setSelectedId, setShirtType, setShirtColor, setShirtView,
@@ -149,12 +149,10 @@ export default function DesignStudioApp() {
 
         setMockupImages(product.images);
 
-        // Trích xuất các màu duy nhất từ biến thể còn hoạt động (API đã lọc status ACTIVE)
+        // Trích xuất các màu duy nhất từ biến thể còn hoạt động và còn hàng
         const colorSet = new Set<string>();
         product.variants.forEach(v => {
-          // Lấy tất cả màu, có thể ưu tiên những màu còn hàng nếu cần,
-          // nhưng theo yêu cầu: "hiển thị tất cả các màu" (chấp nhận cả stockQty = 0)
-          if (v.colorHex) colorSet.add(v.colorHex.toLowerCase());
+          if (v.colorHex && v.stockQty > 0) colorSet.add(v.colorHex.toLowerCase());
         });
 
         const colors = Array.from(colorSet);
@@ -807,6 +805,45 @@ export default function DesignStudioApp() {
                 Mặt sau
               </button>
             </div>
+
+            {/* Chọn Màu (Chỉ hiển thị khi có màu) */}
+            {availableColors.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  justifyContent: "center",
+                  gap: 8,
+                  background: "rgba(30, 41, 59, 0.7)", // bg-slate-800/70
+                  backdropFilter: "blur(12px)",
+                  padding: "6px 12px",
+                  borderRadius: 9999,
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                }}
+              >
+                {availableColors.map((colorHex) => {
+                  const isActive = shirtColor.toLowerCase() === colorHex.toLowerCase();
+                  return (
+                    <button
+                      key={colorHex}
+                      onClick={() => setShirtColor(colorHex)}
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        background: colorHex,
+                        border: isActive ? "2px solid #0ea5e9" : "2px solid transparent",
+                        boxShadow: isActive ? "0 0 0 2px rgba(14, 165, 233, 0.3)" : "inset 0 1px 3px rgba(0,0,0,0.15)",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                      }}
+                      title={`Đổi màu áo`}
+                    />
+                  );
+                })}
+              </div>
+            )}
 
             {/* Nút điều khiển zoom */}
             <div className="ds-zoom-controls">

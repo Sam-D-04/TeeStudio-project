@@ -155,29 +155,7 @@ export default function AppHeader() {
             })}
           </nav>
 
-          {/* ── Search ── */}
-          <div style={{ flex: 1, maxWidth: 380 }} className="hidden md:block">
-            <Input.Search
-              placeholder="Tìm kiếm loại áo, chất liệu..."
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
-              onSearch={handleSearch}
-              allowClear
-              onClear={() => { setSearchValue(""); router.push("/explore"); }}
-              prefix={
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <circle cx="7" cy="7" r="5.5" stroke="#94a3b8" strokeWidth="1.5" />
-                  <path d="M11 11l3 3" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              }
-              style={{
-                background:   "#f8fafc",
-                border:       "1px solid #e2e8f0",
-                borderRadius: 10,
-                fontSize:     14,
-              }}
-            />
-          </div>
+
 
           {/* ── Right Actions ── */}
           <div
