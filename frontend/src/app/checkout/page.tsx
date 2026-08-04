@@ -18,6 +18,7 @@ import {
   MailOutlined,
   SafetyCertificateOutlined,
   ShoppingCartOutlined,
+  PlusOutlined,
 } from "@ant-design/icons";
 import { useCartStore } from "@/store/useCartStore";
 import useAuthStore from "@/store/useAuthStore";
@@ -30,6 +31,7 @@ import {
 } from "@/services/orderService";
 import { validatePromotionCode, type PromotionPreview } from "@/services/promotionService";
 import { pricingService, type PricingConfiguration } from "@/services/pricingService";
+import { addressService, type UserAddress } from "@/services/addressService";
 import AppHeader from "@/components/layout/AppHeader";
 import AppFooter from "@/components/layout/AppFooter";
 
@@ -167,6 +169,10 @@ export default function CheckoutPage() {
   const [addressLoading, setAddressLoading] = useState(true);
   const [pricingConfig, setPricingConfig] = useState<PricingConfiguration | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
+  
+  const [userAddresses, setUserAddresses] = useState<UserAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<number | "NEW">("NEW");
+
   const provinceCode = Form.useWatch("provinceCode", form);
   const watchedPaymentType = Form.useWatch("paymentType", form);
 
@@ -207,15 +213,56 @@ export default function CheckoutPage() {
   const selectedProvince = provinces.find((p) => p.Code === provinceCode);
   const wardsForProvince = selectedProvince?.Wards ?? [];
 
-  /* Pre-fill user data */
+  const handleSelectAddress = (id: number | "NEW", addresses = userAddresses) => {
+    setSelectedAddressId(id);
+    if (id === "NEW") {
+      form.resetFields(["recipientName", "phone", "provinceCode", "wardCode", "addressDetail"]);
+      if (user) {
+        form.setFieldValue("recipientName", user.fullName ?? "");
+      }
+    } else {
+      const address = addresses.find(a => a.id === id);
+      if (address) {
+        const matchedProvince = provinces.find((p) => p.Name === address.city);
+        const matchedWard = matchedProvince?.Wards.find((w) => w.Name === address.ward);
+        form.setFieldsValue({
+          recipientName: address.recipientName,
+          phone: address.phone,
+          provinceCode: matchedProvince?.Code,
+          wardCode: matchedWard?.Code,
+          addressDetail: address.addressLine,
+        });
+      }
+    }
+  };
+
+  /* Pre-fill user data & Load saved addresses */
   useEffect(() => {
-    if (user) {
+    if (user && token && provinces.length > 0) {
+      // Fetch user addresses only when provinces are loaded so mapping works
+      addressService.list().then(addresses => {
+        setUserAddresses(addresses);
+        const def = addresses.find(a => a.isDefault);
+        if (def) {
+          handleSelectAddress(def.id, addresses);
+        } else if (addresses.length > 0) {
+          handleSelectAddress(addresses[0].id, addresses);
+        } else {
+          // If no address, just fill name and email from user
+          form.setFieldsValue({
+            recipientName: user.fullName ?? "",
+            email: user.email ?? "",
+          });
+        }
+      }).catch(err => console.error("Không tải được sổ địa chỉ", err));
+    } else if (user) {
       form.setFieldsValue({
         recipientName: user.fullName ?? "",
         email: user.email ?? "",
       });
     }
-  }, [user, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, token, provinces]);
 
   if (!hydrated) return null;
 
@@ -352,6 +399,9 @@ export default function CheckoutPage() {
 
   /* ── Submit handler ── */
   const onFinish = async (values: CheckoutFormValues) => {
+    // Chặn gọi lại khi đang xử lý (double-click, hoặc form bị submit 2 lần) — tránh
+    // tạo 2 đơn hàng cho 1 lần đặt.
+    if (loading) return;
     if (!token) {
       message.warning("Vui lòng đăng nhập để tiến hành thanh toán");
       router.push("/dang-nhap");
@@ -484,8 +534,35 @@ export default function CheckoutPage() {
                       />
                       <circle cx="12" cy="10" r="2.5" stroke="#0ea5e9" strokeWidth="1.8" />
                     </svg>
-                    Thông tin nhận hàng
                   </h2>
+
+                  {/* Phần chọn địa chỉ có sẵn nếu đã đăng nhập và có địa chỉ */}
+                  {userAddresses.length > 0 && (
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Chọn địa chỉ nhận hàng</span>
+                        <Button
+                          type="link"
+                          size="small"
+                          icon={<PlusOutlined />}
+                          onClick={() => handleSelectAddress("NEW")}
+                          disabled={selectedAddressId === "NEW"}
+                        >
+                          Thêm địa chỉ mới
+                        </Button>
+                      </div>
+                      <Select
+                        value={selectedAddressId === "NEW" ? undefined : selectedAddressId}
+                        placeholder={selectedAddressId === "NEW" ? "--- Đang thêm địa chỉ mới ---" : "Chọn địa chỉ..."}
+                        style={{ width: "100%", height: 40 }}
+                        onChange={(val) => handleSelectAddress(val)}
+                        options={userAddresses.map(a => ({
+                          value: a.id,
+                          label: `${a.recipientName} - ${a.phone} (${a.addressLine}, ${a.ward}, ${a.city})`
+                        }))}
+                      />
+                    </div>
+                  )}
 
                   <div
                     style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}
@@ -995,7 +1072,6 @@ export default function CheckoutPage() {
                       block
                       size="large"
                       loading={loading}
-                      onClick={() => form.submit()}
                       style={{
                         height: 48,
                         borderRadius: 10,
