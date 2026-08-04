@@ -59,6 +59,9 @@ router.get("/vi-tri-in", designController.getDanhSachViTriInCongKhai);
 // GET /api/stickers → chỉ trả sticker đang bật
 router.get("/stickers", designController.getDanhSachSticker);
 
+// GET /api/print-methods → trả danh sách các phương pháp in đang bật
+router.get("/print-methods", designController.getDanhSachPhuongPhapIn);
+
 // ── Public endpoints cho trang chủ ───────────────────────────────────────────
 // GET /api/public/products  → danh sách phôi áo ACTIVE (cho ProductCategories)
 router.get("/public/products", publicController.getDanhSachSanPham);

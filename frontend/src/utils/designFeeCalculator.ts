@@ -36,12 +36,11 @@
 
 import type { DesignElement } from "@/store/useDesignStore";
 
-export type PrintingMethod = "DECAL" | "PET" | "DTG";
-
-export const PRINTING_METHOD_MULTIPLIERS: Record<PrintingMethod, number> = {
-  DECAL: 1,    // In Decal (Mặc định)
-  PET: 1.2,    // In Pet (+20%)
-  DTG: 1.5,    // In DTG (+50%)
+export type PrintMethodDef = {
+  id: number;
+  code: string;
+  name: string;
+  extraCost: number;
 };
 
 // ─── Hằng số (phải khớp với admin.pricing.service.js) ───────────────────────
@@ -185,10 +184,10 @@ export type SideFeeInfo = {
  * "đè" bounding box lên nhau (nếu không mặt sau sẽ vô tình được in miễn phí).
  *
  * @param elements - Mảng phần tử từ useDesignStore (mặt trước + mặt sau)
- * @param printingMethod - Phương pháp in (DECAL, PET, DTG)
+ * @param printExtraCost - Phí in thêm của phương pháp in được chọn (từ DB)
  * @returns { fee, label, bboxAreaCm2, sumAreaCm2, front, back }
  */
-export function calcDesignFee(elements: DesignElement[], printingMethod: PrintingMethod = "DECAL"): {
+export function calcDesignFee(elements: DesignElement[], printExtraCost: number = 0): {
   /** Tổng phí = phí mặt trước + phí mặt sau */
   fee: number;
   label: string;
@@ -214,7 +213,8 @@ export function calcDesignFee(elements: DesignElement[], printingMethod: Printin
   const back  = calcFeeForOneSide(backElements);
 
   const baseFee = front.fee + back.fee;
-  const fee = Math.round(baseFee * PRINTING_METHOD_MULTIPLIERS[printingMethod]);
+  // Cộng thêm phụ phí phương pháp in (chỉ cộng nếu baseFee > 0, tức là có in)
+  const fee = baseFee > 0 ? baseFee + printExtraCost : 0;
 
   return {
     fee,

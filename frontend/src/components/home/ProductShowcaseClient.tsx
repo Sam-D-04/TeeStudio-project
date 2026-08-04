@@ -122,7 +122,7 @@ export default function ProductShowcaseClient({ products }: Props) {
   if (products.length === 0) return null;
 
   return (
-    <section className="section-padding" style={{ background: "#f8fafc" }}>
+    <section className="section-padding relative z-10" style={{ paddingBottom: 64 }}>
       <div className="container-main">
 
         {/* ── Section Header ── */}
@@ -203,35 +203,25 @@ export default function ProductShowcaseClient({ products }: Props) {
             return (
               <div
                 key={v.productId}
-                className="product-card"
+                className="product-card glass-card group"
                 onClick={() =>
                   router.push(`/product/${v.productId}`)
                 }
                 style={{
-                  background:   "#ffffff",
-                  borderRadius: 16,
-                  border:       "1px solid #e2e8f0",
                   overflow:     "hidden",
-                  transition:   "all 0.22s ease",
                   cursor:       "pointer",
-                  boxShadow:    "0 1px 4px rgba(0,0,0,0.05)",
                 }}
                 onMouseEnter={(e) => {
-                  const el = e.currentTarget as HTMLDivElement;
-                  el.style.transform   = "translateY(-4px)";
-                  el.style.boxShadow   = "0 12px 32px rgba(0,0,0,0.09)";
-                  el.style.borderColor = "#bae6fd";
+                  // className glass-card:hover handles transform and shadow
                 }}
                 onMouseLeave={(e) => {
-                  const el = e.currentTarget as HTMLDivElement;
-                  el.style.transform   = "translateY(0)";
-                  el.style.boxShadow   = "0 1px 4px rgba(0,0,0,0.05)";
-                  el.style.borderColor = "#e2e8f0";
+                  // className glass-card:hover handles restore
                 }}
               >
                 <div
                   style={{
-                    background:     "#ffffff",
+                    background:     "transparent",
+                    borderBottom:   "1px solid rgba(255,255,255,0.2)",
                     height:         240,
                     display:        "flex",
                     alignItems:     "center",
@@ -421,7 +411,7 @@ export default function ProductShowcaseClient({ products }: Props) {
                       onClick={(e) => {
                         e.stopPropagation();
                         router.push(
-                          `/design-studio?shirt=${v.form}&color=${encodeURIComponent(firstColor)}&view=front`
+                          `/design-studio?shirt=${v.form}&color=${encodeURIComponent(firstColor)}&productId=${v.productId}&view=front`
                         );
                       }}
                     >

@@ -226,7 +226,7 @@ const calculateFeeForOneSide = (items) => {
   return Math.min(bboxFee, individualSumFee);
 };
 
-const calculateBoundingBoxAreaFee = (canvasData) => {
+const calculateBoundingBoxAreaFee = (canvasData, printExtraCost = 0) => {
   try {
     // Hỗ trợ cả dạng string JSON và object
     const data = typeof canvasData === 'string' ? JSON.parse(canvasData) : canvasData;
@@ -244,7 +244,8 @@ const calculateBoundingBoxAreaFee = (canvasData) => {
     const frontFee = calculateFeeForOneSide(frontItems);
     const backFee  = calculateFeeForOneSide(backItems);
 
-    return frontFee + backFee;
+    const baseFee = frontFee + backFee;
+    return baseFee > 0 ? baseFee + Number(printExtraCost) : 0;
 
   } catch (err) {
     console.error('[pricing] calculateBoundingBoxAreaFee error:', err.message);

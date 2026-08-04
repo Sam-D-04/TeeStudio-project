@@ -43,25 +43,32 @@ export default function AppHeader() {
   return (
     <>
       <header
+        className={pathname === "/" ? "floating-glass-header" : ""}
         style={{
-          position:   "fixed",
-          top: 0, left: 0, right: 0,
-          zIndex:     1000,
-          background: "#ffffff",
-          borderBottom: scrolled
-            ? "1px solid #e2e8f0"
-            : "1px solid transparent",
-          boxShadow: scrolled ? "0 2px 12px rgba(0,0,0,0.06)" : "none",
-          transition: "all 0.25s ease",
+          position: "fixed",
+          top: pathname === "/" ? (scrolled ? 12 : 24) : 0,
+          left: pathname === "/" ? "50%" : 0,
+          right: pathname === "/" ? "auto" : 0,
+          transform: pathname === "/" ? "translateX(-50%)" : "none",
+          width: pathname === "/" ? "calc(100% - 32px)" : "100%",
+          maxWidth: pathname === "/" ? 1200 : "100%",
+          zIndex: 1000,
+          background: pathname === "/" ? undefined : "#ffffff",
+          borderBottom: pathname !== "/" && scrolled ? "1px solid #e2e8f0" : pathname !== "/" ? "1px solid transparent" : undefined,
+          boxShadow: pathname !== "/" && scrolled ? "0 2px 12px rgba(0,0,0,0.06)" : undefined,
+          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          padding: pathname === "/" ? "0 8px" : 0,
         }}
       >
         <div
-          className="container-main"
+          className={pathname === "/" ? "" : "container-main"}
           style={{
-            display:        "flex",
-            alignItems:     "center",
-            height:         64,
-            gap:            24,
+            display: "flex",
+            alignItems: "center",
+            height: pathname === "/" ? 60 : 64,
+            padding: pathname === "/" ? "0 16px" : 0,
+            gap: 24,
+            width: "100%",
           }}
         >
           {/* ── Logo ── */}

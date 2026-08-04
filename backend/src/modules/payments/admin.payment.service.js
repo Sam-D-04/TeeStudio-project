@@ -20,6 +20,7 @@ const {
 } = require("../../common/constants/paymentStatus");
 const { taoBoLocThanhToan } = require("./payment-filter.util");
 const { syncOrderPaymentStatus } = require("./order-payment-progress.service");
+const { ghiOrderHistory } = require("../orders/admin.order.service");
 
 // =====================================================================
 // PHẦN 1: LOGIC RETURN / IPN CỦA CÁC CỔNG ONLINE
@@ -184,6 +185,16 @@ async function dongBoTrangThaiVnpay(query) {
 
     await syncOrderPaymentStatus(conn, payment.orderId);
 
+    if (nextStatus === "COMPLETED") {
+      await ghiOrderHistory(conn, {
+        orderId: payment.orderId,
+        toStatus: "PAID",
+        action: "PAYMENT_CONFIRMED",
+        actor: null,
+        note: "Đã xác nhận thanh toán qua VNPAY",
+      });
+    }
+
     await conn.commit();
 
     return { RspCode: "00", Message: "Confirm Success" };
@@ -307,6 +318,16 @@ async function dongBoTrangThaiMomo(payload, source = "ipn") {
     }
 
     await syncOrderPaymentStatus(conn, payment.orderId);
+
+    if (nextStatus === PAYMENT_STATUS.COMPLETED) {
+      await ghiOrderHistory(conn, {
+        orderId: payment.orderId,
+        toStatus: "PAID",
+        action: "PAYMENT_CONFIRMED",
+        actor: null,
+        note: "Đã xác nhận thanh toán qua MoMo",
+      });
+    }
 
     await conn.commit();
     return {
@@ -710,7 +731,7 @@ function buildIpnHistory(paymentRow) {
 
 // ── Xác nhận thu COD ──────────────────────────────────────────────────
 
-async function xacNhanThuCod(id) {
+async function xacNhanThuCod(id, actor) {
   const conn = await db.pool.getConnection();
 
   try {
@@ -767,6 +788,14 @@ async function xacNhanThuCod(id) {
     );
 
     await syncOrderPaymentStatus(conn, payment.orderId);
+
+    await ghiOrderHistory(conn, {
+      orderId: payment.orderId,
+      toStatus: "PAID",
+      action: "PAYMENT_CONFIRMED",
+      actor,
+      note: "Đã xác nhận thu tiền COD",
+    });
 
     await conn.commit();
 

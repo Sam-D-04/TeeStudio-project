@@ -59,24 +59,19 @@ const steps = [
 
 export default function SimpleWorkflow() {
   return (
-    <section
-      style={{ background: "#ffffff", padding: "48px 0" }}
-    >
+    <section className="relative z-10" style={{ padding: "48px 0" }}>
       <div className="container-main">
 
         {/* ── Strip container ── */}
         <div
+          className="workflow-strip glass-card"
           style={{
-            background:   "#f8fafc",
-            borderRadius: 20,
-            border:       "1px solid #e2e8f0",
             padding:      "40px 48px",
             display:      "grid",
             gridTemplateColumns: "1fr auto 1fr auto 1fr",
             alignItems:   "center",
             gap:          0,
           }}
-          className="workflow-strip"
         >
           {steps.map((step, i) => (
             <React.Fragment key={step.step}>

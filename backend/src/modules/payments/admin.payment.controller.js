@@ -129,7 +129,7 @@ const xacNhanThuCod = async (req, res, next) => {
     if (!id || id < 1) {
       return res.status(400).json({ success: false, message: "ID không hợp lệ" });
     }
-    const data = await paymentService.xacNhanThuCod(id);
+    const data = await paymentService.xacNhanThuCod(id, req.user);
     res.json({ success: true, message: "Đã xác nhận thu COD", data });
   } catch (error) {
     if (error.statusCode) {

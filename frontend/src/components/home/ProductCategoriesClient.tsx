@@ -98,7 +98,7 @@ export default function ProductCategoriesClient({ products }: Props) {
   const router = useRouter();
 
   return (
-    <section style={{ background: "#ffffff", paddingTop: 80 }}>
+    <section className="relative z-10" style={{ paddingTop: 80, paddingBottom: 40 }}>
       <div className="container-main" style={{ padding: "40px 24px 56px" }}>
 
         {/* ── Header Row ── */}
@@ -191,36 +191,28 @@ function ProductCard({ product, router }: { product: ProductFromDB; router: Rout
 
   return (
     <div
-      className="product-card"
+      className="product-card glass-card group"
       onClick={() => router.push(`/product/${product.id}`)}
       style={{
-        background: "#ffffff",
-        borderRadius: 20,
-        border: "1px solid #e2e8f0",
         overflow: "hidden",
         cursor: "pointer",
-        transition: "all 0.25s ease",
-        boxShadow: "var(--shadow-sm)",
         display: "flex",
         flexDirection: "column",
+        position: "relative",
+        zIndex: 1,
       }}
       onMouseEnter={(e) => {
-        const el = e.currentTarget as HTMLDivElement;
-        el.style.transform = "translateY(-6px)";
-        el.style.boxShadow = "var(--shadow-hover)";
-        el.style.borderColor = ui.accentColor + "40";
+        // className glass-card:hover handles transform and shadow
       }}
       onMouseLeave={(e) => {
-        const el = e.currentTarget as HTMLDivElement;
-        el.style.transform = "translateY(0)";
-        el.style.boxShadow = "var(--shadow-sm)";
-        el.style.borderColor = "#e2e8f0";
+        // className glass-card:hover handles restore
       }}
     >
       {/* ─ Visual area ─ */}
       <div
         style={{
-          background: ui.accentBg,
+          background: "transparent",
+          borderBottom: "1px solid rgba(255,255,255,0.2)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -354,7 +346,7 @@ function ProductCard({ product, router }: { product: ProductFromDB; router: Rout
               type="primary"
               onClick={(e) => {
                 e.stopPropagation();
-                router.push(`/design-studio?shirt=${product.form}`);
+                router.push(`/design-studio?shirt=${product.form}&productId=${product.id}`);
               }}
               style={{
                 background: ui.accentColor,

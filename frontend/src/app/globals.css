@@ -108,51 +108,56 @@
   --font-inter: "Inter", sans-serif;
 
   /* Primary – Sky Blue (Light) */
-  --color-primary:       #0ea5e9;
-  --color-primary-dark:  #0284c7;
+  --color-primary: #0ea5e9;
+  --color-primary-dark: #0284c7;
   --color-primary-light: #e0f2fe;
-  --color-primary-mid:   #bae6fd;
+  --color-primary-mid: #bae6fd;
 
   /* Accent – Indigo hint */
-  --color-accent:        #6366f1;
-  --color-accent-light:  #ede9fe;
+  --color-accent: #6366f1;
+  --color-accent-light: #ede9fe;
 
   /* Surface & Backgrounds */
-  --color-bg:            #f1f5f9;
-  --color-surface:       #ffffff;
-  --color-surface-2:     #f8fafc;
-  --color-border:        #e2e8f0;
-  --color-border-light:  #f1f5f9;
+  --color-bg: #f1f5f9;
+  --color-surface: #ffffff;
+  --color-surface-2: #f8fafc;
+  --color-border: #e2e8f0;
+  --color-border-light: #f1f5f9;
 
   /* Text */
-  --color-text-primary:   #0f172a;
+  --color-text-primary: #0f172a;
   --color-text-secondary: #475569;
-  --color-text-muted:     #94a3b8;
+  --color-text-muted: #94a3b8;
 
   /* Semantic */
-  --color-success:        #10b981;
-  --color-success-light:  #d1fae5;
-  --color-warning:        #f59e0b;
-  --color-error:          #ea580c;
+  --color-success: #10b981;
+  --color-success-light: #d1fae5;
+  --color-warning: #f59e0b;
+  --color-error: #ea580c;
 
   /* Shadow */
-  --shadow-sm:   0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md:   0 4px 12px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
-  --shadow-lg:   0 12px 32px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.04);
-  --shadow-hover:0 20px 48px rgba(14,165,233,0.12), 0 6px 16px rgba(0,0,0,0.06);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.10), 0 4px 12px rgba(0, 0, 0, 0.04);
+  --shadow-hover: 0 20px 48px rgba(14, 165, 233, 0.12), 0 6px 16px rgba(0, 0, 0, 0.06);
 }
 
 /* =========================================
    RESET & BASE
    ========================================= */
 @layer base {
-  *, *::before, *::after {
+
+  *,
+  *::before,
+  *::after {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
   }
 
-  html { scroll-behavior: smooth; }
+  html {
+    scroll-behavior: smooth;
+  }
 
   body {
     font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -172,10 +177,12 @@
     color: inherit !important;
     font-family: inherit !important;
   }
+
   .ant-app a {
     color: inherit;
     text-decoration: inherit;
   }
+
   .ant-app a:hover {
     color: inherit;
   }
@@ -267,7 +274,7 @@
   padding: 12px 16px 48px;
 }
 
-.admin-main > * + * {
+.admin-main>*+* {
   margin-top: 24px;
 }
 
@@ -290,13 +297,27 @@
    ANIMATIONS
    ========================================= */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-8px); }
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 .animate-fade-in-up {
@@ -353,4 +374,58 @@
   color: #94a3b8;
   font-size: 12px;
   line-height: 16px;
+}
+
+/* =========================================
+   HOMEPAGE GLASSMORPHISM & PARALLAX
+   ========================================= */
+
+/* Nền Mesh Gradient động */
+.mesh-gradient-bg {
+  background:
+    radial-gradient(at 0% 0%, rgba(224, 242, 254, 1) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(203, 213, 225, 0.7) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(241, 245, 249, 1) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(219, 234, 254, 0.8) 0px, transparent 50%);
+  background-color: #f8fafc;
+  background-attachment: fixed;
+  background-size: 200% 200%;
+  animation: meshFlow 15s ease infinite alternate;
+}
+
+@keyframes meshFlow {
+  0% {
+    background-position: 0% 0%;
+  }
+
+  100% {
+    background-position: 100% 100%;
+  }
+}
+
+/* Thẻ kính mờ lơ lửng */
+.glass-card {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
+  border-radius: 20px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.08);
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+/* Header viên thuốc (Floating Pill) */
+.floating-glass-header {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1);
+  border-radius: 100px;
 }

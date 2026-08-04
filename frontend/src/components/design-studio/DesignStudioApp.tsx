@@ -11,7 +11,8 @@ import { userDesignService, SavedDesign } from "@/services/userDesignService";
 import { getProductById } from "@/services/productService";
 import { calcDesignFee } from "@/utils/designFeeCalculator";
 import { getUploadedImages, saveUploadedImages } from "@/utils/indexedDB";
-import { Modal } from "antd";
+import { printMethodService } from "@/services/printMethodService";
+import { Modal, message } from "antd";
 import html2canvas from "html2canvas";
 
 import Toolbar from "./Toolbar";
@@ -88,10 +89,13 @@ export default function DesignStudioApp() {
 
   // Cập nhật phí mỗi khi danh sách phần tử hoặc phương pháp in thay đổi
   const elements = useDesignStore((s) => s.elements);
-  const printingMethod = useDesignStore((s) => s.printingMethod);
+  const printingMethodCode = useDesignStore((s) => s.printingMethodCode);
+  const printMethods = useDesignStore((s) => s.printMethods);
+  
   useEffect(() => {
-    setDesignFeeInfo(calcDesignFee(elements, printingMethod));
-  }, [elements, printingMethod]);
+    const extraCost = printMethods.find(m => m.code === printingMethodCode)?.extraCost || 0;
+    setDesignFeeInfo(calcDesignFee(elements, extraCost));
+  }, [elements, printingMethodCode, printMethods]);
 
   /* ── Cart modal — productId và tên màu từ URL ── */
   const [urlProductId, setUrlProductId] = useState<number | null>(null);
@@ -188,6 +192,21 @@ export default function DesignStudioApp() {
     fetchColors();
     return () => { isMounted = false; };
   }, [shirtType, urlProductId, setAvailableColors, setMockupImages, setShirtColor]);
+
+  /* ── Lấy danh sách phương pháp in từ DB ── */
+  useEffect(() => {
+    let isMounted = true;
+    const fetchMethods = async () => {
+      const methods = await printMethodService.getPrintMethods();
+      if (!isMounted) return;
+      useDesignStore.getState().setPrintMethods(methods);
+      if (methods.length > 0 && !useDesignStore.getState().printingMethodCode) {
+        useDesignStore.getState().setPrintingMethodCode(methods[0].code);
+      }
+    };
+    fetchMethods();
+    return () => { isMounted = false; };
+  }, []);
 
   /* ── Keyboard shortcuts ── */
   useEffect(() => {
@@ -363,7 +382,7 @@ export default function DesignStudioApp() {
           elements: useDesignStore.getState().elements,
           shirtType: useDesignStore.getState().shirtType,
           shirtView: useDesignStore.getState().shirtView,
-          printingMethod: useDesignStore.getState().printingMethod,
+          printingMethodCode: useDesignStore.getState().printingMethodCode,
           logicalCanvas: { width: CONTAINER_W, height: CONTAINER_H },
         },
         previewUrl
@@ -429,6 +448,7 @@ export default function DesignStudioApp() {
       currentDesignId: design.id,
       currentDesignStatus: design.status,
       adminNote: design.adminNote,
+      printingMethodCode: design.canvasData?.printingMethodCode || design.canvasData?.printingMethod || (state.printMethods.length > 0 ? state.printMethods[0].code : ""),
       designName: design.name,
     });
   }, []);
@@ -829,8 +849,8 @@ export default function DesignStudioApp() {
               )}
             </div>
           </div>
-          {/* Cụm điều khiển: View Toggle & Zoom */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, marginTop: 16 }}>
+          {/* Cụm điều khiển: View Toggle, Color, Zoom, Printing Method */}
+          <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 16 }}>
             {/* Chuyển đổi Mặt trước / Mặt sau */}
             <div
               style={{
@@ -941,13 +961,12 @@ export default function DesignStudioApp() {
                 borderRadius: 9999,
                 boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
                 border: "1px solid rgba(255, 255, 255, 0.1)",
-                marginTop: 4,
               }}
             >
               <span style={{ fontSize: 13, color: "#cbd5e1", fontWeight: 500 }}>In:</span>
               <select
-                value={printingMethod}
-                onChange={(e) => useDesignStore.getState().setPrintingMethod(e.target.value as any)}
+                value={printingMethodCode}
+                onChange={(e) => useDesignStore.getState().setPrintingMethodCode(e.target.value)}
                 style={{
                   background: "transparent",
                   color: "#fff",
@@ -958,9 +977,11 @@ export default function DesignStudioApp() {
                   cursor: "pointer",
                 }}
               >
-                <option value="DECAL" style={{ color: "#000" }}>Decal</option>
-                <option value="PET" style={{ color: "#000" }}>PET (+20%)</option>
-                <option value="DTG" style={{ color: "#000" }}>DTG (+50%)</option>
+                {printMethods.map((method) => (
+                  <option key={method.code} value={method.code} style={{ color: "#000" }}>
+                    {method.name} {method.extraCost > 0 ? `(+${method.extraCost.toLocaleString()}đ)` : ""}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

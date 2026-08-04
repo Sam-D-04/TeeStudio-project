@@ -169,6 +169,26 @@ export default function PropertiesPanel() {
 
       <div className="ds-prop-divider" />
 
+      {/* ── Nhập nội dung văn bản ── */}
+      {!isImage && (
+        <>
+          <div className="ds-prop-field" style={{ width: "100%", flexDirection: "column", alignItems: "flex-start", gap: 6, marginBottom: 16 }}>
+            <label className="ds-prop-field-label" style={{ width: "100%", textAlign: "left", fontSize: 13 }}>Nội dung chữ:</label>
+            <textarea
+              className="ds-prop-input"
+              value={el.text || ""}
+              onChange={(e) => handlePropChange("text", e.target.value)}
+              onBlur={() => pushHistory()}
+              disabled={el.locked}
+              rows={3}
+              style={{ width: "100%", resize: "vertical", padding: "8px", lineHeight: 1.4 }}
+              placeholder="Nhập nội dung chữ..."
+            />
+          </div>
+          <div className="ds-prop-divider" />
+        </>
+      )}
+
       {/* ── Lưới nhập nhanh vị trí (X, Y) và kích thước (W, H, góc xoay) ── */}
       <div className="ds-prop-grid">
         <div className="ds-prop-field">

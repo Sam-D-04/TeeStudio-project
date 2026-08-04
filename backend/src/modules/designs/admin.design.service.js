@@ -17,6 +17,7 @@ const { calculateBoundingBoxAreaFee } = require("../pricing/admin.pricing.servic
 const { taoBaoCaoExcel } = require("../../common/utils/excel-report");
 const { chuanHoaCanvasData } = require("../../common/utils/canvas.util");
 const { sendDesignRevisionEmail } = require("../../common/services/emailService");
+const { capNhatTrangThai: capNhatTrangThaiDonHang, ghiOrderHistory } = require("../orders/admin.order.service");
 
 
 // =====================================================================
@@ -2032,10 +2033,10 @@ async function capNhatTrangThaiDonIn(id, trangThaiMoi, actor) {
     throw taoLoi("Trạng thái tiến độ in mới không hợp lệ.");
   }
 
-  return db.transaction(async (conn) => {
+  const result = await db.transaction(async (conn) => {
     const [rows] = await conn.query(
       `SELECT op.id, op.orderItemId, op.status AS legacyStatus,
-              oi.productionStatus, cd.status AS designStatus
+              oi.productionStatus, oi.orderId, cd.status AS designStatus
        FROM OrderProduction op
        JOIN OrderItem oi ON oi.id = op.orderItemId
        LEFT JOIN CustomDesign cd ON cd.id = oi.designId
@@ -2090,6 +2091,17 @@ async function capNhatTrangThaiDonIn(id, trangThaiMoi, actor) {
       );
     }
 
+    await ghiOrderHistory(conn, {
+      orderId: donHienTai.orderId,
+      toStatus: statusMoiDB,
+      action: "PRODUCTION_STATUS_CHANGED",
+      actor,
+      note:
+        statusMoiDB === "PRINTING"
+          ? "Sản phẩm đang được đưa vào in ấn"
+          : "Đã hoàn thành in ấn sản phẩm",
+    });
+
     let autoTransitionOrderId = null;
     if (statusMoiDB === "PRINTED") {
       const [rowsAoChuaInXong] = await conn.query(
@@ -2126,8 +2138,7 @@ async function capNhatTrangThaiDonIn(id, trangThaiMoi, actor) {
   if (result.autoTransitionOrderId) {
     try {
       console.log(`[Auto-Transition] Triggering capNhatTrangThai for order ${result.autoTransitionOrderId} to cho_giao`);
-      const orderService = require("../orders/admin.order.service");
-      await orderService.capNhatTrangThai(result.autoTransitionOrderId, "cho_giao", actor);
+      await capNhatTrangThaiDonHang(result.autoTransitionOrderId, "cho_giao", actor);
       console.log(`[Auto-Transition] Success for order ${result.autoTransitionOrderId}`);
     } catch (err) {
       console.error(`[Auto-Transition] Failed to transition order ${result.autoTransitionOrderId} to cho_giao:`, err.message);

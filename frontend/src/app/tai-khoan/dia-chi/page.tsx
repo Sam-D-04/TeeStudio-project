@@ -69,7 +69,7 @@ export default function DiaChiPage() {
     addressService
       .list()
       .then(setAddresses)
-      .catch((err) => message.error(getApiErrorMessage(err, "Không tải được sổ địa chỉ")))
+      .catch((err) => message.error(getApiErrorMessage(err, "Không tải được địa chỉ")))
       .finally(() => setLoading(false));
   };
 
@@ -164,7 +164,7 @@ export default function DiaChiPage() {
     <div>
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0f172a" }}>
-          Sổ địa chỉ
+          Địa chỉ
         </h2>
         <p style={{ margin: "4px 0 0", fontSize: 13, color: "#94a3b8" }}>
           Quản lý các địa chỉ giao hàng của bạn.

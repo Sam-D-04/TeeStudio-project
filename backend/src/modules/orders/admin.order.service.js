@@ -1497,6 +1497,7 @@ module.exports = {
   huyDonHang,
   capNhatDiaChiGiaoHang,
   taoLaiMaThanhToanOnline,
+  ghiOrderHistory,
   // ── Service hỗ trợ form Tạo đơn mới ──
   timKiemKhachHang,
   layDiaChiKhachHang,

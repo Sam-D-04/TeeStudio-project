@@ -27,10 +27,12 @@ const NHAN_TRANG_THAI_DON_HANG = {
   CONFIRMED: "Đã xác nhận",
   PROCESSING: "Đang xử lý in",
   PRINTING: "Đang xử lý in",
+  PRINTED: "Đã in xong",
   READY_TO_SHIP: "Chờ giao",
   SHIPPING: "Đang giao hàng",
   COMPLETED: "Hoàn tất",
   CANCELLED: "Đã hủy",
+  PAID: "Đã thanh toán",
 };
 
 function taoMaDonHangMoi() {
@@ -443,6 +445,52 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
     throw err;
   }
 
+  // ─────────────────────────────────────────────
+  // Idempotency guard: nếu khách vừa gửi 1 đơn giống hệt (cùng tổng tiền,
+  // phương thức thanh toán) trong ít giây gần đây và đơn đó còn PENDING, coi
+  // đây là request bị gửi trùng (double-click, form bị submit 2 lần...) và trả
+  // về đơn đã tạo thay vì tạo thêm 1 CustomerOrder mới.
+  // ─────────────────────────────────────────────
+  const [rowsDonTrungLap] = await db.pool.query(
+    `SELECT co.id, co.orderCode, p.gatewayResponse
+       FROM CustomerOrder co
+       JOIN Payment p ON p.orderId = co.id
+      WHERE co.userId = ?
+        AND co.status = 'PENDING'
+        AND co.totalAmount = ?
+        AND p.paymentMethod = ?
+        AND co.createdAt >= (NOW() - INTERVAL 20 SECOND)
+      ORDER BY co.id DESC
+      LIMIT 1`,
+    [userId, totalAmount, paymentMethod]
+  );
+
+  if (rowsDonTrungLap.length > 0) {
+    const donTrungLap = rowsDonTrungLap[0];
+    let onlinePaymentTrungLap = null;
+    try {
+      onlinePaymentTrungLap = donTrungLap.gatewayResponse
+        ? JSON.parse(donTrungLap.gatewayResponse)
+        : null;
+    } catch {
+      onlinePaymentTrungLap = null;
+    }
+
+    return {
+      id: donTrungLap.id,
+      orderCode: donTrungLap.orderCode,
+      totalAmount,
+      depositPercent,
+      depositAmount,
+      codAmount,
+      paymentAmount,
+      paymentMethod,
+      paymentUrl: onlinePaymentTrungLap?.paymentUrl || null,
+      qrCodeValue: onlinePaymentTrungLap?.qrCodeValue || onlinePaymentTrungLap?.paymentUrl || null,
+      paymentUrlExpiresAt: onlinePaymentTrungLap?.expiresAt || null,
+    };
+  }
+
   const orderCode = taoMaDonHangMoi();
   const onlinePayment = await taoThongTinThanhToanOnline({
     paymentMethod,
@@ -460,12 +508,29 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
   try {
     await conn.beginTransaction();
 
-    const [resultAddress] = await conn.query(
-      `INSERT INTO UserAddress (userId, recipientName, phone, addressLine, city, district, ward)
-       VALUES (?, ?, ?, ?, ?, '', ?)`,
+    let addressId;
+    const [existingAddrs] = await conn.query(
+      `SELECT id FROM UserAddress 
+       WHERE userId = ? 
+         AND recipientName = ? 
+         AND phone = ? 
+         AND addressLine = ? 
+         AND city = ? 
+         AND ward = ?
+       LIMIT 1`,
       [userId, recipientName, phone, addressLine, city, ward]
     );
-    const addressId = resultAddress.insertId;
+
+    if (existingAddrs.length > 0) {
+      addressId = existingAddrs[0].id;
+    } else {
+      const [resultAddress] = await conn.query(
+        `INSERT INTO UserAddress (userId, recipientName, phone, addressLine, city, district, ward)
+         VALUES (?, ?, ?, ?, ?, '', ?)`,
+        [userId, recipientName, phone, addressLine, city, ward]
+      );
+      addressId = resultAddress.insertId;
+    }
 
     const [resultOrder] = await conn.query(
       `INSERT INTO CustomerOrder

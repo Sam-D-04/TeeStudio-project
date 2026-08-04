@@ -64,8 +64,14 @@ async function saveNewDesign(userId, payload) {
   const productId = await mapShirtTypeToProductId(shirtType);
   const dataStr = JSON.stringify(canvasData);
 
+  let printExtraCost = 0;
+  if (canvasData.printingMethodCode) {
+    const [pmRows] = await db.pool.query("SELECT extraCost FROM PrintMethod WHERE code = ? AND isActive = 1", [canvasData.printingMethodCode]);
+    if (pmRows.length > 0) printExtraCost = pmRows[0].extraCost || 0;
+  }
+
   // Tự động tính designFee từ canvasData – Backend không tin tưởng giá trị FE gửi lên
-  const designFee = calculateBoundingBoxAreaFee(canvasData);
+  const designFee = calculateBoundingBoxAreaFee(canvasData, printExtraCost);
 
   const conn = await db.pool.getConnection();
   let insertId;
@@ -118,8 +124,14 @@ async function updateDesign(userId, designId, payload) {
   const productId = await mapShirtTypeToProductId(shirtType);
   const dataStr = JSON.stringify(canvasData);
 
+  let printExtraCost = 0;
+  if (canvasData.printingMethodCode) {
+    const [pmRows] = await db.pool.query("SELECT extraCost FROM PrintMethod WHERE code = ? AND isActive = 1", [canvasData.printingMethodCode]);
+    if (pmRows.length > 0) printExtraCost = pmRows[0].extraCost || 0;
+  }
+
   // Tự động tính lại designFee mỗi lần user lưu (dữ liệu thay đổi thì phí cũng thay đổi)
-  const designFee = calculateBoundingBoxAreaFee(canvasData);
+  const designFee = calculateBoundingBoxAreaFee(canvasData, printExtraCost);
 
   const conn = await db.pool.getConnection();
   try {
