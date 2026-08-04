@@ -1,0 +1,22 @@
+- generic [active] [ref=f5e1]:
+  - generic [ref=f5e2]:
+    - banner [ref=f5e3]:
+      - generic [ref=f5e4]:
+        - link "TeeStudio" [ref=f5e5] [cursor=pointer]:
+          - /url: /
+        - navigation [ref=f5e10]:
+          - link "Khám phá" [ref=f5e11] [cursor=pointer]:
+            - /url: /explore
+          - link "Thiết kế áo" [ref=f5e12] [cursor=pointer]:
+            - /url: /design-studio
+          - link "Bộ sưu tập" [ref=f5e13] [cursor=pointer]:
+            - /url: /collections
+        - generic [ref=f5e15]:
+          - searchbox "Tìm kiếm loại áo, chất liệu..." [ref=f5e21]
+          - button [ref=f5e23] [cursor=pointer]:
+            - img "search" [ref=f5e25]
+        - generic [ref=f5e28]:
+          - button [ref=f5e30] [cursor=pointer]
+          - button [ref=f5e34] [cursor=pointer]
+    - main [ref=f5e37]
+  - button "Open Next.js Dev Tools" [ref=f5e50] [cursor=pointer]

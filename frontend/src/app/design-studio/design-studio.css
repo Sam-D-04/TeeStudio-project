@@ -849,23 +849,61 @@
   border: none;
   color: #475569;
   cursor: pointer;
-  padding: 4px;
+  padding: 3px;
   border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
   transition: opacity 0.12s, color 0.12s;
   flex-shrink: 0;
-}
-
-.ds-layer-item:hover .ds-layer-delete {
-  opacity: 1;
 }
 
 .ds-layer-delete:hover {
   color: #f87171;
   background: rgba(248, 113, 113, 0.1);
+}
+
+/* Nút lên/xuống thứ tự lớp */
+.ds-layer-order-btn {
+  background: none;
+  border: none;
+  color: #475569;
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s, background 0.12s;
+  flex-shrink: 0;
+}
+
+.ds-layer-order-btn:hover:not(:disabled) {
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.ds-layer-order-btn:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+}
+
+/* Nhóm các nút thao tác bên phải (reorder + delete) */
+.ds-layer-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 0.12s;
+  flex-shrink: 0;
+}
+
+.ds-layer-item:hover .ds-layer-actions {
+  opacity: 1;
+}
+
+.ds-layer-item--selected .ds-layer-actions {
+  opacity: 1;
 }
 
 /* ── Properties panel (right sidebar) ──────── */

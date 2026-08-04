@@ -9,6 +9,8 @@ const {
   verifyEmailSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  updateProfileSchema,
+  changePasswordSchema,
 } = require("./auth.validation");
 
 // Chặn brute-force: tối đa 10 lần thử/15 phút cho mỗi IP trên các endpoint nhạy cảm.
@@ -55,6 +57,19 @@ router.post("/refresh", lightRateLimiter, authController.refresh);
 router.post("/logout", lightRateLimiter, authController.logout);
 router.post("/logout-all", verifyToken, authController.logoutAll);
 router.get("/me", verifyToken, authController.me);
+router.put(
+  "/me",
+  verifyToken,
+  validate(updateProfileSchema),
+  authController.updateProfile
+);
+router.put(
+  "/me/password",
+  authRateLimiter,
+  verifyToken,
+  validate(changePasswordSchema),
+  authController.changePassword
+);
 
 router.post(
   "/verify-email",

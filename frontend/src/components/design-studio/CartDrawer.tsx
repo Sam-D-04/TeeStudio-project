@@ -144,23 +144,46 @@ export default function CartDrawer({ open, onClose }: Props) {
                     <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: item.color, border: "1px solid #e2e8f0" }} />
                     {item.colorLabel}
                   </span>
+                  {item.stockQty !== undefined && item.stockQty === 1 && (
+                    <span style={{ fontSize: 10, color: "#d97706", background: "#fffbeb", borderRadius: 4, padding: "1px 6px", border: "1px solid #fef3c7", fontWeight: 600 }}>
+                      Chỉ còn 1 sp
+                    </span>
+                  )}
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   {/* Bộ tăng/giảm số lượng */}
-                  <div style={{ display: "flex", alignItems: "center", border: "1px solid #e2e8f0", borderRadius: 7, overflow: "hidden" }}>
-                    <button
-                      onClick={() => updateQty(item.cartItemId, item.quantity - 1)}
-                      style={{ width: 28, height: 28, background: "#f8fafc", border: "none", cursor: "pointer", fontSize: 15, color: "#475569", display: "flex", alignItems: "center", justifyContent: "center" }}
-                    >−</button>
-                    <span style={{ minWidth: 30, textAlign: "center", fontSize: 13, fontWeight: 700, color: "#0f172a", borderLeft: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0", height: 28, lineHeight: "28px" }}>
-                      {item.quantity}
-                    </span>
-                    <button
-                      onClick={() => updateQty(item.cartItemId, item.quantity + 1)}
-                      style={{ width: 28, height: 28, background: "#f8fafc", border: "none", cursor: "pointer", fontSize: 15, color: "#475569", display: "flex", alignItems: "center", justifyContent: "center" }}
-                    >+</button>
-                  </div>
+                  {(() => {
+                    const isMaxReached = item.stockQty !== undefined ? item.quantity >= item.stockQty : false;
+                    return (
+                      <div style={{ display: "flex", alignItems: "center", border: "1px solid #e2e8f0", borderRadius: 7, overflow: "hidden" }}>
+                        <button
+                          onClick={() => updateQty(item.cartItemId, item.quantity - 1)}
+                          style={{ width: 28, height: 28, background: "#f8fafc", border: "none", cursor: "pointer", fontSize: 15, color: "#475569", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        >−</button>
+                        <span style={{ minWidth: 30, textAlign: "center", fontSize: 13, fontWeight: 700, color: "#0f172a", borderLeft: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0", height: 28, lineHeight: "28px" }}>
+                          {item.quantity}
+                        </span>
+                        <button
+                          disabled={isMaxReached}
+                          onClick={() => {
+                            if (isMaxReached) return;
+                            updateQty(item.cartItemId, item.quantity + 1);
+                          }}
+                          title={isMaxReached ? (item.stockQty === 1 ? "Sản phẩm trong kho chỉ còn 1 sản phẩm, không thể tăng thêm" : "Đã đạt số lượng tồn kho tối đa") : "Tăng số lượng"}
+                          style={{
+                            width: 28, height: 28,
+                            background: isMaxReached ? "#f1f5f9" : "#f8fafc",
+                            border: "none",
+                            cursor: isMaxReached ? "not-allowed" : "pointer",
+                            fontSize: 15,
+                            color: isMaxReached ? "#cbd5e1" : "#475569",
+                            display: "flex", alignItems: "center", justifyContent: "center"
+                          }}
+                        >+</button>
+                      </div>
+                    );
+                  })()}
 
                   <span style={{ fontSize: 14, fontWeight: 800, color: "#0ea5e9" }}>
                     {fmt(item.price * item.quantity)}

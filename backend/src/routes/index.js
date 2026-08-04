@@ -3,6 +3,7 @@ const router = require("express").Router();
 const authRoutes = require("../modules/auth/auth.api.routes");
 const userRoutes = require("../modules/users/admin.user.api.routes");
 const userDesignRoutes = require("../modules/users/user.design.routes");
+const userAddressRoutes = require("../modules/users/user.address.routes");
 const pricingRoutes = require("../modules/pricing/admin.pricing.routes");
 const adminOrderRoutes = require("../modules/orders/admin.order.routes");
 const customerOrderRoutes = require("../modules/orders/customer.order.routes");
@@ -41,6 +42,12 @@ router.use("/users", userRoutes);
 // GET/POST /api/users/me/designs  →  danh sách + tạo mới
 // PUT/DELETE /api/users/me/designs/:id  →  cập nhật + xóa
 router.use("/users/me/designs", userDesignRoutes);
+
+// ── Sổ địa chỉ giao hàng (user phải đăng nhập) ─────────────────────────────
+// GET/POST /api/users/me/addresses         →  danh sách + thêm mới
+// PUT/DELETE /api/users/me/addresses/:id   →  cập nhật + xoá
+// PUT /api/users/me/addresses/:id/default  →  đặt làm địa chỉ mặc định
+router.use("/users/me/addresses", userAddressRoutes);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Route công khai – dành cho giao diện khách hàng (Design Studio)

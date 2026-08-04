@@ -53,6 +53,17 @@ const TypeIcon = () => (
   </svg>
 );
 
+const FlipHIcon = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18M7 7l-4 4 4 4M17 7l4 4-4 4" />
+  </svg>
+);
+const FlipVIcon = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h18M7 7l4-4 4 4M7 17l4 4 4-4" />
+  </svg>
+);
+
 /* ─── Icon căn chỉnh vị trí (căn trái/phải/giữa...) ─── */
 const AlignLeftIcon = () => (
   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -98,6 +109,7 @@ export default function PropertiesPanel() {
     moveElementDown,
     toggleLock,
     pushHistory,
+    flipElement,
   } = useDesignStore();
 
   const el = elements.find((e) => e.id === selectedId);
@@ -273,7 +285,7 @@ export default function PropertiesPanel() {
         </>
       )}
 
-      {/* ── Hàng thao tác nhanh: nhân đôi / khoá / đổi thứ tự lớp ── */}
+      {/* ── Hàng thao tác nhanh: nhân đôi / khoá / flip / đổi thứ tự lớp ── */}
       <div className="ds-prop-actions-row">
         <button
           className="ds-prop-icon-btn"
@@ -306,6 +318,25 @@ export default function PropertiesPanel() {
         >
           <DownIcon />
           <span>Xuống</span>
+        </button>
+        {/* Flip ngang / dọc — áp dụng cho cả text lẫn image */}
+        <button
+          className={`ds-prop-icon-btn ${el.flipH ? "ds-prop-icon-btn--active" : ""}`}
+          onClick={() => flipElement(el.id, "H")}
+          title="Lật ngang"
+          disabled={el.locked}
+        >
+          <FlipHIcon />
+          <span>Lật ngang</span>
+        </button>
+        <button
+          className={`ds-prop-icon-btn ${el.flipV ? "ds-prop-icon-btn--active" : ""}`}
+          onClick={() => flipElement(el.id, "V")}
+          title="Lật dọc"
+          disabled={el.locked}
+        >
+          <FlipVIcon />
+          <span>Lật dọc</span>
         </button>
       </div>
 

@@ -450,11 +450,7 @@ export default function ProductDetailClient({ product }: Props) {
                     padding: "48px 56px",
                     position: "relative",
                     transition: "background 0.3s ease",
-                    cursor: hasMockup ? "crosshair" : "default",
                   }}
-                  onMouseMove={hasMockup ? handleImageMouseMove : undefined}
-                  onMouseEnter={() => hasMockup && setIsZooming(true)}
-                  onMouseLeave={() => setIsZooming(false)}
                 >
                   {/* Nhãn tình trạng tồn kho */}
                   <div
@@ -517,45 +513,52 @@ export default function ProductDetailClient({ product }: Props) {
                     style={{
                       width: "100%",
                       maxWidth: 420,
+                      position: "relative",
+                      transition: "all 0.3s ease",
+                      cursor: hasMockup ? "crosshair" : "default",
+                    }}
+                    onMouseMove={hasMockup ? handleImageMouseMove : undefined}
+                    onMouseEnter={() => hasMockup && setIsZooming(true)}
+                    onMouseLeave={() => setIsZooming(false)}
+                  >
+                    <div style={{
                       filter: hasMockup
                         ? "drop-shadow(0 12px 32px rgba(0,0,0,0.18))"
                         : isLightColor
                           ? "drop-shadow(0 4px 12px rgba(0,0,0,0.12))"
                           : "drop-shadow(0 8px 24px rgba(0,0,0,0.22))",
-                      transition: "all 0.3s ease",
-                    }}
-                  >
-                    {hasMockup ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={mockupUrl}
-                        alt={`${product.name} ${selectedColor} ${previewTab}`}
-                        style={{ width: "100%", objectFit: "contain", display: "block" }}
-                        draggable={false}
+                    }}>
+                      {hasMockup ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={mockupUrl}
+                          alt={`${product.name} ${selectedColor} ${previewTab}`}
+                          style={{ width: "100%", objectFit: "contain", display: "block" }}
+                          draggable={false}
+                        />
+                      ) : (
+                        <ShirtSVG form={product.form} fillColor={colorHex} />
+                      )}
+                    </div>
+
+                    {/* Ô kính lúp theo con trỏ, chỉ hiện khi đang zoom ảnh thật */}
+                    {isZooming && hasMockup && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: `${zoomPos.x}%`,
+                          top: `${zoomPos.y}%`,
+                          transform: "translate(-50%, -50%)",
+                          width: 140,
+                          height: 140,
+                          background: "rgba(14,165,233,0.15)",
+                          border: "2px solid #0ea5e9",
+                          borderRadius: 8,
+                          pointerEvents: "none",
+                        }}
                       />
-                    ) : (
-                      <ShirtSVG form={product.form} fillColor={colorHex} />
                     )}
                   </div>
-
-                  {/* Ô kính lúp theo con trỏ, chỉ hiện khi đang zoom ảnh thật */}
-                  {isZooming && hasMockup && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: `${zoomPos.x}%`,
-                        top: `${zoomPos.y}%`,
-                        transform: "translate(-50%, -50%)",
-                        width: 140,
-                        height: 140,
-                        background: "rgba(14,165,233,0.15)",
-                        border: "2px solid #0ea5e9",
-                        borderRadius: 8,
-                        pointerEvents: "none",
-                      }}
-                    />
-                  )}
-
                 </div>
               </div>
 
@@ -603,7 +606,7 @@ export default function ProductDetailClient({ product }: Props) {
                   >
                     {FORM_LABEL[product.form] ?? product.form}
                   </Tag>
-                  {product.category && (
+                  {product.category && product.category.toLowerCase() !== (FORM_LABEL[product.form] ?? product.form).toLowerCase() && (
                     <Tag
                       style={{
                         background: "#f1f5f9",

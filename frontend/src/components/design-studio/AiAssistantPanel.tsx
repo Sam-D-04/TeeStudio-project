@@ -2,7 +2,7 @@
 
 import React from "react";
 import { v4 as uuidv4 } from "uuid";
-import { useDesignStore, type DesignElement } from "@/store/useDesignStore";
+import { useDesignStore, selectElementsBySide, type DesignElement } from "@/store/useDesignStore";
 import { getPrintAreaBoundary } from "./ShirtMockupImage";
 import { aiDesignService, type AiTextElement } from "@/services/aiDesignService";
 import {
@@ -69,8 +69,8 @@ export default function AiAssistantPanel() {
   const hasItems = elements.length > 0;
   // Chỉ lấy phần tử chữ CỦA MẶT ĐANG XEM - "Sắp xếp bố cục" chỉ nên sắp xếp
   // lại chữ trên mặt khách đang thiết kế, không đụng tới chữ ở mặt kia.
-  const textElements = elements.filter(
-    (e) => e.type === "text" && (e.side ?? "front") === shirtView
+  const textElements = selectElementsBySide(elements, shirtView).filter(
+    (e) => e.type === "text"
   );
   const hasText = textElements.length > 0;
   const palette = React.useMemo(() => suggestTextPalette(shirtColor), [shirtColor]);

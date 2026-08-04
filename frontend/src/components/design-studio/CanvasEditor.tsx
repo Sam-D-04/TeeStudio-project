@@ -11,7 +11,7 @@ import {
   Line,
 } from "react-konva";
 import type Konva from "konva";
-import { useDesignStore, DesignElement } from "@/store/useDesignStore";
+import { useDesignStore, selectElementsBySide, type DesignElement } from "@/store/useDesignStore";
 
 /* ─── Kiểu dữ liệu ─── */
 export type PrintArea = { x: number; y: number; w: number; h: number };
@@ -173,18 +173,25 @@ function ExternalTransformer({
           const storeY = node.y() - (flipV ? newH : 0);
           updateElement(el.id, { x: storeX, y: storeY, width: newW, height: newH, rotation: node.rotation() });
         } else if (el.type === "text") {
+          const flipH = el.flipH ?? false;
+          const flipV = el.flipV ?? false;
           const textNode = node as Konva.Text;
-          const scaleX = textNode.scaleX();
-          const scaleY = textNode.scaleY();
-          textNode.scaleX(1);
-          textNode.scaleY(1);
-          const newW = Math.max(20, textNode.width() * scaleX);
-          const newFontSize = Math.max(8, (el.fontSize || 28) * scaleY);
+          const rawScaleX = textNode.scaleX();
+          const rawScaleY = textNode.scaleY();
+          const resScaleX = Math.abs(rawScaleX);
+          const resScaleY = Math.abs(rawScaleY);
+          textNode.scaleX(flipH ? -1 : 1);
+          textNode.scaleY(flipV ? -1 : 1);
+          const newW = Math.max(20, textNode.width() * resScaleX);
+          const newFontSize = Math.max(8, (el.fontSize || 28) * resScaleY);
           textNode.width(newW);
           textNode.fontSize(newFontSize);
           const finalH = textNode.height();
+          /* node.x() = storeX + (flipH ? newW : 0) → giải ngược */
+          const storeX = textNode.x() - (flipH ? newW : 0);
+          const storeY = textNode.y() - (flipV ? finalH : 0);
           updateElement(el.id, {
-            x: textNode.x(), y: textNode.y(),
+            x: storeX, y: storeY,
             width: newW, height: finalH,
             rotation: textNode.rotation(),
             fontSize: newFontSize,
@@ -291,13 +298,25 @@ function TextShape({
 
   const elW = el.width ?? 150;
   const elH = el.height ?? 40;
+  const flipH = el.flipH ?? false;
+  const flipV = el.flipV ?? false;
+
+  /* Khi flipH=true: dịch x sang phải bằng width, scaleX=-1 → text vẫn nằm đúng chỗ */
+  const konvaX = el.x + (flipH ? elW : 0);
+  const konvaY = el.y + (flipV ? elH : 0);
+
+  /* Chuyển Konva x/y về store x/y (bỏ offset flip) */
+  const toStoreX = (kx: number) => kx - (flipH ? elW : 0);
+  const toStoreY = (ky: number) => ky - (flipV ? elH : 0);
 
   return (
     <KonvaText
       ref={shapeRef}
       text={el.textTransform === "uppercase" ? (el.text || "").toUpperCase() : (el.text || "")}
-      x={el.x} y={el.y}
+      x={konvaX} y={konvaY}
       width={elW}
+      scaleX={flipH ? -1 : 1}
+      scaleY={flipV ? -1 : 1}
       fontSize={el.fontSize || 28}
       fontFamily={el.fontFamily || "Arial"}
       fill={el.fill || "#000000"}
@@ -311,10 +330,16 @@ function TextShape({
       onClick={onSelect}
       onTap={onSelect}
       onDragStart={() => { pushHistory(); onDragStateChange(true, el.x, el.y, elW, elH); }}
-      onDragMove={(e) => onDragStateChange(true, e.target.x(), e.target.y(), elW, elH)}
+      onDragMove={(e) => {
+        const sx = toStoreX(e.target.x());
+        const sy = toStoreY(e.target.y());
+        onDragStateChange(true, sx, sy, elW, elH);
+      }}
       onDragEnd={(e) => {
-        onDragStateChange(false, e.target.x(), e.target.y(), elW, elH);
-        updateElement(el.id, { x: e.target.x(), y: e.target.y() });
+        const sx = toStoreX(e.target.x());
+        const sy = toStoreY(e.target.y());
+        onDragStateChange(false, sx, sy, elW, elH);
+        updateElement(el.id, { x: sx, y: sy });
       }}
       perfectDrawEnabled={false}
     />
@@ -331,6 +356,8 @@ export interface CanvasEditorProps {
   /** Danh sách điểm đa giác dùng để clip vùng in (toạ độ logic, đơn vị px).
    *  Nếu có giá trị, vùng in sẽ được clip theo đa giác này thay vì hình chữ nhật. */
   clipPoints?: [number, number][];
+  /** Khi true: khóa canvas (không cho chọn/kéo phần tử – thiết kế đã được duyệt). */
+  isReadOnly?: boolean;
 }
 
 export default function CanvasEditor({
@@ -340,6 +367,7 @@ export default function CanvasEditor({
   containerH,
   zoom,
   clipPoints,
+  isReadOnly = false,
 }: CanvasEditorProps) {
   const { elements, selectedId, setSelectedId, shirtView } = useDesignStore();
 
@@ -347,9 +375,8 @@ export default function CanvasEditor({
   // Chỉ vẽ lên canvas những phần tử thuộc đúng mặt đang xem - nếu không, thiết
   // kế mặt trước sẽ bị "lộ" ra khi đang xem mặt sau (2 vùng in nằm gần trùng
   // nhau trên màn hình nên trước đây rất dễ nhầm là cùng 1 thiết kế).
-  const phanTuMatDangXem = elements.filter(
-    (el) => (el.side ?? "front") === shirtView
-  );
+  // Lọc chỉ render các element thuộc về mặt áo đang được chọn xem
+  const phanTuMatDangXem = selectElementsBySide(elements, shirtView);
 
   /* Map: elementId → Konva.Node — chia sẻ giữa shapes và Transformer */
   const shapeRefs = useRef<Map<string, Konva.Node>>(new Map());
@@ -363,8 +390,9 @@ export default function CanvasEditor({
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleStageClick = useCallback((e: Konva.KonvaEventObject<any>) => {
+    if (isReadOnly) return; // Khi đã duyệt: không cho chọn phần tử
     if (e.target === e.target.getStage()) setSelectedId(null);
-  }, [setSelectedId]);
+  }, [isReadOnly, setSelectedId]);
 
   const handleDragChange = useCallback(
     (active: boolean, x: number, y: number, w: number, h: number) =>
@@ -385,7 +413,11 @@ export default function CanvasEditor({
       scaleY={zoom}
       onClick={handleStageClick}
       onTap={handleStageClick}
-      style={{ position: "absolute", top: 0, left: 0, zIndex: 2 }}
+      style={{
+        position: "absolute", top: 0, left: 0, zIndex: 2,
+        // Khi chế độ chỉ xem: vô hiệu pointer để không chặn các event khác
+        pointerEvents: isReadOnly ? "none" : undefined,
+      }}
     >
       <Layer>
         {/*
@@ -416,7 +448,7 @@ export default function CanvasEditor({
             })}
         >
 
-          {phanTuMatDangXem.map((el) => {
+          {phanTuMatDangXem.map((el, index) => {
 
             const commonProps = {
               el,

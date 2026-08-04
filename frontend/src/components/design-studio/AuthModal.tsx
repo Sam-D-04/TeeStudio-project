@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { authService } from "@/services/authService";
 import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import { syncCart } from "@/services/cartService";
@@ -263,8 +264,15 @@ function InlineLoginForm({
 
       <ModalInput id="ml-email" label="Email" type="email" value={email}
         onChange={setEmail} placeholder="ban@example.com" autoComplete="email" p={p} />
-      <ModalInput id="ml-password" label="Mật khẩu" type="password" value={password}
-        onChange={setPassword} autoComplete="current-password" p={p} />
+      <div style={{ position: "relative" }}>
+        <ModalInput id="ml-password" label="Mật khẩu" type="password" value={password}
+          onChange={setPassword} autoComplete="current-password" p={p} />
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+          <Link href="/quen-mat-khau" style={{ fontSize: 13, color: p.linkColor, textDecoration: "none", fontWeight: 500 }}>
+            Quên mật khẩu?
+          </Link>
+        </div>
+      </div>
 
       <button type="submit" disabled={loading} style={{
         marginTop: 4, padding: "11px 0", borderRadius: 8, border: "none",

@@ -15,6 +15,7 @@ const db = require("../../database/mysql");
 
 const { calculateBoundingBoxAreaFee } = require("../pricing/admin.pricing.service");
 const { taoBaoCaoExcel } = require("../../common/utils/excel-report");
+const { chuanHoaCanvasData } = require("../../common/utils/canvas.util");
 const { sendDesignRevisionEmail } = require("../../common/services/emailService");
 
 
@@ -122,13 +123,16 @@ const TEN_TRANG_THAI_SAN_XUAT_DB = {
   PACKED: "Đã đóng gói",
 };
 
+// ⚠️  Khi thêm/đổi màu: phải cập nhật đồng bộ với
+//    frontend/src/constants/shirtColors.ts (HEX_TO_EN + SHIRT_COLORS)
+//    để đảm bảo màu thiết kế khớp với biến thể sản phẩm trong DB.
 const MAU_AO_MAC_DINH = {
   black: "#000000",
   den: "#000000",
   white: "#ffffff",
   trang: "#ffffff",
-  navy: "#1d4ed8",
-  "xanh navy": "#1d4ed8",
+  navy: "#1e3a8a",
+  "xanh navy": "#1e3a8a",
   blue: "#0066cc",
   "xanh duong": "#0066cc",
   gray: "#9ca3af",
@@ -183,32 +187,7 @@ function layMaMauTuongDuong(color) {
   return [...new Set(values.filter(Boolean))];
 }
 
-function chuanHoaCanvasData(canvasData, shirtType) {
-  let data = canvasData;
-  if (typeof data === "string") {
-    try {
-      data = JSON.parse(data);
-    } catch {
-      throw taoLoi("Dữ liệu thiết kế không phải JSON hợp lệ", 400);
-    }
-  }
-
-  if (!data || typeof data !== "object" || !Array.isArray(data.elements)) {
-    throw taoLoi("Dữ liệu thiết kế phải chứa danh sách elements", 400);
-  }
-  if (data.elements.length > 200) {
-    throw taoLoi("Thiết kế không được vượt quá 200 phần tử", 400);
-  }
-
-  return {
-    ...data,
-    version: Number(data.version) || 1,
-    shirtType,
-    shirtView: data.shirtView === "back" ? "back" : "front",
-    logicalCanvas: { width: 500, height: 600 },
-  };
-}
-
+// chuanHoaCanvasData moved to src/common/utils/canvas.util.js
 async function timSanPhamTheoLoaiAo(shirtType, executor = db.pool) {
   const tenGanDung = {
     tshirt: "%Áo Thun%",
@@ -1379,11 +1358,13 @@ async function yeuCauChinhSua(id, ghiChu) {
   const { email, fullName } = rows[0];
   const maThietKe = `TK-${String(id).padStart(4, "0")}`;
   if (email) {
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     sendDesignRevisionEmail({
       to: email,
       fullName: fullName || "Khách hàng",
       maThietKe,
       ghiChu: ghiChu || "",
+      revisionLink: `${frontendUrl}/design-studio?designId=${id}`,
     }).catch((err) =>
       console.error("Lỗi gửi email yêu cầu chỉnh sửa thiết kế:", err?.message)
     );

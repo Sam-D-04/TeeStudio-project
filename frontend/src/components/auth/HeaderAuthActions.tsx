@@ -72,18 +72,22 @@ export default function HeaderAuthActions({
           </Tag>
         ) : null}
         {user.role !== "CUSTOMER" ? (
-          <Link href={getDefaultRouteForRole(user.role)} onClick={onNavigate}>
-            <Button block={mobile}>{user.fullName}</Button>
-          </Link>
+          <>
+            <Link href={getDefaultRouteForRole(user.role)} onClick={onNavigate}>
+              <Button block={mobile}>{user.fullName}</Button>
+            </Link>
+            <Button block={mobile} danger onClick={() => void logout()}>
+              Đăng xuất
+            </Button>
+          </>
         ) : (
-          // Khách hàng: bấm vào tên để tới trang "Đơn hàng của tôi"
-          <Link href="/tai-khoan/don-hang" onClick={onNavigate}>
+          // Khách hàng: bấm vào tên để tới khu vực "Tài khoản của tôi" — đăng
+          // xuất chỉ nằm trong sidebar của khu vực đó (tránh 2 nút đăng xuất
+          // trùng chức năng cùng lúc hiển thị trên header).
+          <Link href="/tai-khoan" onClick={onNavigate}>
             <Button block={mobile}>{user.fullName}</Button>
           </Link>
         )}
-        <Button block={mobile} danger onClick={() => void logout()}>
-          Đăng xuất
-        </Button>
       </div>
     );
   }

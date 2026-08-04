@@ -48,6 +48,13 @@ export interface DesignElement {
 export type ShirtType = "tshirt" | "polo" | "hoodie";
 export type ShirtView = "front" | "back";
 
+/** Ảnh mockup của phôi áo đang thiết kế, tải từ DB theo màu/mặt (xem ShirtMockupImage.tsx). */
+export interface MockupImage {
+  colorHex: string;
+  view: ShirtView;
+  url: string;
+}
+
 export interface DesignState {
   /* Nội dung canvas */
   elements: DesignElement[];
@@ -57,6 +64,9 @@ export interface DesignState {
   shirtType: ShirtType;
   shirtColor: string;
   shirtView: ShirtView;
+  availableColors: string[];
+  /** Ảnh mockup của sản phẩm đang chọn (tải từ DB theo productId), dùng để hiển thị áo trên canvas. */
+  mockupImages: MockupImage[];
 
   /* Trạng thái liên quan tới thiết kế đã lưu trong DB */
   currentDesignId: number | null;
@@ -77,12 +87,17 @@ export interface DesignState {
   duplicateElement: (id: string) => void;
   moveElementUp: (id: string) => void;
   moveElementDown: (id: string) => void;
+  moveElementToTop: (id: string) => void;
+  moveElementToBottom: (id: string) => void;
   toggleLock: (id: string) => void;
+  flipElement: (id: string, axis: "H" | "V") => void;
 
   /* Hành động thay đổi cấu hình áo */
   setShirtType: (t: ShirtType) => void;
   setShirtColor: (c: string) => void;
   setShirtView: (v: ShirtView) => void;
+  setAvailableColors: (colors: string[]) => void;
+  setMockupImages: (images: MockupImage[]) => void;
 
   /* Hành động cập nhật trạng thái lưu trữ (id/tên thiết kế) */
   setCurrentDesignId: (id: number | null) => void;
@@ -108,6 +123,8 @@ export const useDesignStore = create<DesignState>((set, get) => ({
   shirtType: "tshirt",
   shirtColor: "#ffffff",
   shirtView: "front",
+  availableColors: [],
+  mockupImages: [],
 
   undoStack: [],
   redoStack: [],
@@ -224,6 +241,42 @@ export const useDesignStore = create<DesignState>((set, get) => ({
     set({ elements: arr });
   },
 
+  // Đưa phần tử lên lớp trên cùng của mặt đang xem
+  moveElementToTop: (id) => {
+    const state = get();
+    const idx = state.elements.findIndex((e) => e.id === id);
+    if (idx < 0) return;
+    const side = state.elements[idx].side ?? "front";
+    const el = state.elements[idx];
+    state.pushHistory();
+    const arr = state.elements.filter((e) => e.id !== id);
+    // Tìm index cao nhất của cùng mặt trong arr
+    let insertAt = arr.length;
+    for (let i = arr.length - 1; i >= 0; i--) {
+      if ((arr[i].side ?? "front") === side) { insertAt = i + 1; break; }
+    }
+    arr.splice(insertAt, 0, el);
+    set({ elements: arr });
+  },
+
+  // Đưa phần tử xuống lớp dưới cùng của mặt đang xem
+  moveElementToBottom: (id) => {
+    const state = get();
+    const idx = state.elements.findIndex((e) => e.id === id);
+    if (idx < 0) return;
+    const side = state.elements[idx].side ?? "front";
+    const el = state.elements[idx];
+    state.pushHistory();
+    const arr = state.elements.filter((e) => e.id !== id);
+    // Tìm index thấp nhất của cùng mặt trong arr
+    let insertAt = 0;
+    for (let i = 0; i < arr.length; i++) {
+      if ((arr[i].side ?? "front") === side) { insertAt = i; break; }
+    }
+    arr.splice(insertAt, 0, el);
+    set({ elements: arr });
+  },
+
   toggleLock: (id) => {
     set((s) => ({
       elements: s.elements.map((el) =>
@@ -232,10 +285,25 @@ export const useDesignStore = create<DesignState>((set, get) => ({
     }));
   },
 
+  // Lật ngang hoặc dọc phần tử (áp dụng cả cho image và text)
+  flipElement: (id, axis) => {
+    const state = get();
+    const el = state.elements.find((e) => e.id === id);
+    if (!el || el.locked) return;
+    state.pushHistory();
+    if (axis === "H") {
+      state.updateElement(id, { flipH: !(el.flipH ?? false) });
+    } else {
+      state.updateElement(id, { flipV: !(el.flipV ?? false) });
+    }
+  },
+
   /* ───────────── Cấu hình áo (loại áo / màu áo / mặt trước-sau) ───────────── */
 
   setShirtType: (t) => set({ shirtType: t }),
   setShirtColor: (c) => set({ shirtColor: c }),
+  setAvailableColors: (colors) => set({ availableColors: colors }),
+  setMockupImages: (images) => set({ mockupImages: images }),
 
   // Đổi mặt áo (trước/sau) cũng cần lưu lịch sử vì layout các phần tử
   // in trên mỗi mặt là độc lập với nhau.
@@ -291,3 +359,11 @@ export const useDesignStore = create<DesignState>((set, get) => ({
     });
   },
 }));
+
+/**
+ * Selector lọc phần tử theo mặt áo.
+ * Mặc định phần tử cũ (không có side) được coi là mặt trước ("front").
+ */
+export const selectElementsBySide = (elements: DesignElement[], side: ShirtView) => {
+  return elements.filter((el) => (el.side ?? "front") === side);
+};

@@ -1,0 +1,183 @@
+- generic [ref=f3e1]:
+  - generic [ref=f3e2]:
+    - banner [ref=f3e3]:
+      - generic [ref=f3e4]:
+        - link "TeeStudio" [ref=f3e5] [cursor=pointer]:
+          - /url: /
+        - navigation [ref=f3e10]:
+          - link "Khám phá" [ref=f3e11] [cursor=pointer]:
+            - /url: /explore
+          - link "Thiết kế áo" [ref=f3e12] [cursor=pointer]:
+            - /url: /design-studio
+          - link "Bộ sưu tập" [ref=f3e13] [cursor=pointer]:
+            - /url: /collections
+        - generic [ref=f3e15]:
+          - generic [ref=f3e16]:
+            - searchbox "Tìm kiếm loại áo, chất liệu..."
+          - button [ref=f3e23] [cursor=pointer]:
+            - img "search" [ref=f3e25]
+        - generic [ref=f3e28]:
+          - generic [ref=f3e54]:
+            - generic [ref=f3e55] [cursor=pointer]: Chưa xác minh email — gửi lại
+            - link [ref=f3e56] [cursor=pointer]:
+              - /url: /tai-khoan
+              - button "Browser Test" [ref=f3e57]
+            - button "Đăng xuất" [ref=f3e59] [cursor=pointer]
+          - button [ref=f3e30] [cursor=pointer]
+          - button [ref=f3e34] [cursor=pointer]
+    - main [ref=f3e37]:
+      - generic [ref=f3e61]:
+        - heading "Tài khoản của tôi" [level=1] [ref=f3e63]
+        - generic [ref=f3e64]:
+          - navigation [ref=f3e65]:
+            - link [ref=f3e66] [cursor=pointer]:
+              - /url: /tai-khoan/ho-so
+              - img "user" [ref=f3e67]
+              - text: Hồ sơ của tôi
+            - link [ref=f3e70] [cursor=pointer]:
+              - /url: /tai-khoan/dia-chi
+              - img "environment" [ref=f3e71]
+              - text: Sổ địa chỉ
+            - link [ref=f3e74] [cursor=pointer]:
+              - /url: /tai-khoan/don-hang
+              - img "shopping-cart" [ref=f3e75]
+              - text: Đơn hàng của tôi
+            - button [ref=f3e78] [cursor=pointer]:
+              - img "logout" [ref=f3e79]
+              - text: Đăng xuất
+          - generic [ref=f3e83]:
+            - generic [ref=f3e84]:
+              - heading "Sổ địa chỉ" [level=2] [ref=f3e85]
+              - paragraph [ref=f3e86]: Quản lý các địa chỉ giao hàng của bạn.
+            - generic [ref=f3e87]:
+              - button "plus Thêm địa chỉ mới" [ref=f3e88] [cursor=pointer]:
+                - img "plus" [ref=f3e89]
+                - generic [ref=f3e93]: Thêm địa chỉ mới
+              - generic [ref=f3e95]:
+                - img "environment" [ref=f3e97]
+                - generic [ref=f3e100]: Bạn chưa có địa chỉ nào
+    - contentinfo [ref=f3e101]:
+      - generic [ref=f3e102]:
+        - generic [ref=f3e103]:
+          - generic [ref=f3e104]:
+            - link "TeeStudio" [ref=f3e105] [cursor=pointer]:
+              - /url: "#"
+            - paragraph [ref=f3e110]: Nền tảng thiết kế áo cá nhân hoá & đặt đồng phục số lượng lớn chất lượng cao.
+            - generic [ref=f3e111]:
+              - link "Facebook" [ref=f3e112] [cursor=pointer]:
+                - /url: "#"
+              - link "Instagram" [ref=f3e115] [cursor=pointer]:
+                - /url: "#"
+              - link "YouTube" [ref=f3e120] [cursor=pointer]:
+                - /url: "#"
+          - generic [ref=f3e124]:
+            - heading "Sản phẩm" [level=4] [ref=f3e125]
+            - list [ref=f3e126]:
+              - listitem [ref=f3e127]:
+                - link "Áo Thun In Theo Yêu Cầu" [ref=f3e128] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f3e129]:
+                - link "Áo Polo Doanh Nghiệp" [ref=f3e130] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f3e131]:
+                - link "Áo Hoodie" [ref=f3e132] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f3e133]:
+                - link "Đặt Sỉ Đồng Phục" [ref=f3e134] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f3e135]:
+                - link "Công cụ Thiết Kế" [ref=f3e136] [cursor=pointer]:
+                  - /url: "#"
+          - generic [ref=f3e137]:
+            - heading "Chính sách" [level=4] [ref=f3e138]
+            - list [ref=f3e139]:
+              - listitem [ref=f3e140]:
+                - link "Chính sách đổi trả" [ref=f3e141] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f3e142]:
+                - link "Chính sách bảo mật" [ref=f3e143] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f3e144]:
+                - link "Điều khoản dịch vụ" [ref=f3e145] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f3e146]:
+                - link "Hướng dẫn đặt hàng" [ref=f3e147] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f3e148]:
+                - link "FAQ" [ref=f3e149] [cursor=pointer]:
+                  - /url: "#"
+          - generic [ref=f3e150]:
+            - heading "Liên hệ" [level=4] [ref=f3e151]
+            - generic [ref=f3e152]:
+              - generic [ref=f3e153]:
+                - generic [ref=f3e154]: 📞
+                - generic [ref=f3e155]: 0901 234 567
+              - generic [ref=f3e156]:
+                - generic [ref=f3e157]: ✉️
+                - generic [ref=f3e158]: hello@teestudio.vn
+              - generic [ref=f3e159]:
+                - generic [ref=f3e160]: 📍
+                - generic [ref=f3e161]: 123 Nguyễn Văn Cừ, Q.5, TP.HCM
+        - separator [ref=f3e162]
+        - generic [ref=f3e163]:
+          - paragraph [ref=f3e164]: © 2025 TeeStudio. All rights reserved.
+          - paragraph [ref=f3e165]: Made with ❤️ in Việt Nam
+  - generic [ref=f3e49] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=f3e50]
+    - generic [ref=f3e166]:
+      - button "Open issues overlay" [ref=f3e167]:
+        - generic [ref=f3e168]:
+          - generic [ref=f3e169]: "1"
+          - generic [ref=f3e170]: "2"
+        - generic [ref=f3e171]:
+          - text: Issue
+          - generic [ref=f3e172]: s
+      - button "Collapse issues badge" [ref=f3e173]
+  - alert [ref=f3e176]
+  - generic [ref=f3e177]:
+    - dialog "Thêm địa chỉ mới":
+      - generic [ref=f3e178]:
+        - button "Close" [ref=f3e179] [cursor=pointer]:
+          - generic "Đóng" [ref=f3e180]:
+            - img "close" [ref=f3e181]
+        - generic [ref=f3e184]: Thêm địa chỉ mới
+        - generic [ref=f3e187]:
+          - generic [ref=f3e188]:
+            - generic [ref=f3e190]:
+              - generic "Tên người nhận" [ref=f3e192]
+              - textbox "Tên người nhận" [ref=f3e196]:
+                - /placeholder: Nguyễn Văn A
+                - text: Nguyen Van A
+            - generic [ref=f3e198]:
+              - generic "Số điện thoại" [ref=f3e200]
+              - textbox "Số điện thoại" [ref=f3e204]:
+                - /placeholder: 0901 234 567
+                - text: "0901234567"
+          - generic [ref=f3e205]:
+            - generic [ref=f3e207]:
+              - generic "Tỉnh/Thành phố" [ref=f3e209]
+              - generic [ref=f3e212]:
+                - generic: Hồ Chí Minh
+                - generic [ref=f3e213]:
+                  - generic "Hồ Chí Minh" [ref=f3e289]:
+                    - text: Hồ Chí Minh
+                    - combobox "Tỉnh/Thành phố" [active] [ref=f3e215]
+                  - img "down" [ref=f3e290]
+            - generic [ref=f3e221]:
+              - generic "Phường/Xã" [ref=f3e223]
+              - generic [ref=f3e227]:
+                - generic [ref=f3e228]:
+                  - generic: Tìm phường/xã...
+                  - combobox "Phường/Xã" [ref=f3e229]
+                - img "down" [ref=f3e231]
+          - generic [ref=f3e235]:
+            - generic "Số nhà, tên đường" [ref=f3e237]
+            - textbox "Số nhà, tên đường" [ref=f3e241]:
+              - /placeholder: "Vd: 12 Nguyễn Trãi"
+              - text: 12 Nguyen Trai
+          - generic [ref=f3e247] [cursor=pointer]:
+            - checkbox "Đặt làm địa chỉ mặc định" [ref=f3e249]
+            - generic [ref=f3e250]: Đặt làm địa chỉ mặc định
+        - generic [ref=f3e251]:
+          - button "Huỷ" [ref=f3e252] [cursor=pointer]
+          - button "Lưu địa chỉ" [ref=f3e254] [cursor=pointer]

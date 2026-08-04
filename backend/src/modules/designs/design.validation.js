@@ -1,3 +1,17 @@
+/**
+ * design.validation.js
+ *
+ * Schema validation cho module CustomDesign.
+ *
+ * Trạng thái hợp lệ của CustomDesign (enum thật đang chạy trong DB):
+ *   DRAFT          – Nháp, khách có thể sửa tự do
+ *   PENDING_REVIEW – Đã gửi, đang chờ admin duyệt (khoá sửa)
+ *   NEEDS_REVISION – Admin yêu cầu sửa lại (mở lại cho khách)
+ *   APPROVED       – Đã duyệt (khoá sửa)
+ *
+ * Lưu ý: SUBMITTED / REJECTED là enum CŨ từ phiên bản trước — ĐÃ XOÁ.
+ */
+
 const createDesignSchema = {
   body: {
     productId: {
@@ -30,6 +44,13 @@ const createDesignSchema = {
   },
 };
 
+/**
+ * Schema cập nhật trạng thái thiết kế.
+ *
+ * Chỉ admin mới được gọi endpoint này. Enum phải khớp với:
+ *   - admin.design.service.js (TRANG_THAI_MAP, TRANG_THAI_NGUOC)
+ *   - tinhQuyenSuaThietKe()  (DRAFT / NEEDS_REVISION → cho phép sửa)
+ */
 const updateDesignStatusSchema = {
   params: {
     id: {
@@ -42,7 +63,8 @@ const updateDesignStatusSchema = {
     status: {
       required: true,
       type: "string",
-      enum: ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"],
+      // Enum thật đang chạy — phải khớp với CustomDesign.status trong DB
+      enum: ["DRAFT", "PENDING_REVIEW", "NEEDS_REVISION", "APPROVED"],
     },
   },
 };

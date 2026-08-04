@@ -95,6 +95,25 @@ const me = async (req, res, next) => {
   }
 };
 
+const updateProfile = async (req, res, next) => {
+  try {
+    const data = await authService.updateProfile(req.user.id, req.body);
+    res.json({ success: true, message: "Cập nhật thông tin thành công", data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const changePassword = async (req, res, next) => {
+  try {
+    await authService.changePassword(req.user.id, req.body);
+    clearRefreshCookie(res);
+    res.json({ success: true, message: "Đổi mật khẩu thành công" });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const verifyEmail = async (req, res, next) => {
   try {
     await authService.verifyEmailToken(req.body.token);
@@ -146,6 +165,8 @@ module.exports = {
   logout,
   logoutAll,
   me,
+  updateProfile,
+  changePassword,
   verifyEmail,
   resendVerification,
   forgotPassword,

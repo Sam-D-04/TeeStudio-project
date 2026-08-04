@@ -71,6 +71,8 @@ interface ToolbarProps {
   onAddToCart?: () => void;
   onViewCart?: () => void;
   isSaving?: boolean;
+  /** Khi true: ẩn các nút chỉnh sửa (Thiết kế đã được duyệt) */
+  isReadOnly?: boolean;
 }
 
 const menuItemStyle: React.CSSProperties = {
@@ -81,7 +83,7 @@ const menuItemStyle: React.CSSProperties = {
   textAlign: "left", transition: "background 0.1s",
 };
 
-export default function Toolbar({ onSave, onDownloadImage, onShowToast, onOpenMyDesigns, onNewDesign, onAddToCart, onViewCart, isSaving }: ToolbarProps) {
+export default function Toolbar({ onSave, onDownloadImage, onShowToast, onOpenMyDesigns, onNewDesign, onAddToCart, onViewCart, isSaving, isReadOnly }: ToolbarProps) {
   const { undo, redo, undoStack, redoStack, clearDesign, shirtType } = useDesignStore();
   const { isAuthenticated, user, clearSession, hydrate } = useAuthStore();
   const cartCount = useCartStore((s) => s.totalItems());
@@ -134,15 +136,16 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onOpenMy
       {/* Ở giữa: Hoàn tác / Làm lại / Tạo mới / Xoá / Tải ảnh */}
       <div className="ds-toolbar-center">
         <button className="ds-toolbar-btn ds-toolbar-btn--icon" onClick={undo}
-          disabled={undoStack.length === 0} title="Hoàn tác (Ctrl+Z)">
+          disabled={undoStack.length === 0 || isReadOnly} title="Hoàn tác (Ctrl+Z)">
           <UndoIcon />
         </button>
         <button className="ds-toolbar-btn ds-toolbar-btn--icon" onClick={redo}
-          disabled={redoStack.length === 0} title="Làm lại (Ctrl+Y)">
+          disabled={redoStack.length === 0 || isReadOnly} title="Làm lại (Ctrl+Y)">
           <RedoIcon />
         </button>
         <div className="ds-toolbar-divider" />
-        <button className="ds-toolbar-btn" onClick={onNewDesign} title="Tạo thiết kế mới">
+        <button className="ds-toolbar-btn" onClick={onNewDesign} title="Tạo thiết kế mới"
+          disabled={isReadOnly}>
           <PlusIcon /> Tạo mới
         </button>
         {isAuthenticated && (
@@ -152,6 +155,7 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onOpenMy
         )}
         <button
           className="ds-toolbar-btn ds-toolbar-btn--icon"
+          disabled={isReadOnly}
           onClick={() => {
             if (confirm("Bạn có chắc muốn xóa toàn bộ nội dung?")) {
               clearDesign();

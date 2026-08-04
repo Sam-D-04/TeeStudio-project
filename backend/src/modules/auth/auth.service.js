@@ -324,6 +324,43 @@ const getProfile = async (userId) => {
   return serializeUser(account);
 };
 
+const updateProfile = async (userId, data) => {
+  await db.execute(
+    `UPDATE Account SET fullName = ?, phone = ? WHERE id = ?`,
+    [normalizeText(data.fullName), normalizeText(data.phone), userId]
+  );
+
+  const account = await findAccountById(userId);
+  if (!account) {
+    throw createError("Không tìm thấy tài khoản", 404);
+  }
+
+  return serializeUser(account);
+};
+
+const changePassword = async (userId, { oldPassword, newPassword }) => {
+  const account = await findAccountById(userId);
+  if (!account) {
+    throw createError("Không tìm thấy tài khoản", 404);
+  }
+
+  const oldPasswordMatches = await bcrypt.compare(oldPassword, account.passwordHash);
+  if (!oldPasswordMatches) {
+    throw createError("Mật khẩu hiện tại không đúng", 400);
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+
+  await db.transaction(async (connection) => {
+    await connection.query(`UPDATE Account SET passwordHash = ? WHERE id = ?`, [
+      passwordHash,
+      userId,
+    ]);
+    // Đổi mật khẩu xong thì ép đăng xuất khỏi mọi thiết bị/phiên đang mở, giống resetPassword.
+    await connection.query(`DELETE FROM UserToken WHERE userId = ?`, [userId]);
+  });
+};
+
 const verifyEmailToken = async (rawToken) => {
   const tokenRow = await consumeActionToken(
     rawToken,
@@ -417,5 +454,7 @@ module.exports = {
   logout,
   logoutAll,
   getProfile,
+  updateProfile,
+  changePassword,
   serializeUser,
 };

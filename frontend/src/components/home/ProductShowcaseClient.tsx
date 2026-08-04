@@ -42,9 +42,11 @@ function getHex(colorName: string): string {
 function ShirtSilhouette({
   form,
   fillColor,
+  isBack = false,
 }: {
   form: "tshirt" | "polo" | "hoodie";
   fillColor: string;
+  isBack?: boolean;
 }) {
   const paths = {
     tshirt:  "M20 18L4 40L24 45L24 90H76L76 45L96 40L80 18L62 26C58 30 42 30 38 26L20 18Z",
@@ -76,13 +78,15 @@ function ShirtSilhouette({
       }}
     >
       <path d={paths[form]} fill={fillColor} />
-      <path
-        d={collars[form]}
-        fill="none"
-        stroke={strokeColor}
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
+      {!isBack && (
+        <path
+          d={collars[form]}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      )}
     </svg>
   );
 }
@@ -199,6 +203,7 @@ export default function ProductShowcaseClient({ products }: Props) {
             return (
               <div
                 key={v.productId}
+                className="product-card"
                 onClick={() =>
                   router.push(`/product/${v.productId}`)
                 }
@@ -224,16 +229,16 @@ export default function ProductShowcaseClient({ products }: Props) {
                   el.style.borderColor = "#e2e8f0";
                 }}
               >
-                {/* ─ Preview area ─ */}
                 <div
                   style={{
                     background:     "#ffffff",
-                    height:         198,
+                    height:         240,
                     display:        "flex",
                     alignItems:     "center",
                     justifyContent: "center",
                     padding:        "16px 22px",
                     position:       "relative",
+                    perspective:    "1000px",
                   }}
                 >
                   {/* Tồn kho badge */}
@@ -253,50 +258,98 @@ export default function ProductShowcaseClient({ products }: Props) {
                     {v.totalStock <= 10 ? `Còn ${v.totalStock}` : "Còn hàng"}
                   </span>
 
-                  <div style={{ width: v.imageUrl ? "100%" : 90, height: v.imageUrl ? "100%" : "auto" }}>
-                    {v.imageUrl ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={v.imageUrl}
-                        alt={v.productName}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "contain",
-                          filter: "drop-shadow(0 16px 22px rgba(15,23,42,0.28))",
-                          borderRadius: 8,
-                        }}
-                        draggable={false}
-                      />
-                    ) : v.form === "polo" ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={
-                          firstColor === "Navy"
-                            ? "/images/mockups/Polo-Navy-Front.png"
-                            : firstColor === "Beige"
-                            ? "/images/mockups/Polo-Beige-Front.png"
-                            : "/images/mockups/Polo-White-Front.png"
-                        }
-                        alt={`${v.productName} ${firstColor}`}
-                        style={{ width: "100%", objectFit: "contain", filter: "drop-shadow(0 16px 22px rgba(15,23,42,0.28))" }}
-                        draggable={false}
-                      />
-                    ) : v.form === "hoodie" ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={
-                          firstColor === "Brown"
-                            ? "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209409/Hoodie-Brown-Front_ab4bha.png"
-                            : "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209405/Hoodie-Grey-Front_boebdz.png"
-                        }
-                        alt={`${v.productName} ${firstColor}`}
-                        style={{ width: "100%", objectFit: "contain", filter: "drop-shadow(0 16px 22px rgba(15,23,42,0.28))" }}
-                        draggable={false}
-                      />
-                    ) : (
-                      <ShirtSilhouette form={v.form} fillColor={hex} />
-                    )}
+                  <div className="flip-inner" style={{ width: v.imageUrl ? "100%" : 90, height: v.imageUrl ? "100%" : "auto" }}>
+                    <div className="flip-front">
+                      {v.imageUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={v.imageUrl}
+                          alt={v.productName}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "contain",
+                            filter: "drop-shadow(0 16px 22px rgba(15,23,42,0.28))",
+                            borderRadius: 8,
+                          }}
+                          draggable={false}
+                        />
+                      ) : v.form === "polo" ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={
+                            firstColor === "Navy"
+                              ? "/images/mockups/Polo-Navy-Front.png"
+                              : firstColor === "Beige"
+                              ? "/images/mockups/Polo-Beige-Front.png"
+                              : "/images/mockups/Polo-White-Front.png"
+                          }
+                          alt={`${v.productName} ${firstColor}`}
+                          style={{ width: "100%", objectFit: "contain", filter: "drop-shadow(0 16px 22px rgba(15,23,42,0.28))" }}
+                          draggable={false}
+                        />
+                      ) : v.form === "hoodie" ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={
+                            firstColor === "Brown"
+                              ? "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209409/Hoodie-Brown-Front_ab4bha.png"
+                              : "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209405/Hoodie-Grey-Front_boebdz.png"
+                          }
+                          alt={`${v.productName} ${firstColor}`}
+                          style={{ width: "100%", objectFit: "contain", filter: "drop-shadow(0 16px 22px rgba(15,23,42,0.28))" }}
+                          draggable={false}
+                        />
+                      ) : (
+                        <ShirtSilhouette form={v.form} fillColor={hex} />
+                      )}
+                    </div>
+                    <div className="flip-back">
+                      {v.imageUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={v.imageUrl}
+                          alt={v.productName}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "contain",
+                            filter: "drop-shadow(0 16px 22px rgba(15,23,42,0.28))",
+                            borderRadius: 8,
+                            transform: "scaleX(-1)",
+                          }}
+                          draggable={false}
+                        />
+                      ) : v.form === "polo" ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={
+                            firstColor === "Navy"
+                              ? "/images/mockups/Polo-Navy-Front.png"
+                              : firstColor === "Beige"
+                              ? "/images/mockups/Polo-Beige-Front.png"
+                              : "/images/mockups/Polo-White-Front.png"
+                          }
+                          alt={`${v.productName} ${firstColor} Back`}
+                          style={{ width: "100%", objectFit: "contain", filter: "drop-shadow(0 16px 22px rgba(15,23,42,0.28))", transform: "scaleX(-1)" }}
+                          draggable={false}
+                        />
+                      ) : v.form === "hoodie" ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={
+                            firstColor === "Brown"
+                              ? "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209409/Hoodie-Brown-Front_ab4bha.png"
+                              : "https://res.cloudinary.com/dwol6aarv/image/upload/v1782209405/Hoodie-Grey-Front_boebdz.png"
+                          }
+                          alt={`${v.productName} ${firstColor} Back`}
+                          style={{ width: "100%", objectFit: "contain", filter: "drop-shadow(0 16px 22px rgba(15,23,42,0.28))", transform: "scaleX(-1)" }}
+                          draggable={false}
+                        />
+                      ) : (
+                        <ShirtSilhouette form={v.form} fillColor={hex} isBack={true} />
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -385,6 +438,35 @@ export default function ProductShowcaseClient({ products }: Props) {
       <style>{`
         @media (max-width: 1024px) { .template-grid { grid-template-columns: repeat(3, 1fr) !important; } }
         @media (max-width: 640px)  { .template-grid { grid-template-columns: repeat(2, 1fr) !important; } }
+
+        .flip-inner {
+          display: grid;
+          transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+          transform-style: preserve-3d;
+          min-width: 0;
+          min-height: 0;
+        }
+        .product-card:hover .flip-inner {
+          transform: rotateY(180deg);
+        }
+        .flip-front, .flip-back {
+          grid-area: 1 / 1;
+          backface-visibility: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 100%;
+          min-width: 0;
+          min-height: 0;
+        }
+        .flip-front img, .flip-back img {
+          max-width: 100%;
+          max-height: 100%;
+        }
+        .flip-back {
+          transform: rotateY(180deg);
+        }
       `}</style>
     </section>
   );

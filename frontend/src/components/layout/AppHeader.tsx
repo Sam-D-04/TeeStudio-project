@@ -217,7 +217,7 @@ export default function AppHeader() {
               </button>
             </Badge>
 
-            {/* Mobile menu */}
+            {/* Mobile menu - chỉ hiển thị khi màn hình nhỏ hơn md (768px) */}
             <button
               onClick={() => setDrawerOpen(true)}
               style={{
@@ -225,12 +225,11 @@ export default function AppHeader() {
                 borderRadius: 8,
                 background: "#f1f5f9",
                 border: "1px solid #e2e8f0",
-                display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
               }}
-              className="flex md:hidden"
+              className="hidden md:hidden max-[768px]:flex"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path d="M3 12h18M3 6h18M3 18h18" stroke="#475569" strokeWidth="1.8" strokeLinecap="round" />

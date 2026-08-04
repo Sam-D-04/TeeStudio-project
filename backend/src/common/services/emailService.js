@@ -354,16 +354,18 @@ const sendOrderConfirmationEmail = async ({
  * không nên vì lỗi gửi mail mà báo lỗi ngược lại cho admin.
  */
 const sendDesignRevisionEmail = async ({
-  to,        // email khách hàng
-  fullName,  // tên khách hàng
-  maThietKe, // ví dụ: "TK-0042"
-  ghiChu,    // nội dung ghi chú admin nhập
+  to,          // email khách hàng
+  fullName,    // tên khách hàng
+  maThietKe,   // ví dụ: "TK-0042"
+  ghiChu,      // nội dung ghi chú admin nhập
+  revisionLink, // URL trực tiếp đến trang sửa thiết kế (tùy chọn)
 }) => {
   try {
     const { transporter: gmailTransporter, user } = getTransporter();
     const safeName = escapeHtml(fullName);
     const safeMa = escapeHtml(maThietKe);
     const safeGhiChu = escapeHtml(ghiChu || "");
+    const safeLink = revisionLink ? escapeHtml(revisionLink) : null;
 
     return await gmailTransporter.sendMail({
       from: { name: "TeeStudio", address: user },
@@ -377,7 +379,9 @@ const sendDesignRevisionEmail = async ({
         "Lý do / Ghi chú từ TeeStudio:",
         `"${ghiChu || ""}"`,
         "",
-        "Vui lòng đăng nhập vào tài khoản TeeStudio để xem và chỉnh sửa thiết kế của bạn.",
+        revisionLink
+          ? `Nhấn vào đường dẫn sau để mở và chỉnh sửa thiết kế: ${revisionLink}`
+          : "Vui lòng đăng nhập vào tài khoản TeeStudio để xem và chỉnh sửa thiết kế của bạn.",
         "",
         "Đây là email tự động, vui lòng không trả lời email này.",
         "Trân trọng,",
@@ -395,7 +399,19 @@ const sendDesignRevisionEmail = async ({
             <p style="margin:0 0 8px;font-weight:bold;color:#9a3412">Lý do / Ghi chú từ TeeStudio:</p>
             <p style="margin:0;white-space:pre-wrap">${safeGhiChu}</p>
           </div>
-          <p>Vui lòng đăng nhập vào tài khoản TeeStudio để xem và chỉnh sửa thiết kế của bạn.</p>
+          ${safeLink ? `
+          <div style="text-align:center;margin:24px 0">
+            <a href="${safeLink}"
+               style="display:inline-block;padding:12px 28px;background:#ea580c;color:#ffffff;
+                      border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;
+                      letter-spacing:0.3px">
+              ✏️ Chỉnh sửa thiết kế ngay
+            </a>
+            <p style="margin-top:10px;font-size:12px;color:#94a3b8">
+              Hoặc dán đường dẫn: <a href="${safeLink}" style="color:#ea580c">${safeLink}</a>
+            </p>
+          </div>
+          ` : `<p>Vui lòng đăng nhập vào tài khoản TeeStudio để xem và chỉnh sửa thiết kế của bạn.</p>`}
           <div style="margin-top:16px;color:#64748b;font-size:13px">
             Đây là email tự động, vui lòng không trả lời email này.<br>
             Trân trọng,<br>
@@ -411,10 +427,71 @@ const sendDesignRevisionEmail = async ({
   }
 };
 
+/**
+ * sendDesignSubmittedToAdminEmail – Gửi email thông báo cho Admin khi khách
+ * submit lại thiết kế (gọi sau khi status chuyển → PENDING_REVIEW).
+ *
+ * Fire-and-forget: lỗi gửi mail không block response cho khách hàng.
+ */
+const sendDesignSubmittedToAdminEmail = async ({
+  adminEmail,   // email nhận thông báo (admin/owner)
+  customerName, // tên khách hàng đã nộp lại
+  maThietKe,    // ví dụ: "TK-0042"
+  designId,     // ID số của thiết kế
+}) => {
+  try {
+    const { transporter: gmailTransporter, user } = getTransporter();
+    const safeName = escapeHtml(customerName);
+    const safeMa   = escapeHtml(maThietKe);
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const adminLink = `${frontendUrl}/admin/thiet-ke?designId=${designId}`;
+
+    return await gmailTransporter.sendMail({
+      from: { name: "TeeStudio", address: user },
+      to: adminEmail,
+      subject: `TeeStudio – Khách hàng đã gửi lại thiết kế ${maThietKe}`,
+      text: [
+        `[TeeStudio] Thiết kế cần kiểm tra`,
+        "",
+        `Khách hàng ${customerName} vừa gửi lại thiết kế ${maThietKe} để chờ duyệt.`,
+        "",
+        `Link xem trong admin: ${adminLink}`,
+        "",
+        "Đây là email tự động từ hệ thống TeeStudio.",
+      ].join("\n"),
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#0f172a;line-height:1.6">
+          <h2 style="color:#0ea5e9">Ừ Khách hàng gửi lại thiết kế</h2>
+          <p>
+            Khách hàng <strong>${safeName}</strong> vừa hoàn thành chỉnh sửa và nộp lại
+            thiết kế <strong>${safeMa}</strong>.
+          </p>
+          <p>Thiết kế đã chuyển sang trạng thái <strong>Chờ duyệt</strong>.</p>
+          <div style="text-align:center;margin:24px 0">
+            <a href="${adminLink}"
+               style="display:inline-block;padding:12px 28px;background:#0ea5e9;color:#ffffff;
+                      border-radius:8px;text-decoration:none;font-weight:700;font-size:15px">
+              👁 Xem thiết kế trong Admin
+            </a>
+          </div>
+          <div style="margin-top:16px;color:#64748b;font-size:13px">
+            Đây là email tự động từ hệ thống TeeStudio.
+          </div>
+        </div>
+      `,
+    });
+  } catch (error) {
+    if (error.statusCode) throw error;
+    console.error("Không thể gửi email thông báo admin (thiết kế nộp lại):", error.message);
+    // KHÔNG throw – lỗi mail không được làm hỏng trải nghiệm của khách hàng
+  }
+};
+
 module.exports = {
   sendAccountCredentialsEmail,
   sendOrderConfirmationEmail,
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendDesignRevisionEmail,
+  sendDesignSubmittedToAdminEmail,
 };

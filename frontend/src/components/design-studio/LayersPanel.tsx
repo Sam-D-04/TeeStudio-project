@@ -1,6 +1,6 @@
 "use client";
 
-import { useDesignStore, DesignElement } from "@/store/useDesignStore";
+import { useDesignStore, DesignElement, selectElementsBySide } from "@/store/useDesignStore";
 
 /* ─── Các icon thu nhỏ ─── */
 const ImageIcon = () => (
@@ -28,6 +28,16 @@ const LayersIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3" />
   </svg>
 );
+const ChevronUpIcon = () => (
+  <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+  </svg>
+);
+const ChevronDownIcon = () => (
+  <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+  </svg>
+);
 
 /** Trả về nhãn hiển thị cho một phần tử (tên rút gọn) */
 function getLabel(el: DesignElement): string {
@@ -46,7 +56,10 @@ function Preview({ el }: { el: DesignElement }) {
       <img
         src={el.src}
         alt=""
-        style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+        style={{
+          width: "100%", height: "100%", objectFit: "contain", display: "block",
+          transform: `scale(${el.flipH ? -1 : 1}, ${el.flipV ? -1 : 1})`,
+        }}
       />
     );
   }
@@ -63,6 +76,8 @@ function Preview({ el }: { el: DesignElement }) {
           textOverflow: "ellipsis",
           fontStyle: el.fontStyle?.includes("italic") ? "italic" : "normal",
           fontWeight: el.fontStyle?.includes("bold") ? "bold" : "normal",
+          transform: `scale(${el.flipH ? -1 : 1}, ${el.flipV ? -1 : 1})`,
+          display: "inline-block",
         }}
       >
         {el.text || "Aa"}
@@ -73,14 +88,14 @@ function Preview({ el }: { el: DesignElement }) {
 }
 
 export default function LayersPanel() {
-  const { elements, selectedId, setSelectedId, removeElement, shirtView } = useDesignStore();
+  const {
+    elements, selectedId, setSelectedId, removeElement, shirtView,
+    moveElementUp, moveElementDown,
+  } = useDesignStore();
 
   // "elements" chứa chung phần tử của cả 2 mặt áo - bảng lớp chỉ nên hiển thị
   // (và cho thao tác) phần tử của mặt đang xem, khớp với những gì đang thấy
-  // trên canvas. Nếu không lọc, người dùng sẽ thấy/xoá nhầm lớp của mặt kia.
-  const phanTuMatDangXem = elements.filter(
-    (el) => (el.side ?? "front") === shirtView
-  );
+  const phanTuMatDangXem = selectElementsBySide(elements, shirtView);
 
   // Đảo ngược mảng để lớp nằm trên cùng (thêm sau) hiển thị đầu danh sách
   const layers = [...phanTuMatDangXem].reverse();
@@ -101,6 +116,13 @@ export default function LayersPanel() {
         ) : (
           layers.map((el, index) => {
             const isSelected = el.id === selectedId;
+            // Vị trí trong mảng gốc (phanTuMatDangXem) — dùng để xác định
+            // có thể move up/down không (trong danh sách đã đảo ngược, "lên"
+            // trong UI = move xuống trong mảng gốc và ngược lại)
+            const idxInSource = phanTuMatDangXem.findIndex((e) => e.id === el.id);
+            const canMoveUp = idxInSource < phanTuMatDangXem.length - 1;   // UI: lên = index cao hơn trong store
+            const canMoveDown = idxInSource > 0;                            // UI: xuống = index thấp hơn trong store
+
             return (
               <div
                 key={el.id || index}
@@ -123,17 +145,44 @@ export default function LayersPanel() {
                   )}
                 </div>
 
-                {/* Nút xoá lớp */}
-                <button
-                  className="ds-layer-delete"
-                  title="Xoá lớp"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeElement(el.id);
-                  }}
-                >
-                  <TrashIcon />
-                </button>
+                {/* Nút reorder + xoá — chỉ hiện khi hover */}
+                <div className="ds-layer-actions">
+                  {/* Lên (trong UI = move element lên 1 lớp trong store) */}
+                  <button
+                    className="ds-layer-order-btn"
+                    title="Lên 1 lớp"
+                    disabled={!canMoveUp || el.locked}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      moveElementUp(el.id);
+                    }}
+                  >
+                    <ChevronUpIcon />
+                  </button>
+                  {/* Xuống */}
+                  <button
+                    className="ds-layer-order-btn"
+                    title="Xuống 1 lớp"
+                    disabled={!canMoveDown || el.locked}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      moveElementDown(el.id);
+                    }}
+                  >
+                    <ChevronDownIcon />
+                  </button>
+                  {/* Xoá */}
+                  <button
+                    className="ds-layer-delete"
+                    title="Xoá lớp"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeElement(el.id);
+                    }}
+                  >
+                    <TrashIcon />
+                  </button>
+                </div>
               </div>
             );
           })

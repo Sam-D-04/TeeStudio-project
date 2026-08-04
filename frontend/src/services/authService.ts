@@ -35,6 +35,16 @@ export const authService = {
     return response.data.data;
   },
 
+  updateProfile: async (data: { fullName: string; phone: string }) => {
+    const response = await apiClient.put<ApiResponse<AuthUser>>("/auth/me", data);
+    return response.data.data;
+  },
+
+  changePassword: async (data: { oldPassword: string; newPassword: string }) => {
+    const response = await apiClient.put<ApiResponse<null>>("/auth/me/password", data);
+    return response.data.message;
+  },
+
   verifyEmail: async (token: string) => {
     const response = await apiClient.post<ApiResponse<null>>("/auth/verify-email", {
       token,

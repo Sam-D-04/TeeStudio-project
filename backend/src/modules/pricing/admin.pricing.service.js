@@ -139,23 +139,29 @@ const calculateDesignQuote = async ({
  * của toàn bộ chi tiết (Text, Image, Sticker) trên canvas thiết kế.
  *
  * Thuật toán:
+ *   0. Tách items làm 2 mảng theo `side` (mặt trước/mặt sau). Tính phí RIÊNG
+ *      cho từng mặt rồi cộng lại — nếu gộp chung tọa độ 2 mặt vào 1 Bounding
+ *      Box duy nhất, logo mặt sau đặt trùng vị trí logo mặt trước sẽ bị coi
+ *      là "đè lên nhau" và không tính thêm phí (in mặt sau miễn phí).
+ *   Với mỗi mặt:
  *   - Vẽ 1 hình chữ nhật ảo bao quanh tất cả các item (kể cả đè chồng lên nhau).
  *   - Chuyển đổi diện tích đó từ px² sang cm² (tỷ lệ: 1 cm = 4.67 px).
- *   - Đối chiếu với 3 bậc giá để trả về designFee.
+ *   - Đối chiếu với 3 bậc giá để trả về phí của mặt đó.
  *
  * Toạ độ: (x, y) của mỗi item là GÓC TRÁI-TRÊN (quy ước Konva, khớp với
  * DesignElement ở frontend) => góc phải-dưới = (x + width, y + height).
  *
- * Bậc giá:
+ * Bậc giá (áp dụng cho từng mặt):
  *   - Không in gì: 0đ
  *   - Mức 1: Bao phủ <= 100 cm²  → 20.000đ  (Logo nhỏ)
  *   - Mức 2: Bao phủ <= 600 cm²  → 40.000đ  (Hình tầm trung)
  *   - Mức 3: Bao phủ >  600 cm²  → 60.000đ  (Hình in tràn áo)
  *
  * @param {object|string} canvasData - Dữ liệu JSON của canvas (có thể là object hoặc string)
- * @returns {number} designFee – Phụ phí thiết kế (VNĐ)
+ * @returns {number} designFee – Tổng phụ phí thiết kế 2 mặt (VNĐ)
  */
-const PIXELS_PER_CM = 4.67;
+const PIXELS_PER_CM_X = 8.12;
+const PIXELS_PER_CM_Y = 9.92;
 
 const FEE_TIERS = [
   { maxAreaCm2: 100, fee: 20000 },
@@ -170,6 +176,56 @@ const getFeeForArea = (areaCm2) => {
   return FEE_MAX;
 };
 
+/** Tính phí (min(bboxFee, sumFee)) cho MỘT mặt áo — caller phải lọc items theo side trước */
+const calculateFeeForOneSide = (items) => {
+  if (!items || items.length === 0) return 0;
+
+  // Khởi tạo với giá trị đảo ngược để tìm min/max chính xác
+  let minX = Infinity, minY = Infinity;
+  let maxX = -Infinity, maxY = -Infinity;
+
+  items.forEach((item) => {
+    // Lấy kích thước thực tế sau khi scale
+    const scaleX = item.scaleX ?? 1;
+    const scaleY = item.scaleY ?? 1;
+    const w      = (item.width  ?? item.w ?? 0) * scaleX;
+    const h      = (item.height ?? item.h ?? 0) * scaleY;
+
+    // (x, y)/(left, top) là góc trái-trên => góc phải-dưới = (x+w, y+h)
+    const x1 = item.left ?? item.x ?? 0;
+    const y1 = item.top  ?? item.y ?? 0;
+    const x2 = x1 + w;
+    const y2 = y1 + h;
+
+    if (x1 < minX) minX = x1;
+    if (y1 < minY) minY = y1;
+    if (x2 > maxX) maxX = x2;
+    if (y2 > maxY) maxY = y2;
+  });
+
+  // Cách 1: Tính diện tích Bounding Box (px) và đổi sang cm²
+  const boundingWidthCm  = Math.max(0, maxX - minX) / PIXELS_PER_CM_X;
+  const boundingHeightCm = Math.max(0, maxY - minY) / PIXELS_PER_CM_Y;
+  const bboxAreaCm2      = boundingWidthCm * boundingHeightCm;
+  const bboxFee          = getFeeForArea(bboxAreaCm2);
+
+  // Cách 2: Tính tổng diện tích rời rạc của từng item
+  let sumOfIndividualAreasCm2 = 0;
+  items.forEach((item) => {
+    const scaleX = item.scaleX ?? 1;
+    const scaleY = item.scaleY ?? 1;
+    const w      = (item.width  ?? item.w ?? 0) * scaleX;
+    const h      = (item.height ?? item.h ?? 0) * scaleY;
+
+    const areaCm2 = (w / PIXELS_PER_CM_X) * (h / PIXELS_PER_CM_Y);
+    sumOfIndividualAreasCm2 += areaCm2;
+  });
+  const individualSumFee = getFeeForArea(sumOfIndividualAreasCm2);
+
+  // Lấy mức giá rẻ hơn cho khách hàng
+  return Math.min(bboxFee, individualSumFee);
+};
+
 const calculateBoundingBoxAreaFee = (canvasData) => {
   try {
     // Hỗ trợ cả dạng string JSON và object
@@ -181,50 +237,14 @@ const calculateBoundingBoxAreaFee = (canvasData) => {
 
     if (!items || items.length === 0) return 0;
 
-    // Khởi tạo với giá trị đảo ngược để tìm min/max chính xác
-    let minX = Infinity, minY = Infinity;
-    let maxX = -Infinity, maxY = -Infinity;
+    // Tách theo mặt áo (side) - phần tử thiếu side (thiết kế cũ) mặc định là "front"
+    const frontItems = items.filter((item) => (item.side ?? "front") !== "back");
+    const backItems  = items.filter((item) => (item.side ?? "front") === "back");
 
-    items.forEach((item) => {
-      // Lấy kích thước thực tế sau khi scale
-      const scaleX = item.scaleX ?? 1;
-      const scaleY = item.scaleY ?? 1;
-      const w      = (item.width  ?? item.w ?? 0) * scaleX;
-      const h      = (item.height ?? item.h ?? 0) * scaleY;
+    const frontFee = calculateFeeForOneSide(frontItems);
+    const backFee  = calculateFeeForOneSide(backItems);
 
-      // (x, y)/(left, top) là góc trái-trên => góc phải-dưới = (x+w, y+h)
-      const x1 = item.left ?? item.x ?? 0;
-      const y1 = item.top  ?? item.y ?? 0;
-      const x2 = x1 + w;
-      const y2 = y1 + h;
-
-      if (x1 < minX) minX = x1;
-      if (y1 < minY) minY = y1;
-      if (x2 > maxX) maxX = x2;
-      if (y2 > maxY) maxY = y2;
-    });
-
-    // Cách 1: Tính diện tích Bounding Box (px) và đổi sang cm²
-    const boundingWidthCm  = Math.max(0, maxX - minX) / PIXELS_PER_CM;
-    const boundingHeightCm = Math.max(0, maxY - minY) / PIXELS_PER_CM;
-    const bboxAreaCm2      = boundingWidthCm * boundingHeightCm;
-    const bboxFee          = getFeeForArea(bboxAreaCm2);
-
-    // Cách 2: Tính tổng diện tích rời rạc của từng item
-    let sumOfIndividualAreasCm2 = 0;
-    items.forEach((item) => {
-      const scaleX = item.scaleX ?? 1;
-      const scaleY = item.scaleY ?? 1;
-      const w      = (item.width  ?? item.w ?? 0) * scaleX;
-      const h      = (item.height ?? item.h ?? 0) * scaleY;
-      
-      const areaCm2 = (w / PIXELS_PER_CM) * (h / PIXELS_PER_CM);
-      sumOfIndividualAreasCm2 += areaCm2;
-    });
-    const individualSumFee = getFeeForArea(sumOfIndividualAreasCm2);
-
-    // Lấy mức giá rẻ hơn cho khách hàng
-    return Math.min(bboxFee, individualSumFee);
+    return frontFee + backFee;
 
   } catch (err) {
     console.error('[pricing] calculateBoundingBoxAreaFee error:', err.message);
@@ -235,7 +255,8 @@ const calculateBoundingBoxAreaFee = (canvasData) => {
 module.exports = {
   calculateDesignQuote,
   calculateBoundingBoxAreaFee,
-  PIXELS_PER_CM,
+  PIXELS_PER_CM_X,
+  PIXELS_PER_CM_Y,
   FEE_TIERS,
   FEE_MAX,
 };
