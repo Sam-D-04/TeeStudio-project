@@ -256,7 +256,7 @@ export default function StatisticsPage() {
       {
         label: "Đơn đã thanh toán đủ",
         value: data.soDonDaThanhToanDu.toLocaleString("vi-VN"),
-        description: "Đơn có tổng tiền đã thu >= giá trị đơn",
+        description: "Đơn hàng mà shop đã thu đủ số tiền",
         tone: "text-primary-container",
         href: `/admin/don-hang?status=hoan_tat&payment=da_thanh_toan${completedDateParams}`,
       },
@@ -272,7 +272,7 @@ export default function StatisticsPage() {
         value: formatTiLe(data.tyLeHuyDon),
         description: "Đơn CANCELLED / tổng đơn phát sinh",
         tone: data.tyLeHuyDon > 0 ? "text-red-600" : "text-success",
-        href: `/admin/don-hang?status=da_huy${dateParams}`,
+        href: `/admin/don-hang?status=da_huy&excludeReason=TECH_ADJUST${dateParams}`,
       },
     ];
   }, [chiSo]);

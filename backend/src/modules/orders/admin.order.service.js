@@ -383,12 +383,9 @@ async function layThongKe() {
     "SELECT COUNT(*) AS so_luong FROM CustomerOrder WHERE status IN ('PROCESSING', 'PRINTING')"
   );
 
-  // Đếm đơn chờ thanh toán: có Payment ở trạng thái PENDING
+  // Đếm đơn chờ thanh toán: có paymentStatus là PENDING
   const [rowsChoThanhToan] = await db.pool.query(
-    `SELECT COUNT(DISTINCT co.id) AS so_luong
-     FROM CustomerOrder co
-     JOIN Payment p ON p.orderId = co.id
-     WHERE p.status = 'PENDING'`
+    "SELECT COUNT(*) AS so_luong FROM CustomerOrder WHERE paymentStatus = 'PENDING'"
   );
 
   // Đếm đơn hoàn tất hôm nay
@@ -423,6 +420,7 @@ async function layDanhSachDonHang({
   loai,
   tuKhoa,
   excludeStatus,
+  excludeReason,
   phuongThucThanhToan,
 }) {
   const trangHienTai = parseInt(trang) || 1;
@@ -449,6 +447,11 @@ async function layDanhSachDonHang({
 
   if (String(excludeStatus || "").trim().toUpperCase() === "CANCELLED") {
     dieuKien.push("co.status <> 'CANCELLED'");
+  }
+
+  if (excludeReason) {
+    dieuKien.push("(co.cancelReason NOT LIKE ? OR co.cancelReason IS NULL)");
+    thamSo.push(`[${excludeReason}]%`);
   }
 
   // Lọc theo thanh toán

@@ -66,6 +66,7 @@ export type OrdersInitialFilters = {
   dateField?: "created" | "completed" | "paid";
   hour?: string;
   excludeStatus?: string;
+  excludeReason?: string;
 };
 
 type OrdersPageProps = {
@@ -95,6 +96,9 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
   );
   const [excludeStatus, setExcludeStatus] = useState(
     initialFilters?.excludeStatus ?? ""
+  );
+  const [excludeReason, setExcludeReason] = useState(
+    initialFilters?.excludeReason ?? ""
   );
   const [typeFilter, setTypeFilter] = useState("tat_ca");
   const [tuKhoa, setTuKhoa] = useState("");
@@ -144,6 +148,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
       dateField,
       completionHour,
       excludeStatus,
+      excludeReason,
       typeFilter,
       tuKhoa,
     ],
@@ -161,6 +166,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
         loai: typeFilter,
         tuKhoa,
         excludeStatus,
+        excludeReason,
       }),
   });
 
@@ -184,6 +190,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
       setCompletionHour("");
     }
     setExcludeStatus("");
+    setExcludeReason("");
     setCurrentPage(1);
     if (key === "tat_ca") {
       router.push("/admin/don-hang");
@@ -196,6 +203,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
     setDenNgay(endDate);
     setCompletionHour("");
     setExcludeStatus("");
+    setExcludeReason("");
     setCurrentPage(1);
   }
   function handleDateClear() {
@@ -203,6 +211,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
     setDenNgay("");
     setCompletionHour("");
     setExcludeStatus("");
+    setExcludeReason("");
     setCurrentPage(1);
   }
   function handleTypeChange(v: string) { setTypeFilter(v); setCurrentPage(1); }
@@ -217,6 +226,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
     setDenNgay("");
     setCompletionHour("");
     setExcludeStatus("");
+    setExcludeReason("");
     setDateField("created");
     setCurrentPage(1);
     setResetKey((prev) => prev + 1);

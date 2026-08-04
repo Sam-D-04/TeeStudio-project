@@ -30,7 +30,7 @@ export default function AccountDetailModal({ open, customerId, onClose }: Props)
       title={<span className="text-lg font-bold">Chi tiết tài khoản khách hàng</span>}
       footer={null}
       width={700}
-      destroyOnClose
+      destroyOnHidden
     >
       <Spin spinning={isFetching}>
         {data ? (

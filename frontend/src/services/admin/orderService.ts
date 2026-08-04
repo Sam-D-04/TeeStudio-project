@@ -135,11 +135,12 @@ export type ThamSoLocDonHang = {
   thoiGian?: string;
   tuNgay?: string;
   denNgay?: string;
-  kieuNgay?: "ngay_tao" | "ngay_hoan_tat";
+  kieuNgay?: "ngay_tao" | "ngay_hoan_tat" | "ngay_thanh_toan";
   gio?: string;
   loai?: string;
   tuKhoa?: string;
   excludeStatus?: string;
+  excludeReason?: string;
 };
 
 // =====================================================================
@@ -180,6 +181,7 @@ export async function layDanhSachDonHang(
   if (thamSo.loai && thamSo.loai !== "tat_ca") params.loai = thamSo.loai;
   if (thamSo.tuKhoa && thamSo.tuKhoa.trim()) params.tuKhoa = thamSo.tuKhoa.trim();
   if (thamSo.excludeStatus) params.excludeStatus = thamSo.excludeStatus;
+  if (thamSo.excludeReason) params.excludeReason = thamSo.excludeReason;
 
   const res = await apiClient.get<{ success: boolean; data: KetQuaDanhSach }>(
     "/admin/orders",

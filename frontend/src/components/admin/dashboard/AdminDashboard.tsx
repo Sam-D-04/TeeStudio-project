@@ -129,13 +129,13 @@ export default function AdminDashboard() {
   }));
 
   const dateQuery = hasDateRange
-    ? `&from=${encodeURIComponent(tuNgay)}&to=${encodeURIComponent(denNgay)}`
+    ? `&startDate=${encodeURIComponent(tuNgay)}&endDate=${encodeURIComponent(denNgay)}`
     : "";
   const allOrdersHref = hasDateRange
-    ? `/admin/don-hang?from=${encodeURIComponent(tuNgay)}&to=${encodeURIComponent(denNgay)}`
+    ? `/admin/don-hang?startDate=${encodeURIComponent(tuNgay)}&endDate=${encodeURIComponent(denNgay)}`
     : "/admin/don-hang";
   const completedOrdersHref =
-    `/admin/don-hang?status=COMPLETED&payment=COMPLETED&dateField=completed${dateQuery}`;
+    `/admin/don-hang?status=hoan_tat&payment=da_thanh_toan&dateField=completed${dateQuery}`;
 
   // ── Cấu hình thẻ chỉ số hàng 1 ──
   const primaryMetrics = [
@@ -190,7 +190,7 @@ export default function AdminDashboard() {
     {
       label: "Doanh thu khác / Đền bù",
       value: isLoadingChiSo ? "..." : formatTienVnd(chiSo?.doanhThuKhacDenBuVnd),
-      href: `/admin/don-hang?status=CANCELLED${dateQuery}`,
+      href: `/admin/don-hang?status=da_huy&excludeReason=TECH_ADJUST${dateQuery}`,
       icon: <AlertOutlined />,
       iconClassName: "text-warning",
       subLabel: "Tỷ lệ hủy",
