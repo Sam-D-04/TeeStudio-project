@@ -73,6 +73,8 @@ export interface DesignState {
   designName: string;
   /** Status (DRAFT/PENDING_REVIEW/NEEDS_REVISION/APPROVED) của thiết kế đang tải, nếu có. */
   currentDesignStatus: string | null;
+  /** Ghi chú yêu cầu chỉnh sửa từ admin (nếu status = NEEDS_REVISION). */
+  adminNote: string | null;
 
   /* Ngăn xếp Undo / Redo — mỗi phần tử là một bản snapshot của elements[] */
   undoStack: DesignElement[][];
@@ -103,6 +105,7 @@ export interface DesignState {
   setCurrentDesignId: (id: number | null) => void;
   setDesignName: (name: string) => void;
   setCurrentDesignStatus: (status: string | null) => void;
+  setAdminNote: (note: string | null) => void;
 
   /* Hành động Undo / Redo */
   undo: () => void;
@@ -119,6 +122,7 @@ export const useDesignStore = create<DesignState>((set, get) => ({
   currentDesignId: null,
   designName: "Thiết kế chưa đặt tên",
   currentDesignStatus: null,
+  adminNote: null,
 
   shirtType: "tshirt",
   shirtColor: "#ffffff",
@@ -318,8 +322,9 @@ export const useDesignStore = create<DesignState>((set, get) => ({
   setCurrentDesignId: (id) => set({ currentDesignId: id }),
   setDesignName: (name) => set({ designName: name }),
   setCurrentDesignStatus: (status) => set({ currentDesignStatus: status }),
+  setAdminNote: (note) => set({ adminNote: note }),
 
-  /* ───────────── Undo / Redo ───────────── */
+  /* ──────────────────────────────────────────────────────────── */
 
   undo: () => {
     const { undoStack, elements } = get();

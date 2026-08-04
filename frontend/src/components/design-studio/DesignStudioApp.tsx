@@ -49,11 +49,13 @@ export default function DesignStudioApp() {
     undo, redo,
     setSelectedId, setShirtType, setShirtColor, setShirtView,
     currentDesignId, setCurrentDesignId,
-    currentDesignStatus,
+    currentDesignStatus, adminNote,
   } = useDesignStore();
 
   /** Thiết kế đã được admin duyệt → khóa toàn bộ chỉnh sửa phía khách */
   const isApproved = currentDesignStatus === "APPROVED";
+  /** Thiết kế đang bị yêu cầu sửa → khóa chức năng đổi áo/màu, chỉ cho sửa canvas */
+  const isRevisionMode = currentDesignStatus === "NEEDS_REVISION";
 
   const { isAuthenticated, accessToken } = useAuthStore();
 
@@ -368,6 +370,25 @@ export default function DesignStudioApp() {
     }
   }, [accessToken, currentDesignId, shirtType, shirtColor, setSelectedId, setShirtView, setCurrentDesignId, showToast]);
 
+  const handleSubmitRevision = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      setIsSaving(true);
+      const designName = useDesignStore.getState().designName;
+      const saved = await handleConfirmSave(designName);
+      if (saved && currentDesignId) {
+        await userDesignService.submitForReview(accessToken, currentDesignId);
+        showToast("Đã gửi xác nhận chỉnh sửa thành công!");
+        useDesignStore.getState().setCurrentDesignStatus("PENDING_REVIEW");
+        useDesignStore.getState().setAdminNote(null);
+      }
+    } catch (err: any) {
+      showToast(err.message || "Lỗi khi gửi xác nhận chỉnh sửa");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [accessToken, currentDesignId, handleConfirmSave, showToast]);
+
 
   /** Hàm nội bộ: load một design object vào canvas (không hỏi confirm khi canvas trống) */
   const handleLoadDesignById = useCallback((design: SavedDesign) => {
@@ -390,6 +411,7 @@ export default function DesignStudioApp() {
       shirtColor: design.baseColor,
       currentDesignId: design.id,
       currentDesignStatus: design.status,
+      adminNote: design.adminNote,
       designName: design.name,
     });
   }, []);
@@ -602,27 +624,52 @@ export default function DesignStudioApp() {
         </div>
       )}
 
+      {/* ── Banner: Thiết kế bị yêu cầu chỉnh sửa ── */}
+      {isRevisionMode && adminNote && (
+        <div style={{
+          background: "linear-gradient(90deg, #b45309 0%, #d97706 100%)",
+          color: "#fffbeb",
+          padding: "10px 20px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          fontSize: 14,
+          fontWeight: 600,
+          zIndex: 100,
+          borderBottom: "2px solid #fbbf24",
+        }}>
+          <span style={{ fontSize: 18 }}>⚠️</span>
+          <span>
+            Admin yêu cầu chỉnh sửa: <span style={{ fontWeight: 400, fontStyle: "italic" }}>{adminNote}</span>
+          </span>
+        </div>
+      )}
+
       <Toolbar
         onSave={handleSaveClick}
         onDownloadImage={handleDownloadImage}
         onShowToast={showToast}
         onOpenMyDesigns={() => setIsMyDesignsOpen(true)}
         onNewDesign={handleNewDesign}
-        onAddToCart={isApproved ? undefined : handleOpenCart}
+        onAddToCart={isApproved || isRevisionMode ? undefined : handleOpenCart}
         onViewCart={() => setIsCartDrawerOpen(true)}
         isSaving={isSaving}
         isReadOnly={isApproved}
+        isRevisionMode={isRevisionMode}
+        onSubmitRevision={handleSubmitRevision}
       />
 
       <div className="ds-body">
-        <Sidebar
-          uploadedImages={uploadedImages}
-          onUploadImages={handleUploadImages}
-          onRemoveUploadedImage={handleRemoveUploadedImage}
-          onAddImageToCanvas={handleAddImageToCanvas}
-          lockShirtOptions={isApproved}
-          isReadOnly={isApproved}
-        />
+        {!isRevisionMode && (
+          <Sidebar
+            uploadedImages={uploadedImages}
+            onUploadImages={handleUploadImages}
+            onRemoveUploadedImage={handleRemoveUploadedImage}
+            onAddImageToCanvas={handleAddImageToCanvas}
+            lockShirtOptions={isApproved}
+            isReadOnly={isApproved}
+          />
+        )}
 
         {/* ─── Khu vực làm việc chính (áo + canvas thiết kế) ─── */}
         <div

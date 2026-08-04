@@ -73,6 +73,9 @@ interface ToolbarProps {
   isSaving?: boolean;
   /** Khi true: ẩn các nút chỉnh sửa (Thiết kế đã được duyệt) */
   isReadOnly?: boolean;
+  /** Khi true: chế độ sửa thiết kế bị từ chối */
+  isRevisionMode?: boolean;
+  onSubmitRevision?: () => void;
 }
 
 const menuItemStyle: React.CSSProperties = {
@@ -83,7 +86,10 @@ const menuItemStyle: React.CSSProperties = {
   textAlign: "left", transition: "background 0.1s",
 };
 
-export default function Toolbar({ onSave, onDownloadImage, onShowToast, onOpenMyDesigns, onNewDesign, onAddToCart, onViewCart, isSaving, isReadOnly }: ToolbarProps) {
+export default function Toolbar({
+  onSave, onDownloadImage, onShowToast, onOpenMyDesigns, onNewDesign,
+  onAddToCart, onViewCart, isSaving, isReadOnly, isRevisionMode, onSubmitRevision
+}: ToolbarProps) {
   const { undo, redo, undoStack, redoStack, clearDesign, shirtType } = useDesignStore();
   const { isAuthenticated, user, clearSession, hydrate } = useAuthStore();
   const cartCount = useCartStore((s) => s.totalItems());
@@ -174,26 +180,42 @@ export default function Toolbar({ onSave, onDownloadImage, onShowToast, onOpenMy
 
       {/* Bên phải: Lưu + Thêm giỏ + Giỏ hàng + Khu vực tài khoản */}
       <div className="ds-toolbar-right">
-        <button className="ds-toolbar-btn ds-toolbar-btn--primary" onClick={onSave}
-          title="Lưu thiết kế (Ctrl+S)" disabled={isSaving}>
-          {isSaving ? (
-            <svg className="ds-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
-            </svg>
-          ) : <SaveIcon />}
-          {isSaving ? "Đang lưu..." : "Lưu thiết kế"}
-        </button>
-
-        {onAddToCart && (
-          <button
-            className="ds-toolbar-btn"
-            onClick={onAddToCart}
-            title="Thêm vào giỏ hàng"
-            style={{ background: "#0ea5e9", color: "#fff", border: "none" }}
-          >
-            <CartIcon /> Thêm vào giỏ
+        {isRevisionMode ? (
+          <button className="ds-toolbar-btn ds-toolbar-btn--primary" onClick={onSubmitRevision}
+            title="Xác nhận chỉnh sửa" disabled={isSaving}
+            style={{ background: "#f59e0b", color: "#fff", border: "none" }}>
+            {isSaving ? (
+              <svg className="ds-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+              </svg>
+            ) : <SendIcon />}
+            {isSaving ? "Đang xử lý..." : "Xác nhận chỉnh sửa"}
           </button>
+        ) : (
+          <>
+            <button className="ds-toolbar-btn ds-toolbar-btn--primary" onClick={onSave}
+              title="Lưu thiết kế (Ctrl+S)" disabled={isSaving}>
+              {isSaving ? (
+                <svg className="ds-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                  <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+                </svg>
+              ) : <SaveIcon />}
+              {isSaving ? "Đang lưu..." : "Lưu thiết kế"}
+            </button>
+
+            {onAddToCart && (
+              <button
+                className="ds-toolbar-btn"
+                onClick={onAddToCart}
+                title="Thêm vào giỏ hàng"
+                style={{ background: "#0ea5e9", color: "#fff", border: "none" }}
+              >
+                <CartIcon /> Thêm vào giỏ
+              </button>
+            )}
+          </>
         )}
 
         <button
