@@ -306,8 +306,9 @@ export default function NhapKhoPage() {
         </div>
       </div>
 
-      {/* ===== THÔNG TIN CHUNG (Nhà cung cấp + Ghi chú) ===== */}
+      {/* ===== FORM GỘP (THÔNG TIN CHUNG + BẢNG + TỔNG KẾT) ===== */}
       <div className="overflow-hidden rounded-[16px] border border-border bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
+        {/* ===== THÔNG TIN CHUNG (Nhà cung cấp + Ghi chú) ===== */}
         <div className="border-b border-border bg-surface-alt px-6 py-4">
           <div className="flex items-center gap-2">
             <ShopOutlined className="text-primary-container" />
@@ -320,47 +321,47 @@ export default function NhapKhoPage() {
         <div className="grid grid-cols-1 gap-5 p-6 md:grid-cols-2">
           {/* Nhà cung cấp (bắt buộc) */}
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-text-main">
-              Nhà cung cấp <span className="text-[#b91c1c]">*</span>
-            </label>
-            <div className="flex gap-2">
-              <Select
-                placeholder="Chọn nhà cung cấp..."
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                className="min-w-0 flex-1"
-                size="large"
-                value={nhaCungCapId ?? undefined}
-                loading={dangTaiNCC}
-                disabled={dangTaiNCC}
-                status={loiNhaCungCap ? "error" : undefined}
-                onChange={(val) => {
-                  setNhaCungCapId(val ?? null);
-                  setLoiNhaCungCap("");
-                }}
-                options={danhSachNhaCungCap.map((ncc) => ({
-                  value: ncc.id,
-                  label: ncc.soDienThoai
-                    ? `${ncc.ten} – ${ncc.soDienThoai}`
-                    : ncc.ten,
-                }))}
-                notFoundContent={
-                  <span className="text-xs text-text-muted">
-                    Không tìm thấy nhà cung cấp nào.
-                  </span>
-                }
-              />
+            <div className="mb-1.5 flex items-center gap-2">
+              <label className="text-sm font-semibold text-text-main">
+                Nhà cung cấp <span className="text-[#b91c1c]">*</span>
+              </label>
               <button
                 type="button"
                 onClick={() => setModalThemNCCOpen(true)}
                 disabled={dangGui}
-                className="flex h-10 shrink-0 items-center gap-2 rounded-lg border border-primary-container px-3 text-sm font-semibold text-primary-container transition-colors hover:bg-primary-container/10 disabled:cursor-not-allowed disabled:opacity-50"
+                title="Thêm nhà cung cấp"
+                className="flex h-6 w-6 items-center justify-center rounded-md border border-primary-container/40 bg-primary-container/10 text-primary-container transition-colors hover:border-primary-container hover:bg-primary-container/20 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <PlusOutlined />
-                Thêm nhà cung cấp
+                <PlusOutlined className="text-[12px]" />
               </button>
             </div>
+            <Select
+              placeholder="Chọn nhà cung cấp..."
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              className="w-full"
+              size="large"
+              value={nhaCungCapId ?? undefined}
+              loading={dangTaiNCC}
+              disabled={dangTaiNCC}
+              status={loiNhaCungCap ? "error" : undefined}
+              onChange={(val) => {
+                setNhaCungCapId(val ?? null);
+                setLoiNhaCungCap("");
+              }}
+              options={danhSachNhaCungCap.map((ncc) => ({
+                value: ncc.id,
+                label: ncc.soDienThoai
+                  ? `${ncc.ten} – ${ncc.soDienThoai}`
+                  : ncc.ten,
+              }))}
+              notFoundContent={
+                <span className="text-xs text-text-muted">
+                  Không tìm thấy nhà cung cấp nào.
+                </span>
+              }
+            />
             {loiNhaCungCap && (
               <p className="mt-1 text-xs text-[#b91c1c]">{loiNhaCungCap}</p>
             )}
@@ -394,13 +395,11 @@ export default function NhapKhoPage() {
             </p>
           </div>
         </div>
-      </div>
 
-      {/* ===== BẢNG NHẬP KHO MULTI-ROW ===== */}
-      <div className="overflow-hidden rounded-[16px] border border-border bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
-
+        {/* ===== BẢNG NHẬP KHO MULTI-ROW ===== */}
+        
         {/* Header bảng */}
-        <div className="flex items-center justify-between border-b border-border bg-surface-alt px-6 py-4">
+        <div className="flex items-center justify-between border-y border-border bg-surface-alt px-6 py-4">
           <div className="flex items-center gap-2">
             <InboxOutlined className="text-primary-container" />
             <h3 className="text-[15px] font-bold text-text-main">
@@ -584,11 +583,10 @@ export default function NhapKhoPage() {
             </button>
           </div>
         )}
-      </div>
 
-      {/* ===== TỔNG KẾT + NÚT HÀNH ĐỘNG ===== */}
-      <div className="overflow-hidden rounded-[16px] border border-border bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
-        <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+        {/* ===== TỔNG KẾT + NÚT HÀNH ĐỘNG ===== */}
+        <div className="border-t border-border bg-surface-alt/30">
+          <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
 
           {/* Tổng kết */}
           <div className="space-y-1">
@@ -645,6 +643,7 @@ export default function NhapKhoPage() {
             </button>
           </div>
         </div>
+      </div>
       </div>
 
       <AddSupplierModal

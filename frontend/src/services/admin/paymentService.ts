@@ -10,6 +10,7 @@
 
 import apiClient from "@/lib/apiClient";
 import { downloadExcelReport } from "@/lib/downloadExcelReport";
+import dayjs from "dayjs";
 import type { PaymentStatus } from "@/components/admin/payment/PaymentStatusBadge";
 import type { PaymentType } from "@/components/admin/payment/PaymentTable";
 
@@ -33,6 +34,7 @@ export type GiaoDich = {
   codReconciliationPaymentId?: number | null;
   id: number;
   payCode: string;
+  orderId: number;
   orderCode: string;
   customerName: string;
   amountVnd: number;
@@ -165,6 +167,6 @@ export async function xuatBaoCaoThanhToan(
   return downloadExcelReport(
     "/admin/payments/xuat-bao-cao",
     thamSo,
-    `bao-cao-thanh-toan-${new Date().toISOString().slice(0, 10)}.xlsx`
+    `bao-cao-thanh-toan-${dayjs().format("YYYY-MM-DD")}.xlsx`
   );
 }

@@ -20,6 +20,7 @@ import {
   CheckCircleOutlined,
   ReloadOutlined,
   UserAddOutlined,
+  EyeOutlined,
 } from "@ant-design/icons";
 import type { TaiKhoanKhachHang, ThamSoLocTaiKhoan } from "@/services/admin/accountService";
 import AccountStatusBadge from "./AccountStatusBadge";
@@ -35,6 +36,7 @@ type Props = {
   onDoiLoc: (thamSo: Partial<ThamSoLocTaiKhoan>) => void;
   onThem: () => void;
   onSua: (taiKhoan: TaiKhoanKhachHang) => void;
+  onXem: (taiKhoan: TaiKhoanKhachHang) => void;
   onVoHieuHoa: (taiKhoan: TaiKhoanKhachHang) => void;
   onKhoiPhuc: (taiKhoan: TaiKhoanKhachHang) => void;
 };
@@ -50,6 +52,7 @@ export default function AccountsTable({
   onDoiLoc,
   onThem,
   onSua,
+  onXem,
   onVoHieuHoa,
   onKhoiPhuc,
 }: Props) {
@@ -65,6 +68,18 @@ export default function AccountsTable({
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
+    });
+  };
+
+  const formatDateTime = (dateStr?: string) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    return d.toLocaleString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -121,8 +136,12 @@ export default function AccountsTable({
       dataIndex: "status",
       key: "status",
       width: 160,
-      render: (status: TaiKhoanKhachHang["status"]) => (
-        <AccountStatusBadge status={status} />
+      render: (status: TaiKhoanKhachHang["status"], record: TaiKhoanKhachHang) => (
+        <Tooltip title={record.updatedAt ? `Cập nhật: ${formatDateTime(record.updatedAt)}` : ""}>
+          <div style={{ display: "inline-block" }}>
+            <AccountStatusBadge status={status} />
+          </div>
+        </Tooltip>
       ),
     },
     {
@@ -146,6 +165,26 @@ export default function AccountsTable({
       fixed: "right",
       render: (_: unknown, record: TaiKhoanKhachHang) => (
         <Space size={6}>
+          {/* Nút Xem */}
+          <Tooltip title="Xem chi tiết">
+            <Button
+              type="text"
+              icon={<EyeOutlined />}
+              onClick={() => onXem(record)}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 8,
+                border: "1px solid #e2e8f0",
+                background: "#f8fafc",
+                color: "#475569",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            />
+          </Tooltip>
+
           {/* Nút Sửa */}
           <Tooltip title="Chỉnh sửa thông tin">
             <Button

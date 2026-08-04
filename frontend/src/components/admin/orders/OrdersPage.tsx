@@ -60,11 +60,13 @@ const SO_MOI_TRANG = 10;
 export type OrdersInitialFilters = {
   status?: string;
   payment?: string;
+  paymentMethod?: string;
   startDate?: string;
   endDate?: string;
-  dateField?: "created" | "completed";
+  dateField?: "created" | "completed" | "paid";
   hour?: string;
   excludeStatus?: string;
+  excludeReason?: string;
 };
 
 type OrdersPageProps = {
@@ -81,6 +83,9 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
   const [paymentFilter, setPaymentFilter] = useState(
     initialFilters?.payment ?? "tat_ca"
   );
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState(
+    initialFilters?.paymentMethod ?? "tat_ca"
+  );
   const [tuNgay, setTuNgay] = useState(initialFilters?.startDate ?? "");
   const [denNgay, setDenNgay] = useState(initialFilters?.endDate ?? "");
   const [dateField, setDateField] = useState(
@@ -91,6 +96,9 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
   );
   const [excludeStatus, setExcludeStatus] = useState(
     initialFilters?.excludeStatus ?? ""
+  );
+  const [excludeReason, setExcludeReason] = useState(
+    initialFilters?.excludeReason ?? ""
   );
   const [typeFilter, setTypeFilter] = useState("tat_ca");
   const [tuKhoa, setTuKhoa] = useState("");
@@ -134,11 +142,13 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
       currentPage,
       activeTab,
       paymentFilter,
+      paymentMethodFilter,
       tuNgay,
       denNgay,
       dateField,
       completionHour,
       excludeStatus,
+      excludeReason,
       typeFilter,
       tuKhoa,
     ],
@@ -148,13 +158,15 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
         soMoiTrang: SO_MOI_TRANG,
         trangThai: activeTab,
         thanhToan: paymentFilter,
+        phuongThucThanhToan: paymentMethodFilter,
         tuNgay,
         denNgay,
-        kieuNgay: dateField === "completed" ? "ngay_hoan_tat" : "ngay_tao",
+        kieuNgay: dateField === "completed" ? "ngay_hoan_tat" : dateField === "paid" ? "ngay_thanh_toan" : "ngay_tao",
         gio: completionHour,
         loai: typeFilter,
         tuKhoa,
         excludeStatus,
+        excludeReason,
       }),
   });
 
@@ -178,17 +190,20 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
       setCompletionHour("");
     }
     setExcludeStatus("");
+    setExcludeReason("");
     setCurrentPage(1);
     if (key === "tat_ca") {
       router.push("/admin/don-hang");
     }
   }
   function handlePaymentChange(v: string) { setPaymentFilter(v); setCurrentPage(1); }
+  function handlePaymentMethodChange(v: string) { setPaymentMethodFilter(v); setCurrentPage(1); }
   function handleDateChange(startDate: string, endDate: string) {
     setTuNgay(startDate);
     setDenNgay(endDate);
     setCompletionHour("");
     setExcludeStatus("");
+    setExcludeReason("");
     setCurrentPage(1);
   }
   function handleDateClear() {
@@ -196,6 +211,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
     setDenNgay("");
     setCompletionHour("");
     setExcludeStatus("");
+    setExcludeReason("");
     setCurrentPage(1);
   }
   function handleTypeChange(v: string) { setTypeFilter(v); setCurrentPage(1); }
@@ -203,12 +219,15 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
   function handleResetFilters() {
     setActiveTab("tat_ca");
     setPaymentFilter("tat_ca");
+    setPaymentMethodFilter("tat_ca");
     setTypeFilter("tat_ca");
     setTuKhoa("");
     setTuNgay("");
     setDenNgay("");
     setCompletionHour("");
     setExcludeStatus("");
+    setExcludeReason("");
+    setDateField("created");
     setCurrentPage(1);
     setResetKey((prev) => prev + 1);
     router.push("/admin/don-hang");
@@ -322,10 +341,17 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
           onTabChange={handleTabChange}
           paymentFilter={paymentFilter}
           onPaymentFilterChange={handlePaymentChange}
+          paymentMethodFilter={paymentMethodFilter}
+          onPaymentMethodFilterChange={handlePaymentMethodChange}
           onDateChange={handleDateChange}
           onDateClear={handleDateClear}
           initialStartDate={tuNgay || undefined}
           initialEndDate={denNgay || undefined}
+          dateField={dateField}
+          onDateFieldChange={(val) => {
+            setDateField(val as "created" | "completed" | "paid");
+            setCurrentPage(1);
+          }}
           typeFilter={typeFilter}
           onTypeFilterChange={handleTypeChange}
           onResetFilters={handleResetFilters}

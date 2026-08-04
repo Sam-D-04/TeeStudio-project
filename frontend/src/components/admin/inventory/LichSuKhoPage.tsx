@@ -17,6 +17,8 @@ import {
   ControlOutlined,
   FilterOutlined,
 } from "@ant-design/icons";
+import dayjs from "dayjs";
+import DateRangeFilter from "@/components/admin/common/DateRangeFilter";
 import * as inventoryService from "@/services/admin/inventoryService";
 import type { GiaoDichKho } from "@/services/admin/inventoryService";
 
@@ -67,7 +69,6 @@ const TU_KHOA_LOAI_GD = [
   { value: "tat_ca", label: "Tất cả loại" },
   { value: "IMPORT",       label: "📦 Nhập kho" },
   { value: "EXPORT",       label: "📤 Xuất kho" },
-  { value: "ORDER_EXPORT", label: "🔄 Xuất đơn hàng" },
   { value: "RETURN",       label: "↩️ Hoàn trả" },
   { value: "ADJUSTMENT",   label: "⚙️ Điều chỉnh" },
 ];
@@ -129,6 +130,8 @@ export default function LichSuKhoPage() {
   const [loaiGiaoDich, setLoaiGiaoDich] = useState("tat_ca");
   const [tuKhoa, setTuKhoa] = useState("");
   const [tuKhoaInput, setTuKhoaInput] = useState(""); // Giá trị đang gõ (debounced)
+  const [tuNgay, setTuNgay] = useState<string>(() => dayjs().subtract(29, "day").format("YYYY-MM-DD"));
+  const [denNgay, setDenNgay] = useState<string>(() => dayjs().format("YYYY-MM-DD"));
 
   // ── Tìm kiếm khi nhấn Enter hoặc click icon ──
   const xuLyTimKiem = useCallback(() => {
@@ -145,6 +148,8 @@ export default function LichSuKhoPage() {
     setTuKhoa("");
     setTuKhoaInput("");
     setLoaiGiaoDich("tat_ca");
+    setTuNgay("");
+    setDenNgay("");
     setTrangHienTai(1);
     router.replace("/admin/kho-hang/lich-su");
   }
@@ -156,13 +161,15 @@ export default function LichSuKhoPage() {
     isError: loi,
     isFetching,
   } = useQuery({
-    queryKey: ["inventory", "history", trangHienTai, loaiGiaoDich, tuKhoa],
+    queryKey: ["inventory", "history", trangHienTai, loaiGiaoDich, tuKhoa, tuNgay, denNgay],
     queryFn: () =>
       inventoryService.layLichSuKho({
         trang: trangHienTai,
         soMoiTrang: SO_MOI_TRANG,
         loaiGiaoDich,
         tuKhoa,
+        tuNgay,
+        denNgay,
       }),
     staleTime: 15_000,
     placeholderData: (prev) => prev,
@@ -247,11 +254,30 @@ export default function LichSuKhoPage() {
           <Select
             value={loaiGiaoDich}
             onChange={xuLyDoiLoai}
-            className="w-52"
+            className="w-48"
             size="middle"
             options={TU_KHOA_LOAI_GD}
           />
         </div>
+
+        {/* Lọc thời gian (Mặc định 30 ngày) */}
+        <DateRangeFilter
+          initialPreset="last30Days"
+          initialStartDate={tuNgay}
+          initialEndDate={denNgay}
+          allowClear
+          onChange={(start, end) => {
+            setTuNgay(start);
+            setDenNgay(end);
+            setTrangHienTai(1);
+          }}
+          onClear={() => {
+            setTuNgay("");
+            setDenNgay("");
+            setTrangHienTai(1);
+          }}
+          className="shrink-0"
+        />
 
         {/* Nút Đặt lại */}
         <button
@@ -351,12 +377,12 @@ export default function LichSuKhoPage() {
 
                       {/* Chi tiết */}
                       <td className="max-w-xs p-4">
-                        <p className="truncate text-sm text-text-secondary">
+                        <p className="text-sm text-text-secondary whitespace-normal break-words">
                           {gd.moTa}
                         </p>
-                        {gd.maDonHang && (
+                        {gd.orderId && gd.maDonHang && (
                           <Link
-                            href={`/admin/don-hang/${gd.maDonHang}`}
+                            href={`/admin/don-hang/${gd.orderId}`}
                             className="mt-0.5 block text-xs text-primary-container hover:underline"
                           >
                             Đơn: {gd.maDonHang}

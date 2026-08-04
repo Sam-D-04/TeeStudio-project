@@ -9,7 +9,9 @@ import { useRouter } from "next/navigation";
 import PromotionStatCard from "./PromotionStatCard";
 import PromotionFilterBar, { type BoDucMaKhuyenMai } from "./PromotionFilterBar";
 import PromotionTable from "./PromotionTable";
+import PromotionPagination from "./PromotionPagination";
 import PromotionDrawer, { type FormMaKhuyenMai } from "./PromotionDrawer";
+import PromotionDetailModal from "./PromotionDetailModal";
 import BulkPricingTab from "./BulkPricingTab";
 import PrintSurchargeTab from "./PrintSurchargeTab";
 import PriceFormulaTab from "./PriceFormulaTab";
@@ -57,7 +59,7 @@ const doiFormSangPayload = (
 });
 
 function PromotionContent({ initialFilters }: PromotionPageProps) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [resetKey, setResetKey] = useState(0);
@@ -83,6 +85,9 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
   const [moDrawer, setMoDrawer] = useState(false);
   const [dangSuaId, setDangSuaId] = useState<number | null>(null);
   const [phienMoDrawer, setPhienMoDrawer] = useState(0);
+
+  const [moModalChiTiet, setMoModalChiTiet] = useState(false);
+  const [dangXemId, setDangXemId] = useState<number | null>(null);
 
   const statsQuery = useQuery({
     queryKey: ["admin-promotions", "stats"],
@@ -138,6 +143,7 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
 
   const danhSach = listQuery.data?.danhSach ?? [];
   const maDangSua = danhSach.find((item) => item.id === dangSuaId) ?? null;
+  const maDangXem = danhSach.find((item) => item.id === dangXemId) ?? null;
   const thongKe = statsQuery.data;
 
   function moTaoMoi() {
@@ -150,6 +156,11 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
     setDangSuaId(id);
     setPhienMoDrawer((value) => value + 1);
     setMoDrawer(true);
+  }
+
+  function moXemChiTiet(id: number) {
+    setDangXemId(id);
+    setMoModalChiTiet(true);
   }
 
   function doiBoLoc(value: BoDucMaKhuyenMai) {
@@ -337,52 +348,29 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
             ) : (
               <PromotionTable
                 danhSach={danhSach}
-                onXem={moChinhSua}
+                onXem={moXemChiTiet}
                 onSua={moChinhSua}
                 onXoa={(id) => {
-                  if (window.confirm("Bạn có chắc muốn xóa mã khuyến mãi này?")) {
-                    deleteMutation.mutate(id);
-                  }
+                  modal.confirm({
+                    title: "Xác nhận xóa",
+                    content: "Bạn có chắc muốn xóa mã khuyến mãi này?",
+                    okText: "Xóa",
+                    okType: "danger",
+                    cancelText: "Hủy",
+                    onOk: () => {
+                      deleteMutation.mutate(id);
+                    },
+                  });
                 }}
               />
             )}
-            <div
-              style={{
-                padding: "12px 16px",
-                borderTop: "1px solid #e2e8f0",
-                backgroundColor: "#f8fafc",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span style={{ fontSize: 12, color: "#475569" }}>
-                Tổng cộng {listQuery.data?.tongSo ?? 0} mã khuyến mãi
-              </span>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button
-                  disabled={trang <= 1}
-                  onClick={() => setTrang((value) => value - 1)}
-                  style={{ padding: "5px 10px", cursor: trang <= 1 ? "not-allowed" : "pointer" }}
-                >
-                  Trước
-                </button>
-                <span style={{ fontSize: 12 }}>
-                  Trang {trang}/{listQuery.data?.tongSoTrang ?? 1}
-                </span>
-                <button
-                  disabled={trang >= (listQuery.data?.tongSoTrang ?? 1)}
-                  onClick={() => setTrang((value) => value + 1)}
-                  style={{
-                    padding: "5px 10px",
-                    cursor:
-                      trang >= (listQuery.data?.tongSoTrang ?? 1) ? "not-allowed" : "pointer",
-                  }}
-                >
-                  Sau
-                </button>
-              </div>
-            </div>
+            <PromotionPagination
+              currentPage={trang}
+              totalPages={listQuery.data?.tongSoTrang ?? 1}
+              totalItems={listQuery.data?.tongSo ?? 0}
+              itemsPerPage={SO_MOI_TRANG}
+              onPageChange={setTrang}
+            />
           </div>
         )}
 
@@ -402,6 +390,15 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
         }}
         onLuu={(form) => saveMutation.mutate(form)}
         dangLuu={saveMutation.isPending}
+      />
+
+      <PromotionDetailModal
+        open={moModalChiTiet}
+        onClose={() => {
+          setMoModalChiTiet(false);
+          setDangXemId(null);
+        }}
+        promotion={maDangXem}
       />
     </>
   );

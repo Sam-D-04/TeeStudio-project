@@ -48,7 +48,8 @@ const validateField = (value, rules, location, field, req) => {
   const errors = [];
   const label = rules.label || field;
 
-  if (rules.required && isEmpty(value)) {
+  const isRequired = typeof rules.required === 'function' ? rules.required(req) : rules.required;
+  if (isRequired && isEmpty(value)) {
     errors.push({
       field,
       location,

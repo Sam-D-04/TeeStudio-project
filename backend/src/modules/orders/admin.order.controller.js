@@ -64,24 +64,6 @@ const capNhatTrangThai = async (req, res, next) => {
   }
 };
 
-const yeuCauChinhSuaThietKe = async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id);
-    const data = await orderService.yeuCauChinhSuaThietKeDonHang(
-      id,
-      req.body.ghiChu,
-      req.user
-    );
-    res.json({
-      success: true,
-      message: "Đã gửi yêu cầu chỉnh sửa thiết kế",
-      data,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 /**
  * PATCH /api/admin/orders/:id/cancel
  * Hủy đơn hàng kèm lý do.
@@ -232,7 +214,6 @@ module.exports = {
   getDanhSachDonHang,
   getChiTietDonHang,
   capNhatTrangThai,
-  yeuCauChinhSuaThietKe,
   huyDonHang,
   capNhatDiaChiGiaoHang,
   taoLaiMaThanhToanOnline,

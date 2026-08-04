@@ -10,7 +10,7 @@ const uploadService = require("../uploads/upload.service");
 // HẰNG SỐ
 // =====================================================================
 /** Ngưỡng cảnh báo sắp hết hàng */
-const NGUONG_SAP_HET = 10;
+const NGUONG_SAP_HET = 50;
 const TRANG_THAI_DON_GIU_HANG =
   "'PENDING','CONFIRMED','PROCESSING','PRINTING','READY_TO_SHIP'";
 const TRANG_THAI_DON_CHAN_XOA_AN =
@@ -147,6 +147,34 @@ function sinhSlug(ten) {
     + "-" + Date.now();
 }
 
+function laNgayHopLe(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const [nam, thang, ngay] = value.split("-").map(Number);
+  const d = new Date(Date.UTC(nam, thang - 1, ngay));
+  return (
+    d.getUTCFullYear() === nam &&
+    d.getUTCMonth() === thang - 1 &&
+    d.getUTCDate() === ngay
+  );
+}
+
+function chuanHoaKhoangNgay(tuNgay, denNgay) {
+  const homNay = new Date();
+  const nam = homNay.getFullYear();
+  const thang = String(homNay.getMonth() + 1).padStart(2, "0");
+  const ngay = String(homNay.getDate()).padStart(2, "0");
+
+  const macDinhTuNgay = `${nam}-${thang}-01`;
+  const macDinhDenNgay = `${nam}-${thang}-${ngay}`;
+
+  const batDau = laNgayHopLe(tuNgay) ? tuNgay : macDinhTuNgay;
+  const ketThuc = laNgayHopLe(denNgay) ? denNgay : macDinhDenNgay;
+
+  return batDau <= ketThuc ? [batDau, ketThuc] : [ketThuc, batDau];
+}
+
 // =====================================================================
 // SERVICE 1: Thống kê KPI (4 thẻ đầu trang)
 // =====================================================================
@@ -207,7 +235,7 @@ async function layBangMau() {
 // =====================================================================
 // SERVICE 3: Danh sách phôi áo (phân trang + lọc)
 // =====================================================================
-async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangThai, tonKho }) {
+async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangThai, tonKho, tuNgay, denNgay }) {
   const trangHienTai = parseInt(trang) || 1;
   const soMoi = parseInt(soMoiTrang) || 10;
   const offset = (trangHienTai - 1) * soMoi;
@@ -215,8 +243,11 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
   const dieuKien = [];
   const thamSo = [];
   const laLocBanChay = tonKho === "ban_chay";
-  const bestSellerJoin = laLocBanChay
-    ? `
+  
+  let bestSellerJoin = "";
+  if (laLocBanChay) {
+    const [batDau, ketThuc] = chuanHoaKhoangNgay(tuNgay, denNgay);
+    bestSellerJoin = `
       INNER JOIN (
         SELECT
           pvSales.productId,
@@ -224,15 +255,22 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
         FROM OrderItem oiSales
         INNER JOIN ProductVariant pvSales ON pvSales.id = oiSales.variantId
         INNER JOIN CustomerOrder coSales ON coSales.id = oiSales.orderId
-        WHERE coSales.status IN ('COMPLETED', 'SHIPPING')
-          AND DATE(coSales.updatedAt) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
-          AND DATE(coSales.updatedAt) <= LAST_DAY(CURDATE())
+        INNER JOIN (
+          SELECT orderId, MAX(paidAt) AS fullyPaidAt
+          FROM Payment
+          WHERE status = 'COMPLETED'
+            AND paymentType <> 'DEPOSIT'
+          GROUP BY orderId
+        ) pRevenue ON pRevenue.orderId = coSales.id
+        WHERE coSales.status = 'COMPLETED'
+          AND DATE(COALESCE(pRevenue.fullyPaidAt, coSales.updatedAt)) >= '${batDau}'
+          AND DATE(COALESCE(pRevenue.fullyPaidAt, coSales.updatedAt)) <= '${ketThuc}'
         GROUP BY pvSales.productId
         ORDER BY salesRevenue DESC
         LIMIT 3
       ) bestSeller ON bestSeller.productId = p.id
-    `
-    : "";
+    `;
+  }
 
   if (tuKhoa && tuKhoa.trim()) {
     dieuKien.push("(p.name LIKE ? OR p.slug LIKE ?)");

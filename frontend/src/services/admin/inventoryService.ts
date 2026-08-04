@@ -169,6 +169,8 @@ export type GiaoDichKho = {
   tenNhaCungCap: string | null;
   /** Mã đơn hàng (nếu là ORDER_EXPORT) */
   maDonHang: string | null;
+  /** ID đơn hàng bằng số (dùng để tạo link chi tiết) */
+  orderId: number | null;
   /** Ngày dạng dd/MM/yyyy */
   ngay: string;
   /** Giờ dạng HH:mm */
@@ -192,6 +194,8 @@ export type ThamSoLichSuKho = {
   soMoiTrang?: number;
   loaiGiaoDich?: string;
   tuKhoa?: string;
+  tuNgay?: string;
+  denNgay?: string;
 };
 
 // =====================================================================
@@ -341,6 +345,8 @@ export async function layLichSuKho(
     params.loaiGiaoDich = thamSo.loaiGiaoDich;
   if (thamSo.tuKhoa && thamSo.tuKhoa.trim())
     params.tuKhoa = thamSo.tuKhoa.trim();
+  if (thamSo.tuNgay) params.tuNgay = thamSo.tuNgay;
+  if (thamSo.denNgay) params.denNgay = thamSo.denNgay;
 
   const res = await apiClient.get<{
     success: boolean;

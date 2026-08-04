@@ -326,7 +326,7 @@ export default function DesignResourceTab() {
             {danhSachSticker.length === 0 && (
               <p style={{ color: "#94a3b8", fontSize: 13, gridColumn: "1 / -1" }}>Chưa có sticker nào.</p>
             )}
-            {danhSachSticker.map((sticker: Sticker) => (
+            {[...danhSachSticker].reverse().map((sticker: Sticker) => (
               <div
                 key={sticker.id}
                 style={{

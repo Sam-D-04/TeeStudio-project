@@ -87,7 +87,7 @@ export default function AdminDashboard() {
   // ── Truy vấn 4: Tồn kho cảnh báo ──
   const { data: tonKhoRaw } = useQuery({
     queryKey: ["dashboard/ton-kho-canh-bao"],
-    queryFn: () => dashboardService.layTonKhoCanhBao(15, 10),
+    queryFn: () => dashboardService.layTonKhoCanhBao(50, 10),
     staleTime: 120_000,
   });
 
@@ -129,18 +129,18 @@ export default function AdminDashboard() {
   }));
 
   const dateQuery = hasDateRange
-    ? `&from=${encodeURIComponent(tuNgay)}&to=${encodeURIComponent(denNgay)}`
+    ? `&startDate=${encodeURIComponent(tuNgay)}&endDate=${encodeURIComponent(denNgay)}`
     : "";
   const allOrdersHref = hasDateRange
-    ? `/admin/don-hang?from=${encodeURIComponent(tuNgay)}&to=${encodeURIComponent(denNgay)}`
+    ? `/admin/don-hang?startDate=${encodeURIComponent(tuNgay)}&endDate=${encodeURIComponent(denNgay)}`
     : "/admin/don-hang";
   const completedOrdersHref =
-    `/admin/don-hang?status=COMPLETED&payment=COMPLETED&dateField=completed${dateQuery}`;
+    `/admin/don-hang?status=hoan_tat&payment=da_thanh_toan&dateField=completed${dateQuery}`;
 
   // ── Cấu hình thẻ chỉ số hàng 1 ──
   const primaryMetrics = [
     {
-      label: "Doanh thu tháng này",
+      label: "Doanh thu",
       value: isLoadingChiSo ? "..." : formatTienVnd(chiSo?.doanhThuThangVnd),
       href: completedOrdersHref,
       icon: <RiseOutlined />,
@@ -182,7 +182,7 @@ export default function AdminDashboard() {
     {
       label: "Tỷ lệ đơn hàng thành công",
       value: isLoadingChiSo ? "..." : formatPhanTram(chiSo?.tyLeThanhCongPhanTram),
-      href: `/admin/don-hang?status=COMPLETED%2CDELIVERED${dateQuery}`,
+      href: allOrdersHref,
       icon: <RiseOutlined />,
       iconClassName: "text-success",
       valueClassName: "text-success",
@@ -190,7 +190,7 @@ export default function AdminDashboard() {
     {
       label: "Doanh thu khác / Đền bù",
       value: isLoadingChiSo ? "..." : formatTienVnd(chiSo?.doanhThuKhacDenBuVnd),
-      href: `/admin/don-hang?status=CANCELLED${dateQuery}`,
+      href: `/admin/don-hang?status=da_huy&excludeReason=TECH_ADJUST${dateQuery}`,
       icon: <AlertOutlined />,
       iconClassName: "text-warning",
       subLabel: "Tỷ lệ hủy",
@@ -286,7 +286,7 @@ export default function AdminDashboard() {
       {/* ── Tồn kho & 3 Sản phẩm bán chạy nhất ── */}
       <section className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
         <InventoryWarningCard items={inventoryItems} />
-        <BestSellingProductsCard products={bestSellingProducts} />
+        <BestSellingProductsCard products={bestSellingProducts} dateRange={hasDateRange ? dateRange : undefined} />
       </section>
     </>
   );

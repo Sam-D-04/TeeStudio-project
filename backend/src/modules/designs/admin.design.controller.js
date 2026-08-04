@@ -229,6 +229,16 @@ const taiAnhThietKe = async (req, res, next) => {
   }
 };
 
+/** GET /api/admin/designs/print-methods - Danh sách phương pháp in đang hoạt động. */
+const getDanhSachPhuongPhapIn = async (req, res, next) => {
+  try {
+    const data = await designService.layDanhSachPhuongPhapIn();
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /**
  * PATCH /api/admin/designs/:id/duyet
  * Duyệt thiết kế (chuyển sang trạng thái "Đã duyệt").
@@ -342,7 +352,7 @@ const capNhatTrangThaiDonIn = async (req, res, next) => {
     }
 
     const { trangThai } = req.body || {};
-    const data = await designService.capNhatTrangThaiDonIn(id, trangThai);
+    const data = await designService.capNhatTrangThaiDonIn(id, trangThai, req.user);
     res.json({
       success: true,
       message: trangThai === "da_in_xong"
@@ -461,4 +471,5 @@ module.exports = {
   themSticker,
   xoaSticker,
   getDanhSachViTriInCongKhai,
+  getDanhSachPhuongPhapIn,
 };

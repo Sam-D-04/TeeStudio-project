@@ -29,6 +29,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
+import * as promotionService from "@/services/admin/promotionService";
 import type {
   BienTheSanPham,
   KhachHang,
@@ -66,6 +67,7 @@ type OrderPreviewLine = {
   quantity: number;
   design?: ThietKe;
   unitPrice: number;
+  printFee: number;
   lineProductTotal: number;
   designFee: number;
   lineTotal: number;
@@ -299,6 +301,16 @@ function buildPreview(
   designById: Record<number, ThietKe>,
   promotions: KhuyenMai[]
 ): OrderPreview {
+  const qtyByProductId: Record<number, number> = {};
+  values.items?.forEach((item) => {
+    const qty = Math.max(1, Number(item.quantity) || 1);
+    if (item.productId) {
+      qtyByProductId[item.productId] = (qtyByProductId[item.productId] || 0) + qty;
+    }
+  });
+
+  const uniqueDesignIds = new Set<number>();
+
   const lines =
     values.items?.map((item) => {
       const productType = getItemProductType(item);
@@ -309,12 +321,20 @@ function buildPreview(
         productType === "CUSTOM" && item?.designId
           ? designById[item.designId]
           : undefined;
+
+      const totalProductQty = item?.productId ? (qtyByProductId[item.productId] || quantity) : quantity;
       const { unitPrice, discountPercent, bulkMinQty } = tinhDonGiaPreview(
         product,
-        quantity
+        totalProductQty
       );
-      const lineProductTotal = unitPrice * quantity;
-      const designFee = design?.phiThietKe ?? 0;
+      const printFee = design?.phiInAn ?? 0;
+      const lineProductTotal = (unitPrice + printFee) * quantity;
+
+      let designFee = 0;
+      if (design && !uniqueDesignIds.has(design.id)) {
+        designFee = design.phiThietKe ?? 0;
+        uniqueDesignIds.add(design.id);
+      }
 
       return {
         productType,
@@ -323,6 +343,7 @@ function buildPreview(
         quantity,
         design,
         unitPrice,
+        printFee,
         lineProductTotal,
         designFee,
         lineTotal: lineProductTotal + designFee,
@@ -529,7 +550,7 @@ function DesignPicker({
                 ) : null}
                 <div className="min-w-0">
                   <div className="truncate font-semibold text-text-main">
-                    Thiết kế #{design.id} · {design.tenSanPham}
+                    TK-{String(design.id).padStart(4, "0")} · {design.tenThietKe || design.tenSanPham}
                   </div>
                   <div className="text-xs text-text-secondary">
                     Màu {getDesignColor(design, design.sanPham) || "Không rõ"} · Phí thiết kế{" "}
@@ -817,12 +838,31 @@ function ProductItemRow({
           <Tag className="m-0">Chưa đạt mức giá sỉ</Tag>
         ) : null}
 
-        <span className="ml-auto font-semibold text-text-main">
-          Đơn giá preview: {formatCurrency(previewLine?.unitPrice ?? 0)}
-        </span>
-        <span className="font-semibold text-primary-container">
-          Dòng: {formatCurrency(previewLine?.lineTotal ?? 0)}
-        </span>
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-text-main">
+            Đơn giá áo: <span className="font-semibold">{formatCurrency(previewLine?.unitPrice ?? 0)}</span>
+          </span>
+          {previewLine?.printFee ? (
+            <>
+              <span className="text-border">•</span>
+              <span className="text-text-main">
+                Phí in ấn: <span className="font-semibold text-blue-600">{formatCurrency(previewLine.printFee)}</span>
+              </span>
+            </>
+          ) : null}
+          {previewLine?.designFee ? (
+            <>
+              <span className="text-border">•</span>
+              <span className="text-text-main">
+                Phí thiết kế: <span className="font-semibold text-orange-600">{formatCurrency(previewLine.designFee)}</span>
+              </span>
+            </>
+          ) : null}
+          <span className="text-border">•</span>
+          <span className="text-primary-container">
+            Thành tiền: <span className="font-bold">{formatCurrency(previewLine?.lineTotal ?? 0)}</span>
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -1126,7 +1166,7 @@ function OrderSummary({
       <div className="mb-3">
         <h3 className="text-sm font-bold text-text-main">Tóm tắt giá (preview)</h3>
         <p className="mt-0.5 text-xs text-text-secondary">
-          Backend sẽ tính lại chính xác từ database.
+
         </p>
       </div>
 
@@ -1311,6 +1351,17 @@ export default function CreateOrderPage() {
     queryKey: ["admin-order-promotions"],
     queryFn: orderService.layDanhSachKhuyenMai,
   });
+
+  const { data: pricingFormula } = useQuery({
+    queryKey: ["admin-pricing-formula"],
+    queryFn: promotionService.layCongThucBaoGia,
+  });
+
+  useEffect(() => {
+    if (pricingFormula?.cauHinh && !form.isFieldTouched("shippingFee")) {
+      form.setFieldValue("shippingFee", pricingFormula.cauHinh.defaultShippingFee);
+    }
+  }, [pricingFormula, form]);
 
   const preview = useMemo(
     () => buildPreview(values, productById, designById, promotions),

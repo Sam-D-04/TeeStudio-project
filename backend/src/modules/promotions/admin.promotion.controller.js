@@ -92,6 +92,14 @@ const capNhatPhuPhi = dieuPhoi(async (req, res) => {
   });
 });
 
+const taoPhuongPhapIn = dieuPhoi(async (req, res) => {
+  res.status(201).json({
+    success: true,
+    message: "Thêm phương pháp in thành công",
+    data: await service.taoPhuongPhapIn(req.body),
+  });
+});
+
 const layCongThucBaoGia = dieuPhoi(async (req, res) => {
   res.json({ success: true, data: await service.layCongThucBaoGia() });
 });
@@ -118,6 +126,7 @@ module.exports = {
   xoaGiaSoLuong,
   layPhuPhi,
   capNhatPhuPhi,
+  taoPhuongPhapIn,
   layCongThucBaoGia,
   capNhatCongThucBaoGia,
 };

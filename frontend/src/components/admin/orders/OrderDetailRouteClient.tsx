@@ -18,9 +18,11 @@ import {
   Button,
   Descriptions,
   Drawer,
+  Image,
   Input,
   Modal,
   QRCode,
+  Radio,
   Skeleton,
   Space,
   Tag,
@@ -29,6 +31,7 @@ import {
 } from "antd";
 import { isAxiosError } from "axios";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
 import type { ChiTietDonHang } from "@/services/admin/orderService";
@@ -122,26 +125,26 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
   const items = order.items?.length
     ? order.items
     : [
-        {
-          id: order.id,
-          productId: 0,
-          variantId: 0,
-          designId: null,
-          tenSanPham: order.sanPham.ten,
-          mauSac: "",
-          kichCo: order.sanPham.sizes,
-          sku: "",
-          soLuong: 1,
-          donGiaVnd: order.tamTinhVnd,
-          phiThietKeVnd: order.phiThietKeVnd,
-          thanhTienVnd: order.tamTinhVnd + order.phiThietKeVnd,
-          loai: order.sanPham.loai,
-          anhUrl: order.sanPham.anhUrl,
-          anhXemTruocThietKe: order.anhXemTruocThietKe,
-          viTriIn: order.viTriIn,
-          phuongPhapIn: order.phuongPhapIn,
-        },
-      ];
+      {
+        id: order.id,
+        productId: 0,
+        variantId: 0,
+        designId: null,
+        tenSanPham: order.sanPham.ten,
+        mauSac: "",
+        kichCo: order.sanPham.sizes,
+        sku: "",
+        soLuong: 1,
+        donGiaVnd: order.tamTinhVnd,
+        phiThietKeVnd: order.phiThietKeVnd,
+        thanhTienVnd: order.tamTinhVnd + order.phiThietKeVnd,
+        loai: order.sanPham.loai,
+        anhUrl: order.sanPham.anhUrl,
+        anhXemTruocThietKe: order.anhXemTruocThietKe,
+        viTriIn: order.viTriIn,
+        phuongPhapIn: order.phuongPhapIn,
+      },
+    ];
 
   return (
     <div className="overflow-x-auto">
@@ -165,11 +168,12 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
                   <div className="flex items-center gap-2">
                     <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-border bg-surface-alt">
                       {imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <Image
                           src={imageUrl}
                           alt={item.tenSanPham}
                           className="h-full w-full object-cover"
+                          rootClassName="h-full w-full"
+                          preview={{ mask: "Xem ảnh" }}
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-xs text-text-muted">
@@ -179,7 +183,17 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
                     </div>
                     <div className="min-w-0">
                       <div className="truncate font-semibold text-text-main leading-tight">
-                        {item.tenSanPham}
+                        {item.loai === "custom_design" && item.designId ? (
+                          <Link
+                            href={`/admin/thiet-ke?designId=${item.designId}`}
+                            className="hover:text-primary-container hover:underline transition-colors"
+                            title="Xem chi tiết thiết kế của sản phẩm này"
+                          >
+                            {item.tenSanPham}
+                          </Link>
+                        ) : (
+                          item.tenSanPham
+                        )}
                       </div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-1">
                         {item.loai === "custom_design" ? (
@@ -238,9 +252,11 @@ function OnlinePaymentQrButton({ order }: { order: ChiTietDonHang }) {
   const gatewayName = payment.phuongThuc === "MOMO" ? "MoMo" : "VNPAY";
   const expiresAtMs = Date.parse(payment.expiresAt || "");
   const isCancelled = order.trangThai === "da_huy";
-  const isPaid = payment.status === "COMPLETED";
-  const isPending = payment.status === "PENDING";
-  const isFailed = payment.status === "FAILED";
+  // isPaid: dùng paymentStatus cấp đơn hàng (PAID = đơn đã thanh toán đủ)
+  const isPaid = order.thanhToan.status === "PAID";
+  const isPending = payment.transactionStatus === "PENDING";
+  // isFailed: dùng transactionStatus cấp giao dịch (FAILED hoặc CANCELLED)
+  const isFailed = payment.transactionStatus === "FAILED" || payment.transactionStatus === "CANCELLED";
   const isLegacyMomoPayment =
     payment.phuongThuc === "MOMO" && payment.requestType !== "payWithMethod";
   const qrCodeContent =
@@ -425,11 +441,10 @@ function OrderHistoryDrawer({ order }: { order: ChiTietDonHang }) {
             <div key={`${step.thoiGian}-${index}`} className="flex gap-3">
               <div className="flex flex-col items-center">
                 <span
-                  className={`mt-1 h-3 w-3 shrink-0 rounded-full border-2 ${
-                    step.laDangHienTai
+                  className={`mt-1 h-3 w-3 shrink-0 rounded-full border-2 ${step.laDangHienTai
                       ? "border-primary-container bg-primary-container"
                       : "border-border bg-white"
-                  }`}
+                    }`}
                 />
                 {index < order.thoiGianXuLy.length - 1 && (
                   <span className="mt-1 w-0.5 flex-1 bg-border" />
@@ -505,17 +520,19 @@ function OrderDetailContent({
               </span>
               <span className="text-text-muted">·</span>
               <span className={paymentState.className}>{paymentState.label}</span>
+              {/* Hiển thị nút QR khi: online payment, chưa thanh toán đủ, đơn chưa hủy.
+                  Bỏ điều kiện transactionStatus === PENDING vì component bên trong
+                  tự xử lý mọi trường hợp (PENDING→QR, FAILED/CANCELLED→nút tạo lại). */}
               {canManagePayment &&
-              isOnlinePayment &&
-              order.thanhToan.transactionStatus === "PENDING" &&
-              !isPaid &&
-              order.trangThai !== "da_huy" ? (
+                isOnlinePayment &&
+                !isPaid &&
+                order.trangThai !== "da_huy" ? (
                 <OnlinePaymentQrButton order={order} />
               ) : null}
               {isPaid ? (
                 <Tag color="green" className="m-0 text-xs">
                   <CheckCircleFilled className="mr-1" />
-                  Ghi nhận lúc {formatDateTime(order.thanhToan.paidAt)}
+                  Hoàn tất thanh toán lúc {formatDateTime(order.thanhToan.paidAt)}
                 </Tag>
               ) : null}
             </div>
@@ -535,12 +552,28 @@ function OrderDetailContent({
       {/* ── Lý do hủy (nếu có) ── */}
       {order.lyDoHuy ? (
         <div className="px-4 pt-3">
-          <Alert
-            showIcon
-            type="warning"
-            title="Lý do hủy đơn"
-            description={order.lyDoHuy}
-          />
+          {order.lyDoHuy.startsWith("[TECH_ADJUST]") ? (
+            <Alert
+              showIcon
+              type="error"
+              title={
+                <div className="flex items-center gap-2">
+                  <span>Lý do hủy đơn</span>
+                  <Tag color="magenta" className="m-0 border-0 font-bold">
+                    Điều chỉnh kỹ thuật
+                  </Tag>
+                </div>
+              }
+              description={order.lyDoHuy.replace("[TECH_ADJUST]", "").trim()}
+            />
+          ) : (
+            <Alert
+              showIcon
+              type="warning"
+              title="Lý do hủy đơn"
+              description={order.lyDoHuy}
+            />
+          )}
         </div>
       ) : null}
 
@@ -611,6 +644,7 @@ export default function OrderDetailRouteClient() {
   const [messageApi, messageContextHolder] = message.useMessage();
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [cancelType, setCancelType] = useState<"NORMAL" | "TECH_ADJUST">("NORMAL");
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [addrRecipientName, setAddrRecipientName] = useState("");
   const [addrPhone, setAddrPhone] = useState("");
@@ -663,6 +697,7 @@ export default function OrderDetailRouteClient() {
     onSuccess: async () => {
       setIsCancelModalOpen(false);
       setCancelReason("");
+      setCancelType("NORMAL");
       messageApi.success("Đã hủy đơn hàng thành công");
       await Promise.all([refreshOrderData(), refreshStockData()]);
     },
@@ -711,7 +746,7 @@ export default function OrderDetailRouteClient() {
             Quay lại danh sách
           </Button>
           <p className="text-xs text-text-secondary">
-            Xem thông tin đơn hàng hoặc tiếp tục thao tác.
+
           </p>
         </div>
 
@@ -798,14 +833,31 @@ export default function OrderDetailRouteClient() {
         onCancel={() => {
           setIsCancelModalOpen(false);
           setCancelReason("");
+          setCancelType("NORMAL");
         }}
         onOk={() => {
           if (trimmedCancelReason.length >= 5) {
-            cancelOrderMutation.mutate(trimmedCancelReason);
+            const finalReason =
+              cancelType === "TECH_ADJUST"
+                ? `[TECH_ADJUST] ${trimmedCancelReason}`
+                : trimmedCancelReason;
+            cancelOrderMutation.mutate(finalReason);
           }
         }}
       >
-        <p className="mb-2 text-sm font-semibold text-text-main">Lý do hủy</p>
+        <p className="mb-2 text-sm font-semibold text-text-main">Phân loại hủy</p>
+        <Radio.Group
+          className="mb-4"
+          value={cancelType}
+          onChange={(e) => setCancelType(e.target.value)}
+        >
+          <div className="flex flex-col gap-3">
+            <Radio value="NORMAL">Hủy do khách hàng / Thông thường</Radio>
+            <Radio value="TECH_ADJUST">Nhập lỗi / Điều chỉnh kỹ thuật</Radio>
+          </div>
+        </Radio.Group>
+
+        <p className="mb-2 text-sm font-semibold text-text-main">Lý do hủy chi tiết</p>
         <div className="pb-6">
           <Input.TextArea
             value={cancelReason}

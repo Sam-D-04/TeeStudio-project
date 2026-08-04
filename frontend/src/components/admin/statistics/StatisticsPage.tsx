@@ -11,6 +11,7 @@ import {
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import * as statisticsService from "@/services/admin/statisticsService";
 import StatisticsFilterBar from "./components/StatisticsFilterBar";
@@ -146,9 +147,15 @@ export default function StatisticsPage() {
   const reportMetrics: MetricItem[] = useMemo(() => {
     if (!chiSo) return [];
     const { soSanhKyTruoc: ss } = chiSo;
+    const start = chiSo.khoangThoiGian?.tuNgay;
+    const end = chiSo.khoangThoiGian?.denNgay;
 
     const pctDir = (pct: number): "up" | "down" | undefined =>
       pct > 0 ? "up" : pct < 0 ? "down" : undefined;
+
+    // Tạo query params ngày từ khoảng thời gian đang xem
+    const dateParams = start && end ? `&startDate=${start}&endDate=${end}` : "";
+    const completedDateParams = start && end ? `&startDate=${start}&endDate=${end}&dateField=completed` : "&dateField=completed";
 
     return [
       {
@@ -159,6 +166,7 @@ export default function StatisticsPage() {
         tone: "primary",
         direction: pctDir(ss.doanhThuPhanTram),
         directionLabel: formatPct(ss.doanhThuPhanTram),
+        href: `/admin/don-hang?status=hoan_tat${completedDateParams}`,
       },
       {
         label: "Số đơn hàng",
@@ -168,6 +176,7 @@ export default function StatisticsPage() {
         tone: "success",
         direction: pctDir(ss.soDonPhanTram),
         directionLabel: formatPct(ss.soDonPhanTram),
+        href: `/admin/don-hang?status=tat_ca${dateParams}`,
       },
       {
         label: "Sản phẩm bán ra",
@@ -177,6 +186,7 @@ export default function StatisticsPage() {
         tone: "accent",
         direction: pctDir(ss.soSanPhamPhanTram),
         directionLabel: formatPct(ss.soSanPhamPhanTram),
+        href: `/admin/don-hang?status=hoan_tat${completedDateParams}`,
       },
       {
         label: "Giá trị trung bình đơn",
@@ -186,6 +196,7 @@ export default function StatisticsPage() {
         tone: "warning",
         direction: pctDir(ss.giaTriTBDonPhanTram),
         directionLabel: formatPct(ss.giaTriTBDonPhanTram),
+        href: `/admin/don-hang?status=hoan_tat${completedDateParams}`,
       },
     ];
   }, [chiSo]);
@@ -193,7 +204,18 @@ export default function StatisticsPage() {
   // ── Xây dựng dữ liệu biểu đồ ─────────────────────────────────────────────
   const reconciliationMetrics = useMemo(() => {
     const data = chiSo?.doiSoatBaoCao;
+    const khoang = chiSo?.khoangThoiGian;
     if (!data) return [];
+
+    // Query params khoảng thời gian cho link điều hướng
+    const dateParams = khoang ? `&startDate=${khoang.tuNgay}&endDate=${khoang.denNgay}` : "";
+    const completedDateParams = khoang
+      ? `&startDate=${khoang.tuNgay}&endDate=${khoang.denNgay}&dateField=completed`
+      : "&dateField=completed";
+
+    const paidDateParams = khoang
+      ? `&startDate=${khoang.tuNgay}&endDate=${khoang.denNgay}&dateField=paid`
+      : "&dateField=paid";
 
     return [
       {
@@ -201,48 +223,56 @@ export default function StatisticsPage() {
         value: formatTien(data.doanhThuGhiNhanVnd),
         description: "Đơn COMPLETED và đã thanh toán đủ",
         tone: "text-primary-container",
+        href: `/admin/don-hang?status=hoan_tat&payment=da_thanh_toan${completedDateParams}`,
       },
       {
         label: "Tiền đã thu trong kỳ",
         value: formatTien(data.tienDaThuTrongKyVnd),
-        description: "Tổng tiền thực nhận từ các giao dịch đã hoàn tất",
+        description: "Tổng tiền thực nhận từ các giao dịch đã hoàn tất (bao gồm cả cọc)",
         tone: "text-success",
+        href: `/admin/thanh-toan?startDate=${khoang?.tuNgay ?? ""}&endDate=${khoang?.denNgay ?? ""}&dateField=paid`,
       },
       {
         label: "Dòng tiền COD đang treo",
         value: formatTien(data.dongTienCodDangTreoVnd),
         description: "Tiền COD chưa được kế toán xác nhận đối soát",
         tone: "text-warning",
+        href: `/admin/don-hang?payment=can_doi_soat${dateParams}`,
       },
       {
         label: "Tổng giá trị đơn hàng",
         value: formatTien(data.tongGiaTriDonHangVnd),
         description: "Tổng giá trị tất cả đơn phát sinh trong kỳ",
         tone: "text-text-main",
+        href: `/admin/don-hang?status=tat_ca${dateParams}`,
       },
       {
         label: "Đơn hoàn tất",
         value: data.soDonHoanTat.toLocaleString("vi-VN"),
         description: "Số đơn có trạng thái COMPLETED",
         tone: "text-success",
+        href: `/admin/don-hang?status=hoan_tat${completedDateParams}`,
       },
       {
         label: "Đơn đã thanh toán đủ",
         value: data.soDonDaThanhToanDu.toLocaleString("vi-VN"),
-        description: "Đơn có tổng tiền đã thu >= giá trị đơn",
+        description: "Đơn hàng mà shop đã thu đủ số tiền",
         tone: "text-primary-container",
+        href: `/admin/don-hang?status=hoan_tat&payment=da_thanh_toan${completedDateParams}`,
       },
       {
         label: "Đơn chờ đối soát COD",
         value: data.soDonChoDoiSoatCod.toLocaleString("vi-VN"),
         description: "Đơn còn khoản COD đang treo",
         tone: "text-warning",
+        href: `/admin/don-hang?payment=can_doi_soat${dateParams}`,
       },
       {
         label: "Tỷ lệ hủy đơn",
         value: formatTiLe(data.tyLeHuyDon),
         description: "Đơn CANCELLED / tổng đơn phát sinh",
         tone: data.tyLeHuyDon > 0 ? "text-red-600" : "text-success",
+        href: `/admin/don-hang?status=da_huy&excludeReason=TECH_ADJUST${dateParams}`,
       },
     ];
   }, [chiSo]);
@@ -256,6 +286,57 @@ export default function StatisticsPage() {
         orderCount: d.soDon,
       })),
     [bieuDo]
+  );
+
+  // ── Map phân bổ trạng thái đơn + thanh toán với href điều hướng ──────────
+  const phanBoDateParams = useMemo(() => {
+    const khoang = phanBo?.khoangThoiGian;
+    return khoang ? `&startDate=${khoang.tuNgay}&endDate=${khoang.denNgay}` : "";
+  }, [phanBo]);
+
+  // Map label trạng thái đơn → filter key
+  const STATUS_LABEL_TO_KEY: Record<string, string> = {
+    "Đang xử lý": "dang_xu_ly_in",
+    "Hoàn tất": "hoan_tat",
+    "Đang giao": "dang_giao",
+    "Đã hủy": "da_huy",
+  };
+
+  // Map label thanh toán → query params
+  const PAYMENT_LABEL_TO_PARAMS: Record<string, string> = {
+    "Đã thanh toán": "payment=da_thanh_toan",
+    "Chờ thanh toán": "payment=cho_thanh_toan",
+    "Thất bại / Hủy": "status=da_huy",
+  };
+
+  const trangThaiDonItems = useMemo(
+    () =>
+      (phanBo?.trangThaiDon ?? []).map((item) => {
+        const statusKey = STATUS_LABEL_TO_KEY[item.label];
+        return {
+          ...item,
+          href: statusKey
+            ? `/admin/don-hang?status=${statusKey}${phanBoDateParams}`
+            : undefined,
+        };
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [phanBo, phanBoDateParams]
+  );
+
+  const trangThaiThanhToanItems = useMemo(
+    () =>
+      (phanBo?.trangThaiThanhToan ?? []).map((item) => {
+        const paymentParams = PAYMENT_LABEL_TO_PARAMS[item.label];
+        return {
+          ...item,
+          href: paymentParams
+            ? `/admin/don-hang?${paymentParams}${phanBoDateParams}`
+            : undefined,
+        };
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [phanBo, phanBoDateParams]
   );
 
   // ── Xây dựng bảng top sản phẩm ───────────────────────────────────────────
@@ -356,15 +437,34 @@ export default function StatisticsPage() {
         ) : (
           <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 xl:grid-cols-4">
             {reconciliationMetrics.map((metric) => (
-              <div key={metric.label} className="min-w-0 p-4 sm:p-5">
-                <p className="text-xs font-medium text-text-secondary">{metric.label}</p>
-                <p className={`mt-2 truncate text-xl font-extrabold ${metric.tone}`}>
-                  {metric.value}
-                </p>
-                <p className="mt-2 text-xs leading-5 text-text-muted">
-                  {metric.description}
-                </p>
-              </div>
+              metric.href ? (
+                <Link
+                  key={metric.label}
+                  href={metric.href}
+                  className="group min-w-0 cursor-pointer p-4 transition-colors hover:bg-surface-alt sm:p-5"
+                >
+                  <p className="text-xs font-medium text-text-secondary">{metric.label}</p>
+                  <p className={`mt-2 truncate text-xl font-extrabold ${metric.tone}`}>
+                    {metric.value}
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-text-muted">
+                    {metric.description}
+                  </p>
+                  <p className="mt-1.5 text-[11px] font-medium text-text-muted opacity-0 transition-opacity group-hover:opacity-100">
+                    Xem danh sách →
+                  </p>
+                </Link>
+              ) : (
+                <div key={metric.label} className="min-w-0 p-4 sm:p-5">
+                  <p className="text-xs font-medium text-text-secondary">{metric.label}</p>
+                  <p className={`mt-2 truncate text-xl font-extrabold ${metric.tone}`}>
+                    {metric.value}
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-text-muted">
+                    {metric.description}
+                  </p>
+                </div>
+              )
             ))}
           </div>
         )}
@@ -417,7 +517,7 @@ export default function StatisticsPage() {
             </div>
           ) : (
             <DistributionPanel
-              items={phanBo?.trangThaiDon ?? []}
+              items={trangThaiDonItems}
               loading={loadingPhanBo}
             />
           )}
@@ -433,7 +533,7 @@ export default function StatisticsPage() {
             </div>
           ) : (
             <DistributionPanel
-              items={phanBo?.trangThaiThanhToan ?? []}
+              items={trangThaiThanhToanItems}
               loading={loadingPhanBo}
             />
           )}

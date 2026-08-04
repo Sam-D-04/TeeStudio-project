@@ -27,6 +27,9 @@ type PaymentFilterBarProps = {
   onDateChange: (startDate: string, endDate: string) => void;
   onDateClear: () => void;
 
+  dateField: string;
+  onDateFieldChange: (value: "created" | "paid") => void;
+
   // Nút đặt lại
   onReset: () => void;
 };
@@ -44,6 +47,8 @@ export default function PaymentFilterBar({
   initialEndDate,
   onDateChange,
   onDateClear,
+  dateField,
+  onDateFieldChange,
   onReset,
 }: PaymentFilterBarProps) {
   return (
@@ -121,6 +126,26 @@ export default function PaymentFilterBar({
               <option value="vnpay">VNPAY</option>
               <option value="momo">MoMo</option>
               <option value="cod">COD</option>
+            </select>
+            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-text-secondary">
+              ▾
+            </span>
+          </div>
+        </div>
+
+        {/* Select lọc theo loại ngày */}
+        <div className="w-full sm:w-auto">
+          <label className="mb-1 block text-xs font-bold uppercase text-text-secondary">
+            Loại ngày
+          </label>
+          <div className="relative">
+            <select
+              value={dateField}
+              onChange={(e) => onDateFieldChange(e.target.value as "created" | "paid")}
+              className="h-control-h w-full appearance-none rounded-lg border border-border bg-surface-alt pl-3 pr-8 text-sm text-text-main outline-none focus:border-primary-container sm:w-36"
+            >
+              <option value="created">Ngày tạo</option>
+              <option value="paid">Ngày thanh toán</option>
             </select>
             <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-text-secondary">
               ▾

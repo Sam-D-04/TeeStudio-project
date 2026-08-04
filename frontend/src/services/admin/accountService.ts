@@ -63,6 +63,22 @@ export type CapNhatTaiKhoanInput = {
   status?: TrangThaiTaiKhoan;
 };
 
+/** Địa chỉ khách hàng */
+export type UserAddress = {
+  id: number;
+  recipientName: string;
+  phone: string;
+  addressLine: string;
+  city: string;
+  district: string;
+  ward: string;
+};
+
+/** Chi tiết tài khoản khách hàng bao gồm địa chỉ */
+export type ChiTietTaiKhoanKhachHang = TaiKhoanKhachHang & {
+  addresses: UserAddress[];
+};
+
 // =====================================================================
 // CÁC HÀM GỌI API
 // =====================================================================
@@ -132,5 +148,19 @@ export async function voHieuHoaTaiKhoan(
     message: string;
     data: TaiKhoanKhachHang;
   }>(`/users/admin/customers/${id}/deactivate`, { targetStatus });
+  return res.data.data;
+}
+
+/**
+ * Lấy chi tiết thông tin khách hàng (bao gồm địa chỉ).
+ * GET /api/users/admin/customers/:id
+ */
+export async function layChiTietTaiKhoanKhachHang(
+  id: number
+): Promise<ChiTietTaiKhoanKhachHang> {
+  const res = await apiClient.get<{
+    success: boolean;
+    data: ChiTietTaiKhoanKhachHang;
+  }>(`/users/admin/customers/${id}`);
   return res.data.data;
 }

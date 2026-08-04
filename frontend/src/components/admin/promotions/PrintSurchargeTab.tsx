@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LoadingOutlined } from "@ant-design/icons";
-import { App, Button, Input, InputNumber, Modal, Space } from "antd";
+import { LoadingOutlined, PlusOutlined } from "@ant-design/icons";
+import { App, Button, Form, Input, InputNumber, Modal, Space } from "antd";
 import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import * as promotionService from "@/services/admin/promotionService";
 
@@ -17,6 +17,10 @@ function PrintSurchargeContent() {
 
   // State cho modal xác nhận tắt/bật
   const [toggleItem, setToggleItem] = useState<promotionService.PhuPhiBaoGia | null>(null);
+
+  // State cho modal thêm phương pháp in
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm] = Form.useForm();
 
   const query = useQuery({
     queryKey: ["admin-promotions", "surcharges"],
@@ -47,9 +51,43 @@ function PrintSurchargeContent() {
     onError: (error) => message.error(getApiErrorMessage(error)),
   });
 
-  const renderGroup = (title: string, items: promotionService.PhuPhiBaoGia[]) => (
+  const addMutation = useMutation({
+    mutationFn: promotionService.taoPhuongPhapIn,
+    onSuccess: () => {
+      message.success("Đã thêm phương pháp in mới");
+      setShowAddModal(false);
+      addForm.resetFields();
+      queryClient.invalidateQueries({ queryKey: ["admin-promotions", "surcharges"] });
+    },
+    onError: (error) => message.error(getApiErrorMessage(error)),
+  });
+
+  const renderGroup = (
+    title: string,
+    items: promotionService.PhuPhiBaoGia[],
+    showAdd?: boolean,
+  ) => (
     <section>
-      <h4 style={{ margin: "0 0 10px", fontSize: 13, color: "#475569" }}>{title}</h4>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 10,
+        }}
+      >
+        <h4 style={{ margin: 0, fontSize: 13, color: "#475569" }}>{title}</h4>
+        {showAdd && (
+          <Button
+            size="small"
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setShowAddModal(true)}
+          >
+            Thêm
+          </Button>
+        )}
+      </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {items.map((item) => (
           <div
@@ -151,7 +189,7 @@ function PrintSurchargeContent() {
       ) : (
         <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 24 }}>
           {renderGroup("Vị trí in", query.data?.viTriIn ?? [])}
-          {renderGroup("Phương pháp in", query.data?.phuongPhapIn ?? [])}
+          {renderGroup("Phương pháp in", query.data?.phuongPhapIn ?? [], true)}
         </div>
       )}
 
@@ -205,6 +243,63 @@ function PrintSurchargeContent() {
           <strong>{toggleItem?.dangBat ? "tắt" : "bật"}</strong> phụ phí{" "}
           <strong>{toggleItem?.ten}</strong> không?
         </p>
+      </Modal>
+
+      {/* Modal thêm phương pháp in */}
+      <Modal
+        title="Thêm phương pháp in"
+        open={showAddModal}
+        onOk={() => addForm.submit()}
+        onCancel={() => {
+          setShowAddModal(false);
+          addForm.resetFields();
+        }}
+        okText="Thêm"
+        cancelText="Hủy"
+        confirmLoading={addMutation.isPending}
+      >
+        <Form
+          form={addForm}
+          layout="vertical"
+          style={{ marginTop: 12 }}
+          onFinish={(values) =>
+            addMutation.mutate({
+              name: values.name,
+              code: values.code,
+              extraCost: values.extraCost ?? 0,
+            })
+          }
+        >
+          <Form.Item
+            label="Tên phương pháp in"
+            name="name"
+            rules={[{ required: true, message: "Nhập tên phương pháp in" }]}
+          >
+            <Input placeholder="Ví dụ: In Thêu" maxLength={100} />
+          </Form.Item>
+          <Form.Item
+            label="Mã (code)"
+            name="code"
+            rules={[
+              { required: true, message: "Nhập mã phương pháp in" },
+              { pattern: /^[A-Za-z0-9_]+$/, message: "Chỉ dùng chữ, số và dấu _" },
+            ]}
+          >
+            <Input
+              placeholder="Ví dụ: IN_THEU"
+              maxLength={50}
+              style={{ textTransform: "uppercase" }}
+            />
+          </Form.Item>
+          <Form.Item
+            label="Phụ phí (VNĐ/áo)"
+            name="extraCost"
+            initialValue={0}
+            rules={[{ required: true, message: "Nhập giá trị phụ phí" }]}
+          >
+            <InputNumber min={0} style={{ width: "100%" }} />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

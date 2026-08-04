@@ -383,12 +383,9 @@ async function layThongKe() {
     "SELECT COUNT(*) AS so_luong FROM CustomerOrder WHERE status IN ('PROCESSING', 'PRINTING')"
   );
 
-  // Đếm đơn chờ thanh toán: có Payment ở trạng thái PENDING
+  // Đếm đơn chờ thanh toán: có paymentStatus là PENDING
   const [rowsChoThanhToan] = await db.pool.query(
-    `SELECT COUNT(DISTINCT co.id) AS so_luong
-     FROM CustomerOrder co
-     JOIN Payment p ON p.orderId = co.id
-     WHERE p.status = 'PENDING'`
+    "SELECT COUNT(*) AS so_luong FROM CustomerOrder WHERE paymentStatus = 'PENDING'"
   );
 
   // Đếm đơn hoàn tất hôm nay
@@ -423,6 +420,8 @@ async function layDanhSachDonHang({
   loai,
   tuKhoa,
   excludeStatus,
+  excludeReason,
+  phuongThucThanhToan,
 }) {
   const trangHienTai = parseInt(trang) || 1;
   const soMoi = parseInt(soMoiTrang) || 10;
@@ -450,6 +449,11 @@ async function layDanhSachDonHang({
     dieuKien.push("co.status <> 'CANCELLED'");
   }
 
+  if (excludeReason) {
+    dieuKien.push("(co.cancelReason NOT LIKE ? OR co.cancelReason IS NULL)");
+    thamSo.push(`[${excludeReason}]%`);
+  }
+
   // Lọc theo thanh toán
   if (thanhToan === "da_thanh_toan") {
     dieuKien.push("co.paymentStatus = 'PAID'");
@@ -463,35 +467,69 @@ async function layDanhSachDonHang({
     );
   }
 
+  // Lọc theo phương thức thanh toán
+  if (phuongThucThanhToan && phuongThucThanhToan !== "tat_ca") {
+    if (phuongThucThanhToan === "COD") {
+      dieuKien.push("(p.paymentMethod = 'COD' OR p.paymentMethod IS NULL)");
+    } else {
+      dieuKien.push("p.paymentMethod = ?");
+      thamSo.push(phuongThucThanhToan);
+    }
+  }
+
   // Lọc theo thời gian. Ưu tiên khoảng ngày cụ thể từ RangePicker.
   const tuNgayHopLe = laNgayLocHopLe(tuNgay) ? tuNgay : null;
   const denNgayHopLe = laNgayLocHopLe(denNgay) ? denNgay : null;
   const cotNgay = kieuNgay === "ngay_hoan_tat" ? "co.updatedAt" : "co.createdAt";
-  if (tuNgayHopLe && denNgayHopLe) {
-    const [ngayBatDau, ngayKetThuc] =
-      tuNgayHopLe <= denNgayHopLe
-        ? [tuNgayHopLe, denNgayHopLe]
-        : [denNgayHopLe, tuNgayHopLe];
-
-    dieuKien.push(`${cotNgay} >= ? AND ${cotNgay} < DATE_ADD(?, INTERVAL 1 DAY)`);
-    thamSo.push(ngayBatDau, ngayKetThuc);
-  } else if (tuNgayHopLe) {
-    dieuKien.push(`${cotNgay} >= ?`);
-    thamSo.push(tuNgayHopLe);
-  } else if (denNgayHopLe) {
-    dieuKien.push(`${cotNgay} < DATE_ADD(?, INTERVAL 1 DAY)`);
-    thamSo.push(denNgayHopLe);
-  } else if (thoiGian === "hom_nay") {
-    dieuKien.push("DATE(co.createdAt) = CURDATE()");
-  } else if (thoiGian === "tuan_nay") {
-    dieuKien.push("YEARWEEK(co.createdAt, 1) = YEARWEEK(CURDATE(), 1)");
-  } else if (thoiGian === "thang_nay") {
-    dieuKien.push("MONTH(co.createdAt) = MONTH(CURDATE()) AND YEAR(co.createdAt) = YEAR(CURDATE())");
-  }
-
-  if (typeof gio === "string" && /^(?:[01]\d|2[0-3])$/.test(gio)) {
-    dieuKien.push(`DATE_FORMAT(${cotNgay}, '%H') = ?`);
-    thamSo.push(gio);
+  
+  if (kieuNgay === "ngay_thanh_toan") {
+    if (tuNgayHopLe && denNgayHopLe) {
+      const [ngayBatDau, ngayKetThuc] =
+        tuNgayHopLe <= denNgayHopLe
+          ? [tuNgayHopLe, denNgayHopLe]
+          : [denNgayHopLe, tuNgayHopLe];
+      dieuKien.push(`EXISTS (SELECT 1 FROM Payment pFilter WHERE pFilter.orderId = co.id AND pFilter.status = 'COMPLETED' AND pFilter.paymentType NOT IN ('REFUND', 'COMPENSATION') AND pFilter.paidAt >= ? AND pFilter.paidAt < DATE_ADD(?, INTERVAL 1 DAY))`);
+      thamSo.push(ngayBatDau, ngayKetThuc);
+    } else if (tuNgayHopLe) {
+      dieuKien.push(`EXISTS (SELECT 1 FROM Payment pFilter WHERE pFilter.orderId = co.id AND pFilter.status = 'COMPLETED' AND pFilter.paymentType NOT IN ('REFUND', 'COMPENSATION') AND pFilter.paidAt >= ?)`);
+      thamSo.push(tuNgayHopLe);
+    } else if (denNgayHopLe) {
+      dieuKien.push(`EXISTS (SELECT 1 FROM Payment pFilter WHERE pFilter.orderId = co.id AND pFilter.status = 'COMPLETED' AND pFilter.paymentType NOT IN ('REFUND', 'COMPENSATION') AND pFilter.paidAt < DATE_ADD(?, INTERVAL 1 DAY))`);
+      thamSo.push(denNgayHopLe);
+    } else if (thoiGian === "hom_nay") {
+      dieuKien.push("EXISTS (SELECT 1 FROM Payment pFilter WHERE pFilter.orderId = co.id AND pFilter.status = 'COMPLETED' AND pFilter.paymentType NOT IN ('REFUND', 'COMPENSATION') AND DATE(pFilter.paidAt) = CURDATE())");
+    } else if (thoiGian === "tuan_nay") {
+      dieuKien.push("EXISTS (SELECT 1 FROM Payment pFilter WHERE pFilter.orderId = co.id AND pFilter.status = 'COMPLETED' AND pFilter.paymentType NOT IN ('REFUND', 'COMPENSATION') AND YEARWEEK(pFilter.paidAt, 1) = YEARWEEK(CURDATE(), 1))");
+    } else if (thoiGian === "thang_nay") {
+      dieuKien.push("EXISTS (SELECT 1 FROM Payment pFilter WHERE pFilter.orderId = co.id AND pFilter.status = 'COMPLETED' AND pFilter.paymentType NOT IN ('REFUND', 'COMPENSATION') AND MONTH(pFilter.paidAt) = MONTH(CURDATE()) AND YEAR(pFilter.paidAt) = YEAR(CURDATE()))");
+    }
+  } else {
+    if (tuNgayHopLe && denNgayHopLe) {
+      const [ngayBatDau, ngayKetThuc] =
+        tuNgayHopLe <= denNgayHopLe
+          ? [tuNgayHopLe, denNgayHopLe]
+          : [denNgayHopLe, tuNgayHopLe];
+  
+      dieuKien.push(`${cotNgay} >= ? AND ${cotNgay} < DATE_ADD(?, INTERVAL 1 DAY)`);
+      thamSo.push(ngayBatDau, ngayKetThuc);
+    } else if (tuNgayHopLe) {
+      dieuKien.push(`${cotNgay} >= ?`);
+      thamSo.push(tuNgayHopLe);
+    } else if (denNgayHopLe) {
+      dieuKien.push(`${cotNgay} < DATE_ADD(?, INTERVAL 1 DAY)`);
+      thamSo.push(denNgayHopLe);
+    } else if (thoiGian === "hom_nay") {
+      dieuKien.push(`DATE(${cotNgay}) = CURDATE()`);
+    } else if (thoiGian === "tuan_nay") {
+      dieuKien.push(`YEARWEEK(${cotNgay}, 1) = YEARWEEK(CURDATE(), 1)`);
+    } else if (thoiGian === "thang_nay") {
+      dieuKien.push(`MONTH(${cotNgay}) = MONTH(CURDATE()) AND YEAR(${cotNgay}) = YEAR(CURDATE())`);
+    }
+    
+    if (typeof gio === "string" && /^(?:[01]\d|2[0-3])$/.test(gio)) {
+      dieuKien.push(`DATE_FORMAT(${cotNgay}, '%H') = ?`);
+      thamSo.push(gio);
+    }
   }
 
   // Lọc theo loại đơn (custom_design hay ao_mau)
@@ -628,7 +666,9 @@ async function layDanhSachDonHang({
       thanhToan: {
         phuongThuc: row.paymentMethod || "COD",
         loai: row.orderPaymentType || "FULL",
-        status: row.orderPaymentStatus || "PENDING",
+        status: row.transactionPaymentStatus === "PENDING_RECONCILIATION" 
+          ? "PENDING_RECONCILIATION" 
+          : (row.orderPaymentStatus || "PENDING"),
         transactionStatus: row.transactionPaymentStatus || null,
         daThanh: daThanh,
       },
@@ -791,7 +831,9 @@ async function layChiTietDonHang(id) {
       donHang.paymentStatus === "PAID"
         ? donHang.latestPaidAt || donHang.paidAt
         : donHang.paidAt,
-    status: donHang.paymentStatus || "PENDING",
+    status: donHang.transactionPaymentStatus === "PENDING_RECONCILIATION" 
+      ? "PENDING_RECONCILIATION" 
+      : (donHang.paymentStatus || "PENDING"),
     transactionStatus: donHang.transactionPaymentStatus || null,
     transactionId: donHang.transactionId || null,
     paymentUrl: isOnlinePayment ? gatewayResponse.paymentUrl || null : null,
@@ -994,7 +1036,7 @@ async function capNhatTrangThai(id, trangThaiFE, actor, shippingInfo = {}) {
       }
     }
 
-    if (trangThaiDB === "READY_TO_SHIP") {
+    if (trangThaiDB === "READY_TO_SHIP" && actor?.role !== "ADMIN") {
       const [rowsAoChuaInXong] = await conn.query(
         `SELECT COUNT(*) AS soLuong
          FROM OrderItem
@@ -1124,122 +1166,6 @@ async function capNhatTrangThai(id, trangThaiFE, actor, shippingInfo = {}) {
   return { id: Number(id), trangThai: trangThaiFE };
 }
 
-// =====================================================================
-// SERVICE 4.1: Yêu cầu chỉnh sửa thiết kế của đơn đang chờ xác nhận
-// =====================================================================
-async function yeuCauChinhSuaThietKeDonHang(id, ghiChu, actor) {
-  const noiDung = String(ghiChu || "").trim();
-  if (noiDung.length < 5) {
-    throw taoLoiCoStatus("Ghi chú yêu cầu chỉnh sửa phải có ít nhất 5 ký tự", 400);
-  }
-
-  // --- TRANSACTION: cập nhật DB (giữ nguyên logic hiện tại) ---
-  const result = await db.transaction(async (conn) => {
-    const [rowsDonHang] = await conn.query(
-      `SELECT id, status
-       FROM CustomerOrder
-       WHERE id = ?
-       LIMIT 1
-       FOR UPDATE`,
-      [id]
-    );
-    if (rowsDonHang.length === 0) {
-      throw taoLoiCoStatus("Không tìm thấy đơn hàng", 404);
-    }
-    if (rowsDonHang[0].status !== "PENDING") {
-      throw taoLoiCoStatus(
-        "Chỉ có thể yêu cầu chỉnh sửa thiết kế khi đơn đang ở trạng thái Chờ xác nhận",
-        400
-      );
-    }
-
-    const [rowsThietKe] = await conn.query(
-      `SELECT cd.id
-       FROM OrderItem oi
-       JOIN CustomDesign cd ON cd.id = oi.designId
-       WHERE oi.orderId = ?
-       FOR UPDATE`,
-      [id]
-    );
-    if (rowsThietKe.length === 0) {
-      throw taoLoiCoStatus("Đơn hàng không có thiết kế để yêu cầu chỉnh sửa", 400);
-    }
-
-    const designIds = [...new Set(rowsThietKe.map((row) => row.id))];
-    await conn.query(
-      `UPDATE CustomDesign
-       SET status = 'NEEDS_REVISION', adminNote = ?
-       WHERE id IN (?)`,
-      [noiDung, designIds]
-    );
-    await conn.query(
-      `UPDATE OrderItem
-       SET productionStatus = 'WAITING_DESIGN_APPROVAL'
-       WHERE orderId = ? AND designId IS NOT NULL`,
-      [id]
-    );
-    // Dữ liệu cũ có thể đã tạo hàng chờ in sớm. Loại bỏ để đơn PENDING
-    // không xuất hiện trong danh sách sản xuất.
-    await conn.query(
-      `DELETE op
-       FROM OrderProduction op
-       JOIN OrderItem oi ON oi.id = op.orderItemId
-       WHERE oi.orderId = ?`,
-      [id]
-    );
-
-    await ghiOrderHistory(conn, {
-      orderId: Number(id),
-      fromStatus: "PENDING",
-      toStatus: "PENDING",
-      action: "DESIGN_REVISION_REQUESTED",
-      actor,
-      note: `Yêu cầu khách chỉnh sửa thiết kế: ${noiDung}`,
-    });
-
-    return {
-      id: Number(id),
-      trangThai: "cho_xac_nhan",
-      designIds,
-      designStatus: "NEEDS_REVISION",
-      ghiChu: noiDung,
-    };
-  });
-
-  // --- GỬi EMAIL (ngoài transaction, sau khi commit thành công) ---
-  // Không dùng await ở đây để không block response; lỗi ghi ra console, không throw.
-  try {
-    const [rowsKhach] = await db.pool.query(
-      `SELECT a.email, a.fullName
-       FROM CustomerOrder co
-       JOIN Account a ON a.id = co.userId
-       WHERE co.id = ?
-       LIMIT 1`,
-      [id]
-    );
-    const emailKhach = rowsKhach[0]?.email;
-    const tenKhach = rowsKhach[0]?.fullName || "Khách hàng";
-
-    if (emailKhach && result.designIds?.length > 0) {
-      for (const designId of result.designIds) {
-        const maThietKe = `TK-${String(designId).padStart(4, "0")}`;
-        sendDesignRevisionEmail({
-          to: emailKhach,
-          fullName: tenKhach,
-          maThietKe,
-          ghiChu: noiDung,
-        }).catch((err) =>
-          console.error("Lỗi gửi email yêu cầu chỉnh sửa thiết kế (đơn hàng):", err?.message)
-        );
-      }
-    }
-  } catch (emailQueryErr) {
-    // Lỗi query lấy email không được làm hỏng kết quả nghiệp vụ đã hoàn thành
-    console.error("Lỗi khi truy vấn email để gửi thông báo chỉnh sửa:", emailQueryErr.message);
-  }
-
-  return result;
-}
 
 // =====================================================================
 // SERVICE 5: Hủy đơn hàng
@@ -1444,7 +1370,7 @@ async function taoLaiMaThanhToanOnline(id, actor, ipAddress) {
     const [rows] = await conn.query(
       `SELECT
          co.id,
-         co.orderCode,
+         co.orderCode AS orderCode,
          co.status AS orderStatus,
          p.id AS paymentId,
          p.amount,
@@ -1568,7 +1494,6 @@ module.exports = {
   layDanhSachDonHang,
   layChiTietDonHang,
   capNhatTrangThai,
-  yeuCauChinhSuaThietKeDonHang,
   huyDonHang,
   capNhatDiaChiGiaoHang,
   taoLaiMaThanhToanOnline,
@@ -1738,7 +1663,8 @@ async function timKiemThietKe(userId, keyword) {
 
   const [rows] = await db.pool.query(
     `SELECT cd.id, cd.productId, cd.variantId, cd.baseColor,
-            cd.previewUrl, cd.designFee, cd.status, cd.createdAt,
+            cd.previewUrl, cd.designFee, cd.status, cd.createdAt, cd.name AS tenThietKe,
+            (SELECT IFNULL(SUM(extraCost), 0) FROM DesignPrintMethod dpm WHERE dpm.designId = cd.id) AS phiInAn,
             p.name AS tenSanPham, p.basePrice, p.material, p.form,
             pi.imageUrl AS anhUrl,
             pv.color AS mauSanPham
@@ -1783,10 +1709,12 @@ async function timKiemThietKe(userId, keyword) {
     productId: r.productId,
     variantId: r.variantId,
     tenSanPham: r.tenSanPham,
+    tenThietKe: r.tenThietKe,
     mauNen: r.baseColor,
     mauSanPham: r.mauSanPham || r.baseColor,
     anhXemTruoc: r.previewUrl,
     phiThietKe: Number(r.designFee),
+    phiInAn: Number(r.phiInAn || 0),
     trangThai: r.status,
     ngayTao: r.createdAt,
     sanPham: {
@@ -1907,6 +1835,8 @@ async function taoMoiDonHang(data, actor, ipAddress) {
 
   // 1c. Validate từng item: variant tồn tại + đủ tồn kho
   const itemsEnriched = []; // sẽ chứa thông tin đầy đủ để tính giá
+  const qtyByProductId = {};
+  const variantDataMap = new Map();
 
   for (const item of items) {
     const [rowsVariant] = await db.pool.query(
@@ -1937,15 +1867,23 @@ async function taoMoiDonHang(data, actor, ipAddress) {
       throw err;
     }
 
+    qtyByProductId[variant.productId] = (qtyByProductId[variant.productId] || 0) + item.quantity;
+    variantDataMap.set(item, variant);
+  }
+
+  for (const item of items) {
+    const variant = variantDataMap.get(item);
+
     // ── Tính đơn giá theo BulkPricing ──
-    // Chọn mức BulkPricing có minQty lớn nhất nhưng <= quantity của item này
+    // Chọn mức BulkPricing dựa trên tổng số lượng của sản phẩm trong đơn
+    const totalProductQty = qtyByProductId[variant.productId];
     const [rowsBulk] = await db.pool.query(
       `SELECT discountPercent
        FROM BulkPricing
        WHERE productId = ? AND minQty <= ?
        ORDER BY minQty DESC
        LIMIT 1`,
-      [variant.productId, item.quantity]
+      [variant.productId, totalProductQty]
     );
 
     let unitPrice;
@@ -1979,12 +1917,14 @@ async function taoMoiDonHang(data, actor, ipAddress) {
   // admin thêm nhiều dòng cùng trỏ tới 1 designId (VD: tách theo size), tránh
   // upload trùng ảnh giống hệt nhau lên Cloudinary.
   const designIdsDaUploadAnh = new Set();
+  const uniqueDesignIdsFee = new Set();
   for (const enriched of itemsEnriched) {
     if (!enriched.designId) continue;
 
     const [rowsDesign] = await db.pool.query(
       `SELECT cd.id, cd.userId AS designUserId, cd.productId, cd.variantId,
               cd.baseColor, cd.designFee, cd.status, cd.previewUrl,
+              (SELECT IFNULL(SUM(extraCost), 0) FROM DesignPrintMethod dpm WHERE dpm.designId = cd.id) AS phiInAn,
               pv.color AS designColor
        FROM CustomDesign cd
        LEFT JOIN ProductVariant pv ON pv.id = cd.variantId
@@ -2048,7 +1988,15 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     }
 
     // Gán designFee và trạng thái thiết kế từ DB
-    enriched.designFee = Number(design.designFee);
+    if (!uniqueDesignIdsFee.has(enriched.designId)) {
+      enriched.designFee = Number(design.designFee);
+      uniqueDesignIdsFee.add(enriched.designId);
+    } else {
+      enriched.designFee = 0;
+    }
+    enriched.printFee = Number(design.phiInAn || 0);
+    // Tính printFee vào unitPrice để lưu vào OrderItem và tính lineTotal, subtotal tự động
+    enriched.unitPrice += enriched.printFee;
     enriched.designStatus = design.status;
 
     // Upload ảnh in print-ready lên Cloudinary rồi lưu URL vào CustomDesign.printFileUrlFront.
@@ -2361,7 +2309,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
        VALUES (?, ?, ?, ?, 'PENDING', ?, ?)`,
         [
           orderId,
-          paymentAmount,
+          paymentMethod === 'COD' ? codAmount : paymentAmount,
           paymentMethod,
           paymentTypeDb,
           onlinePayment?.transactionRef || null,

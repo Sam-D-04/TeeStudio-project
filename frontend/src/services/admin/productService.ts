@@ -134,6 +134,8 @@ export type ThamSoLocSanPham = {
   danhMuc?: string;
   trangThai?: string;
   tonKho?: "tat_ca" | "ban_chay" | "con_hang" | "sap_het" | "het_hang";
+  tuNgay?: string;
+  denNgay?: string;
 };
 
 /** Payload tạo phôi áo mới */
@@ -236,6 +238,8 @@ export async function layDanhSachSanPham(
   if (thamSo.danhMuc && thamSo.danhMuc.trim()) params.danhMuc = thamSo.danhMuc.trim();
   if (thamSo.trangThai && thamSo.trangThai.trim()) params.trangThai = thamSo.trangThai.trim();
   if (thamSo.tonKho && thamSo.tonKho !== "tat_ca") params.tonKho = thamSo.tonKho;
+  if (thamSo.tuNgay) params.tuNgay = thamSo.tuNgay;
+  if (thamSo.denNgay) params.denNgay = thamSo.denNgay;
 
   const res = await apiClient.get<{
     success: boolean;

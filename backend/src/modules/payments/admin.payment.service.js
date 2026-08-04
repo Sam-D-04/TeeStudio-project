@@ -393,12 +393,11 @@ async function layThongKeThanhToan() {
        AND DATE(paidAt) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`
   );
 
-  // Giao dịch online đang chờ thanh toán (VNPAY/MOMO PENDING)
+  // Giao dịch đang chờ thanh toán (PENDING)
   const [choThanhToanRows] = await db.pool.query(
     `SELECT COUNT(*) AS soLuong
      FROM Payment
-     WHERE status = 'PENDING'
-       AND paymentMethod IN ('VNPAY', 'MOMO')`
+     WHERE status = 'PENDING'`
   );
 
   // Giao dịch COD đã giao hàng, đang chờ kế toán đối soát
@@ -499,6 +498,7 @@ async function layDanhSachThanhToan(queryParams) {
   const danhSach = rows.map((row) => ({
     id: row.id,
     payCode: formatPayCode(row.id),
+    orderId: row.orderId,
     orderCode: row.orderCode,
     customerName: row.customerName,
     amountVnd: Number(row.amount),
@@ -548,6 +548,7 @@ async function layChiTietThanhToan(id) {
        co.orderCode,
        co.totalAmount,
        co.codAmount,
+       co.deliveredAt,
        co.createdAt AS orderCreatedAt,
        co.paymentType AS orderPaymentType,
        co.paymentStatus AS orderPaymentStatus,
@@ -575,6 +576,7 @@ async function layChiTietThanhToan(id) {
   return {
     id: row.id,
     payCode: formatPayCode(row.id),
+    orderId: row.orderId,
     orderCode: row.orderCode,
     customerName: row.customerName,
     customerPhone: row.customerPhone || null,
@@ -647,7 +649,9 @@ function buildIpnHistory(paymentRow) {
         : gwData.source === "query";
       const isReturn = !isVnpay && gwData.source === "return";
       const responseCode = isVnpay
-        ? String(gwData.vnp_ResponseCode || "N/A")
+        ? (gwData.vnp_TransactionStatus && gwData.vnp_TransactionStatus !== gwData.vnp_ResponseCode
+            ? `${gwData.vnp_ResponseCode} (Lỗi GD: ${gwData.vnp_TransactionStatus})`
+            : String(gwData.vnp_ResponseCode || "N/A"))
         : String(gwData.resultCode ?? "N/A");
       const isSuccess = isVnpay
         ? gwData.vnp_ResponseCode === "00" &&
@@ -673,6 +677,19 @@ function buildIpnHistory(paymentRow) {
         isSuccess,
       });
     }
+  }
+
+  // Lịch sử chờ đối soát cho COD
+  if (
+    paymentRow.paymentMethod === PAYMENT_METHOD.COD &&
+    (paymentRow.status === PAYMENT_STATUS.PENDING_RECONCILIATION || paymentRow.status === PAYMENT_STATUS.COMPLETED)
+  ) {
+    steps.push({
+      description: "Chờ kế toán đối soát COD",
+      time: formatDateVn(paymentRow.deliveredAt) || "",
+      note: "Shipper đã giao hàng thành công",
+      isSuccess: false,
+    });
   }
 
   // Nếu đã thanh toán thành công

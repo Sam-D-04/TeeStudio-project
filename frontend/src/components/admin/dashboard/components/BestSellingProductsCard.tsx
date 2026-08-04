@@ -12,6 +12,7 @@ export type BestSellingProduct = {
 
 type BestSellingProductsCardProps = {
   products: BestSellingProduct[];
+  dateRange?: { startDate: string; endDate: string };
 };
 
 /** Định dạng số tiền VND có dấu chấm ngàn */
@@ -21,7 +22,16 @@ function formatTienVnd(amount: number): string {
 
 export default function BestSellingProductsCard({
   products,
+  dateRange,
 }: BestSellingProductsCardProps) {
+  const queryParams = new URLSearchParams();
+  queryParams.set("stock", "ban_chay");
+  if (dateRange?.startDate && dateRange?.endDate) {
+    queryParams.set("from", dateRange.startDate);
+    queryParams.set("to", dateRange.endDate);
+  }
+  const href = `/admin/san-pham-phoi-ao?${queryParams.toString()}`;
+
   return (
     <section className="admin-card p-6">
       <div className="mb-4 flex items-center justify-between gap-4">
@@ -31,7 +41,7 @@ export default function BestSellingProductsCard({
             : "Sản phẩm bán chạy nhất"}
         </h3>
         <Link
-          href="/admin/san-pham-phoi-ao"
+          href={href}
           className="text-sm font-medium text-primary-container hover:underline"
         >
           Xem tất cả

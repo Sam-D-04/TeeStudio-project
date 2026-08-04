@@ -33,8 +33,8 @@ function hasCustomDesignOrder(order?: ChiTietDonHang | null) {
 
   return Boolean(
     order.items?.some((item) => item.loai === "custom_design" || Boolean(item.designId)) ||
-      order.sanPham?.loai === "custom_design" ||
-      order.anhXemTruocThietKe
+    order.sanPham?.loai === "custom_design" ||
+    order.anhXemTruocThietKe
   );
 }
 
@@ -45,8 +45,9 @@ function areAllCustomItemsPrinted(order?: ChiTietDonHang | null) {
   );
 }
 
-function getProductionStatusBlockReason(order?: ChiTietDonHang | null) {
+function getProductionStatusBlockReason(order?: ChiTietDonHang | null, isAdmin = false) {
   if (!order || order.trangThai !== "dang_xu_ly_in") return null;
+  if (isAdmin) return null; // Admin được quyền bypass chặn trạng thái in ấn
 
   const itemsChuaInXong = order.items?.filter(
     (item) => Boolean(item.designId) && !["PRINTED", "PACKED"].includes(item.productionStatus || "")
@@ -86,7 +87,7 @@ function getAllowedNextStatuses(order?: ChiTietDonHang | null, isAdmin = false) 
     return ["cho_giao"];
   }
 
-  if (order.trangThai === "dang_xu_ly_in" && !areAllCustomItemsPrinted(order)) {
+  if (order.trangThai === "dang_xu_ly_in" && !areAllCustomItemsPrinted(order) && !isAdmin) {
     return [];
   }
 
@@ -103,8 +104,8 @@ function getApiErrorMessage(error: unknown) {
 function isCodWaitingForDeliveryReconciliation(order?: ChiTietDonHang | null) {
   return Boolean(
     order &&
-      order.thanhToan.phuongThuc === "COD" &&
-      order.thanhToan.status === "PENDING"
+    order.thanhToan.phuongThuc === "COD" &&
+    order.thanhToan.status === "PENDING"
   );
 }
 
@@ -142,12 +143,10 @@ export default function UpdateOrderStatusModal({
   const currentUser = useAuthStore((state) => state.user);
   const [messageApi, messageContextHolder] = message.useMessage();
   const [modal, modalContextHolder] = Modal.useModal();
-  
+
   const [newStatus, setNewStatus] = useState("");
   const [shippingCarrier, setShippingCarrier] = useState<string | undefined>(undefined);
   const [trackingCode, setTrackingCode] = useState("");
-  const [showRevisionInput, setShowRevisionInput] = useState(false);
-  const [revisionNote, setRevisionNote] = useState("");
 
   const { data: order, isLoading } = useQuery({
     queryKey: ["admin-order-detail", orderId],
@@ -160,14 +159,14 @@ export default function UpdateOrderStatusModal({
     paymentType: order?.thanhToan.loai,
     status: order?.thanhToan.status,
   });
-  const productionStatusBlockReason = getProductionStatusBlockReason(order);
+  const productionStatusBlockReason = getProductionStatusBlockReason(order, isAdmin);
   const canManageDesignRevision = isAdmin;
   const canRequestDesignRevision =
     canManageDesignRevision &&
     order?.trangThai === "cho_xac_nhan" &&
     hasCustomDesignOrder(order);
-  const designIdToReview =
-    order?.items?.find((item) => Boolean(item.designId))?.designId ?? null;
+  const hasDesignRecords =
+    order?.items?.some((item) => Boolean(item.designId)) ?? false;
 
   const updateStatusMutation = useMutation({
     mutationFn: (payload: { trangThai: string; shippingCarrier?: string; trackingCode?: string }) =>
@@ -200,26 +199,6 @@ export default function UpdateOrderStatusModal({
     },
   });
 
-  const requestRevisionMutation = useMutation({
-    mutationFn: () =>
-      orderService.yeuCauChinhSuaThietKeDonHang(orderId!, revisionNote.trim()),
-    onSuccess: async () => {
-      setRevisionNote("");
-      setShowRevisionInput(false);
-      messageApi.success("Đã gửi yêu cầu khách chỉnh sửa thiết kế");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["admin-order-detail", orderId] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["thiet-ke-danh-sach"] }),
-        queryClient.invalidateQueries({ queryKey: ["thiet-ke-thong-ke"] }),
-      ]);
-      onClose();
-    },
-    onError: (mutationError) => {
-      messageApi.error(getApiErrorMessage(mutationError));
-    },
-  });
-
   return (
     <>
       {messageContextHolder}
@@ -230,14 +209,12 @@ export default function UpdateOrderStatusModal({
         okText="Xác nhận"
         cancelText="Đóng"
         confirmLoading={updateStatusMutation.isPending || isLoading}
-        okButtonProps={{ disabled: !newStatus || isLoading || isStateLocked || showRevisionInput }}
+        okButtonProps={{ disabled: !newStatus || isLoading || isStateLocked }}
         mask={{ closable: true }}
         onCancel={() => {
           setNewStatus("");
           setShippingCarrier(undefined);
           setTrackingCode("");
-          setShowRevisionInput(false);
-          setRevisionNote("");
           onClose();
         }}
         onOk={() => {
@@ -260,6 +237,16 @@ export default function UpdateOrderStatusModal({
               "Không thể hoàn tất: khoản thanh toán của đơn hàng chưa ở trạng thái hợp lệ."
             );
             return;
+          }
+
+          if (newStatus === "da_xac_nhan") {
+            const hasNeedsRevisionDesign = order?.items?.some(
+              (item) => item.designStatus === "NEEDS_REVISION"
+            );
+            if (hasNeedsRevisionDesign) {
+              messageApi.error("Không thể duyệt nhanh. Có bản thiết kế đang chờ khách sửa.");
+              return;
+            }
           }
 
           const performUpdate = () => {
@@ -327,58 +314,17 @@ export default function UpdateOrderStatusModal({
                   title="Đơn hàng có thiết kế khách hàng"
                   description="Khi chuyển đơn sang Đã xác nhận, hệ thống sẽ tự duyệt thiết kế và đưa sản phẩm vào hàng chờ in. Nếu mẫu chưa đạt, hãy yêu cầu khách chỉnh sửa trước."
                 />
-                {designIdToReview ? (
+                {hasDesignRecords ? (
                   <Button
-                    className="mb-3"
                     type="primary"
                     icon={<EyeOutlined />}
                     onClick={() =>
-                      router.push(`/admin/thiet-ke?designId=${designIdToReview}`)
+                      router.push(`/admin/thiet-ke?orderId=${orderId}`)
                     }
                   >
                     Xem thiết kế
                   </Button>
                 ) : null}
-                {!showRevisionInput ? (
-                  <Button danger onClick={() => setShowRevisionInput(true)}>
-                    Yêu cầu chỉnh sửa thiết kế
-                  </Button>
-                ) : (
-                  <div className="space-y-3">
-                    <div>
-                      <p className="mb-1 text-sm font-semibold text-text-main">
-                        Ghi chú cho khách hàng <span className="text-red-500">*</span>
-                      </p>
-                      <Input.TextArea
-                        value={revisionNote}
-                        rows={4}
-                        maxLength={1000}
-                        showCount
-                        placeholder="Mô tả cụ thể nội dung khách hàng cần chỉnh sửa..."
-                        onChange={(event) => setRevisionNote(event.target.value)}
-                      />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        onClick={() => {
-                          setShowRevisionInput(false);
-                          setRevisionNote("");
-                        }}
-                      >
-                        Hủy
-                      </Button>
-                      <Button
-                        danger
-                        type="primary"
-                        loading={requestRevisionMutation.isPending}
-                        disabled={revisionNote.trim().length < 5}
-                        onClick={() => requestRevisionMutation.mutate()}
-                      >
-                        Gửi yêu cầu
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
             ) : null}
             <p className="mb-2 text-sm font-semibold text-text-main">Trạng thái mới</p>

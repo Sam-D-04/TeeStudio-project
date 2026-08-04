@@ -69,11 +69,11 @@ const getThietKeCanXuLy = async (req, res, next) => {
 /**
  * GET /api/admin/dashboard/ton-kho-canh-bao
  * Trả về danh sách variant tồn kho thấp.
- * Query params: nguong (số nguyên, mặc định 15)
+ * Query params: nguong (số nguyên, mặc định 50)
  */
 const getTonKhoCanhBao = async (req, res, next) => {
   try {
-    const nguong = parseInt(req.query.nguong) || 15;
+    const nguong = parseInt(req.query.nguong) || 50;
     const limit = parseInt(req.query.limit) || 10;
 
     if (nguong < 0 || nguong > 10000) {

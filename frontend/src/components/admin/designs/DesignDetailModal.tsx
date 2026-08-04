@@ -10,7 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Image, Input, Modal, Skeleton, message } from "antd";
 import { isAxiosError } from "axios";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import * as designService from "@/services/admin/designService";
 import DesignStatusBadge from "./DesignStatusBadge";
 
@@ -112,16 +112,29 @@ export default function DesignDetailModal({
     staleTime: 30_000,
   });
 
+  useEffect(() => {
+    if (open && data?.trangThai === "can_chinh_sua" && data?.ghiChu) {
+      setRevisionNote(data.ghiChu);
+    } else if (!open) {
+      setRevisionNote("");
+    }
+  }, [open, data?.trangThai, data?.ghiChu]);
+
   const requestRevisionMutation = useMutation({
     mutationFn: () =>
       designService.yeuCauChinhSuaThietKe(designId!, revisionNote.trim()),
     onSuccess: async () => {
-      messageApi.success("Đã gửi yêu cầu chỉnh sửa thiết kế đến khách hàng");
+      messageApi.success(
+        data?.trangThai === "can_chinh_sua"
+          ? "Đã cập nhật yêu cầu chỉnh sửa thiết kế"
+          : "Đã gửi yêu cầu chỉnh sửa thiết kế đến khách hàng"
+      );
       setRevisionNote("");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["thiet-ke-chi-tiet", designId] }),
         queryClient.invalidateQueries({ queryKey: ["thiet-ke-danh-sach"] }),
         queryClient.invalidateQueries({ queryKey: ["thiet-ke-thong-ke"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-order-detail"] }),
       ]);
     },
     onError: (error) => {
@@ -138,6 +151,7 @@ export default function DesignDetailModal({
         queryClient.invalidateQueries({ queryKey: ["thiet-ke-chi-tiet", designId] }),
         queryClient.invalidateQueries({ queryKey: ["thiet-ke-danh-sach"] }),
         queryClient.invalidateQueries({ queryKey: ["thiet-ke-thong-ke"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-order-detail"] }),
       ]);
     },
     onError: (error) => {
@@ -277,9 +291,10 @@ export default function DesignDetailModal({
 
                 <Section title="Sản phẩm và biến thể">
                   <div className="grid gap-x-5 gap-y-3 sm:grid-cols-3">
-                    <Field label="Sản phẩm" value={data.tenSanPham} wide />
+                    <Field label="Sản phẩm" value={data.tenSanPham} />
                     <Field label="ID sản phẩm" value={data.productId || data.sanPhamId} />
                     <Field label="ID biến thể" value={data.variantId || <EmptyValue />} />
+                    <Field label="SKU" value={data.skuAo || <EmptyValue />} />
                     <Field label="Size" value={data.sizeAo || <EmptyValue />} />
                     <Field
                       label="Màu áo"
@@ -295,7 +310,6 @@ export default function DesignDetailModal({
                         </span>
                       }
                     />
-                    <Field label="SKU" value={data.skuAo || <EmptyValue />} />
                     <Field
                       label="Tồn biến thể"
                       value={
@@ -306,6 +320,8 @@ export default function DesignDetailModal({
                     />
                     <Field label="Vị trí in" value={data.viTriIn || <EmptyValue />} />
                     <Field label="Phí vị trí" value={formatCurrency(data.phiViTriIn)} />
+                    <Field label="Phương pháp in" value={data.phuongPhapIn || <EmptyValue />} />
+                    <Field label="Phí PP in" value={formatCurrency(data.phiPhuongPhapIn)} />
                     <Field label="Phí thiết kế" value={formatCurrency(data.phiThietKe)} />
                   </div>
                 </Section>
@@ -368,69 +384,70 @@ export default function DesignDetailModal({
 
                 {canApproveDesign ? (
                   <Section title="Xử lý thiết kế">
-                    <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
-                      <div>
-                        <Button
-                          type="primary"
-                          icon={<CheckOutlined />}
-                          loading={approveMutation.isPending}
-                          disabled={requestRevisionMutation.isPending}
-                          onClick={() => {
-                            modalApi.confirm({
-                              title: `Duyệt thiết kế ${data.maThietKe}?`,
-                              content:
-                                "Thiết kế sẽ chuyển sang trạng thái Đã duyệt. Sản phẩm chỉ được đưa vào hàng chờ in sau khi đơn hàng được xác nhận.",
-                              okText: "Duyệt thiết kế",
-                              cancelText: "Hủy",
-                              onOk: () => approveMutation.mutateAsync(),
-                            });
-                          }}
-                          block
-                        >
-                          Duyệt thiết kế
-                        </Button>
-                        {data.trangThai === "can_chinh_sua" ? (
-                          <p className="mb-0 mt-2 text-xs leading-5 text-text-secondary">
-                            Kiểm tra bản khách đã chỉnh sửa trước khi duyệt.
-                          </p>
-                        ) : null}
+                    <div className="min-w-0">
+                      <div className="design-revision-note-field">
+                        <Input.TextArea
+                          value={revisionNote}
+                          rows={3}
+                          maxLength={1000}
+                          showCount
+                          placeholder="Nhập nội dung cần khách chỉnh sửa..."
+                          disabled={requestRevisionMutation.isPending || approveMutation.isPending}
+                          onChange={(event) => setRevisionNote(event.target.value)}
+                        />
                       </div>
-
-                      {data.trangThai === "cho_kiem_tra" ? (
-                        <div className="min-w-0">
-                          <div className="design-revision-note-field">
-                            <Input.TextArea
-                              value={revisionNote}
-                              rows={3}
-                              maxLength={1000}
-                              showCount
-                              placeholder="Nhập nội dung cần khách chỉnh sửa..."
-                              disabled={requestRevisionMutation.isPending || approveMutation.isPending}
-                              onChange={(event) => setRevisionNote(event.target.value)}
-                            />
-                          </div>
-                          <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-                            {trimmedRevisionNote.length > 0 && trimmedRevisionNote.length < 5 ? (
-                              <span className="text-xs font-medium text-red-600">
-                                Ghi chú cần có ít nhất 5 ký tự.
-                              </span>
-                            ) : null}
-                            <Button
-                              danger
-                              icon={<EditOutlined />}
-                              loading={requestRevisionMutation.isPending}
-                              disabled={trimmedRevisionNote.length < 5 || approveMutation.isPending}
-                              onClick={() => requestRevisionMutation.mutate()}
-                            >
-                              Yêu cầu chỉnh sửa
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="m-0 text-sm leading-6 text-text-secondary">
-                          Ghi chú yêu cầu chỉnh sửa được hiển thị ở phần trên để đối chiếu.
+                      
+                      {data.trangThai === "can_chinh_sua" ? (
+                        <p className="mb-0 mt-2 text-xs leading-5 text-text-secondary">
+                          Kiểm tra bản khách đã chỉnh sửa trước khi duyệt.
                         </p>
-                      )}
+                      ) : null}
+
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                          <Button
+                            type="primary"
+                            icon={<CheckOutlined />}
+                            loading={approveMutation.isPending}
+                            disabled={requestRevisionMutation.isPending}
+                            onClick={() => {
+                              modalApi.confirm({
+                                title: `Duyệt thiết kế ${data.maThietKe}?`,
+                                content:
+                                  "Thiết kế sẽ chuyển sang trạng thái Đã duyệt. Sản phẩm chỉ được đưa vào hàng chờ in sau khi đơn hàng được xác nhận.",
+                                okText: "Duyệt thiết kế",
+                                cancelText: "Hủy",
+                                onOk: () => approveMutation.mutateAsync(),
+                              });
+                            }}
+                          >
+                            Duyệt thiết kế
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            danger
+                            icon={<EditOutlined />}
+                            loading={requestRevisionMutation.isPending}
+                            disabled={trimmedRevisionNote.length === 0 || approveMutation.isPending || (data.trangThai === "can_chinh_sua" && trimmedRevisionNote === data.ghiChu?.trim())}
+                            onClick={() => {
+                              if (data.trangThai === "can_chinh_sua") {
+                                modalApi.confirm({
+                                  title: "Cập nhật yêu cầu chỉnh sửa?",
+                                  content: "Hệ thống sẽ gửi thêm một email cập nhật đính chính đến cho khách hàng.",
+                                  okText: "Gửi cập nhật",
+                                  cancelText: "Hủy",
+                                  onOk: () => requestRevisionMutation.mutateAsync(),
+                                });
+                              } else {
+                                requestRevisionMutation.mutate();
+                              }
+                            }}
+                          >
+                            {data.trangThai === "can_chinh_sua" ? "Cập nhật yêu cầu chỉnh sửa" : "Yêu cầu chỉnh sửa"}
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </Section>
                 ) : null}

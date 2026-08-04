@@ -78,6 +78,18 @@ export default function AccountStaffTable() {
     },
   });
 
+  const formatDateTime = (dateStr?: string) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    return d.toLocaleString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const openCreateModal = () => {
     setEditing(null);
     form.resetFields();
@@ -111,6 +123,15 @@ export default function AccountStaffTable() {
 
   const columns: ColumnsType<AuthUser> = [
     {
+      title: <span style={{ fontSize: 13, fontWeight: 700, color: "#64748b" }}>ID</span>,
+      dataIndex: "id",
+      key: "id",
+      width: 70,
+      render: (id: number) => (
+        <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 500 }}>#{id}</span>
+      ),
+    },
+    {
       title: <span style={{ fontSize: 13, fontWeight: 700, color: "#64748b" }}>Họ tên</span>,
       dataIndex: "fullName",
       key: "fullName",
@@ -134,6 +155,12 @@ export default function AccountStaffTable() {
       render: (email: string) => <span style={{ color: "#475569" }}>{email}</span>,
     },
     {
+      title: <span style={{ fontSize: 13, fontWeight: 700, color: "#64748b" }}>Số điện thoại</span>,
+      dataIndex: "phone",
+      key: "phone",
+      render: (phone: string) => <span style={{ color: "#475569" }}>{phone || "-"}</span>,
+    },
+    {
       title: <span style={{ fontSize: 13, fontWeight: 700, color: "#64748b" }}>Vai trò</span>,
       dataIndex: "role",
       key: "role",
@@ -144,8 +171,12 @@ export default function AccountStaffTable() {
       dataIndex: "status",
       key: "status",
       width: 160,
-      render: (status: AuthUser["status"]) => (
-        <AccountStaffStatusBadge status={status} />
+      render: (status: AuthUser["status"], record: AuthUser) => (
+        <Tooltip title={record.updatedAt ? `Cập nhật: ${formatDateTime(record.updatedAt)}` : ""}>
+          <div style={{ display: "inline-block" }}>
+            <AccountStaffStatusBadge status={status} />
+          </div>
+        </Tooltip>
       ),
     },
     {
@@ -174,24 +205,26 @@ export default function AccountStaffTable() {
       align: "center",
       fixed: "right",
       render: (_: unknown, record: AuthUser) => (
-        <Tooltip title="Cập nhật quyền">
-          <Button
-            type="text"
-            icon={<EditOutlined />}
-            onClick={() => openEditModal(record)}
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 8,
-              border: "1px solid #e2e8f0",
-              background: "#f8fafc",
-              color: "#475569",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          />
-        </Tooltip>
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <Tooltip title="Cập nhật quyền">
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              onClick={() => openEditModal(record)}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 8,
+                border: "1px solid #e2e8f0",
+                background: "#f8fafc",
+                color: "#475569",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            />
+          </Tooltip>
+        </div>
       ),
     },
   ];

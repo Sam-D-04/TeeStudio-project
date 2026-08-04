@@ -131,14 +131,16 @@ export type ThamSoLocDonHang = {
   soMoiTrang?: number;
   trangThai?: string;
   thanhToan?: string;
+  phuongThucThanhToan?: string;
   thoiGian?: string;
   tuNgay?: string;
   denNgay?: string;
-  kieuNgay?: "ngay_tao" | "ngay_hoan_tat";
+  kieuNgay?: "ngay_tao" | "ngay_hoan_tat" | "ngay_thanh_toan";
   gio?: string;
   loai?: string;
   tuKhoa?: string;
   excludeStatus?: string;
+  excludeReason?: string;
 };
 
 // =====================================================================
@@ -170,6 +172,7 @@ export async function layDanhSachDonHang(
   if (thamSo.soMoiTrang) params.soMoiTrang = thamSo.soMoiTrang;
   if (thamSo.trangThai && thamSo.trangThai !== "tat_ca") params.trangThai = thamSo.trangThai;
   if (thamSo.thanhToan && thamSo.thanhToan !== "tat_ca") params.thanhToan = thamSo.thanhToan;
+  if (thamSo.phuongThucThanhToan && thamSo.phuongThucThanhToan !== "tat_ca") params.phuongThucThanhToan = thamSo.phuongThucThanhToan;
   if (thamSo.thoiGian && thamSo.thoiGian !== "tat_ca") params.thoiGian = thamSo.thoiGian;
   if (thamSo.tuNgay) params.tuNgay = thamSo.tuNgay;
   if (thamSo.denNgay) params.denNgay = thamSo.denNgay;
@@ -178,6 +181,7 @@ export async function layDanhSachDonHang(
   if (thamSo.loai && thamSo.loai !== "tat_ca") params.loai = thamSo.loai;
   if (thamSo.tuKhoa && thamSo.tuKhoa.trim()) params.tuKhoa = thamSo.tuKhoa.trim();
   if (thamSo.excludeStatus) params.excludeStatus = thamSo.excludeStatus;
+  if (thamSo.excludeReason) params.excludeReason = thamSo.excludeReason;
 
   const res = await apiClient.get<{ success: boolean; data: KetQuaDanhSach }>(
     "/admin/orders",
@@ -219,17 +223,6 @@ export async function capNhatTrangThaiDonHang({
   return res.data.data;
 }
 
-/** Yêu cầu khách chỉnh sửa toàn bộ thiết kế thuộc đơn đang chờ xác nhận. */
-export async function yeuCauChinhSuaThietKeDonHang(
-  id: number,
-  ghiChu: string
-): Promise<{ id: number; designIds: number[]; designStatus: "NEEDS_REVISION" }> {
-  const res = await apiClient.patch<{
-    success: boolean;
-    data: { id: number; designIds: number[]; designStatus: "NEEDS_REVISION" };
-  }>(`/admin/orders/${id}/design-revision`, { ghiChu });
-  return res.data.data;
-}
 
 /**
  * Hủy đơn hàng kèm lý do.
@@ -349,11 +342,13 @@ export type ThietKe = {
   id: number;
   productId: number;
   variantId: number | null;
+  tenThietKe?: string;
   tenSanPham: string;
   mauNen: string;
   mauSanPham: string;
   anhXemTruoc: string;
   phiThietKe: number;
+  phiInAn?: number;
   trangThai: string;
   ngayTao: string;
   sanPham: SanPhamTimKiem;

@@ -466,6 +466,21 @@ async function layDanhSachPhuPhi() {
   };
 }
 
+async function taoPhuongPhapIn({ name, code, extraCost }) {
+  try {
+    const [result] = await db.pool.query(
+      `INSERT INTO PrintMethod (code, name, extraCost, isActive) VALUES (?, ?, ?, 1)`,
+      [code.trim().toUpperCase(), name.trim(), extraCost]
+    );
+    return { id: result.insertId };
+  } catch (error) {
+    if (error.code === "ER_DUP_ENTRY") {
+      throw taoLoi("Mã phương pháp in đã tồn tại");
+    }
+    throw error;
+  }
+}
+
 async function capNhatPhuPhi(id, { loai, extraCost, isActive }) {
   const table = loai === "VI_TRI_IN" ? "PrintPosition" : "PrintMethod";
   const [result] = await db.pool.query(
@@ -541,6 +556,7 @@ module.exports = {
   capNhatGiaSoLuong,
   xoaGiaSoLuong,
   layDanhSachPhuPhi,
+  taoPhuongPhapIn,
   capNhatPhuPhi,
   layCongThucBaoGia,
   capNhatCongThucBaoGia,

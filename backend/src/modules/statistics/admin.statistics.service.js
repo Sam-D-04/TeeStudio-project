@@ -127,7 +127,7 @@ async function _queryMetrics(batDau, ketThuc) {
       [batDau, ketThuc]
     ),
     db.pool.query(
-      `SELECT COUNT(*) AS soDon
+      `SELECT SUM(CASE WHEN status != 'CANCELLED' OR cancelReason IS NULL OR cancelReason NOT LIKE '[TECH_ADJUST]%' THEN 1 ELSE 0 END) AS soDon
        FROM CustomerOrder
        WHERE DATE(createdAt) >= ? AND DATE(createdAt) <= ?`,
       [batDau, ketThuc]
@@ -154,43 +154,22 @@ async function _queryMetrics(batDau, ketThuc) {
 }
 
 async function _queryDoiSoatBaoCao(batDau, ketThuc) {
-  const [rows] = await db.pool.query(
+  // 1. Chỉ số lọc theo ngày tạo (createdAt)
+  const [rowsCreated] = await db.pool.query(
     `SELECT
-       COUNT(*) AS tongSoDon,
+       SUM(CASE WHEN co.status != 'CANCELLED' OR co.cancelReason IS NULL OR co.cancelReason NOT LIKE '[TECH_ADJUST]%' THEN 1 ELSE 0 END) AS tongSoDon,
        COALESCE(SUM(co.totalAmount), 0) AS tongGiaTriDonHang,
-       COALESCE(SUM(COALESCE(paymentSummary.totalPaidAmount, 0)), 0) AS tienDaThu,
        COALESCE(SUM(COALESCE(paymentSummary.pendingCodAmount, 0)), 0) AS codDangTreo,
-       COALESCE(SUM(
-         CASE
-           WHEN co.status = 'COMPLETED'
-            AND (
-              co.paymentStatus = 'PAID'
-              OR COALESCE(paymentSummary.totalPaidAmount, 0) >= co.totalAmount
-            )
-           THEN co.totalAmount
-           ELSE 0
-         END
-       ), 0) AS doanhThuGhiNhan,
-       SUM(CASE WHEN co.status = 'COMPLETED' THEN 1 ELSE 0 END) AS soDonHoanTat,
-       SUM(
-         CASE
-           WHEN co.paymentStatus = 'PAID'
-             OR COALESCE(paymentSummary.totalPaidAmount, 0) >= co.totalAmount
-           THEN 1
-           ELSE 0
-         END
-       ) AS soDonDaThanhToanDu,
        SUM(
          CASE
            WHEN COALESCE(paymentSummary.pendingCodAmount, 0) > 0 THEN 1
            ELSE 0
          END
        ) AS soDonChoDoiSoatCod,
-       SUM(CASE WHEN co.status = 'CANCELLED' THEN 1 ELSE 0 END) AS soDonDaHuy
+       SUM(CASE WHEN co.status = 'CANCELLED' AND (co.cancelReason IS NULL OR co.cancelReason NOT LIKE '[TECH_ADJUST]%') THEN 1 ELSE 0 END) AS soDonDaHuy
      FROM CustomerOrder co
      LEFT JOIN (
        SELECT orderId,
-              SUM(CASE WHEN status = 'COMPLETED' THEN amount ELSE 0 END) AS totalPaidAmount,
               SUM(CASE WHEN status = 'PENDING_RECONCILIATION' AND paymentMethod = 'COD' THEN amount ELSE 0 END) AS pendingCodAmount
        FROM Payment
        GROUP BY orderId
@@ -199,18 +178,67 @@ async function _queryDoiSoatBaoCao(batDau, ketThuc) {
     [batDau, ketThuc]
   );
 
-  const row = rows[0] || {};
-  const tongSoDon = Number(row.tongSoDon) || 0;
-  const soDonDaHuy = Number(row.soDonDaHuy) || 0;
+  // 2. Chỉ số lọc theo ngày hoàn tất (completedDate) giống _queryMetrics
+  const [rowsCompleted] = await db.pool.query(
+    `SELECT
+       COALESCE(SUM(
+         CASE
+           WHEN co.paymentStatus = 'PAID'
+             OR COALESCE(paymentSummary.totalPaidAmount, 0) >= co.totalAmount
+           THEN co.totalAmount
+           ELSE 0
+         END
+       ), 0) AS doanhThuGhiNhan,
+       COUNT(*) AS soDonHoanTat,
+       SUM(
+         CASE
+           WHEN co.paymentStatus = 'PAID'
+             OR COALESCE(paymentSummary.totalPaidAmount, 0) >= co.totalAmount
+           THEN 1
+           ELSE 0
+         END
+       ) AS soDonDaThanhToanDu
+     FROM CustomerOrder co
+     LEFT JOIN (
+       SELECT orderId,
+              SUM(CASE WHEN status = 'COMPLETED' THEN amount ELSE 0 END) AS totalPaidAmount
+       FROM Payment
+       GROUP BY orderId
+     ) paymentSummary ON paymentSummary.orderId = co.id
+     ${JOIN_PAYMENT_HOAN_THANH}
+     WHERE co.status = 'COMPLETED'
+       AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) >= ?
+       AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) <= ?`,
+    [batDau, ketThuc]
+  );
+
+  // 3. Chỉ số lọc theo ngày thanh toán thực tế (Payment.paidAt)
+  const [rowsPayment] = await db.pool.query(
+    `SELECT COALESCE(SUM(p.amount), 0) AS tienDaThu
+     FROM Payment p
+     JOIN CustomerOrder co ON co.id = p.orderId
+     WHERE p.status = 'COMPLETED'
+       AND p.paymentType NOT IN ('REFUND', 'COMPENSATION')
+       AND p.paidAt >= ? AND p.paidAt < DATE_ADD(?, INTERVAL 1 DAY)
+       AND (co.cancelReason IS NULL OR co.cancelReason NOT LIKE '[TECH_ADJUST]%')`,
+    [batDau, ketThuc]
+  );
+
+  const rowCreated = rowsCreated[0] || {};
+  const rowCompleted = rowsCompleted[0] || {};
+  const rowPayment = rowsPayment[0] || {};
+
+  const tongSoDon = Number(rowCreated.tongSoDon) || 0;
+  const soDonDaHuy = Number(rowCreated.soDonDaHuy) || 0;
 
   return {
-    doanhThuGhiNhanVnd: Number(row.doanhThuGhiNhan) || 0,
-    tienDaThuTrongKyVnd: Number(row.tienDaThu) || 0,
-    dongTienCodDangTreoVnd: Number(row.codDangTreo) || 0,
-    tongGiaTriDonHangVnd: Number(row.tongGiaTriDonHang) || 0,
-    soDonHoanTat: Number(row.soDonHoanTat) || 0,
-    soDonDaThanhToanDu: Number(row.soDonDaThanhToanDu) || 0,
-    soDonChoDoiSoatCod: Number(row.soDonChoDoiSoatCod) || 0,
+    doanhThuGhiNhanVnd: Number(rowCompleted.doanhThuGhiNhan) || 0,
+    tienDaThuTrongKyVnd: Number(rowPayment.tienDaThu) || 0,
+    dongTienCodDangTreoVnd: Number(rowCreated.codDangTreo) || 0,
+    tongGiaTriDonHangVnd: Number(rowCreated.tongGiaTriDonHang) || 0,
+    soDonHoanTat: Number(rowCompleted.soDonHoanTat) || 0,
+    soDonDaThanhToanDu: Number(rowCompleted.soDonDaThanhToanDu) || 0,
+    soDonChoDoiSoatCod: Number(rowCreated.soDonChoDoiSoatCod) || 0,
     tyLeHuyDon: tongSoDon > 0 ? Math.round((soDonDaHuy / tongSoDon) * 10000) / 100 : 0,
   };
 }
@@ -440,7 +468,7 @@ async function layPhanBoTrangThai(tuNgay, denNgay) {
          SUM(CASE WHEN status IN ('PENDING','CONFIRMED','PROCESSING','PRINTING') THEN 1 ELSE 0 END) AS dangXuLy,
          SUM(CASE WHEN status IN ('READY_TO_SHIP','SHIPPING','DELIVERING')       THEN 1 ELSE 0 END) AS dangGiao,
          SUM(CASE WHEN status = 'COMPLETED'                                      THEN 1 ELSE 0 END) AS hoanTat,
-         SUM(CASE WHEN status = 'CANCELLED'                                      THEN 1 ELSE 0 END) AS daHuy
+         SUM(CASE WHEN status = 'CANCELLED' AND (cancelReason IS NULL OR cancelReason NOT LIKE '[TECH_ADJUST]%') THEN 1 ELSE 0 END) AS daHuy
        FROM CustomerOrder
        WHERE DATE(createdAt) >= ? AND DATE(createdAt) <= ?`,
       [batDau, ketThuc]
@@ -453,7 +481,7 @@ async function layPhanBoTrangThai(tuNgay, denNgay) {
       `SELECT
          SUM(CASE WHEN status = 'COMPLETED'                            THEN 1 ELSE 0 END) AS daThanhToan,
          SUM(CASE WHEN status NOT IN ('COMPLETED','CANCELLED')         THEN 1 ELSE 0 END) AS choThanhToan,
-         SUM(CASE WHEN status = 'CANCELLED'                            THEN 1 ELSE 0 END) AS thatBaiHuy
+         SUM(CASE WHEN status = 'CANCELLED' AND (cancelReason IS NULL OR cancelReason NOT LIKE '[TECH_ADJUST]%') THEN 1 ELSE 0 END) AS thatBaiHuy
        FROM CustomerOrder
        WHERE DATE(createdAt) >= ? AND DATE(createdAt) <= ?`,
       [batDau, ketThuc]

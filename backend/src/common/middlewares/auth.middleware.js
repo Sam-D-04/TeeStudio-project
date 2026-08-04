@@ -42,7 +42,7 @@ const verifyToken = async (req, res, next) => {
     const account = accounts[0];
 
     if (!account || account.status !== "ACTIVE") {
-      return unauthorized(res, "Tài khoản không tồn tại hoặc đã bị vô hiệu hóa");
+      return unauthorized(res, "Tài khoản không tồn tại hoặc đã bị vô hiệu hóa. Vui lòng liên hệ với chúng tôi qua email để biết lý do.");
     }
 
     req.user = {

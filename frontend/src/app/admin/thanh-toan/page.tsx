@@ -34,7 +34,12 @@ export default async function ThanhToanPage({
   const statuses = status.split(",").map((item) => item.trim());
   const method = layGiaTriDauTien(params.method).toUpperCase();
   const date = layGiaTriDauTien(params.date);
-  const isExplicit = Boolean(status || method || date);
+  // Hỗ trợ cả startDate/endDate riêng lẻ (dùng từ trang Thống kê)
+  const startDate = layGiaTriDauTien(params.startDate);
+  const endDate = layGiaTriDauTien(params.endDate);
+  const resolvedStartDate = laNgayHopLe(startDate) ? startDate : laNgayHopLe(date) ? date : "";
+  const resolvedEndDate = laNgayHopLe(endDate) ? endDate : laNgayHopLe(date) ? date : "";
+  const isExplicit = Boolean(status || method || date || startDate || endDate);
   const initialFilters = isExplicit
     ? {
         status:
@@ -57,8 +62,8 @@ export default async function ThanhToanPage({
               : method === "COD"
                 ? "cod"
                 : "tat_ca",
-        startDate: laNgayHopLe(date) ? date : "",
-        endDate: laNgayHopLe(date) ? date : "",
+        startDate: resolvedStartDate,
+        endDate: resolvedEndDate,
         dateField:
           layGiaTriDauTien(params.dateField) === "paid"
             ? ("paid" as const)

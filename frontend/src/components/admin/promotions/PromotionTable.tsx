@@ -314,34 +314,13 @@ export default function PromotionTable({
                         <EditOutlined />
                       </button>
 
-                      {/* Nút xóa – màu đỏ khi hover */}
+                      {/* Nút xóa */}
                       <button
                         title="Xóa"
                         onClick={() => onXoa(ma.id)}
-                        style={{
-                          padding: "6px",
-                          border: "none",
-                          background: "transparent",
-                          color: "#94a3b8",
-                          borderRadius: 6,
-                          cursor: "pointer",
-                          fontSize: 15,
-                          transition: "all 0.15s ease",
-                          display: "flex",
-                          alignItems: "center",
-                        }}
-                        onMouseEnter={(e) => {
-                          const el = e.currentTarget as HTMLButtonElement;
-                          el.style.background = "#ffdad6";
-                          el.style.color = "#ea580c";
-                        }}
-                        onMouseLeave={(e) => {
-                          const el = e.currentTarget as HTMLButtonElement;
-                          el.style.background = "transparent";
-                          el.style.color = "#94a3b8";
-                        }}
+                        className="flex items-center rounded p-1.5 text-[#94a3b8] transition-colors hover:bg-error-container hover:text-error bg-transparent border-none cursor-pointer"
                       >
-                        <DeleteOutlined />
+                        <DeleteOutlined className="text-[18px]" />
                       </button>
                     </div>
                   </td>

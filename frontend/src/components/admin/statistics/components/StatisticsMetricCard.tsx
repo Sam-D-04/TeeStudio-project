@@ -1,4 +1,5 @@
-import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
+import { ArrowDownOutlined, ArrowRightOutlined, ArrowUpOutlined } from "@ant-design/icons";
+import Link from "next/link";
 import type { MetricItem } from "../types";
 
 const toneClasses: Record<MetricItem["tone"], { icon: string; background: string }> = {
@@ -27,12 +28,10 @@ export function StatisticsMetricCardSkeleton() {
   );
 }
 
-export default function StatisticsMetricCard({ metric }: { metric: MetricItem }) {
-  const tone = toneClasses[metric.tone];
+function MetricCardContent({ metric, tone }: { metric: MetricItem; tone: { icon: string; background: string } }) {
   const isDown = metric.direction === "down";
-
   return (
-    <article className="admin-card min-w-0 p-4 sm:p-5">
+    <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-medium text-text-secondary">{metric.label}</p>
@@ -59,8 +58,33 @@ export default function StatisticsMetricCard({ metric }: { metric: MetricItem })
             {isDown ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
             {metric.directionLabel}
           </span>
+        ) : metric.href ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-surface-container px-2 py-1 text-[11px] font-medium text-text-muted">
+            Xem danh sách <ArrowRightOutlined />
+          </span>
         ) : null}
       </div>
+    </>
+  );
+}
+
+export default function StatisticsMetricCard({ metric }: { metric: MetricItem }) {
+  const tone = toneClasses[metric.tone];
+
+  if (metric.href) {
+    return (
+      <Link
+        href={metric.href}
+        className="admin-card group relative min-w-0 cursor-pointer p-4 transition-all duration-200 hover:shadow-md hover:ring-2 hover:ring-primary-container/30 sm:p-5"
+      >
+        <MetricCardContent metric={metric} tone={tone} />
+      </Link>
+    );
+  }
+
+  return (
+    <article className="admin-card min-w-0 p-4 sm:p-5">
+      <MetricCardContent metric={metric} tone={tone} />
     </article>
   );
 }

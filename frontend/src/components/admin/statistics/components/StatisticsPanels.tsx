@@ -1,4 +1,5 @@
-import { InboxOutlined } from "@ant-design/icons";
+import { ArrowRightOutlined, InboxOutlined } from "@ant-design/icons";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import type {
   ChartDataItem,
@@ -77,29 +78,52 @@ export function DistributionPanel({
 
   return (
     <div className="space-y-5 p-4 sm:p-5">
-      {items.map((item) => (
-        <div key={item.label}>
-          <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-            <span className="flex min-w-0 items-center gap-2 font-medium text-text-main">
-              <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: item.color }}
+      {items.map((item) => {
+        const barContent = (
+          <>
+            <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+              <span className="flex min-w-0 items-center gap-2 font-medium text-text-main">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: item.color }}
+                />
+                <span>{item.label}</span>
+              </span>
+              <span className="flex shrink-0 items-center gap-1.5 font-bold text-text-main">
+                {item.displayValue}
+                {item.href && (
+                  <ArrowRightOutlined className="text-[11px] text-text-muted opacity-0 transition-opacity group-hover:opacity-100" />
+                )}
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-surface-container-low">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.max((item.value / total) * 100, 3)}%`,
+                  backgroundColor: item.color,
+                }}
               />
-              <span>{item.label}</span>
-            </span>
-            <span className="shrink-0 font-bold text-text-main">{item.displayValue}</span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-surface-container-low">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${Math.max((item.value / total) * 100, 3)}%`,
-                backgroundColor: item.color,
-              }}
-            />
-          </div>
-        </div>
-      ))}
+            </div>
+          </>
+        );
+
+        if (item.href) {
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              className="group block rounded-lg px-2 py-1.5 transition-colors hover:bg-surface-alt"
+            >
+              {barContent}
+            </Link>
+          );
+        }
+
+        return (
+          <div key={item.label}>{barContent}</div>
+        );
+      })}
     </div>
   );
 }

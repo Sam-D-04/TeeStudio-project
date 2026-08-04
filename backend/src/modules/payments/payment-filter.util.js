@@ -17,7 +17,7 @@ function taoBoLocThanhToan(queryParams = {}) {
   } else if (trangThai === "da_dat_coc") {
     conditions.push("p.status = 'COMPLETED' AND p.paymentType = 'DEPOSIT'");
   } else if (trangThai === "cho_thanh_toan") {
-    conditions.push("p.status = 'PENDING' AND p.paymentMethod IN ('VNPAY', 'MOMO')");
+    conditions.push("p.status = 'PENDING'");
   } else if (trangThai === "da_thanh_toan") {
     conditions.push("p.status = 'COMPLETED' AND p.paymentType <> 'DEPOSIT'");
   } else if (trangThai === "that_bai") {
@@ -47,6 +47,17 @@ function taoBoLocThanhToan(queryParams = {}) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(denNgay)) {
     conditions.push(`DATE(${cotNgay}) <= ?`);
     params.push(denNgay);
+  }
+
+  // Khi lọc theo ngày thanh toán mà không chọn loại trạng thái cụ thể
+  // → chỉ lấy giao dịch đã COMPLETED (tức là đã thực nhận tiền), khớp với tienDaThu
+  if (
+    queryParams.kieuNgay === "ngay_thanh_toan" &&
+    trangThai === "tat_ca" &&
+    (tuNgay || denNgay || thoiGian)
+  ) {
+    conditions.push("p.status = 'COMPLETED'");
+    conditions.push("p.paymentType NOT IN ('REFUND', 'COMPENSATION')");
   }
 
   return {

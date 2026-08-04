@@ -35,6 +35,10 @@ export default async function ThietKePage({
   const designId = Number.isInteger(designIdParam) && designIdParam > 0
     ? designIdParam
     : null;
+  const orderIdParam = Number(layGiaTriDauTien(params.orderId));
+  const orderId = Number.isInteger(orderIdParam) && orderIdParam > 0
+    ? orderIdParam
+    : null;
   const laTabDonIn = tabParam === "PRINT_ORDERS";
 
   const initialFilters = {
@@ -42,6 +46,7 @@ export default async function ThietKePage({
       ? ("don_can_in" as const)
       : ("thiet_ke_khach_hang" as const),
     designId,
+    orderId,
     designStatus:
       statusParam === "ACTION_REQUIRED"
         ? "can_xu_ly"

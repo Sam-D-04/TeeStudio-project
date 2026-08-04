@@ -85,28 +85,6 @@ function taoLinkDoanhThuTheoCot(
   return `/admin/don-hang?${params.toString()}`;
 }
 
-function taoLinkDonDatTheoCot(
-  item: DiemBieuDo,
-  groupBy: DashboardGroupBy
-): string {
-  const params = new URLSearchParams({
-    dateField: "created",
-    excludeStatus: "CANCELLED",
-  });
-  const mocThoiGian = dayjs(item.ngay);
-
-  if (groupBy === "month") {
-    params.set("from", mocThoiGian.startOf("month").format("YYYY-MM-DD"));
-    params.set("to", mocThoiGian.endOf("month").format("YYYY-MM-DD"));
-  } else {
-    params.set("date", mocThoiGian.format("YYYY-MM-DD"));
-    if (groupBy === "hour") {
-      params.set("hour", mocThoiGian.format("HH"));
-    }
-  }
-
-  return `/admin/don-hang?${params.toString()}`;
-}
 
 export default function RevenueOverviewChart({
   data = [],
@@ -116,7 +94,7 @@ export default function RevenueOverviewChart({
   isError = false,
 }: RevenueOverviewChartProps) {
   const maxRevenue = data.length > 0 ? Math.max(...data.map((item) => item.doanhThuVnd)) : 0;
-  const maxOrders = data.length > 0 ? Math.max(...data.map((item) => item.soDonDat ?? item.soDonHoanTat ?? 0)) : 0;
+  const maxOrders = data.length > 0 ? Math.max(...data.map((item) => item.soDonHoanTat ?? 0)) : 0;
   const coDuLieuBieuDo = maxRevenue > 0 || maxOrders > 0;
   const maxOrderAxis = Math.max(maxOrders, 1);
   const nhanTrucX = taoTapChiSoNhan(data.length, groupBy);
@@ -131,16 +109,12 @@ export default function RevenueOverviewChart({
         <div>
           <h3 className="flex items-center gap-2 text-card-title font-bold text-text-main">
             <BarChartOutlined className="text-primary-container" />
-            <span>Biểu đồ số đơn và Doanh thu</span>
+            <span>Biểu đồ doanh thu và Số đơn hoàn tất</span>
           </h3>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs font-medium text-text-secondary">
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-[3px] bg-primary-container/70" />
               Doanh thu
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-[3px] bg-success/80" />
-              Số đơn đặt
             </span>
           </div>
         </div>
@@ -189,38 +163,29 @@ export default function RevenueOverviewChart({
               <span>{rutGonTienVnd(maxRevenue / 2)}</span>
               <span>0đ</span>
             </div>
-            <div className="absolute bottom-10 right-3 top-10 flex w-10 flex-col justify-between text-left text-[10px] font-medium text-text-muted">
-              <span>{maxOrders.toLocaleString("vi-VN")}</span>
-              <span>{Math.round(maxOrders / 2).toLocaleString("vi-VN")}</span>
-              <span>0 đơn</span>
-            </div>
 
             <div className="absolute inset-y-0 left-14 right-14 overflow-x-auto overflow-y-hidden">
               <div className="relative h-full min-w-full" style={{ minWidth: `${chartMinWidth}px` }}>
                 <div className="absolute bottom-12 left-4 right-5 top-12 flex items-end gap-2">
                   {data.map((item, index) => {
-                    const orderCount = item.soDonDat ?? item.soDonHoanTat ?? 0;
+                    const orderCount = item.soDonHoanTat ?? 0;
                     const revenueHeightPct =
                       item.doanhThuVnd > 0 && maxRevenue > 0
                         ? Math.max(8, (item.doanhThuVnd / maxRevenue) * 100)
-                        : 0;
-                    const orderHeightPct =
-                      orderCount > 0
-                        ? Math.max(8, (orderCount / maxOrderAxis) * 100)
                         : 0;
                     return (
                       <div
                         key={item.ngay || `${item.nhan}-${index}`}
                         className="group relative flex h-full min-w-[18px] flex-1 items-end justify-center gap-1 rounded-t-[6px]"
-                        title={`${item.nhan}: ${formatTienVnd(item.doanhThuVnd)} | ${orderCount} đơn đặt`}
+                        title={`${item.nhan}: ${formatTienVnd(item.doanhThuVnd)} | ${orderCount} đơn hoàn tất`}
                       >
                         <span
                           className="pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-[6px] bg-text-main px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
                           style={{
-                            bottom: `min(calc(${Math.max(revenueHeightPct, orderHeightPct)}% + 0.35rem), calc(100% - 1.75rem))`,
+                            bottom: `min(calc(${revenueHeightPct}% + 0.35rem), calc(100% - 1.75rem))`,
                           }}
                         >
-                          {rutGonTienVnd(item.doanhThuVnd)} · {orderCount} đơn đặt
+                          {rutGonTienVnd(item.doanhThuVnd)} · {orderCount} đơn hoàn tất
                         </span>
                         {item.doanhThuVnd > 0 ? (
                           <Link
@@ -230,18 +195,6 @@ export default function RevenueOverviewChart({
                             style={{ height: `${revenueHeightPct}%` }}
                           >
                             <span className="block h-full w-full rounded-t-[5px] bg-primary-container/60 transition-all duration-300 hover:bg-primary-container" />
-                          </Link>
-                        ) : (
-                          <span className="block w-full max-w-[18px]" />
-                        )}
-                        {orderCount > 0 ? (
-                          <Link
-                            href={taoLinkDonDatTheoCot(item, groupBy)}
-                            aria-label={`Xem ${orderCount} đơn đặt ${item.nhan}, không gồm đơn hủy`}
-                            className="block h-full w-full max-w-[18px] rounded-t-[5px] outline-none focus-visible:ring-2 focus-visible:ring-success"
-                            style={{ height: `${orderHeightPct}%` }}
-                          >
-                            <span className="block h-full w-full rounded-t-[5px] bg-success/70 transition-all duration-300 hover:bg-success" />
                           </Link>
                         ) : (
                           <span className="block w-full max-w-[18px]" />

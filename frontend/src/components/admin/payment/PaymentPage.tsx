@@ -62,8 +62,8 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
   );
   const [tuNgay, setTuNgay] = useState(initialFilters?.startDate ?? "");
   const [denNgay, setDenNgay] = useState(initialFilters?.endDate ?? "");
-  const [dateField, setDateField] = useState(
-    initialFilters?.dateField ?? "created"
+  const [dateField, setDateField] = useState<"created" | "paid">(
+    initialFilters?.dateField ?? "paid"
   );
   const [dateFilterKey, setDateFilterKey] = useState(0);
 
@@ -153,9 +153,11 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
       if (selectedPaymentId) {
         queryClient.invalidateQueries({ queryKey: ["admin-payment-detail", selectedPaymentId] });
       }
+      messageApi.success("Đã lưu ghi chú kế toán thành công.");
       setActionLoading(false);
     },
-    onError: () => {
+    onError: (error) => {
+      messageApi.error(getApiErrorMessage(error, "Không thể lưu ghi chú."));
       setActionLoading(false);
     },
   });
@@ -227,7 +229,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
     setSearchValue("");
     setStatusFilter("tat_ca");
     setMethodFilter("tat_ca");
-    setDateField("created");
+    setDateField("paid");
     setTuNgay("");
     setDenNgay("");
     setCurrentPage(1);
@@ -280,10 +282,10 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
   // Xây dựng PaymentDetail từ detailQuery
   const selectedPayment: PaymentDetail | null = detailQuery.data
     ? {
-        ...detailQuery.data,
-        createdAt: detailQuery.data.createdAt || "",
-        ipnHistory: detailQuery.data.ipnHistory || [],
-      }
+      ...detailQuery.data,
+      createdAt: detailQuery.data.createdAt || "",
+      ipnHistory: detailQuery.data.ipnHistory || [],
+    }
     : null;
 
   // ===== FORMAT HELPERS =====
@@ -360,11 +362,10 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
           badge={
             stats && stats.phanTramThayDoi !== 0 ? (
               <span
-                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${
-                  stats.phanTramThayDoi >= 0
+                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${stats.phanTramThayDoi >= 0
                     ? "bg-[#dcfce7] text-[#059669]"
                     : "bg-[#fee2e2] text-[#b91c1c]"
-                }`}
+                  }`}
               >
                 <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                   {stats.phanTramThayDoi >= 0 ? (
@@ -480,6 +481,11 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
           initialEndDate={denNgay || undefined}
           onDateChange={handleDateChange}
           onDateClear={handleDateClear}
+          dateField={dateField}
+          onDateFieldChange={(val) => {
+            setDateField(val);
+            setCurrentPage(1);
+          }}
           onReset={handleReset}
         />
 

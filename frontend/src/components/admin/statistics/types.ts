@@ -12,6 +12,8 @@ export type MetricItem = {
   tone: "primary" | "success" | "warning" | "accent";
   direction?: "up" | "down";
   directionLabel?: string;
+  /** URL điều hướng khi click vào thẻ (tùy chọn) */
+  href?: string;
 };
 
 export type DistributionItem = {
@@ -19,6 +21,8 @@ export type DistributionItem = {
   value: number;
   displayValue: string;
   color: string;
+  /** URL điều hướng khi click vào hàng (tùy chọn) */
+  href?: string;
 };
 
 export type ChartDataItem = {

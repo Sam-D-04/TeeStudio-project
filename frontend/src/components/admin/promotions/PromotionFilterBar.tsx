@@ -94,33 +94,28 @@ export default function PromotionFilterBar({ boDuc, onThayDoi, onReset }: Props)
         <option value="mien_phi_van_chuyen">Miễn phí vận chuyển</option>
       </select>
 
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-semibold text-text-secondary">
-          Thời gian hiệu lực
-        </span>
-        <DateRangeFilter
-          initialPreset={boDuc.tuNgay && boDuc.denNgay ? "custom" : "all"}
-          initialStartDate={boDuc.tuNgay}
-          initialEndDate={boDuc.denNgay}
-          allowClear
-          onChange={(startDate, endDate) =>
-            onThayDoi({
-              ...boDuc,
-              tuNgay: startDate,
-              denNgay: endDate,
-            })
-          }
-          onClear={() =>
-            onThayDoi({
-              ...boDuc,
-              tuNgay: "",
-              denNgay: "",
-            })
-          }
-          selectClassName="h-10"
-          rangePickerClassName="h-10 sm:w-[280px]"
-        />
-      </div>
+      <DateRangeFilter
+        initialPreset={boDuc.tuNgay && boDuc.denNgay ? "custom" : "all"}
+        initialStartDate={boDuc.tuNgay}
+        initialEndDate={boDuc.denNgay}
+        allowClear
+        onChange={(startDate, endDate) =>
+          onThayDoi({
+            ...boDuc,
+            tuNgay: startDate,
+            denNgay: endDate,
+          })
+        }
+        onClear={() =>
+          onThayDoi({
+            ...boDuc,
+            tuNgay: "",
+            denNgay: "",
+          })
+        }
+        selectClassName="h-10"
+        rangePickerClassName="h-10 sm:w-[280px]"
+      />
 
       <button
         onClick={onReset}

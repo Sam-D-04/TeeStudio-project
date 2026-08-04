@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { App, Button, Input, Select, Spin, ConfigProvider, theme } from "antd";
+import { App, Button, Input, InputNumber, Select, Spin, ConfigProvider, theme } from "antd";
 import {
   ArrowLeftOutlined,
   DeleteOutlined,
@@ -48,6 +48,9 @@ export default function AdminDesignStudio() {
     variants: designService.BienTheTaoThietKe[];
   }>({ key: "", variants: [] });
   const [designName, setDesignName] = useState("");
+  const [designFee, setDesignFee] = useState<number | null>(null);
+  const [selectedPrintMethodId, setSelectedPrintMethodId] = useState<number | undefined>();
+  const [printMethods, setPrintMethods] = useState<designService.PhuongPhapIn[]>([]);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -93,6 +96,10 @@ export default function AdminDesignStudio() {
       .then((result) => setCustomers(result.items))
       .catch(() => message.error("Không thể tải danh sách khách hàng"))
       .finally(() => setLoadingCustomers(false));
+
+    designService.layDanhSachPhuongPhapIn()
+      .then(setPrintMethods)
+      .catch(() => message.warning("Không thể tải danh sách phương pháp in"));
 
     return () => {
       useDesignStore.setState({
@@ -225,6 +232,7 @@ export default function AdminDesignStudio() {
     if (!variantId) return message.warning("Vui lòng chọn size áo");
     if (!designName.trim()) return message.warning("Vui lòng nhập tên thiết kế");
     if (!elements.length) return message.warning("Thiết kế cần có ít nhất một hình ảnh hoặc văn bản");
+    if (!selectedPrintMethodId) return message.warning("Vui lòng chọn phương pháp in");
     if (!shirtContainerRef.current) return;
 
     try {
@@ -269,6 +277,8 @@ export default function AdminDesignStudio() {
         previewUrl,
         printImageFront: printImageFront ?? null,
         printImageBack: printImageBack ?? null,
+        designFeeOverride: designFee != null ? designFee : 0,
+        printMethodId: selectedPrintMethodId,
       });
 
       modal.success({
@@ -288,7 +298,7 @@ export default function AdminDesignStudio() {
     } finally {
       setSaving(false);
     }
-  }, [customerId, designName, elements.length, message, modal, router, setSelectedId, shirtColor, shirtType, shirtView, variantId, zoom]);
+  }, [customerId, designFee, designName, elements.length, message, modal, router, selectedPrintMethodId, setSelectedId, shirtColor, shirtType, shirtView, variantId, zoom]);
 
   const area = getPrintAreaBoundary(shirtType, shirtView, CONTAINER_W, CONTAINER_H);
   const printArea = { x: area.left, y: area.top, w: area.width, h: area.height };
@@ -322,8 +332,9 @@ export default function AdminDesignStudio() {
             <strong style={{ color: "#f8fafc" }}>Tạo thiết kế</strong>
           </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "center", flexWrap: "wrap" }}>
-          <Select
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, paddingLeft: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <Select
               showSearch
               allowClear
               loading={loadingCustomers}
@@ -331,7 +342,7 @@ export default function AdminDesignStudio() {
               onChange={setCustomerId}
               placeholder="Chọn khách hàng (không bắt buộc)"
               optionFilterProp="label"
-              style={{ width: 260 }}
+              style={{ width: 400 }}
               options={customers.map((customer) => ({
                 value: customer.id,
                 label: `${customer.fullName} — ${customer.phone || customer.email}`,
@@ -358,6 +369,32 @@ export default function AdminDesignStudio() {
               }))}
               notFoundContent={loadingSizes ? <Spin size="small" /> : "Không có size phù hợp"}
             />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <InputNumber
+              value={designFee}
+              onChange={(value) => setDesignFee(value)}
+              placeholder="Phí thiết kế (để trống = 0đ)"
+              min={0}
+              step={10000}
+              formatter={(value) => value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : ""}
+              parser={(value) => Number((value ?? "").replace(/[^\d]/g, ""))}
+              style={{ width: 220 }}
+              suffix="₫"
+            />
+            <Select
+              allowClear
+              value={selectedPrintMethodId}
+              onChange={setSelectedPrintMethodId}
+              placeholder="Phương pháp in"
+              style={{ width: 200 }}
+              options={printMethods.map((pm) => ({
+                value: pm.id,
+                label: `${pm.ten}${pm.phiInThem > 0 ? ` (+${pm.phiInThem.toLocaleString("vi-VN")}₫)` : ""}`,
+              }))}
+              notFoundContent="Không có phương pháp in"
+            />
+          </div>
         </div>
 
         <div className="ds-toolbar-right">

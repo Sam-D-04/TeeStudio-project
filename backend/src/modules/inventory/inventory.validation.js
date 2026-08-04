@@ -42,7 +42,7 @@ const createInventoryTransactionSchema = {
     },
     reason: {
       label: "Lý do / Ghi chú",
-      required: true,
+      required: (req) => req.body.transactionType !== "IMPORT",
       type: "string",
       minLength: 3,
       maxLength: 300,

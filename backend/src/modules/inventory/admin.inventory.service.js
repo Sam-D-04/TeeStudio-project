@@ -19,7 +19,7 @@ const db = require("../../database/mysql");
 // ────────────────────────────────────────────────────────────────────────────
 
 /** Số lượng ≤ ngưỡng này → trạng thái "sap_het" */
-const NGUONG_SAP_HET = 20;
+const NGUONG_SAP_HET = 50;
 const NGUONG_TON_THAP_DASHBOARD = 15;
 
 const RESERVED_STOCK_JOIN = `
@@ -151,7 +151,7 @@ async function layDanhSachTonKho(params = {}) {
   // Lọc theo trạng thái tồn kho
   if (boLoc === "ton_thap") {
     conditions.push(
-      `${AVAILABLE_STOCK_SQL} <= ${NGUONG_TON_THAP_DASHBOARD}`
+      `${AVAILABLE_STOCK_SQL} <= ${NGUONG_SAP_HET}`
     );
   } else if (boLoc === "sap_het") {
     conditions.push(
@@ -613,6 +613,8 @@ async function layLichSuKho(params = {}) {
   const offset = (trang - 1) * soMoiTrang;
   const loaiGiaoDich = params.loaiGiaoDich || "tat_ca";
   const tuKhoa = params.tuKhoa ? params.tuKhoa.trim() : "";
+  const tuNgay = laNgayHopLe(params.tuNgay) ? params.tuNgay : "";
+  const denNgay = laNgayHopLe(params.denNgay) ? params.denNgay : "";
 
   const conditions = [];
   const values = [];
@@ -628,6 +630,15 @@ async function layLichSuKho(params = {}) {
     conditions.push(`(pv.sku LIKE ? OR p.name LIKE ?)`);
     const like = `%${tuKhoa}%`;
     values.push(like, like);
+  }
+
+  if (tuNgay) {
+    conditions.push(`it.createdAt >= ?`);
+    values.push(tuNgay);
+  }
+  if (denNgay) {
+    conditions.push(`it.createdAt < DATE_ADD(?, INTERVAL 1 DAY)`);
+    values.push(denNgay);
   }
 
   const whereClause =
@@ -657,6 +668,7 @@ async function layLichSuKho(params = {}) {
        pv.size,
        p.name    AS tenSanPham,
        co.orderCode,
+       co.id     AS orderId,
        s.name    AS tenNhaCungCap
      FROM InventoryTransaction it
      INNER JOIN ProductVariant pv ON pv.id = it.variantId
@@ -716,6 +728,7 @@ async function layLichSuKho(params = {}) {
       moTa,
       tenNhaCungCap: row.tenNhaCungCap || null,
       maDonHang: row.orderCode || null,
+      orderId: row.orderId || null,
       ngay,
       gio,
       thoiGianISO: row.createdAt,

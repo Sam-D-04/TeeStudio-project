@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 /**
  * DesignPage – Trang chính "Thiết kế & In ấn" (Orchestrator).
@@ -65,6 +65,7 @@ export type DesignInitialFilters = {
   designStatus?: string;
   printStatus?: string;
   designId?: number | null;
+  orderId?: number | null;
 };
 
 type DesignPageProps = {
@@ -101,13 +102,16 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
   const [idThietKeDangLoc, setIdThietKeDangLoc] = useState<number | null>(
     initialFilters?.designId ?? null
   );
+  const [idDonHangDangLoc, setIdDonHangDangLoc] = useState<number | null>(
+    initialFilters?.orderId ?? null
+  );
 
   // ── State bộ lọc bảng thiết kế ──
   const [boDuc, setBoDuc] = useState<BoDucThietKe>({
-    tuKhoa: initialFilters?.designId
-      ? `TK-${String(initialFilters.designId).padStart(4, "0")}`
+    tuKhoa: initialFilters?.designId || initialFilters?.orderId
+      ? ""
       : "",
-    trangThai: initialFilters?.designId
+    trangThai: initialFilters?.designId || initialFilters?.orderId
       ? "tat_ca"
       : initialFilters?.designStatus || "khong_nhap",
     viTriIn: "",
@@ -131,12 +135,13 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
     isLoading: dangTaiThietKe,
     isError: loiThietKe,
   } = useQuery({
-    queryKey: ["thiet-ke-danh-sach", trangHienTai, boDuc, idThietKeDangLoc],
+    queryKey: ["thiet-ke-danh-sach", trangHienTai, boDuc, idThietKeDangLoc, idDonHangDangLoc],
     queryFn: () =>
       designService.layDanhSachThietKe({
         page: trangHienTai,
         limit: 10,
         design_id: idThietKeDangLoc ?? undefined,
+        order_id: idDonHangDangLoc ?? undefined,
         tu_khoa: boDuc.tuKhoa,
         trang_thai: boDuc.trangThai,
         vi_tri_in: boDuc.viTriIn,
@@ -149,12 +154,14 @@ export default function DesignPage({ initialFilters }: DesignPageProps) {
   // ─── Xử lý thay đổi bộ lọc: reset về trang 1 ──────────────────────────
   function xuLyThayDoiBoDuc(boDucMoi: BoDucThietKe) {
     setIdThietKeDangLoc(null);
+    setIdDonHangDangLoc(null);
     setBoDuc(boDucMoi);
     setTrangHienTai(1);
   }
 
   function datLaiTatCaBoLoc() {
     setIdThietKeDangLoc(null);
+    setIdDonHangDangLoc(null);
     setBoDuc({
       tuKhoa: "",
       trangThai: "tat_ca",
