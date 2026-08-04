@@ -2275,4 +2275,5 @@ module.exports = {
   xoaSticker,
   layDanhSachViTriIn,
   layDanhSachPhuongPhapIn,
+  dongBoViTriInTheoCanvas,
 };

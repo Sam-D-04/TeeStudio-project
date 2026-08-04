@@ -2,6 +2,7 @@ const db = require("../../database/mysql");
 const { calculateBoundingBoxAreaFee } = require("../pricing/admin.pricing.service");
 const { chuanHoaCanvasData } = require("../../common/utils/canvas.util");
 const { sendDesignSubmittedToAdminEmail } = require("../../common/services/emailService");
+const { dongBoViTriInTheoCanvas } = require("../designs/admin.design.service");
 
 /**
  * Maps frontend shirtType to a database product ID.
@@ -66,13 +67,29 @@ async function saveNewDesign(userId, payload) {
   // Tự động tính designFee từ canvasData – Backend không tin tưởng giá trị FE gửi lên
   const designFee = calculateBoundingBoxAreaFee(canvasData);
 
-  const [result] = await db.pool.query(
-    `INSERT INTO CustomDesign (userId, name, productId, baseColor, canvasData, previewUrl, status, designFee) 
-     VALUES (?, ?, ?, ?, ?, ?, 'DRAFT', ?)`,
-    [userId, name || 'Thiết kế chưa đặt tên', productId, shirtColor, dataStr, previewUrl, designFee]
-  );
+  const conn = await db.pool.getConnection();
+  let insertId;
+  try {
+    await conn.beginTransaction();
 
-  return { id: result.insertId, designFee };
+    const [result] = await conn.query(
+      `INSERT INTO CustomDesign (userId, name, productId, baseColor, canvasData, previewUrl, status, designFee) 
+       VALUES (?, ?, ?, ?, ?, ?, 'DRAFT', ?)`,
+      [userId, name || 'Thiết kế chưa đặt tên', productId, shirtColor, dataStr, previewUrl, designFee]
+    );
+    insertId = result.insertId;
+
+    await dongBoViTriInTheoCanvas(conn, insertId, canvasData);
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+
+  return { id: insertId, designFee };
 }
 
 /**
@@ -104,12 +121,26 @@ async function updateDesign(userId, designId, payload) {
   // Tự động tính lại designFee mỗi lần user lưu (dữ liệu thay đổi thì phí cũng thay đổi)
   const designFee = calculateBoundingBoxAreaFee(canvasData);
 
-  await db.pool.query(
-    `UPDATE CustomDesign 
-     SET name = COALESCE(?, name), productId = ?, baseColor = ?, canvasData = ?, previewUrl = ?, designFee = ?
-     WHERE id = ?`,
-    [name || null, productId, shirtColor, dataStr, previewUrl, designFee, designId]
-  );
+  const conn = await db.pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    await conn.query(
+      `UPDATE CustomDesign 
+       SET name = COALESCE(?, name), productId = ?, baseColor = ?, canvasData = ?, previewUrl = ?, designFee = ?
+       WHERE id = ?`,
+      [name || null, productId, shirtColor, dataStr, previewUrl, designFee, designId]
+    );
+
+    await dongBoViTriInTheoCanvas(conn, designId, canvasData);
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 
   return { id: designId, designFee };
 }
