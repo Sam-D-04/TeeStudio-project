@@ -184,6 +184,12 @@ export default function CheckoutPage() {
     ? paymentOptions.filter((opt) => opt.value !== "COD")
     : paymentOptions;
 
+  useEffect(() => {
+    if (hasCustomDesign && form.getFieldValue("paymentMethod") === "COD") {
+      form.setFieldValue("paymentMethod", "VNPAY");
+    }
+  }, [hasCustomDesign, form]);
+
   /* ── Mã khuyến mãi ── */
   const [promoInput, setPromoInput]     = useState("");
   const [promoApplying, setPromoApplying] = useState(false);
@@ -516,7 +522,7 @@ export default function CheckoutPage() {
                   }}
                 >
                   <h2
-                    style={{
+                  style={{
                       fontSize: 15,
                       fontWeight: 800,
                       color: "#0f172a",
@@ -534,69 +540,12 @@ export default function CheckoutPage() {
                       />
                       <circle cx="12" cy="10" r="2.5" stroke="#0ea5e9" strokeWidth="1.8" />
                     </svg>
+                    Thông tin liên hệ & nhận hàng
                   </h2>
-
-                  {/* Phần chọn địa chỉ có sẵn nếu đã đăng nhập và có địa chỉ */}
-                  {userAddresses.length > 0 && (
-                    <div style={{ marginBottom: 20 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Chọn địa chỉ nhận hàng</span>
-                        <Button
-                          type="link"
-                          size="small"
-                          icon={<PlusOutlined />}
-                          onClick={() => handleSelectAddress("NEW")}
-                          disabled={selectedAddressId === "NEW"}
-                        >
-                          Thêm địa chỉ mới
-                        </Button>
-                      </div>
-                      <Select
-                        value={selectedAddressId === "NEW" ? undefined : selectedAddressId}
-                        placeholder={selectedAddressId === "NEW" ? "--- Đang thêm địa chỉ mới ---" : "Chọn địa chỉ..."}
-                        style={{ width: "100%", height: 40 }}
-                        onChange={(val) => handleSelectAddress(val)}
-                        options={userAddresses.map(a => ({
-                          value: a.id,
-                          label: `${a.recipientName} - ${a.phone} (${a.addressLine}, ${a.ward}, ${a.city})`
-                        }))}
-                      />
-                    </div>
-                  )}
-
-                  <div
-                    style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}
-                    className="max-sm:grid-cols-1"
-                  >
-                    <Form.Item
-                      name="recipientName"
-                      label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Họ và tên *</span>}
-                      rules={[{ required: true, message: "Vui lòng nhập họ tên" }]}
-                    >
-                      <Input
-                        placeholder="Nguyễn Văn A"
-                        style={{ height: 40, borderRadius: 8 }}
-                      />
-                    </Form.Item>
-
-                    <Form.Item
-                      name="phone"
-                      label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Số điện thoại *</span>}
-                      rules={[
-                        { required: true, message: "Vui lòng nhập số điện thoại" },
-                        { pattern: /^(0|\+84)[0-9]{8,9}$/, message: "Số điện thoại không hợp lệ" },
-                      ]}
-                    >
-                      <Input
-                        placeholder="0901 234 567"
-                        style={{ height: 40, borderRadius: 8 }}
-                      />
-                    </Form.Item>
-                  </div>
 
                   <Form.Item
                     name="email"
-                    label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Email *</span>}
+                    label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Email liên hệ *</span>}
                     rules={[
                       { required: true, message: "Vui lòng nhập email" },
                       { type: "email", message: "Email không hợp lệ" },
@@ -608,56 +557,164 @@ export default function CheckoutPage() {
                     />
                   </Form.Item>
 
-                  <div
-                    style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}
-                    className="max-sm:grid-cols-1"
-                  >
-                    <Form.Item
-                      name="provinceCode"
-                      label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Tỉnh/Thành phố *</span>}
-                      rules={[{ required: true, message: "Vui lòng chọn tỉnh/thành phố" }]}
+                  {/* Phần chọn địa chỉ có sẵn nếu đã đăng nhập và có địa chỉ */}
+                  {userAddresses.length > 0 && (
+                    <div style={{ marginBottom: 24, marginTop: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                        <span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Sổ địa chỉ của bạn</span>
+                      </div>
+                      
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {userAddresses.map(a => {
+                          const isSelected = selectedAddressId === a.id;
+                          return (
+                            <div 
+                              key={a.id}
+                              onClick={() => handleSelectAddress(a.id)}
+                              style={{ 
+                                padding: 16, 
+                                borderRadius: 12, 
+                                border: isSelected ? "2px solid #0ea5e9" : "1px solid #e2e8f0",
+                                background: isSelected ? "#f0f9ff" : "#fff",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease"
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                                <div>
+                                  <div style={{ fontWeight: 600, color: "#0f172a", marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
+                                    {a.recipientName}
+                                    {a.isDefault && (
+                                      <span style={{ fontSize: 10, padding: "2px 6px", background: "#0ea5e9", color: "#fff", borderRadius: 4, fontWeight: 700 }}>
+                                        Mặc định
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize: 13, color: "#475569", marginBottom: 4 }}>SĐT: {a.phone}</div>
+                                  <div style={{ fontSize: 13, color: "#475569" }}>{a.addressLine}, {a.ward}, {a.city}</div>
+                                </div>
+                                {isSelected && (
+                                  <div style={{ color: "#0ea5e9", display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, background: "#fff", borderRadius: "50%", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+
+                        {/* Nút thêm địa chỉ mới */}
+                        <div 
+                          onClick={() => handleSelectAddress("NEW")}
+                          style={{ 
+                            padding: 16, 
+                            borderRadius: 12, 
+                            border: selectedAddressId === "NEW" ? "2px solid #0ea5e9" : "1px dashed #cbd5e1",
+                            background: selectedAddressId === "NEW" ? "#f0f9ff" : "transparent",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            color: selectedAddressId === "NEW" ? "#0ea5e9" : "#64748b",
+                            fontWeight: 600,
+                            fontSize: 14,
+                            transition: "all 0.2s ease",
+                            justifyContent: "center"
+                          }}
+                        >
+                          <PlusOutlined /> Giao đến địa chỉ mới khác
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: selectedAddressId === "NEW" || userAddresses.length === 0 ? "block" : "none" }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "#0f172a", marginBottom: 12, marginTop: userAddresses.length > 0 ? 12 : 0 }}>
+                      {userAddresses.length > 0 ? "Nhập địa chỉ nhận hàng mới:" : ""}
+                    </div>
+                    <div
+                      style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}
+                      className="max-sm:grid-cols-1"
                     >
-                      <Select
-                        showSearch
-                        loading={addressLoading}
-                        placeholder="Tìm tỉnh/thành phố..."
-                        style={{ height: 40 }}
-                        options={provinces.map((p) => ({ value: p.Code, label: p.Name }))}
-                        filterOption={(input, option) =>
-                          stripDiacritics(option?.label ?? "").includes(stripDiacritics(input))
-                        }
-                        onChange={() => form.setFieldValue("wardCode", undefined)}
-                      />
-                    </Form.Item>
+                      <Form.Item
+                        name="recipientName"
+                        label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Họ và tên *</span>}
+                        rules={[{ required: true, message: "Vui lòng nhập họ tên" }]}
+                      >
+                        <Input
+                          placeholder="Nguyễn Văn A"
+                          style={{ height: 40, borderRadius: 8 }}
+                        />
+                      </Form.Item>
+
+                      <Form.Item
+                        name="phone"
+                        label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Số điện thoại *</span>}
+                        rules={[
+                          { required: true, message: "Vui lòng nhập số điện thoại" },
+                          { pattern: /^(0|\+84)[0-9]{8,9}$/, message: "Số điện thoại không hợp lệ" },
+                        ]}
+                      >
+                        <Input
+                          placeholder="0901 234 567"
+                          style={{ height: 40, borderRadius: 8 }}
+                        />
+                      </Form.Item>
+                    </div>
+                    
+                    <div
+                      style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}
+                      className="max-sm:grid-cols-1"
+                    >
+                      <Form.Item
+                        name="provinceCode"
+                        label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Tỉnh/Thành phố *</span>}
+                        rules={[{ required: true, message: "Vui lòng chọn tỉnh/thành phố" }]}
+                      >
+                        <Select
+                          showSearch
+                          loading={addressLoading}
+                          placeholder="Tìm tỉnh/thành phố..."
+                          style={{ height: 40 }}
+                          options={provinces.map((p) => ({ value: p.Code, label: p.Name }))}
+                          filterOption={(input, option) =>
+                            stripDiacritics(option?.label ?? "").includes(stripDiacritics(input))
+                          }
+                          onChange={() => form.setFieldValue("wardCode", undefined)}
+                        />
+                      </Form.Item>
+
+                      <Form.Item
+                        name="wardCode"
+                        label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Phường/Xã *</span>}
+                        rules={[{ required: true, message: "Vui lòng chọn phường/xã" }]}
+                      >
+                        <Select
+                          showSearch
+                          disabled={!provinceCode}
+                          placeholder={provinceCode ? "Tìm phường/xã..." : "Chọn tỉnh/thành phố trước"}
+                          style={{ height: 40 }}
+                          options={wardsForProvince.map((w) => ({ value: w.Code, label: w.Name }))}
+                          filterOption={(input, option) =>
+                            stripDiacritics(option?.label ?? "").includes(stripDiacritics(input))
+                          }
+                        />
+                      </Form.Item>
+                    </div>
 
                     <Form.Item
-                      name="wardCode"
-                      label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Phường/Xã *</span>}
-                      rules={[{ required: true, message: "Vui lòng chọn phường/xã" }]}
+                      name="addressDetail"
+                      label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Số nhà, tên đường *</span>}
+                      rules={[{ required: true, message: "Vui lòng nhập số nhà, tên đường" }]}
                     >
-                      <Select
-                        showSearch
-                        disabled={!provinceCode}
-                        placeholder={provinceCode ? "Tìm phường/xã..." : "Chọn tỉnh/thành phố trước"}
-                        style={{ height: 40 }}
-                        options={wardsForProvince.map((w) => ({ value: w.Code, label: w.Name }))}
-                        filterOption={(input, option) =>
-                          stripDiacritics(option?.label ?? "").includes(stripDiacritics(input))
-                        }
+                      <Input
+                        placeholder="Vd: 12 Nguyễn Trãi"
+                        style={{ height: 40, borderRadius: 8 }}
                       />
                     </Form.Item>
                   </div>
-
-                  <Form.Item
-                    name="addressDetail"
-                    label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Số nhà, tên đường *</span>}
-                    rules={[{ required: true, message: "Vui lòng nhập số nhà, tên đường" }]}
-                  >
-                    <Input
-                      placeholder="Vd: 12 Nguyễn Trãi"
-                      style={{ height: 40, borderRadius: 8 }}
-                    />
-                  </Form.Item>
 
                   <Form.Item
                     name="note"

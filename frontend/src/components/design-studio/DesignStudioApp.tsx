@@ -560,10 +560,22 @@ export default function DesignStudioApp() {
     return result;
   };
 
-  /* Mở modal thêm vào giỏ: chụp ảnh in (nếu có thiết kế) rồi mới mở */
+  /* Mở modal thêm vào giỏ: lưu thiết kế trước, chụp ảnh in (nếu có thiết kế) rồi mới mở */
   const handleOpenCart = async () => {
     setSelectedId(null);
     if (elements.length > 0) {
+      if (!accessToken) {
+        message.warning("Vui lòng đăng nhập để lưu thiết kế trước khi thêm vào giỏ hàng!");
+        return;
+      }
+
+      showToast("Đang lưu bản cập nhật thiết kế...");
+      const designName = useDesignStore.getState().designName || "Thiết kế mới";
+      const saved = await handleConfirmSave(designName);
+      if (!saved) {
+        return; // Lỗi khi lưu thì không mở modal
+      }
+
       showToast("Đang chuẩn bị ảnh in...");
       const { printImageFront: front, printImageBack: back } = await capturePrintImages();
       setPrintImageFront(front);
