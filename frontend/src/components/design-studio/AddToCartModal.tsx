@@ -34,9 +34,10 @@ interface Props {
   printImageBack?: string;
   /** Ảnh đại diện thiết kế (base64 hoặc URL) — chỉ để hiển thị thumbnail trong giỏ hàng */
   designPreviewUrl?: string;
+  designFee?: number;
 }
 
-export default function AddToCartModal({ open, onClose, productId, shirtColor, designId, printImageFront, printImageBack, designPreviewUrl }: Props) {
+export default function AddToCartModal({ open, onClose, productId, shirtColor, designId, printImageFront, printImageBack, designPreviewUrl, designFee }: Props) {
   const addItem   = useCartStore((s) => s.addItem);
   const cartItems = useCartStore((s) => s.items);
 
@@ -154,6 +155,7 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
         color: colorHex,
         colorLabel,
         price: product.basePrice,
+        designFee: designFee ?? 0,
         quantity: qty,
         designId,
         printImageFront,
@@ -323,11 +325,12 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
               <div>
                 <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>Tổng cộng ({totalQty} sản phẩm)</p>
                 <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0ea5e9" }}>
-                  {fmt(product.basePrice * totalQty)}
+                  {fmt((product.basePrice + (designFee || 0)) * totalQty)}
                 </p>
               </div>
-              <div style={{ fontSize: 12, color: "#94a3b8", textAlign: "right" }}>
-                {fmt(product.basePrice)} × {totalQty}
+              <div style={{ fontSize: 12, color: "#94a3b8", textAlign: "right", display: "flex", flexDirection: "column", gap: 2 }}>
+                <span>{fmt(product.basePrice)} × {totalQty} (áo)</span>
+                {designFee ? <span>+ {fmt(designFee)} × {totalQty} (in)</span> : null}
               </div>
             </div>
 

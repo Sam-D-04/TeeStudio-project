@@ -144,6 +144,11 @@ export default function CartDrawer({ open, onClose }: Props) {
                     <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: item.color, border: "1px solid #e2e8f0" }} />
                     {item.colorLabel}
                   </span>
+                  {(item.designFee ?? 0) > 0 && (
+                    <span style={{ fontSize: 11, color: "#7c3aed", background: "#ede9fe", borderRadius: 5, padding: "1px 7px", fontWeight: 600 }}>
+                      + Thiết kế
+                    </span>
+                  )}
                   {item.stockQty !== undefined && item.stockQty === 1 && (
                     <span style={{ fontSize: 10, color: "#d97706", background: "#fffbeb", borderRadius: 4, padding: "1px 6px", border: "1px solid #fef3c7", fontWeight: 600 }}>
                       Chỉ còn 1 sp
@@ -186,7 +191,7 @@ export default function CartDrawer({ open, onClose }: Props) {
                   })()}
 
                   <span style={{ fontSize: 14, fontWeight: 800, color: "#0ea5e9" }}>
-                    {fmt(item.price * item.quantity)}
+                    {fmt((item.price + (item.designFee || 0)) * item.quantity)}
                   </span>
 
                   <button

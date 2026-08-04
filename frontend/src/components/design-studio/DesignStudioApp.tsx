@@ -896,6 +896,7 @@ export default function DesignStudioApp() {
         designId={currentDesignId ?? undefined}
         printImageFront={printImageFront}
         printImageBack={printImageBack}
+        designFee={designFeeInfo.fee}
         designPreviewUrl={printImageFront ?? printImageBack}
       />
 

@@ -34,6 +34,7 @@ async function layGioHang(userId) {
        pv.productId,
        p.name         AS productName,
        p.basePrice    AS price,
+       cd.designFee  AS designFee,
        -- Ưu tiên ảnh xem trước của thiết kế riêng (nếu có) thay vì ảnh phôi áo gốc,
        -- để giỏ hàng hiển thị đúng sản phẩm khách đã thiết kế.
        COALESCE(

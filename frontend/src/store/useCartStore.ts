@@ -24,6 +24,8 @@ export interface CartItem {
   stockQty?: number;
   /** ID của CustomDesign (nếu là sản phẩm có thiết kế riêng) */
   designId?: number;
+  /** Phụ phí thiết kế nếu có (ví dụ: in 1 mặt, 2 mặt) */
+  designFee?: number;
   /**
    * Ảnh in print-ready (base64 PNG nền trong suốt) export từ canvas Design Studio -
    * tối đa 2 ảnh (mặt trước/sau), mặt nào khách không thiết kế thì undefined.
@@ -72,6 +74,7 @@ function apiItemToCartItem(item: CartItemFromAPI): CartItem {
     color: item.color,
     colorLabel: item.color,
     price: item.price,
+    designFee: item.designFee ?? 0,
     quantity: item.quantity,
     stockQty: item.stockQty,
     designId: item.designId ?? undefined,
@@ -85,7 +88,7 @@ export const useCartStore = create<CartState>()(
 
       totalItems: () => get().items.reduce((acc, i) => acc + i.quantity, 0),
       totalPrice: () =>
-        get().items.reduce((acc, i) => acc + i.price * i.quantity, 0),
+        get().items.reduce((acc, i) => acc + (i.price + (i.designFee || 0)) * i.quantity, 0),
 
       addItem: (item) => {
         const id = buildCartItemId(item.variantId, item.designId);

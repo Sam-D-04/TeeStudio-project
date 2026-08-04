@@ -313,6 +313,20 @@ export default function CartPage() {
                           />
                           {item.colorLabel}
                         </span>
+                        {(item.designFee ?? 0) > 0 && (
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "#7c3aed",
+                              background: "#ede9fe",
+                              borderRadius: 6,
+                              padding: "2px 8px",
+                              fontWeight: 600,
+                            }}
+                          >
+                            + Phí in thiết kế: {formatVND(item.designFee ?? 0)}
+                          </span>
+                        )}
                         {item.stockQty !== undefined && item.stockQty === 1 && (
                           <span
                             style={{
@@ -432,7 +446,7 @@ export default function CartPage() {
                             color: "#0ea5e9",
                           }}
                         >
-                          {formatVND(item.price * item.quantity)}
+                          {formatVND((item.price + (item.designFee || 0)) * item.quantity)}
                         </span>
 
                         {/* Remove */}

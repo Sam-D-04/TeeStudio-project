@@ -1,0 +1,1 @@
+- bỏ mục "phôi áo" trong design studio luôn, đổi ở đó chỉ đổi được box canvas hiện không đổi được giữa các loại áo nữa

@@ -12,6 +12,7 @@ export interface CartItemFromAPI {
   productId: number;
   productName: string;
   price: number;
+  designFee?: number;
   image: string | null;
 }
 

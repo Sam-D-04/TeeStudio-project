@@ -20,6 +20,8 @@ export interface ProductImage {
   url: string;
   altText: string;
   isPrimary: boolean;
+  colorHex?: string;
+  view?: "front" | "back" | "model";
 }
 
 // Một mốc ưu đãi số lượng: mua từ minQty trở lên được giảm discountPercent %
@@ -252,7 +254,7 @@ export default function ProductDetailClient({ product }: Props) {
 
   const [selectedColor, setSelectedColor] = useState(() => initialColor);
   const [selectedSize, setSelectedSize] = useState("");
-  const [previewTab, setPreviewTab] = useState<"front" | "back">("front");
+  const [previewTab, setPreviewTab] = useState<"front" | "back" | "model">("front");
   const [activeTab, setActiveTab] = useState<"detail" | "size">("detail");
 
   // ── Zoom ảnh kiểu kính lúp (theo vị trí con trỏ) ──
@@ -321,10 +323,18 @@ export default function ProductDetailClient({ product }: Props) {
 
   const dbImageFront = findDbImage(selectedColor, "front");
   const dbImageBack = findDbImage(selectedColor, "back");
+  const dbImageModel = product.images?.find((img) => 
+    img.view === 'model' && 
+    (img.colorHex?.toLowerCase() === colorHex.toLowerCase() || 
+     img.altText?.toLowerCase().includes(englishColor.toLowerCase()))
+  )?.url;
 
   // Mockup image: ưu tiên ảnh từ DB, fallback về MOCKUP_MAP (Cloudinary hoặc local)
-  const mockupUrl = (previewTab === "front" ? dbImageFront : dbImageBack)
-    || MOCKUP_MAP[product.form]?.[englishColor]?.[previewTab];
+  let mockupUrl = undefined;
+  if (previewTab === "front") mockupUrl = dbImageFront || MOCKUP_MAP[product.form]?.[englishColor]?.front;
+  else if (previewTab === "back") mockupUrl = dbImageBack || MOCKUP_MAP[product.form]?.[englishColor]?.back;
+  else if (previewTab === "model") mockupUrl = dbImageModel;
+
   const hasMockup = !!mockupUrl;
 
   const addItem = useCartStore((s) => s.addItem);
@@ -415,28 +425,31 @@ export default function ProductDetailClient({ product }: Props) {
                     background: "#f8fafc",
                   }}
                 >
-                  {(["front", "back"] as const).map(tab => (
-                    <button
-                      key={tab}
-                      onClick={() => setPreviewTab(tab)}
-                      style={{
-                        flex: 1,
-                        padding: "12px 0",
-                        background: "none",
-                        border: "none",
-                        borderBottom: previewTab === tab ? "2px solid #0ea5e9" : "2px solid transparent",
-                        color: previewTab === tab ? "#0ea5e9" : "#94a3b8",
-                        fontWeight: previewTab === tab ? 700 : 500,
-                        fontSize: 13,
-                        cursor: "pointer",
-                        transition: "all 0.15s",
-                        fontFamily: "inherit",
-                        letterSpacing: "0.3px",
-                      }}
-                    >
-                      {tab === "front" ? "Mặt trước" : "Mặt sau"}
-                    </button>
-                  ))}
+                  {(["front", "back", "model"] as const).map(tab => {
+                    if (tab === "model" && !dbImageModel) return null; // Ẩn tab người mẫu nếu không có ảnh
+                    return (
+                      <button
+                        key={tab}
+                        onClick={() => setPreviewTab(tab)}
+                        style={{
+                          flex: 1,
+                          padding: "12px 0",
+                          background: "none",
+                          border: "none",
+                          borderBottom: previewTab === tab ? "2px solid #0ea5e9" : "2px solid transparent",
+                          color: previewTab === tab ? "#0ea5e9" : "#94a3b8",
+                          fontWeight: previewTab === tab ? 700 : 500,
+                          fontSize: 13,
+                          cursor: "pointer",
+                          transition: "all 0.15s",
+                          fontFamily: "inherit",
+                          letterSpacing: "0.3px",
+                        }}
+                      >
+                        {tab === "front" ? "Mặt trước" : tab === "back" ? "Mặt sau" : "Trên người mẫu"}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {/* Khu vực hiển thị ảnh áo */}

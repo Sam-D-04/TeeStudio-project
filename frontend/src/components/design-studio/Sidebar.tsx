@@ -72,7 +72,7 @@ export default function Sidebar({
   lockShirtOptions = false,
   isReadOnly = false,
 }: SidebarProps) {
-  const [activeTab, setActiveTab] = React.useState<TabId>(isReadOnly ? "shirt" : "images");
+  const [activeTab, setActiveTab] = React.useState<TabId>(isReadOnly ? "images" : "images");
   const [stickers, setStickers] = React.useState<any[]>([]);
   const [hasFetchedStickers, setHasFetchedStickers] = React.useState<boolean>(false);
   const [activeCategorySticker, setActiveCategorySticker] = React.useState<string>("Tất cả");
@@ -132,7 +132,6 @@ export default function Sidebar({
     { id: "images", label: "Hình ảnh", icon: <ImageIcon /> },
     { id: "stickers", label: "Họa tiết", icon: <StickerIcon /> },
     { id: "text", label: "Văn bản", icon: <TypeIcon /> },
-    { id: "shirt", label: "Phôi áo", icon: <ShirtIcon /> },
     { id: "ai", label: "Trợ lý", icon: <AiIcon /> },
     {
       id: "my-designs",
@@ -356,72 +355,7 @@ export default function Sidebar({
           </>
         )}
 
-        {/* ── Tab Phôi áo ── */}
-        {activeTab === "shirt" && (
-          <>
-            <div className="ds-section-title">Loại áo</div>
-            <div className="ds-shirt-grid">
-              {(["tshirt", "polo", "hoodie"] as ShirtType[]).map((type) => (
-                <button
-                  key={type}
-                  className={`ds-shirt-option ${shirtType === type ? "ds-shirt-option--active" : ""}`}
-                  disabled={lockShirtOptions}
-                  onClick={() => {
-                    if (!lockShirtOptions) setShirtType(type);
-                  }}
-                  title={lockShirtOptions ? "Phôi áo đã gắn với đơn hàng" : undefined}
-                >
-                  <ShirtMiniIcon type={type} />
-                  {type === "tshirt" ? "Áo Thun" : type === "polo" ? "Áo Polo" : "Hoodie"}
-                </button>
-              ))}
-            </div>
-
-            <div className="ds-section-title">Mặt hiển thị</div>
-            <div className="ds-view-toggle">
-              <button
-                className={shirtView === "front" ? "active" : ""}
-                onClick={() => setShirtView("front")}
-              >
-                Mặt trước
-              </button>
-              <button
-                className={shirtView === "back" ? "active" : ""}
-                onClick={() => setShirtView("back")}
-              >
-                Mặt sau
-              </button>
-            </div>
-
-            <div className="ds-section-title">Màu áo</div>
-            <div className="ds-color-swatches" style={{ marginBottom: 16 }}>
-              {availableColors.length === 0 ? (
-                <div style={{ color: "#64748b", fontSize: 12 }}>Đang tải...</div>
-              ) : (
-                availableColors.map((color) => (
-                  <button
-                    key={color}
-                    className={`ds-color-swatch ${shirtColor === color ? "ds-color-swatch--active" : ""}`}
-                    style={{
-                      backgroundColor: color,
-                      opacity: lockShirtOptions && shirtColor !== color ? 0.35 : undefined,
-                      cursor: lockShirtOptions ? "not-allowed" : undefined,
-                    }}
-                    disabled={lockShirtOptions}
-                    onClick={() => {
-                      if (!lockShirtOptions) setShirtColor(color);
-                    }}
-                    title={lockShirtOptions ? "Màu áo phôi đã gắn với đơn hàng" : color}
-                  >
-                    {shirtColor === color && (
-                      <span style={{ color: color === "#ffffff" ? "#000" : "#fff" }}>✓</span>
-                    )}
-                  </button>
-                ))
-              )}
-            </div>
-          </>
-        )}
+        {/* ── Tab Phôi áo ── Removed per user request */}
         {/* ── Tab Trợ lý AI ── */}
         {activeTab === "ai" && (
           <AiAssistantPanel />
