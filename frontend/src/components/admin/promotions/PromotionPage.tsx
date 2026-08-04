@@ -11,6 +11,7 @@ import PromotionFilterBar, { type BoDucMaKhuyenMai } from "./PromotionFilterBar"
 import PromotionTable from "./PromotionTable";
 import PromotionPagination from "./PromotionPagination";
 import PromotionDrawer, { type FormMaKhuyenMai } from "./PromotionDrawer";
+import PromotionDetailModal from "./PromotionDetailModal";
 import BulkPricingTab from "./BulkPricingTab";
 import PrintSurchargeTab from "./PrintSurchargeTab";
 import PriceFormulaTab from "./PriceFormulaTab";
@@ -85,6 +86,9 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
   const [dangSuaId, setDangSuaId] = useState<number | null>(null);
   const [phienMoDrawer, setPhienMoDrawer] = useState(0);
 
+  const [moModalChiTiet, setMoModalChiTiet] = useState(false);
+  const [dangXemId, setDangXemId] = useState<number | null>(null);
+
   const statsQuery = useQuery({
     queryKey: ["admin-promotions", "stats"],
     queryFn: promotionService.layThongKeKhuyenMai,
@@ -139,6 +143,7 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
 
   const danhSach = listQuery.data?.danhSach ?? [];
   const maDangSua = danhSach.find((item) => item.id === dangSuaId) ?? null;
+  const maDangXem = danhSach.find((item) => item.id === dangXemId) ?? null;
   const thongKe = statsQuery.data;
 
   function moTaoMoi() {
@@ -151,6 +156,11 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
     setDangSuaId(id);
     setPhienMoDrawer((value) => value + 1);
     setMoDrawer(true);
+  }
+
+  function moXemChiTiet(id: number) {
+    setDangXemId(id);
+    setMoModalChiTiet(true);
   }
 
   function doiBoLoc(value: BoDucMaKhuyenMai) {
@@ -338,7 +348,7 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
             ) : (
               <PromotionTable
                 danhSach={danhSach}
-                onXem={moChinhSua}
+                onXem={moXemChiTiet}
                 onSua={moChinhSua}
                 onXoa={(id) => {
                   modal.confirm({
@@ -380,6 +390,15 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
         }}
         onLuu={(form) => saveMutation.mutate(form)}
         dangLuu={saveMutation.isPending}
+      />
+
+      <PromotionDetailModal
+        open={moModalChiTiet}
+        onClose={() => {
+          setMoModalChiTiet(false);
+          setDangXemId(null);
+        }}
+        promotion={maDangXem}
       />
     </>
   );
