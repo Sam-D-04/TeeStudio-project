@@ -672,16 +672,15 @@ export default function DesignStudioApp() {
       />
 
       <div className="ds-body">
-        {!isRevisionMode && (
-          <Sidebar
-            uploadedImages={uploadedImages}
-            onUploadImages={handleUploadImages}
-            onRemoveUploadedImage={handleRemoveUploadedImage}
-            onAddImageToCanvas={handleAddImageToCanvas}
-            lockShirtOptions={isApproved}
-            isReadOnly={isApproved}
-          />
-        )}
+        <Sidebar
+          uploadedImages={uploadedImages}
+          onUploadImages={handleUploadImages}
+          onRemoveUploadedImage={handleRemoveUploadedImage}
+          onAddImageToCanvas={handleAddImageToCanvas}
+          lockShirtOptions={isApproved || isRevisionMode}
+          isReadOnly={isApproved}
+          showMyDesigns={!isRevisionMode}
+        />
 
         {/* ─── Khu vực làm việc chính (áo + canvas thiết kế) ─── */}
         <div
@@ -865,8 +864,8 @@ export default function DesignStudioApp() {
               </button>
             </div>
 
-            {/* Chọn Màu (Chỉ hiển thị khi có màu) */}
-            {availableColors.length > 0 && (
+            {/* Chọn Màu (Chỉ hiển thị khi có màu và không ở chế độ revision) */}
+            {availableColors.length > 0 && !isRevisionMode && (
               <div
                 style={{
                   display: "flex",

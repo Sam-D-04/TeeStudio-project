@@ -150,14 +150,18 @@ export default function Toolbar({
           <RedoIcon />
         </button>
         <div className="ds-toolbar-divider" />
-        <button className="ds-toolbar-btn" onClick={onNewDesign} title="Tạo thiết kế mới"
-          disabled={isReadOnly}>
-          <PlusIcon /> Tạo mới
-        </button>
-        {isAuthenticated && (
-          <button className="ds-toolbar-btn" onClick={onOpenMyDesigns} title="Mở thiết kế đã lưu">
-            <FolderIcon /> Mở thiết kế
-          </button>
+        {!isRevisionMode && (
+          <>
+            <button className="ds-toolbar-btn" onClick={onNewDesign} title="Tạo thiết kế mới"
+              disabled={isReadOnly}>
+              <PlusIcon /> Tạo mới
+            </button>
+            {isAuthenticated && (
+              <button className="ds-toolbar-btn" onClick={onOpenMyDesigns} title="Mở thiết kế đã lưu">
+                <FolderIcon /> Mở thiết kế
+              </button>
+            )}
+          </>
         )}
         <button
           className="ds-toolbar-btn ds-toolbar-btn--icon"
