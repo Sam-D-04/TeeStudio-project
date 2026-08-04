@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CloseOutlined } from "@ant-design/icons";
-import { Drawer } from "antd";
+import { Drawer, Switch } from "antd";
 import type { MaKhuyenMai } from "./PromotionTable";
 
 /**
@@ -478,31 +478,33 @@ export default function PromotionDrawer({
             </label>
           </div>
 
-          <div style={{ paddingTop: 4 }}>
-            <label
+          <div style={{ paddingTop: 8, paddingBottom: 8 }}>
+            <div
               style={{
                 display: "flex",
-                alignItems: "flex-start",
-                gap: 8,
-                cursor: "pointer",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 16px",
+                backgroundColor: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: 8,
               }}
             >
-              <input
-                type="checkbox"
+              <div>
+                <label style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", display: "block" }}>
+                  Trạng thái hoạt động
+                </label>
+                <span style={{ fontSize: 12, color: "#64748b" }}>
+                  {form.dangHoatDong ? "Đang cho phép sử dụng mã khuyến mãi" : "Đã tạm dừng mã khuyến mãi"}
+                </span>
+              </div>
+              <Switch
                 checked={form.dangHoatDong}
-                onChange={(e) => capNhatTruong("dangHoatDong", e.target.checked)}
-                style={{
-                  accentColor: "#0ea5e9",
-                  width: 16,
-                  height: 16,
-                  marginTop: 2,
-                  cursor: "pointer",
-                }}
+                onChange={(checked) => capNhatTruong("dangHoatDong", checked)}
+                checkedChildren="Đang hoạt động"
+                unCheckedChildren="Tạm dừng"
               />
-              <span style={{ fontSize: 13, color: "#0f172a", lineHeight: "20px" }}>
-                Cho phép sử dụng mã khuyến mãi
-              </span>
-            </label>
+            </div>
           </div>
         </div>
 

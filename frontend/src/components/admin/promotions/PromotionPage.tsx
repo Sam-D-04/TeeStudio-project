@@ -58,7 +58,7 @@ const doiFormSangPayload = (
 });
 
 function PromotionContent({ initialFilters }: PromotionPageProps) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [resetKey, setResetKey] = useState(0);
@@ -341,9 +341,16 @@ function PromotionContent({ initialFilters }: PromotionPageProps) {
                 onXem={moChinhSua}
                 onSua={moChinhSua}
                 onXoa={(id) => {
-                  if (window.confirm("Bạn có chắc muốn xóa mã khuyến mãi này?")) {
-                    deleteMutation.mutate(id);
-                  }
+                  modal.confirm({
+                    title: "Xác nhận xóa",
+                    content: "Bạn có chắc muốn xóa mã khuyến mãi này?",
+                    okText: "Xóa",
+                    okType: "danger",
+                    cancelText: "Hủy",
+                    onOk: () => {
+                      deleteMutation.mutate(id);
+                    },
+                  });
                 }}
               />
             )}

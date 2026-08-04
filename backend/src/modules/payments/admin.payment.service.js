@@ -393,12 +393,11 @@ async function layThongKeThanhToan() {
        AND DATE(paidAt) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`
   );
 
-  // Giao dịch online đang chờ thanh toán (VNPAY/MOMO PENDING)
+  // Giao dịch đang chờ thanh toán (PENDING)
   const [choThanhToanRows] = await db.pool.query(
     `SELECT COUNT(*) AS soLuong
      FROM Payment
-     WHERE status = 'PENDING'
-       AND paymentMethod IN ('VNPAY', 'MOMO')`
+     WHERE status = 'PENDING'`
   );
 
   // Giao dịch COD đã giao hàng, đang chờ kế toán đối soát

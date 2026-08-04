@@ -282,10 +282,10 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
   // Xây dựng PaymentDetail từ detailQuery
   const selectedPayment: PaymentDetail | null = detailQuery.data
     ? {
-        ...detailQuery.data,
-        createdAt: detailQuery.data.createdAt || "",
-        ipnHistory: detailQuery.data.ipnHistory || [],
-      }
+      ...detailQuery.data,
+      createdAt: detailQuery.data.createdAt || "",
+      ipnHistory: detailQuery.data.ipnHistory || [],
+    }
     : null;
 
   // ===== FORMAT HELPERS =====
@@ -362,11 +362,10 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
           badge={
             stats && stats.phanTramThayDoi !== 0 ? (
               <span
-                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${
-                  stats.phanTramThayDoi >= 0
+                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${stats.phanTramThayDoi >= 0
                     ? "bg-[#dcfce7] text-[#059669]"
                     : "bg-[#fee2e2] text-[#b91c1c]"
-                }`}
+                  }`}
               >
                 <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                   {stats.phanTramThayDoi >= 0 ? (

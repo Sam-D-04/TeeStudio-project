@@ -23,7 +23,7 @@ const inputStyle: React.CSSProperties = {
 type FormValues = { minQty: number; discountPercent: number };
 
 function BulkPricingContent() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
   const [productId, setProductId] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -211,9 +211,16 @@ function BulkPricingContent() {
                       <button
                         title="Xóa"
                         onClick={() => {
-                          if (window.confirm("Bạn có chắc muốn xóa mức giá này?")) {
-                            deleteMutation.mutate(tier.id);
-                          }
+                          modal.confirm({
+                            title: "Xác nhận xóa",
+                            content: "Bạn có chắc muốn xóa mức giá này?",
+                            okText: "Xóa",
+                            okType: "danger",
+                            cancelText: "Hủy",
+                            onOk: () => {
+                              deleteMutation.mutate(tier.id);
+                            },
+                          });
                         }}
                         style={{ cursor: "pointer", color: "#b91c1c" }}
                       >
