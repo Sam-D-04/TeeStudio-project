@@ -389,26 +389,26 @@ const sendDesignRevisionEmail = async ({
       ].join("\n"),
       html: `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#0f172a;line-height:1.6">
-          <h2 style="color:#ea580c">Yêu cầu chỉnh sửa thiết kế</h2>
+          <h2 style="color:#0ea5e9">Yêu cầu chỉnh sửa thiết kế</h2>
           <p>Xin chào <strong>${safeName}</strong>,</p>
           <p>
             Thiết kế <strong>${safeMa}</strong> của bạn cần được chỉnh sửa
             trước khi tiếp tục xử lý đơn hàng.
           </p>
-          <div style="padding:16px 20px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;margin:16px 0">
-            <p style="margin:0 0 8px;font-weight:bold;color:#9a3412">Lý do / Ghi chú từ TeeStudio:</p>
+          <div style="padding:16px 20px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;margin:16px 0">
+            <p style="margin:0 0 8px;font-weight:bold;color:#075985">Lý do / Ghi chú từ TeeStudio:</p>
             <p style="margin:0;white-space:pre-wrap">${safeGhiChu}</p>
           </div>
           ${safeLink ? `
           <div style="text-align:center;margin:24px 0">
             <a href="${safeLink}"
-               style="display:inline-block;padding:12px 28px;background:#ea580c;color:#ffffff;
+               style="display:inline-block;padding:12px 28px;background:#0ea5e9;color:#ffffff;
                       border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;
                       letter-spacing:0.3px">
               ✏️ Chỉnh sửa thiết kế ngay
             </a>
             <p style="margin-top:10px;font-size:12px;color:#94a3b8">
-              Hoặc dán đường dẫn: <a href="${safeLink}" style="color:#ea580c">${safeLink}</a>
+              Hoặc dán đường dẫn: <a href="${safeLink}" style="color:#0ea5e9">${safeLink}</a>
             </p>
           </div>
           ` : `<p>Vui lòng đăng nhập vào tài khoản TeeStudio để xem và chỉnh sửa thiết kế của bạn.</p>`}
