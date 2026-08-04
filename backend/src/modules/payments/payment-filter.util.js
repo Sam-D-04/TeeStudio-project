@@ -49,6 +49,17 @@ function taoBoLocThanhToan(queryParams = {}) {
     params.push(denNgay);
   }
 
+  // Khi lọc theo ngày thanh toán mà không chọn loại trạng thái cụ thể
+  // → chỉ lấy giao dịch đã COMPLETED (tức là đã thực nhận tiền), khớp với tienDaThu
+  if (
+    queryParams.kieuNgay === "ngay_thanh_toan" &&
+    trangThai === "tat_ca" &&
+    (tuNgay || denNgay || thoiGian)
+  ) {
+    conditions.push("p.status = 'COMPLETED'");
+    conditions.push("p.paymentType NOT IN ('REFUND', 'COMPENSATION')");
+  }
+
   return {
     whereClause: conditions.length ? `WHERE ${conditions.join(" AND ")}` : "",
     params,

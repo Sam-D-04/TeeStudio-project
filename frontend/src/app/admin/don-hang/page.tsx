@@ -25,15 +25,23 @@ function layGiaTriDauTien(value: string | string[] | undefined): string {
 }
 
 function chuyenTrangThaiSangBoLoc(value: string): string {
+  // Trước tiên kiểm tra nếu đã là frontend filter key
+  const FRONTEND_KEYS = ["tat_ca", "cho_xac_nhan", "da_xac_nhan", "dang_xu_ly_in", "cho_giao", "dang_giao", "hoan_tat", "da_huy"];
+  if (FRONTEND_KEYS.includes(value)) return value;
+
+  // Sau đó mới map từ DB status (uppercase)
   const statuses = value
     .split(",")
     .map((status) => status.trim().toUpperCase())
     .filter(Boolean);
 
   if (statuses.includes("PENDING")) return "cho_xac_nhan";
+  if (statuses.includes("CONFIRMED")) return "da_xac_nhan";
   if (statuses.includes("PROCESSING") || statuses.includes("PRINTING")) {
     return "dang_xu_ly_in";
   }
+  if (statuses.includes("READY_TO_SHIP")) return "cho_giao";
+  if (statuses.includes("SHIPPING") || statuses.includes("DELIVERING")) return "dang_giao";
   if (statuses.includes("CANCELLED")) return "da_huy";
   if (statuses.includes("COMPLETED") || statuses.includes("DELIVERED")) {
     return "hoan_tat";
@@ -43,6 +51,11 @@ function chuyenTrangThaiSangBoLoc(value: string): string {
 }
 
 function chuyenThanhToanSangBoLoc(value: string): string {
+  // Kiểm tra nếu đã là frontend filter key
+  const FRONTEND_PAYMENT_KEYS = ["tat_ca", "da_dat_coc", "da_thanh_toan", "cho_thanh_toan", "can_doi_soat"];
+  if (FRONTEND_PAYMENT_KEYS.includes(value)) return value;
+
+  // Map từ DB payment status
   const payment = value.trim().toUpperCase();
 
   if (payment === "PENDING") return "cho_thanh_toan";
@@ -66,13 +79,16 @@ export default async function AdminOrdersPage({
   const date = layGiaTriDauTien(params.date);
   const from = layGiaTriDauTien(params.from);
   const to = layGiaTriDauTien(params.to);
+  // Cũng chấp nhận startDate/endDate (dùng từ trang thống kê)
+  const startDate = layGiaTriDauTien(params.startDate);
+  const endDate = layGiaTriDauTien(params.endDate);
   const hour = layGiaTriDauTien(params.hour);
   const excludeStatus = layGiaTriDauTien(params.excludeStatus).toUpperCase();
   const initialFilters = {
     status: chuyenTrangThaiSangBoLoc(layGiaTriDauTien(params.status)),
     payment: chuyenThanhToanSangBoLoc(layGiaTriDauTien(params.payment)),
-    startDate: laNgayHopLe(date) ? date : laNgayHopLe(from) ? from : "",
-    endDate: laNgayHopLe(date) ? date : laNgayHopLe(to) ? to : "",
+    startDate: laNgayHopLe(date) ? date : laNgayHopLe(from) ? from : laNgayHopLe(startDate) ? startDate : "",
+    endDate: laNgayHopLe(date) ? date : laNgayHopLe(to) ? to : laNgayHopLe(endDate) ? endDate : "",
     dateField:
       layGiaTriDauTien(params.dateField) === "completed"
         ? ("completed" as const)

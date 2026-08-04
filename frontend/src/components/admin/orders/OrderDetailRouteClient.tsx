@@ -532,7 +532,7 @@ function OrderDetailContent({
               {isPaid ? (
                 <Tag color="green" className="m-0 text-xs">
                   <CheckCircleFilled className="mr-1" />
-                  Ghi nhận lúc {formatDateTime(order.thanhToan.paidAt)}
+                  Hoàn tất thanh toán lúc {formatDateTime(order.thanhToan.paidAt)}
                 </Tag>
               ) : null}
             </div>

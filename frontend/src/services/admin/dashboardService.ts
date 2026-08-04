@@ -40,7 +40,6 @@ export type DiemBieuDo = {
   nhan: string;       // Nhãn hiển thị trên trục X
   doanhThuVnd: number;
   soDonHoanTat: number;
-  soDonDat: number;
 };
 
 export type DashboardGroupBy = "hour" | "day" | "month";
@@ -50,7 +49,6 @@ export type DuLieuBieuDo = {
   danhSach: DiemBieuDo[];
   tongDoanhThuVnd: number;
   tongDonHoanTat: number;
-  tongSoDonDat?: number;
   doanhThuLonNhatVnd: number;
   groupBy: DashboardGroupBy;
   khoangThoiGian: KhoangThoiGian;
@@ -158,7 +156,7 @@ export async function layThietKeCanXuLy(): Promise<ThietKeCanXuLy[]> {
  * GET /api/admin/dashboard/ton-kho-canh-bao
  */
 export async function layTonKhoCanhBao(
-  nguong = 15,
+  nguong = 50,
   limit = 10
 ): Promise<TonKhoItem[]> {
   const res = await apiClient.get<{ success: boolean; data: TonKhoItem[] }>(

@@ -87,7 +87,7 @@ export default function AdminDashboard() {
   // ── Truy vấn 4: Tồn kho cảnh báo ──
   const { data: tonKhoRaw } = useQuery({
     queryKey: ["dashboard/ton-kho-canh-bao"],
-    queryFn: () => dashboardService.layTonKhoCanhBao(15, 10),
+    queryFn: () => dashboardService.layTonKhoCanhBao(50, 10),
     staleTime: 120_000,
   });
 
@@ -140,7 +140,7 @@ export default function AdminDashboard() {
   // ── Cấu hình thẻ chỉ số hàng 1 ──
   const primaryMetrics = [
     {
-      label: "Doanh thu tháng này",
+      label: "Doanh thu",
       value: isLoadingChiSo ? "..." : formatTienVnd(chiSo?.doanhThuThangVnd),
       href: completedOrdersHref,
       icon: <RiseOutlined />,
@@ -182,7 +182,7 @@ export default function AdminDashboard() {
     {
       label: "Tỷ lệ đơn hàng thành công",
       value: isLoadingChiSo ? "..." : formatPhanTram(chiSo?.tyLeThanhCongPhanTram),
-      href: `/admin/don-hang?status=COMPLETED%2CDELIVERED${dateQuery}`,
+      href: allOrdersHref,
       icon: <RiseOutlined />,
       iconClassName: "text-success",
       valueClassName: "text-success",

@@ -478,31 +478,55 @@ async function layDanhSachDonHang({
   const tuNgayHopLe = laNgayLocHopLe(tuNgay) ? tuNgay : null;
   const denNgayHopLe = laNgayLocHopLe(denNgay) ? denNgay : null;
   const cotNgay = kieuNgay === "ngay_hoan_tat" ? "co.updatedAt" : "co.createdAt";
-  if (tuNgayHopLe && denNgayHopLe) {
-    const [ngayBatDau, ngayKetThuc] =
-      tuNgayHopLe <= denNgayHopLe
-        ? [tuNgayHopLe, denNgayHopLe]
-        : [denNgayHopLe, tuNgayHopLe];
-
-    dieuKien.push(`${cotNgay} >= ? AND ${cotNgay} < DATE_ADD(?, INTERVAL 1 DAY)`);
-    thamSo.push(ngayBatDau, ngayKetThuc);
-  } else if (tuNgayHopLe) {
-    dieuKien.push(`${cotNgay} >= ?`);
-    thamSo.push(tuNgayHopLe);
-  } else if (denNgayHopLe) {
-    dieuKien.push(`${cotNgay} < DATE_ADD(?, INTERVAL 1 DAY)`);
-    thamSo.push(denNgayHopLe);
-  } else if (thoiGian === "hom_nay") {
-    dieuKien.push("DATE(co.createdAt) = CURDATE()");
-  } else if (thoiGian === "tuan_nay") {
-    dieuKien.push("YEARWEEK(co.createdAt, 1) = YEARWEEK(CURDATE(), 1)");
-  } else if (thoiGian === "thang_nay") {
-    dieuKien.push("MONTH(co.createdAt) = MONTH(CURDATE()) AND YEAR(co.createdAt) = YEAR(CURDATE())");
-  }
-
-  if (typeof gio === "string" && /^(?:[01]\d|2[0-3])$/.test(gio)) {
-    dieuKien.push(`DATE_FORMAT(${cotNgay}, '%H') = ?`);
-    thamSo.push(gio);
+  
+  if (kieuNgay === "ngay_thanh_toan") {
+    if (tuNgayHopLe && denNgayHopLe) {
+      const [ngayBatDau, ngayKetThuc] =
+        tuNgayHopLe <= denNgayHopLe
+          ? [tuNgayHopLe, denNgayHopLe]
+          : [denNgayHopLe, tuNgayHopLe];
+      dieuKien.push(`EXISTS (SELECT 1 FROM Payment pFilter WHERE pFilter.orderId = co.id AND pFilter.status = 'COMPLETED' AND pFilter.paymentType NOT IN ('REFUND', 'COMPENSATION') AND pFilter.paidAt >= ? AND pFilter.paidAt < DATE_ADD(?, INTERVAL 1 DAY))`);
+      thamSo.push(ngayBatDau, ngayKetThuc);
+    } else if (tuNgayHopLe) {
+      dieuKien.push(`EXISTS (SELECT 1 FROM Payment pFilter WHERE pFilter.orderId = co.id AND pFilter.status = 'COMPLETED' AND pFilter.paymentType NOT IN ('REFUND', 'COMPENSATION') AND pFilter.paidAt >= ?)`);
+      thamSo.push(tuNgayHopLe);
+    } else if (denNgayHopLe) {
+      dieuKien.push(`EXISTS (SELECT 1 FROM Payment pFilter WHERE pFilter.orderId = co.id AND pFilter.status = 'COMPLETED' AND pFilter.paymentType NOT IN ('REFUND', 'COMPENSATION') AND pFilter.paidAt < DATE_ADD(?, INTERVAL 1 DAY))`);
+      thamSo.push(denNgayHopLe);
+    } else if (thoiGian === "hom_nay") {
+      dieuKien.push("EXISTS (SELECT 1 FROM Payment pFilter WHERE pFilter.orderId = co.id AND pFilter.status = 'COMPLETED' AND pFilter.paymentType NOT IN ('REFUND', 'COMPENSATION') AND DATE(pFilter.paidAt) = CURDATE())");
+    } else if (thoiGian === "tuan_nay") {
+      dieuKien.push("EXISTS (SELECT 1 FROM Payment pFilter WHERE pFilter.orderId = co.id AND pFilter.status = 'COMPLETED' AND pFilter.paymentType NOT IN ('REFUND', 'COMPENSATION') AND YEARWEEK(pFilter.paidAt, 1) = YEARWEEK(CURDATE(), 1))");
+    } else if (thoiGian === "thang_nay") {
+      dieuKien.push("EXISTS (SELECT 1 FROM Payment pFilter WHERE pFilter.orderId = co.id AND pFilter.status = 'COMPLETED' AND pFilter.paymentType NOT IN ('REFUND', 'COMPENSATION') AND MONTH(pFilter.paidAt) = MONTH(CURDATE()) AND YEAR(pFilter.paidAt) = YEAR(CURDATE()))");
+    }
+  } else {
+    if (tuNgayHopLe && denNgayHopLe) {
+      const [ngayBatDau, ngayKetThuc] =
+        tuNgayHopLe <= denNgayHopLe
+          ? [tuNgayHopLe, denNgayHopLe]
+          : [denNgayHopLe, tuNgayHopLe];
+  
+      dieuKien.push(`${cotNgay} >= ? AND ${cotNgay} < DATE_ADD(?, INTERVAL 1 DAY)`);
+      thamSo.push(ngayBatDau, ngayKetThuc);
+    } else if (tuNgayHopLe) {
+      dieuKien.push(`${cotNgay} >= ?`);
+      thamSo.push(tuNgayHopLe);
+    } else if (denNgayHopLe) {
+      dieuKien.push(`${cotNgay} < DATE_ADD(?, INTERVAL 1 DAY)`);
+      thamSo.push(denNgayHopLe);
+    } else if (thoiGian === "hom_nay") {
+      dieuKien.push(`DATE(${cotNgay}) = CURDATE()`);
+    } else if (thoiGian === "tuan_nay") {
+      dieuKien.push(`YEARWEEK(${cotNgay}, 1) = YEARWEEK(CURDATE(), 1)`);
+    } else if (thoiGian === "thang_nay") {
+      dieuKien.push(`MONTH(${cotNgay}) = MONTH(CURDATE()) AND YEAR(${cotNgay}) = YEAR(CURDATE())`);
+    }
+    
+    if (typeof gio === "string" && /^(?:[01]\d|2[0-3])$/.test(gio)) {
+      dieuKien.push(`DATE_FORMAT(${cotNgay}, '%H') = ?`);
+      thamSo.push(gio);
+    }
   }
 
   // Lọc theo loại đơn (custom_design hay ao_mau)
@@ -639,7 +663,9 @@ async function layDanhSachDonHang({
       thanhToan: {
         phuongThuc: row.paymentMethod || "COD",
         loai: row.orderPaymentType || "FULL",
-        status: row.orderPaymentStatus || "PENDING",
+        status: row.transactionPaymentStatus === "PENDING_RECONCILIATION" 
+          ? "PENDING_RECONCILIATION" 
+          : (row.orderPaymentStatus || "PENDING"),
         transactionStatus: row.transactionPaymentStatus || null,
         daThanh: daThanh,
       },
@@ -802,7 +828,9 @@ async function layChiTietDonHang(id) {
       donHang.paymentStatus === "PAID"
         ? donHang.latestPaidAt || donHang.paidAt
         : donHang.paidAt,
-    status: donHang.paymentStatus || "PENDING",
+    status: donHang.transactionPaymentStatus === "PENDING_RECONCILIATION" 
+      ? "PENDING_RECONCILIATION" 
+      : (donHang.paymentStatus || "PENDING"),
     transactionStatus: donHang.transactionPaymentStatus || null,
     transactionId: donHang.transactionId || null,
     paymentUrl: isOnlinePayment ? gatewayResponse.paymentUrl || null : null,

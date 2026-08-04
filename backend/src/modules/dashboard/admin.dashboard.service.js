@@ -104,7 +104,8 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
   // Chỉ ghi nhận doanh thu khi đơn đã hoàn tất và có giao dịch thanh toán đủ.
   // Giao dịch DEPOSIT chỉ là tiền cọc nên không đủ điều kiện ghi nhận toàn bộ đơn.
   const [rowsDoanhThu] = await db.pool.query(
-    `SELECT COALESCE(SUM(co.totalAmount), 0) AS doanh_thu
+    `SELECT COALESCE(SUM(co.totalAmount), 0) AS doanh_thu,
+            COUNT(co.id) AS so_don_doanh_thu
      FROM CustomerOrder co
      JOIN (
        SELECT orderId, MAX(paidAt) AS fullyPaidAt
@@ -114,8 +115,8 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
        GROUP BY orderId
      ) pRevenue ON pRevenue.orderId = co.id
      WHERE co.status = 'COMPLETED'
-       AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) >= ?
-       AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) <= ?`,
+       AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) >= ?
+       AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) <= ?`,
     [batDau, ketThuc]
   );
 
@@ -133,21 +134,21 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
      ) pRevenue ON pRevenue.orderId = co.id
      WHERE co.status = 'COMPLETED'
        AND oi.designFee > 0
-       AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) >= ?
-       AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) <= ?`,
+       AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) >= ?
+       AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) <= ?`,
     [batDau, ketThuc]
   );
 
   // --- Tổng số đơn hàng tạo trong khoảng thời gian ---
   const [rowsDonMoi] = await db.pool.query(
-    `SELECT COUNT(*) AS so_don_moi
+    `SELECT COUNT(CASE WHEN status != 'CANCELLED' OR cancelReason IS NULL OR cancelReason NOT LIKE '[TECH_ADJUST]%' THEN 1 END) AS so_don_moi
      FROM CustomerOrder
      WHERE DATE(createdAt) >= ? AND DATE(createdAt) <= ?`,
     [batDau, ketThuc]
   );
 
-  // --- Tồn kho mức thấp: variant có available <= 15 (bất kể thời gian) ---
-  const NGUONG_TON_KHO = 15;
+  // --- Tồn kho mức thấp: variant có available <= 50 (bất kể thời gian) ---
+  const NGUONG_TON_KHO = 50;
   const [rowsTonKho] = await db.pool.query(
     `SELECT COUNT(*) AS so_variant_thap
      FROM ProductVariant pv
@@ -166,8 +167,8 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
            AND pPaid.status = 'COMPLETED'
            AND pPaid.paymentType <> 'DEPOSIT'
        ) THEN 1 END) AS so_hoan_tat_da_thu,
-       COUNT(CASE WHEN co.status = 'CANCELLED' THEN 1 END) AS so_da_huy,
-       COUNT(CASE WHEN co.status NOT IN ('CANCELLED') THEN 1 END) AS so_hop_le
+       COUNT(CASE WHEN co.status = 'CANCELLED' AND (co.cancelReason IS NULL OR co.cancelReason NOT LIKE '[TECH_ADJUST]%') THEN 1 END) AS so_da_huy,
+       COUNT(CASE WHEN co.status != 'CANCELLED' THEN 1 END) AS so_hop_le
      FROM CustomerOrder co
      WHERE DATE(co.createdAt) >= ? AND DATE(co.createdAt) <= ?`,
     [batDau, ketThuc]
@@ -186,6 +187,7 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
 
   // Tính toán chỉ số
   const doanhThu = Number(rowsDoanhThu[0].doanh_thu) || 0;
+  const soDonDoanhThu = Number(rowsDoanhThu[0].so_don_doanh_thu) || 0;
   const doanhThuThietKe = Number(rowsDoanhThuThietKe[0].doanh_thu_thiet_ke) || 0;
   const soDonMoi = Number(rowsDonMoi[0].so_don_moi) || 0;
   const soVariantThap = Number(rowsTonKho[0].so_variant_thap) || 0;
@@ -197,16 +199,18 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
 
   const doanhThuKhac = Number(rowsDoanhThuKhac[0].doanh_thu_khac) || 0;
 
-  // AOV = doanh thu / số đơn hoàn tất
-  const aov = soHoanTatDaThu > 0 ? Math.round(doanhThu / soHoanTatDaThu) : 0;
+  // AOV = doanh thu / số đơn đóng góp vào doanh thu
+  const aov = soDonDoanhThu > 0 ? Math.round(doanhThu / soDonDoanhThu) : 0;
 
-  // Tỷ lệ thành công: COMPLETED / (tổng đơn không hủy)
-  const tyLeThanhCong = soHopLe > 0
-    ? Math.round((soHoanTat / soHopLe) * 1000) / 10 // 1 chữ số thập phân
+  // Tổng số đơn hợp lệ (không tính các đơn hủy do lỗi kỹ thuật)
+  const tongDon = soHopLe + soDaHuy;
+
+  // Tỷ lệ thành công: COMPLETED / (tổng đơn hợp lệ)
+  const tyLeThanhCong = tongDon > 0
+    ? Math.round((soHoanTat / tongDon) * 1000) / 10 // 1 chữ số thập phân
     : 0;
 
   // Tỷ lệ hủy
-  const tongDon = soHopLe + soDaHuy;
   const tyLeHuy = tongDon > 0
     ? Math.round((soDaHuy / tongDon) * 1000) / 10
     : 0;
@@ -390,7 +394,6 @@ async function layDuLieuBieuDo(tuNgay, denNgay) {
          GROUP BY orderId
        ) pRevenue ON pRevenue.orderId = co.id
        WHERE co.status = 'COMPLETED'
-         AND co.paymentStatus = 'PAID'
          AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) = ?
        GROUP BY moc_raw
        ORDER BY moc_raw ASC`,
@@ -427,7 +430,6 @@ async function layDuLieuBieuDo(tuNgay, denNgay) {
          GROUP BY orderId
        ) pRevenue ON pRevenue.orderId = co.id
        WHERE co.status = 'COMPLETED'
-         AND co.paymentStatus = 'PAID'
          AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) >= ?
          AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) <= ?
        GROUP BY moc_raw
@@ -467,7 +469,6 @@ async function layDuLieuBieuDo(tuNgay, denNgay) {
          GROUP BY orderId
        ) pRevenue ON pRevenue.orderId = co.id
        WHERE co.status = 'COMPLETED'
-         AND co.paymentStatus = 'PAID'
          AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) >= ?
          AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) <= ?
        GROUP BY moc_raw
@@ -578,7 +579,7 @@ async function layThietKeCanXuLy() {
  * Lấy danh sách ProductVariant có available <= nguong,
  * sắp xếp theo available tăng dần (nguy hiểm nhất trước).
  */
-async function layTonKhoCanhBao(nguong = 15, limit = 10) {
+async function layTonKhoCanhBao(nguong = 50, limit = 10) {
   const [rows] = await db.pool.query(
     `SELECT
        pv.id          AS variantId,
@@ -649,8 +650,8 @@ async function laySanPhamBanChay(tuNgay, denNgay, limit = 3) {
          ) pRevenueBest ON pRevenueBest.orderId = coBest.id
          WHERE pvBest.productId = p.id
            AND coBest.status = 'COMPLETED'
-           AND DATE(GREATEST(coBest.updatedAt, COALESCE(pRevenueBest.fullyPaidAt, coBest.updatedAt))) >= ?
-           AND DATE(GREATEST(coBest.updatedAt, COALESCE(pRevenueBest.fullyPaidAt, coBest.updatedAt))) <= ?
+           AND DATE(COALESCE(pRevenueBest.fullyPaidAt, coBest.updatedAt)) >= ?
+           AND DATE(COALESCE(pRevenueBest.fullyPaidAt, coBest.updatedAt)) <= ?
          GROUP BY pvBest.id
          ORDER BY SUM(oiBest.quantity) DESC
          LIMIT 1
@@ -669,8 +670,8 @@ async function laySanPhamBanChay(tuNgay, denNgay, limit = 3) {
        GROUP BY orderId
      ) pRevenue ON pRevenue.orderId = co.id
      WHERE co.status = 'COMPLETED'
-       AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) >= ?
-       AND DATE(GREATEST(co.updatedAt, COALESCE(pRevenue.fullyPaidAt, co.updatedAt))) <= ?
+       AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) >= ?
+       AND DATE(COALESCE(pRevenue.fullyPaidAt, co.updatedAt)) <= ?
      GROUP BY p.id, p.name
      ORDER BY tongDoanhThu DESC
      LIMIT ?`,

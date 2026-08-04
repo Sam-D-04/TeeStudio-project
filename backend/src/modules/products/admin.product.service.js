@@ -255,9 +255,16 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
         FROM OrderItem oiSales
         INNER JOIN ProductVariant pvSales ON pvSales.id = oiSales.variantId
         INNER JOIN CustomerOrder coSales ON coSales.id = oiSales.orderId
-        WHERE coSales.status IN ('COMPLETED', 'SHIPPING')
-          AND DATE(coSales.updatedAt) >= '${batDau}'
-          AND DATE(coSales.updatedAt) <= '${ketThuc}'
+        INNER JOIN (
+          SELECT orderId, MAX(paidAt) AS fullyPaidAt
+          FROM Payment
+          WHERE status = 'COMPLETED'
+            AND paymentType <> 'DEPOSIT'
+          GROUP BY orderId
+        ) pRevenue ON pRevenue.orderId = coSales.id
+        WHERE coSales.status = 'COMPLETED'
+          AND DATE(COALESCE(pRevenue.fullyPaidAt, coSales.updatedAt)) >= '${batDau}'
+          AND DATE(COALESCE(pRevenue.fullyPaidAt, coSales.updatedAt)) <= '${ketThuc}'
         GROUP BY pvSales.productId
         ORDER BY salesRevenue DESC
         LIMIT 3

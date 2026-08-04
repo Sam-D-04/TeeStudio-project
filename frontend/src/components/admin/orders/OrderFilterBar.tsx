@@ -46,6 +46,9 @@ type OrderFilterBarProps = {
   initialStartDate?: string;
   initialEndDate?: string;
 
+  dateField: string;
+  onDateFieldChange: (value: string) => void;
+
   typeFilter: string;
   onTypeFilterChange: (value: string) => void;
 
@@ -64,6 +67,8 @@ export default function OrderFilterBar({
   onDateClear,
   initialStartDate,
   initialEndDate,
+  dateField,
+  onDateFieldChange,
   typeFilter,
   onTypeFilterChange,
   searchSlot,
@@ -146,6 +151,22 @@ export default function OrderFilterBar({
             <option value="tat_ca">Loại đơn: Tất cả</option>
             <option value="custom_design">Thiết kế tùy chỉnh</option>
             <option value="ao_mau">Áo mẫu</option>
+          </select>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary">
+            ▾
+          </span>
+        </div>
+
+        {/* Select lọc theo loại ngày */}
+        <div className="relative shrink-0">
+          <select
+            value={dateField}
+            onChange={(e) => onDateFieldChange(e.target.value)}
+            className="h-control-h appearance-none rounded-lg border border-border bg-surface pl-3 pr-9 text-sm text-text-main outline-none focus:border-primary-container"
+          >
+            <option value="created">Lọc theo ngày tạo</option>
+            <option value="completed">Lọc theo ngày hoàn tất</option>
+            <option value="paid">Lọc theo ngày thanh toán</option>
           </select>
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary">
             ▾

@@ -151,7 +151,7 @@ async function layDanhSachTonKho(params = {}) {
   // Lọc theo trạng thái tồn kho
   if (boLoc === "ton_thap") {
     conditions.push(
-      `${AVAILABLE_STOCK_SQL} <= ${NGUONG_TON_THAP_DASHBOARD}`
+      `${AVAILABLE_STOCK_SQL} <= ${NGUONG_SAP_HET}`
     );
   } else if (boLoc === "sap_het") {
     conditions.push(

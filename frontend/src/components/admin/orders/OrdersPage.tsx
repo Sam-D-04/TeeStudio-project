@@ -63,7 +63,7 @@ export type OrdersInitialFilters = {
   paymentMethod?: string;
   startDate?: string;
   endDate?: string;
-  dateField?: "created" | "completed";
+  dateField?: "created" | "completed" | "paid";
   hour?: string;
   excludeStatus?: string;
 };
@@ -156,7 +156,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
         phuongThucThanhToan: paymentMethodFilter,
         tuNgay,
         denNgay,
-        kieuNgay: dateField === "completed" ? "ngay_hoan_tat" : "ngay_tao",
+        kieuNgay: dateField === "completed" ? "ngay_hoan_tat" : dateField === "paid" ? "ngay_thanh_toan" : "ngay_tao",
         gio: completionHour,
         loai: typeFilter,
         tuKhoa,
@@ -217,6 +217,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
     setDenNgay("");
     setCompletionHour("");
     setExcludeStatus("");
+    setDateField("created");
     setCurrentPage(1);
     setResetKey((prev) => prev + 1);
     router.push("/admin/don-hang");
@@ -336,6 +337,11 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
           onDateClear={handleDateClear}
           initialStartDate={tuNgay || undefined}
           initialEndDate={denNgay || undefined}
+          dateField={dateField}
+          onDateFieldChange={(val) => {
+            setDateField(val as "created" | "completed" | "paid");
+            setCurrentPage(1);
+          }}
           typeFilter={typeFilter}
           onTypeFilterChange={handleTypeChange}
           onResetFilters={handleResetFilters}
