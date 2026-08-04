@@ -465,62 +465,6 @@ export default function ProductDetailClient({ product }: Props) {
                     transition: "background 0.3s ease",
                   }}
                 >
-                  {/* Nhãn tình trạng tồn kho */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: 16,
-                      right: 16,
-                      background: totalStockForColor <= 10 ? "#fff7ed" : "#f0fdf4",
-                      color: totalStockForColor <= 10 ? "#ea580c" : "#16a34a",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      borderRadius: 20,
-                      padding: "3px 10px",
-                      border: `1px solid ${totalStockForColor <= 10 ? "#fed7aa" : "#bbf7d0"}`,
-                    }}
-                  >
-                    {totalStockForColor <= 0
-                      ? "Hết hàng"
-                      : totalStockForColor <= 10
-                        ? `Còn ${totalStockForColor}`
-                        : "Còn hàng"}
-                  </div>
-
-                  {/* Nhãn tên màu đang chọn */}
-                  {selectedColor && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 16,
-                        left: 16,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        background: "rgba(255,255,255,0.9)",
-                        borderRadius: 20,
-                        padding: "3px 10px 3px 6px",
-                        border: "1px solid #e2e8f0",
-                        backdropFilter: "blur(8px)",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: "50%",
-                          background: colorHex,
-                          border: "1px solid rgba(0,0,0,0.12)",
-                          display: "inline-block",
-                          flexShrink: 0,
-                        }}
-                      />
-                      <span style={{ fontSize: 11, fontWeight: 600, color: "#475569" }}>
-                        {getColorLabel(selectedColor)}
-                      </span>
-                    </div>
-                  )}
-
                   {/* Ảnh mockup thật (nếu có), fallback về hình SVG minh hoạ */}
                   <div
                     style={{
@@ -671,28 +615,6 @@ export default function ProductDetailClient({ product }: Props) {
                   }}
                 >
                   <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Màu sắc</span>
-                  <span
-                    style={{
-                      fontSize: 13,
-                      color: "#0ea5e9",
-                      fontWeight: 600,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 5,
-                    }}
-                  >
-                    <span
-                      style={{
-                        display: "inline-block",
-                        width: 12,
-                        height: 12,
-                        borderRadius: "50%",
-                        background: colorHex,
-                        border: "1px solid rgba(0,0,0,0.1)",
-                      }}
-                    />
-                    {getColorLabel(selectedColor)}
-                  </span>
                 </div>
 
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -744,7 +666,10 @@ export default function ProductDetailClient({ product }: Props) {
                 >
                   <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Kích cỡ</span>
                   <button
-                    onClick={() => setActiveTab("size")}
+                    onClick={() => {
+                      setActiveTab("size");
+                      document.getElementById("tabs-section")?.scrollIntoView({ behavior: "smooth" });
+                    }}
                     style={{
                       background: "none",
                       border: "none",
@@ -1010,7 +935,7 @@ export default function ProductDetailClient({ product }: Props) {
         </div>
 
         {/* ── Khu vực tab: thông tin chi tiết / bảng size ── */}
-        <div className="container-main" style={{ padding: "40px 24px 0" }}>
+        <div id="tabs-section" className="container-main" style={{ padding: "40px 24px 0" }}>
           <div
             style={{
               background: "#ffffff",

@@ -120,21 +120,18 @@ export default function ShirtMockupImage({
   if (!src) return null;
 
   return (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img
-      src={src}
-      alt={`${type} ${view}`}
-      width={width}
-      height={height}
+    <div
       style={{
-        display: "block",
         width,
         height,
-        objectFit: "contain",
+        backgroundImage: `url(${src})`,
+        backgroundSize: "contain",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
         pointerEvents: "none",
         userSelect: "none",
       }}
-      draggable={false}
+      title={`${type} ${view}`}
     />
   );
 }

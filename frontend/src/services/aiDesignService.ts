@@ -11,8 +11,8 @@ export interface PrintAreaInput {
   height: number;
 }
 
-/** Phần tử chữ do AI trả về — thiếu `id` (client tự gán khi áp vào canvas). */
-export type AiTextElement = Omit<DesignElement, "id" | "type">;
+/** Phần tử do AI trả về — thiếu `id` (client tự gán khi áp vào canvas). */
+export type AiDesignElement = Omit<DesignElement, "id">;
 
 interface GenerateParams {
   shirtType: ShirtType;
@@ -39,21 +39,21 @@ interface ArrangeParams {
 const AI_TIMEOUT_MS = 45000;
 
 export const aiDesignService = {
-  /** Sinh thiết kế mới (câu chữ + bố cục) bằng AI thật. */
-  generate: async (params: GenerateParams): Promise<AiTextElement[]> => {
+  /** Sinh thiết kế mới (câu chữ/hình ảnh + bố cục) bằng AI thật. */
+  generate: async (params: GenerateParams): Promise<AiDesignElement[]> => {
     try {
       const res = await apiClient.post(`${BASE}/generate`, params, { timeout: AI_TIMEOUT_MS });
-      return res.data.data.elements as AiTextElement[];
+      return res.data.data.elements as AiDesignElement[];
     } catch (err) {
       throw new Error(getApiErrorMessage(err, "AI không sinh được thiết kế. Vui lòng thử lại."));
     }
   },
 
-  /** Tự sắp xếp lại các phần tử chữ đang có bằng AI thật (giữ nguyên nội dung chữ). */
-  arrange: async (params: ArrangeParams): Promise<AiTextElement[]> => {
+  /** Tự sắp xếp lại các phần tử chữ đang có bằng AI thật. */
+  arrange: async (params: ArrangeParams): Promise<AiDesignElement[]> => {
     try {
       const res = await apiClient.post(`${BASE}/arrange`, params, { timeout: AI_TIMEOUT_MS });
-      return res.data.data.elements as AiTextElement[];
+      return res.data.data.elements as AiDesignElement[];
     } catch (err) {
       throw new Error(getApiErrorMessage(err, "AI không sắp xếp được bố cục. Vui lòng thử lại."));
     }

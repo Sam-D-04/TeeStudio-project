@@ -112,7 +112,7 @@ export function suggestTextPalette(shirtHex: string): string[] {
     const norm = c.toLowerCase();
     if (out.includes(norm)) continue;
     if (contrastRatio(norm, shirtHex) >= 3) out.push(norm);
-    if (out.length >= 6) break;
+    if (out.length >= 5) break;
   }
   return out;
 }

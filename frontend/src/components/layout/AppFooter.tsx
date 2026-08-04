@@ -19,8 +19,8 @@ const links = {
   ],
   contact: [
     { icon: "📞", text: "0901 234 567" },
-    { icon: "✉️", text: "hello@teestudio.vn" },
-    { icon: "📍", text: "123 Nguyễn Văn Cừ, Q.5, TP.HCM" },
+    { icon: "✉️", text: "teestudiocompany@gmail.com" },
+    { icon: "📍", text: "180 Cao Lỗ, Q.8, TP.HCM" },
   ],
 };
 
@@ -62,10 +62,10 @@ export default function AppFooter() {
         {/* ── Main Grid ── */}
         <div
           style={{
-            display:             "grid",
+            display: "grid",
             gridTemplateColumns: "1.4fr 1fr 1fr 1fr",
-            gap:                 40,
-            paddingBottom:       48,
+            gap: 40,
+            paddingBottom: 48,
           }}
           className="footer-grid"
         >
@@ -87,10 +87,10 @@ export default function AppFooter() {
 
             <p
               style={{
-                fontSize:  13,
-                color:     "#64748b",
-                lineHeight:1.75,
-                maxWidth:  220,
+                fontSize: 13,
+                color: "#64748b",
+                lineHeight: 1.75,
+                maxWidth: 220,
                 marginBottom: 20,
               }}
             >
@@ -105,24 +105,24 @@ export default function AppFooter() {
                   href="#"
                   aria-label={s.label}
                   style={{
-                    width:          34,
-                    height:         34,
-                    borderRadius:   8,
-                    background:     "#f8fafc",
-                    border:         "1px solid #e2e8f0",
-                    display:        "flex",
-                    alignItems:     "center",
+                    width: 34,
+                    height: 34,
+                    borderRadius: 8,
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    display: "flex",
+                    alignItems: "center",
                     justifyContent: "center",
                     textDecoration: "none",
-                    transition:     "all 0.15s",
+                    transition: "all 0.15s",
                   }}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLAnchorElement).style.background   = "#e0f2fe";
-                    (e.currentTarget as HTMLAnchorElement).style.borderColor  = "#bae6fd";
+                    (e.currentTarget as HTMLAnchorElement).style.background = "#e0f2fe";
+                    (e.currentTarget as HTMLAnchorElement).style.borderColor = "#bae6fd";
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLAnchorElement).style.background   = "#f8fafc";
-                    (e.currentTarget as HTMLAnchorElement).style.borderColor  = "#e2e8f0";
+                    (e.currentTarget as HTMLAnchorElement).style.background = "#f8fafc";
+                    (e.currentTarget as HTMLAnchorElement).style.borderColor = "#e2e8f0";
                   }}
                 >
                   {s.svg}
@@ -135,12 +135,12 @@ export default function AppFooter() {
           <div>
             <h4
               style={{
-                fontSize:      12,
-                fontWeight:    700,
-                color:         "#0f172a",
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#0f172a",
                 letterSpacing: "0.8px",
                 textTransform: "uppercase",
-                marginBottom:  16,
+                marginBottom: 16,
               }}
             >
               Sản phẩm
@@ -151,10 +151,10 @@ export default function AppFooter() {
                   <a
                     href="#"
                     style={{
-                      fontSize:       13,
-                      color:          "#64748b",
+                      fontSize: 13,
+                      color: "#64748b",
                       textDecoration: "none",
-                      transition:     "color 0.15s",
+                      transition: "color 0.15s",
                     }}
                     onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = "#0ea5e9")}
                     onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = "#64748b")}
@@ -170,12 +170,12 @@ export default function AppFooter() {
           <div>
             <h4
               style={{
-                fontSize:      12,
-                fontWeight:    700,
-                color:         "#0f172a",
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#0f172a",
                 letterSpacing: "0.8px",
                 textTransform: "uppercase",
-                marginBottom:  16,
+                marginBottom: 16,
               }}
             >
               Chính sách
@@ -186,10 +186,10 @@ export default function AppFooter() {
                   <a
                     href="#"
                     style={{
-                      fontSize:       13,
-                      color:          "#64748b",
+                      fontSize: 13,
+                      color: "#64748b",
                       textDecoration: "none",
-                      transition:     "color 0.15s",
+                      transition: "color 0.15s",
                     }}
                     onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = "#0ea5e9")}
                     onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = "#64748b")}
@@ -205,12 +205,12 @@ export default function AppFooter() {
           <div>
             <h4
               style={{
-                fontSize:      12,
-                fontWeight:    700,
-                color:         "#0f172a",
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#0f172a",
                 letterSpacing: "0.8px",
                 textTransform: "uppercase",
-                marginBottom:  16,
+                marginBottom: 16,
               }}
             >
               Liên hệ
@@ -231,12 +231,12 @@ export default function AppFooter() {
         {/* ── Bottom bar ── */}
         <div
           style={{
-            display:        "flex",
-            alignItems:     "center",
+            display: "flex",
+            alignItems: "center",
             justifyContent: "space-between",
-            padding:        "16px 0",
-            flexWrap:       "wrap",
-            gap:            8,
+            padding: "16px 0",
+            flexWrap: "wrap",
+            gap: 8,
           }}
         >
           <p style={{ fontSize: 12, color: "#94a3b8", margin: 0 }}>

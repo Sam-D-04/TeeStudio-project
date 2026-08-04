@@ -181,27 +181,19 @@ export default function CollectionsPage() {
                       Cập nhật: {new Date(d.updatedAt).toLocaleDateString("vi-VN")}
                     </span>
                     <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
-                      <span style={{
-                        flex: 1, textAlign: "center",
-                        fontSize: 12, fontWeight: 600, color: "#38bdf8",
-                        background: "#e0f2fe", padding: "7px 10px", borderRadius: 8,
-                        cursor: "pointer",
-                      }}>
-                        Tiếp tục sửa ➔
+                      <span 
+                        className="flex-1 text-center text-xs font-semibold text-sky-600 bg-sky-50 hover:bg-sky-100 py-2 rounded-lg cursor-pointer transition-colors border border-sky-100 flex items-center justify-center gap-1"
+                      >
+                        Tiếp tục sửa <span style={{ fontSize: 10 }}>➔</span>
                       </span>
                       <button
                         onClick={(e) => { e.stopPropagation(); setCartDesign(d); }}
-                        style={{
-                          flex: 1,
-                          fontSize: 12, fontWeight: 700, color: "#fff",
-                          background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
-                          border: "none", padding: "7px 10px", borderRadius: 8,
-                          cursor: "pointer", transition: "opacity 0.15s",
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.opacity = "0.85")}
-                        onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+                        className="flex-1 text-center text-xs font-bold text-white bg-sky-500 hover:bg-sky-600 py-2 rounded-lg cursor-pointer transition-colors border-none shadow-sm flex items-center justify-center gap-1.5"
                       >
-                        🛒 Đặt hàng
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        Đặt hàng
                       </button>
                     </div>
                   </div>

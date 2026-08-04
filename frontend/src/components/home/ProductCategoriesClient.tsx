@@ -186,8 +186,16 @@ function ProductCard({ product, router }: { product: ProductFromDB; router: Rout
     ? product.images
     : product.imageUrl ? [product.imageUrl] : [];
 
-  const currentImage = images[0] ?? null;
-  const backImage = images[1] ?? null;
+  const [randomIdx, setRandomIdx] = useState(0);
+
+  useEffect(() => {
+    if (images.length > 1) {
+      setRandomIdx(Math.floor(Math.random() * images.length));
+    }
+  }, [images.length]);
+
+  const currentImage = images[randomIdx] ?? null;
+  const backImage = images[(randomIdx + 1) % images.length] ?? null; // Dùng màu khác làm mặt sau khi lật nếu không có ảnh mặt sau thực sự
 
   return (
     <div
@@ -324,24 +332,7 @@ function ProductCard({ product, router }: { product: ProductFromDB; router: Rout
           </span>
 
           <div style={{ display: "flex", gap: 6 }}>
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                router.push(`/product/${product.id}`);
-              }}
-              style={{
-                border: `1px solid ${ui.accentColor}40`,
-                borderRadius: 8,
-                fontWeight: 600,
-                height: 36,
-                fontSize: 12,
-                padding: "0 12px",
-                color: ui.accentColor,
-                background: "#ffffff",
-              }}
-            >
-              Xem chi tiết
-            </Button>
+
             <Button
               type="primary"
               onClick={(e) => {

@@ -977,11 +977,14 @@ export default function DesignStudioApp() {
                   cursor: "pointer",
                 }}
               >
-                {printMethods.map((method) => (
-                  <option key={method.code} value={method.code} style={{ color: "#000" }}>
-                    {method.name} {method.extraCost > 0 ? `(+${method.extraCost.toLocaleString()}đ)` : ""}
-                  </option>
-                ))}
+                {printMethods.map((method) => {
+                  const displayName = method.name.replace(/\s*\(.*?\)/g, '');
+                  return (
+                    <option key={method.code} value={method.code} style={{ color: "#000" }}>
+                      {displayName} {method.extraCost > 0 ? `(+${method.extraCost.toLocaleString()}đ)` : ""}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>
