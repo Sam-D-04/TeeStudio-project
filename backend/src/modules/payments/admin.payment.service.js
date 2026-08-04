@@ -650,7 +650,9 @@ function buildIpnHistory(paymentRow) {
         : gwData.source === "query";
       const isReturn = !isVnpay && gwData.source === "return";
       const responseCode = isVnpay
-        ? String(gwData.vnp_ResponseCode || "N/A")
+        ? (gwData.vnp_TransactionStatus && gwData.vnp_TransactionStatus !== gwData.vnp_ResponseCode
+            ? `${gwData.vnp_ResponseCode} (Lỗi GD: ${gwData.vnp_TransactionStatus})`
+            : String(gwData.vnp_ResponseCode || "N/A"))
         : String(gwData.resultCode ?? "N/A");
       const isSuccess = isVnpay
         ? gwData.vnp_ResponseCode === "00" &&
