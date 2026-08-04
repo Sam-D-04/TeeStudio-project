@@ -29,6 +29,7 @@ import {
   type CreateOrderPayload,
 } from "@/services/orderService";
 import { validatePromotionCode, type PromotionPreview } from "@/services/promotionService";
+import { pricingService, type PricingConfiguration } from "@/services/pricingService";
 import AppHeader from "@/components/layout/AppHeader";
 import AppFooter from "@/components/layout/AppFooter";
 
@@ -40,8 +41,6 @@ function formatVND(value: number) {
     maximumFractionDigits: 0,
   }).format(value);
 }
-
-const SHIPPING_FEE = 35_000;
 
 type PaymentMethod = "VNPAY" | "MOMO" | "COD";
 /** Các phương thức thanh toán online — chuyển hướng sang cổng thanh toán sau khi tạo đơn */
@@ -166,6 +165,8 @@ export default function CheckoutPage() {
   const [resendingVerification, setResendingVerification] = useState(false);
   const [provinces, setProvinces]     = useState<ProvinceData[]>([]);
   const [addressLoading, setAddressLoading] = useState(true);
+  const [pricingConfig, setPricingConfig] = useState<PricingConfiguration | null>(null);
+  const [configLoading, setConfigLoading] = useState(true);
   const provinceCode = Form.useWatch("provinceCode", form);
   const watchedPaymentType = Form.useWatch("paymentType", form);
 
@@ -195,6 +196,14 @@ export default function CheckoutPage() {
       .finally(() => setAddressLoading(false));
   }, []);
 
+  /* Tải cấu hình giá (phí vận chuyển mặc định) */
+  useEffect(() => {
+    pricingService.getConfig()
+      .then(setPricingConfig)
+      .catch((err) => console.error("Failed to load pricing config:", err))
+      .finally(() => setConfigLoading(false));
+  }, []);
+
   const selectedProvince = provinces.find((p) => p.Code === provinceCode);
   const wardsForProvince = selectedProvince?.Wards ?? [];
 
@@ -211,10 +220,18 @@ export default function CheckoutPage() {
   if (!hydrated) return null;
 
   const subtotal = totalPrice();
-  // Mã miễn phí vận chuyển thì trừ luôn phí ship; các loại giảm khác (PERCENT/FIXED)
-  // trừ vào discountAmount đã tính sẵn từ backend (validatePromotionCode) - không tự
-  // tính lại ở FE để tránh lệch công thức với backend.
-  const shippingFee   = appliedPromo?.mienPhiVanChuyen ? 0 : SHIPPING_FEE;
+  
+  let shippingFee = pricingConfig?.defaultShippingFee ?? 30_000;
+  if (appliedPromo?.mienPhiVanChuyen) {
+    shippingFee = 0;
+  } else if (
+    !appliedPromo && 
+    pricingConfig && 
+    pricingConfig.freeShippingThreshold > 0 && 
+    subtotal >= pricingConfig.freeShippingThreshold
+  ) {
+    shippingFee = 0;
+  }
   const discountAmount = appliedPromo?.discountAmount ?? 0;
   const total = Math.max(0, subtotal + shippingFee - discountAmount);
 
@@ -359,7 +376,7 @@ export default function CheckoutPage() {
         paymentMethod: values.paymentMethod,
         paymentType: hasCustomDesign ? values.paymentType : "FULL",
         items: cartItemsToOrderItems(items),
-        shippingFee: SHIPPING_FEE,
+        shippingFee: shippingFee,
         ...(appliedPromo ? { promotionId: appliedPromo.promotionId } : {}),
       };
       const result = await createOrder(payload, token);
@@ -901,9 +918,9 @@ export default function CheckoutPage() {
 
                   {/* Totals */}
                   <div style={{ padding: "16px 24px", borderTop: "1px solid #f1f5f9" }}>
-                    {[
+                    {[ 
                       { label: "Tạm tính", value: formatVND(subtotal) },
-                      { label: "Phí vận chuyển", value: formatVND(shippingFee) },
+                      { label: "Phí vận chuyển", value: configLoading ? <Spin size="small" /> : formatVND(shippingFee) },
                     ].map((r) => (
                       <div
                         key={r.label}
