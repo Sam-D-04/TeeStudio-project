@@ -404,16 +404,19 @@ export default function CheckoutPage() {
   }
 
   /* ── Submit handler ── */
+  const isSubmittingRef = useRef(false);
+
   const onFinish = async (values: CheckoutFormValues) => {
     // Chặn gọi lại khi đang xử lý (double-click, hoặc form bị submit 2 lần) — tránh
     // tạo 2 đơn hàng cho 1 lần đặt.
-    if (loading) return;
+    if (loading || isSubmittingRef.current) return;
     if (!token) {
       message.warning("Vui lòng đăng nhập để tiến hành thanh toán");
       router.push("/dang-nhap");
       return;
     }
     setLoading(true);
+    isSubmittingRef.current = true;
     try {
       const province = provinces.find((p) => p.Code === values.provinceCode);
       const ward = province?.Wards.find((w) => w.Code === values.wardCode);
@@ -449,6 +452,7 @@ export default function CheckoutPage() {
       );
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 
