@@ -146,7 +146,7 @@ export default function CartDrawer({ open, onClose }: Props) {
                   </span>
                   {(item.designFee ?? 0) > 0 && (
                     <span style={{ fontSize: 11, color: "#7c3aed", background: "#ede9fe", borderRadius: 5, padding: "1px 7px", fontWeight: 600 }}>
-                      + Thiết kế
+                      + In ấn
                     </span>
                   )}
                   {item.stockQty !== undefined && item.stockQty === 1 && (

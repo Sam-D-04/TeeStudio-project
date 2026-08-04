@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { v4 as uuidv4 } from "uuid";
+import type { PrintingMethod } from "@/utils/designFeeCalculator";
 
 /* ────────────────────────────────────────────────────────────
  * Kiểu dữ liệu cho một phần tử trên canvas thiết kế (ảnh hoặc chữ)
@@ -76,6 +77,9 @@ export interface DesignState {
   /** Ghi chú yêu cầu chỉnh sửa từ admin (nếu status = NEEDS_REVISION). */
   adminNote: string | null;
 
+  /* Phương pháp in */
+  printingMethod: PrintingMethod;
+
   /* Ngăn xếp Undo / Redo — mỗi phần tử là một bản snapshot của elements[] */
   undoStack: DesignElement[][];
   redoStack: DesignElement[][];
@@ -101,7 +105,9 @@ export interface DesignState {
   setAvailableColors: (colors: string[]) => void;
   setMockupImages: (images: MockupImage[]) => void;
 
-  /* Hành động cập nhật trạng thái lưu trữ (id/tên thiết kế) */
+  setPrintingMethod: (method: PrintingMethod) => void;
+
+  /* Quản lý thiết kế đã lưu / reset */
   setCurrentDesignId: (id: number | null) => void;
   setDesignName: (name: string) => void;
   setCurrentDesignStatus: (status: string | null) => void;
@@ -123,6 +129,7 @@ export const useDesignStore = create<DesignState>((set, get) => ({
   designName: "Thiết kế chưa đặt tên",
   currentDesignStatus: null,
   adminNote: null,
+  printingMethod: "DECAL",
 
   shirtType: "tshirt",
   shirtColor: "#ffffff",
@@ -361,8 +368,12 @@ export const useDesignStore = create<DesignState>((set, get) => ({
       currentDesignId: null,
       designName: "Thiết kế chưa đặt tên",
       currentDesignStatus: null,
+      adminNote: null,
+      printingMethod: "DECAL",
     });
   },
+
+  setPrintingMethod: (method) => set({ printingMethod: method }),
 }));
 
 /**

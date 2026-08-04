@@ -86,11 +86,12 @@ export default function DesignStudioApp() {
   /* ── Phụ phí thiết kế (real-time) ── */
   const [designFeeInfo, setDesignFeeInfo] = useState({ fee: 0, label: "Miễn phí", areaCm2: 0 });
 
-  // Cập nhật phí mỗi khi danh sách phần tử thay đổi
+  // Cập nhật phí mỗi khi danh sách phần tử hoặc phương pháp in thay đổi
   const elements = useDesignStore((s) => s.elements);
+  const printingMethod = useDesignStore((s) => s.printingMethod);
   useEffect(() => {
-    setDesignFeeInfo(calcDesignFee(elements));
-  }, [elements]);
+    setDesignFeeInfo(calcDesignFee(elements, printingMethod));
+  }, [elements, printingMethod]);
 
   /* ── Cart modal — productId và tên màu từ URL ── */
   const [urlProductId, setUrlProductId] = useState<number | null>(null);
@@ -362,6 +363,7 @@ export default function DesignStudioApp() {
           elements: useDesignStore.getState().elements,
           shirtType: useDesignStore.getState().shirtType,
           shirtView: useDesignStore.getState().shirtView,
+          printingMethod: useDesignStore.getState().printingMethod,
           logicalCanvas: { width: CONTAINER_W, height: CONTAINER_H },
         },
         previewUrl
@@ -926,9 +928,44 @@ export default function DesignStudioApp() {
               </button>
               <button className="ds-zoom-btn" onClick={zoomIn} title="Phóng to">+</button>
             </div>
+
+            {/* Chọn Phương Pháp In */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                background: "rgba(30, 41, 59, 0.7)",
+                backdropFilter: "blur(12px)",
+                padding: "4px 12px",
+                borderRadius: 9999,
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                marginTop: 4,
+              }}
+            >
+              <span style={{ fontSize: 13, color: "#cbd5e1", fontWeight: 500 }}>In:</span>
+              <select
+                value={printingMethod}
+                onChange={(e) => useDesignStore.getState().setPrintingMethod(e.target.value as any)}
+                style={{
+                  background: "transparent",
+                  color: "#fff",
+                  border: "none",
+                  outline: "none",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                <option value="DECAL" style={{ color: "#000" }}>Decal</option>
+                <option value="PET" style={{ color: "#000" }}>PET (+20%)</option>
+                <option value="DTG" style={{ color: "#000" }}>DTG (+50%)</option>
+              </select>
+            </div>
           </div>
 
-          {/* Hiển thị phụ phí thiết kế theo thời gian thực, cập nhật mỗi khi elements thay đổi */}
+          {/* Hiển thị phụ phí in ấn theo thời gian thực */}
           <div
             style={{
               display: "flex",
@@ -943,7 +980,7 @@ export default function DesignStudioApp() {
               color: "#f1f5f9",
             }}
           >
-            <span style={{ opacity: 0.65 }}>Phụ phí thiết kế:</span>
+            <span style={{ opacity: 0.65 }}>Phí in ấn:</span>
             <span
               style={{
                 fontWeight: 700,

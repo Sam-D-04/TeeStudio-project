@@ -324,7 +324,7 @@ export default function CartPage() {
                               fontWeight: 600,
                             }}
                           >
-                            + Phí in thiết kế: {formatVND(item.designFee ?? 0)}
+                            + Phí in ấn: {formatVND(item.designFee ?? 0)}
                           </span>
                         )}
                         {item.stockQty !== undefined && item.stockQty === 1 && (
