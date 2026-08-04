@@ -10,6 +10,7 @@ import useAuthStore from "@/store/useAuthStore";
 import { userDesignService, SavedDesign } from "@/services/userDesignService";
 import { getProductById } from "@/services/productService";
 import { calcDesignFee } from "@/utils/designFeeCalculator";
+import { getUploadedImages, saveUploadedImages } from "@/utils/indexedDB";
 import { Modal } from "antd";
 import html2canvas from "html2canvas";
 
@@ -63,6 +64,15 @@ export default function DesignStudioApp() {
 
   /* ── Uploaded images (object URLs) ── */
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+
+  useEffect(() => {
+    // Load ảnh từ IndexedDB khi khởi tạo
+    getUploadedImages().then((images) => {
+      setUploadedImages(images);
+      setImagesLoaded(true);
+    });
+  }, []);
 
   /* ── Toast ── */
   const [toast, setToast]   = useState<string | null>(null);
@@ -210,7 +220,11 @@ export default function DesignStudioApp() {
       if (file.size > 5 * 1024 * 1024) { showToast("File quá lớn (>5MB)"); return; }
       const reader = new FileReader();
       reader.onload = () => {
-        setUploadedImages((prev) => [...prev, reader.result as string]);
+        setUploadedImages((prev) => {
+          const newImages = [...prev, reader.result as string];
+          saveUploadedImages(newImages);
+          return newImages;
+        });
       };
       reader.readAsDataURL(file);
     });
@@ -220,6 +234,7 @@ export default function DesignStudioApp() {
     setUploadedImages((prev) => {
       const arr = [...prev];
       arr.splice(idx, 1);
+      saveUploadedImages(arr);
       return arr;
     });
   }, []);
