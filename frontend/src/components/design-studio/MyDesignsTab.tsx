@@ -120,12 +120,12 @@ export default function MyDesignsTab() {
                   background: "#1e293b",
                   borderRadius: 8,
                   overflow: "hidden",
-                  cursor: canEdit ? "pointer" : "default",
+                  cursor: "pointer",
                   border: currentDesignId === d.id ? "2px solid #38bdf8" : "2px solid transparent",
                   position: "relative"
                 }}
-                onClick={() => canEdit && handleLoadDesign(d)}
-                title={canEdit ? "Nhấn để sửa" : undefined}
+                onClick={() => handleLoadDesign(d)}
+                title={canEdit ? "Nhấn để sửa" : "Nhấn để xem"}
               >
                 <div style={{ width: "100%", height: 100, background: "#0f172a", position: "relative" }}>
                   {d.printFileUrlFront || d.printFileUrlBack ? (
