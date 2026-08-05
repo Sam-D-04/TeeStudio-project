@@ -114,6 +114,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     updateElement,
     removeElement,
     setSelectedId,
+    setShirtView,
     undo,
     redo,
     undoStack,
@@ -824,22 +825,60 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
               )}
             </div>
           </div>
-          <div className="ds-zoom-controls">
-            <button
-              className="ds-zoom-btn"
-              onClick={() => setZoom((value) => Math.max(0.5, value - 0.25))}
+          <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 12, zIndex: 10 }}>
+            {/* Chuyển đổi Mặt trước / Mặt sau */}
+            <div
+              style={{
+                display: "flex",
+                background: "rgba(30, 41, 59, 0.7)",
+                backdropFilter: "blur(12px)",
+                padding: 4,
+                borderRadius: 9999,
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+              }}
             >
-              −
-            </button>
-            <button className="ds-zoom-label" onClick={() => setZoom(1)}>
-              {Math.round(zoom * 100)}%
-            </button>
-            <button
-              className="ds-zoom-btn"
-              onClick={() => setZoom((value) => Math.min(2, value + 0.25))}
-            >
-              +
-            </button>
+              <button
+                onClick={() => setShirtView("front")}
+                style={{
+                  padding: "6px 16px",
+                  borderRadius: 9999,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  transition: "all 0.2s",
+                  cursor: "pointer",
+                  border: "none",
+                  ...(shirtView === "front"
+                    ? { background: "#0ea5e9", color: "#ffffff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }
+                    : { background: "transparent", color: "#cbd5e1" }),
+                }}
+              >
+                Mặt trước
+              </button>
+              <button
+                onClick={() => setShirtView("back")}
+                style={{
+                  padding: "6px 16px",
+                  borderRadius: 9999,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  transition: "all 0.2s",
+                  cursor: "pointer",
+                  border: "none",
+                  ...(shirtView === "back"
+                    ? { background: "#0ea5e9", color: "#ffffff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }
+                    : { background: "transparent", color: "#cbd5e1" }),
+                }}
+              >
+                Mặt sau
+              </button>
+            </div>
+
+            <div className="ds-zoom-controls" style={{ position: "static" }}>
+              <button className="ds-zoom-btn" onClick={() => setZoom((value) => Math.max(0.5, value - 0.25))}>−</button>
+              <button className="ds-zoom-label" onClick={() => setZoom(1)}>{Math.round(zoom * 100)}%</button>
+              <button className="ds-zoom-btn" onClick={() => setZoom((value) => Math.min(2, value + 0.25))}>+</button>
+            </div>
           </div>
         </div>
 

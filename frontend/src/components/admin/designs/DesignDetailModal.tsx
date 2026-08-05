@@ -13,6 +13,16 @@ import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import * as designService from "@/services/admin/designService";
 import DesignStatusBadge from "./DesignStatusBadge";
+import AdminShirtMockupImage from "./AdminShirtMockupImage";
+import { getPrintAreaBoundary } from "@/components/design-studio/ShirtMockupImage";
+import { ShirtType, ShirtView } from "@/store/useDesignStore";
+
+const getShirtType = (name: string): ShirtType => {
+  const lower = (name || "").toLowerCase();
+  if (lower.includes('polo')) return 'polo';
+  if (lower.includes('hoodie')) return 'hoodie';
+  return 'tshirt';
+};
 
 type DesignDetailModalProps = {
   designId: number | null;
@@ -264,15 +274,61 @@ export default function DesignDetailModal({
                     </div>
                   )}
                   <div className="flex flex-1 items-center justify-center p-3">
-                    {data.urlPreview || (activeTab === 'front' ? data.printFileUrlFront : data.printFileUrlBack) ? (
-                      <Image
-                        src={(activeTab === 'back' && data.printFileUrlBack ? data.printFileUrlBack : (data.printFileUrlFront || data.urlPreview)) || ''}
-                        alt={`Bản xem trước thiết kế ${data.maThietKe} - ${activeTab === 'front' ? 'Mặt trước' : 'Mặt sau'}`}
-                        className="max-h-[calc(100vh-265px)] w-full rounded-md object-contain"
-                        rootClassName="flex w-full items-center justify-center"
-                        preview={{ mask: "Phóng to" }}
-                      />
-                    ) : (
+                    {data.urlPreview || data.printFileUrlFront || data.printFileUrlBack ? (() => {
+                      const containerW = 400;
+                      const containerH = 480;
+                      const shirtType = getShirtType(data.tenSanPham || "");
+                      const currentView = activeTab as ShirtView;
+                      const printSrc = activeTab === 'front' ? data.printFileUrlFront : data.printFileUrlBack;
+
+                      if (printSrc) {
+                        const boundary = getPrintAreaBoundary(shirtType, currentView, containerW, containerH);
+                        return (
+                          <div
+                            style={{
+                              width: containerW,
+                              height: containerH,
+                              position: "relative",
+                              backgroundColor: "#f8fafc",
+                              borderRadius: "8px",
+                              overflow: "hidden",
+                              boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                            }}
+                          >
+                            <AdminShirtMockupImage
+                              type={shirtType}
+                              view={currentView}
+                              color={data.mauAo || "#ffffff"}
+                              width={containerW}
+                              height={containerH}
+                            />
+                            <img
+                              src={printSrc}
+                              alt={`Thiết kế ${activeTab}`}
+                              style={{
+                                position: "absolute",
+                                top: boundary.top,
+                                left: boundary.left,
+                                width: boundary.width,
+                                height: boundary.height,
+                                objectFit: "contain",
+                                pointerEvents: "none"
+                              }}
+                            />
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <Image
+                          src={data.urlPreview || ''}
+                          alt="Bản xem trước"
+                          className="max-h-[calc(100vh-265px)] w-full rounded-md object-contain"
+                          rootClassName="flex w-full items-center justify-center"
+                          preview={{ mask: "Phóng to" }}
+                        />
+                      );
+                    })() : (
                       <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-md bg-white text-center text-text-muted">
                         <PictureOutlined className="text-4xl" />
                         <div>

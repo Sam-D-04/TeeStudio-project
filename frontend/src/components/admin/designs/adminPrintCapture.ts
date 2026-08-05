@@ -31,7 +31,7 @@ export async function captureAdminPrintImages({
     for (const side of sidesToCapture) {
       if (useDesignStore.getState().shirtView !== side) {
         useDesignStore.setState({ shirtView: side, selectedId: null });
-        await new Promise((resolve) => window.setTimeout(resolve, 120));
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
       }
 
       const printArea = getPrintAreaBoundary(shirtType, side, CONTAINER_W, CONTAINER_H);

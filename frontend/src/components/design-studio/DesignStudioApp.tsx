@@ -367,6 +367,9 @@ export default function DesignStudioApp() {
         // Hiển thị lại khung đứt nét
         boundaries.forEach((el: any) => el.style.display = '');
 
+        // Capture print images for both sides
+        const { printImageFront, printImageBack } = await capturePrintImages();
+
         // Trả UI về đúng mặt khách đang xem trước khi lưu (preview chỉ mượn tạm)
         if (previewView !== originalView) {
           setShirtView(originalView);
@@ -385,7 +388,9 @@ export default function DesignStudioApp() {
           printingMethodCode: useDesignStore.getState().printingMethodCode,
           logicalCanvas: { width: CONTAINER_W, height: CONTAINER_H },
         },
-        previewUrl
+        previewUrl,
+        printImageFront,
+        printImageBack
       };
 
       if (currentDesignId) {
@@ -544,7 +549,7 @@ export default function DesignStudioApp() {
       tử của mặt vừa chuyển sang trước khi chụp, tránh chụp nhầm frame cũ.
     - pixelRatio (multiplier) nâng độ phân giải lên ~2400px cạnh dài (đủ ~250-300 DPI).
   */
-  const capturePrintImages = async (): Promise<{ printImageFront?: string; printImageBack?: string }> => {
+  async function capturePrintImages(): Promise<{ printImageFront?: string; printImageBack?: string }> {
     const stage = stageRef.current;
     if (!stage) return {};
 
@@ -561,7 +566,7 @@ export default function DesignStudioApp() {
     for (const side of sidesToCapture) {
       if (useDesignStore.getState().shirtView !== side) {
         useDesignStore.setState({ shirtView: side, selectedId: null });
-        await new Promise((r) => setTimeout(r, 120));
+        await new Promise((r) => setTimeout(r, 500));
       }
 
       const paSide = getPrintAreaBoundary(shirtType, side, CONTAINER_W, CONTAINER_H);

@@ -883,6 +883,8 @@ async function layChiTietThietKe(id) {
     productId: Number(row.productId),
     variantId: row.variantId ? Number(row.variantId) : null,
     urlPreview: row.urlPreview || null,
+    printFileUrlFront: row.printFileUrlFront || null,
+    printFileUrlBack: row.printFileUrlBack || null,
     mauAo: chuanHoaMauAo(row.mauAoHex, row.mauAo, row.tenMauAo),
     tenKhachHang: row.tenKhachHang || "Chưa gán khách",
     soDienThoai: row.soDienThoai || null,
