@@ -7,7 +7,7 @@ import {
   ReloadOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, Image, Input, Modal, Skeleton, message } from "antd";
+import { Alert, Button, Image, Input, Modal, Skeleton, message, Radio } from "antd";
 import { isAxiosError } from "axios";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
@@ -104,6 +104,7 @@ export default function DesignDetailModal({
   const [messageApi, messageContextHolder] = message.useMessage();
   const [modalApi, modalContextHolder] = Modal.useModal();
   const [revisionNote, setRevisionNote] = useState("");
+  const [activeTab, setActiveTab] = useState<'front' | 'back'>('front');
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["thiet-ke-chi-tiet", designId],
@@ -247,26 +248,42 @@ export default function DesignDetailModal({
 
             <div className="grid gap-4 xl:grid-cols-[minmax(520px,0.95fr)_minmax(600px,1.05fr)]">
               <section className="min-w-0">
-                <div className="flex h-[calc(100vh-185px)] min-h-[500px] items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-alt p-3">
-                  {data.urlPreview ? (
-                    <Image
-                      src={data.urlPreview}
-                      alt={`Bản xem trước thiết kế ${data.maThietKe}`}
-                      className="max-h-[calc(100vh-215px)] w-full rounded-md object-contain"
-                      rootClassName="flex w-full items-center justify-center"
-                      preview={{ mask: "Phóng to" }}
-                    />
-                  ) : (
-                    <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-md bg-white text-center text-text-muted">
-                      <PictureOutlined className="text-4xl" />
-                      <div>
-                        <p className="m-0 font-semibold text-text-secondary">
-                          Chưa có ảnh xem trước
-                        </p>
-                        <p className="mb-0 mt-1 text-xs">Màu áo: {data.tenMauAo}</p>
-                      </div>
+                <div className="flex h-[calc(100vh-185px)] min-h-[500px] flex-col overflow-hidden rounded-lg border border-border bg-surface-alt">
+                  {data.printFileUrlBack && (
+                    <div className="flex justify-center border-b border-border bg-white p-2">
+                      <Radio.Group
+                        options={[
+                          { label: 'Mặt trước', value: 'front' },
+                          { label: 'Mặt sau', value: 'back' },
+                        ]}
+                        onChange={({ target: { value } }) => setActiveTab(value)}
+                        value={activeTab}
+                        optionType="button"
+                        buttonStyle="solid"
+                      />
                     </div>
                   )}
+                  <div className="flex flex-1 items-center justify-center p-3">
+                    {data.urlPreview || (activeTab === 'front' ? data.printFileUrlFront : data.printFileUrlBack) ? (
+                      <Image
+                        src={(activeTab === 'back' && data.printFileUrlBack ? data.printFileUrlBack : (data.printFileUrlFront || data.urlPreview)) || ''}
+                        alt={`Bản xem trước thiết kế ${data.maThietKe} - ${activeTab === 'front' ? 'Mặt trước' : 'Mặt sau'}`}
+                        className="max-h-[calc(100vh-265px)] w-full rounded-md object-contain"
+                        rootClassName="flex w-full items-center justify-center"
+                        preview={{ mask: "Phóng to" }}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-md bg-white text-center text-text-muted">
+                        <PictureOutlined className="text-4xl" />
+                        <div>
+                          <p className="m-0 font-semibold text-text-secondary">
+                            Chưa có ảnh xem trước
+                          </p>
+                          <p className="mb-0 mt-1 text-xs">Màu áo: {data.tenMauAo}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </section>
 

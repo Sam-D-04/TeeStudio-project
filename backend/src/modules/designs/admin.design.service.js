@@ -785,6 +785,8 @@ async function layChiTietThietKe(id) {
        cd.productId,
        cd.variantId,
        cd.previewUrl AS urlPreview,
+       cd.printFileUrlFront,
+       cd.printFileUrlBack,
        cd.baseColor AS mauAo,
        cd.status,
        cd.createdAt AS ngayGui,

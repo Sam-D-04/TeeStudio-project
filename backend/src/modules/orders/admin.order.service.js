@@ -1681,7 +1681,10 @@ async function timKiemThietKe(userId, keyword) {
   const [rows] = await db.pool.query(
     `SELECT cd.id, cd.productId, cd.variantId, cd.baseColor,
             cd.previewUrl, cd.designFee, cd.status, cd.createdAt, cd.name AS tenThietKe,
-            (SELECT IFNULL(SUM(extraCost), 0) FROM DesignPrintMethod dpm WHERE dpm.designId = cd.id) AS phiInAn,
+            (
+              (SELECT IFNULL(SUM(extraCost), 0) FROM DesignPrintMethod dpm WHERE dpm.designId = cd.id) +
+              (SELECT IFNULL(SUM(extraCost), 0) FROM DesignPrintPosition dpp WHERE dpp.designId = cd.id)
+            ) AS phiInAn,
             p.name AS tenSanPham, p.basePrice, p.material, p.form,
             pi.imageUrl AS anhUrl,
             pv.color AS mauSanPham
@@ -1941,7 +1944,10 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     const [rowsDesign] = await db.pool.query(
       `SELECT cd.id, cd.userId AS designUserId, cd.productId, cd.variantId,
               cd.baseColor, cd.designFee, cd.status, cd.previewUrl,
-              (SELECT IFNULL(SUM(extraCost), 0) FROM DesignPrintMethod dpm WHERE dpm.designId = cd.id) AS phiInAn,
+              (
+                (SELECT IFNULL(SUM(extraCost), 0) FROM DesignPrintMethod dpm WHERE dpm.designId = cd.id) +
+                (SELECT IFNULL(SUM(extraCost), 0) FROM DesignPrintPosition dpp WHERE dpp.designId = cd.id)
+              ) AS phiInAn,
               pv.color AS designColor
        FROM CustomDesign cd
        LEFT JOIN ProductVariant pv ON pv.id = cd.variantId

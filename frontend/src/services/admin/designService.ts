@@ -44,6 +44,8 @@ export type ChiTietThietKe = ThietKe & {
   tenThietKe: string;
   khachHangId: number | null;
   emailKhachHang: string | null;
+  printFileUrlFront?: string | null;
+  printFileUrlBack?: string | null;
   sanPhamId: number;
   productId: number;
   variantId: number | null;

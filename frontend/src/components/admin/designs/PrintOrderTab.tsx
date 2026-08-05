@@ -338,38 +338,42 @@ export default function PrintOrderTab({
             </div>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={() => setMatDangXem("front")}
-                style={{
-                  height: 34,
-                  padding: "0 14px",
-                  borderRadius: 6,
-                  border: matDangXem === "front" ? "1px solid #0ea5e9" : "1px solid #e2e8f0",
-                  background: matDangXem === "front" ? "#e0f2fe" : "#ffffff",
-                  color: matDangXem === "front" ? "#0369a1" : "#475569",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                Mặt trước{coMatTruoc ? "" : " (trống)"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMatDangXem("back")}
-                style={{
-                  height: 34,
-                  padding: "0 14px",
-                  borderRadius: 6,
-                  border: matDangXem === "back" ? "1px solid #0ea5e9" : "1px solid #e2e8f0",
-                  background: matDangXem === "back" ? "#e0f2fe" : "#ffffff",
-                  color: matDangXem === "back" ? "#0369a1" : "#475569",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                Mặt sau{coMatSau ? "" : " (trống)"}
-              </button>
+              {coMatTruoc && (
+                <button
+                  type="button"
+                  onClick={() => setMatDangXem("front")}
+                  style={{
+                    height: 34,
+                    padding: "0 14px",
+                    borderRadius: 6,
+                    border: matDangXem === "front" ? "1px solid #0ea5e9" : "1px solid #e2e8f0",
+                    background: matDangXem === "front" ? "#e0f2fe" : "#ffffff",
+                    color: matDangXem === "front" ? "#0369a1" : "#475569",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Mặt trước
+                </button>
+              )}
+              {coMatSau && (
+                <button
+                  type="button"
+                  onClick={() => setMatDangXem("back")}
+                  style={{
+                    height: 34,
+                    padding: "0 14px",
+                    borderRadius: 6,
+                    border: matDangXem === "back" ? "1px solid #0ea5e9" : "1px solid #e2e8f0",
+                    background: matDangXem === "back" ? "#e0f2fe" : "#ffffff",
+                    color: matDangXem === "back" ? "#0369a1" : "#475569",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Mặt sau
+                </button>
+              )}
             </div>
 
             <div
