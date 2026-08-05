@@ -35,6 +35,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import * as orderService from "@/services/admin/orderService";
 import type { ChiTietDonHang } from "@/services/admin/orderService";
+import * as promotionService from "@/services/admin/promotionService";
 import useAuthStore from "@/store/useAuthStore";
 import {
   getOrderPaymentState,
@@ -130,11 +131,16 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
         productId: 0,
         variantId: 0,
         designId: null,
+        designStatus: null,
+        designAdminNote: null,
+        productionStatus: null,
         tenSanPham: order.sanPham.ten,
         mauSac: "",
         kichCo: order.sanPham.sizes,
         sku: "",
         soLuong: 1,
+        // tamTinhVnd = sum(unitPrice * qty), phiThietKeVnd = sum(designFee)
+        // Đây là fallback khi items rỗng: coi toàn bộ là 1 item
         donGiaVnd: order.tamTinhVnd,
         phiThietKeVnd: order.phiThietKeVnd,
         thanhTienVnd: order.tamTinhVnd + order.phiThietKeVnd,
@@ -224,12 +230,18 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
                 </td>
                 <td className="px-2 py-2 text-right align-middle text-text-main">
                   <div className="font-semibold">{formatCurrency(item.donGiaVnd)}</div>
+                  {item.loai === "custom_design" ? (
+                    <div className="mt-0.5 text-xs text-blue-500">
+                      (đã gồm phí in)
+                    </div>
+                  ) : null}
                   {item.phiThietKeVnd > 0 ? (
                     <div className="mt-0.5 text-xs text-text-secondary">
                       + phí TK: {formatCurrency(item.phiThietKeVnd)}
                     </div>
                   ) : null}
                 </td>
+                {/* Thành tiền = donGiaVnd (đã gồm phí in) × soLuong + phiThietKeVnd */}
                 <td className="px-2 py-2 text-right align-middle font-bold text-primary-container">
                   {formatCurrency(item.thanhTienVnd)}
                 </td>
@@ -243,7 +255,13 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
 }
 
 /** Nút "Hiển thị mã QR" → modal popup. Ẩn khi đơn PAID hoặc CANCELLED. */
-function OnlinePaymentQrButton({ order }: { order: ChiTietDonHang }) {
+function OnlinePaymentQrButton({
+  order,
+  vatPercent = 0,
+}: {
+  order: ChiTietDonHang;
+  vatPercent?: number;
+}) {
   const queryClient = useQueryClient();
   const [messageApi, messageContextHolder] = message.useMessage();
   const [isQrOpen, setIsQrOpen] = useState(false);
@@ -274,6 +292,21 @@ function OnlinePaymentQrButton({ order }: { order: ChiTietDonHang }) {
     Boolean(payment.paymentUrl) &&
     hasValidExpiry &&
     now < expiresAtMs;
+
+  const amountBeforeVat =
+    order.tamTinhVnd +
+    order.phiThietKeVnd +
+    order.phiVanChuyenVnd -
+    order.giamGiaVnd;
+  const vatAmount =
+    vatPercent > 0 ? Math.round((amountBeforeVat * vatPercent) / 100) : 0;
+  
+  const backendHasVat = order.tongTienVnd > amountBeforeVat;
+  const finalTotal = backendHasVat ? order.tongTienVnd : order.tongTienVnd + vatAmount;
+  
+  const finalPaymentAmount = backendHasVat
+    ? (order.thanhToan.soTienVnd || (order.tienCocVnd > 0 ? order.tienCocVnd : order.tongTienVnd))
+    : (order.tienCocVnd > 0 ? Math.round(finalTotal / 2) : finalTotal);
 
   useEffect(() => {
     if (!isPending || isCancelled) return;
@@ -381,6 +414,9 @@ function OnlinePaymentQrButton({ order }: { order: ChiTietDonHang }) {
                     {formatExpiryTime(payment.expiresAt)}
                   </strong>
                 </p>
+                <p className="mt-2 text-lg font-bold text-primary-container">
+                  Số tiền: {formatCurrency(finalPaymentAmount)}
+                </p>
               </div>
               <div className="flex w-full flex-col gap-2">
                 <Button
@@ -467,9 +503,11 @@ function OrderHistoryDrawer({ order }: { order: ChiTietDonHang }) {
 function OrderDetailContent({
   order,
   canManagePayment,
+  vatPercent = 0,
 }: {
   order: ChiTietDonHang;
   canManagePayment: boolean;
+  vatPercent?: number;
 }) {
   const isOnlinePayment = ["VNPAY", "MOMO"].includes(
     order.thanhToan.phuongThuc
@@ -479,6 +517,21 @@ function OrderDetailContent({
     paymentType: order.thanhToan.loai,
     status: order.thanhToan.status,
   });
+
+  const amountBeforeVat =
+    order.tamTinhVnd +
+    order.phiThietKeVnd +
+    order.phiVanChuyenVnd -
+    order.giamGiaVnd;
+  const vatAmount =
+    vatPercent > 0 ? Math.round((amountBeforeVat * vatPercent) / 100) : 0;
+  
+  const backendHasVat = order.tongTienVnd > amountBeforeVat;
+  const finalTotal = backendHasVat ? order.tongTienVnd : order.tongTienVnd + vatAmount;
+
+  const hasDeposit = order.tienCocVnd > 0;
+  const finalDeposit = backendHasVat ? order.tienCocVnd : (hasDeposit ? Math.round(finalTotal / 2) : 0);
+  const finalCod = backendHasVat ? order.tienThuHoCodVnd : ((hasDeposit || order.tienThuHoCodVnd > 0) ? finalTotal - finalDeposit : 0);
 
   return (
     <section className="rounded-xl border border-border bg-surface shadow-admin-card">
@@ -527,7 +580,7 @@ function OrderDetailContent({
                 isOnlinePayment &&
                 !isPaid &&
                 order.trangThai !== "da_huy" ? (
-                <OnlinePaymentQrButton order={order} />
+                <OnlinePaymentQrButton order={order} vatPercent={vatPercent} />
               ) : null}
               {isPaid ? (
                 <Tag color="green" className="m-0 text-xs">
@@ -597,6 +650,11 @@ function OrderDetailContent({
             <p className="mb-2 text-xs font-bold uppercase tracking-wide text-text-secondary">
               Chi tiết các khoản
             </p>
+            {/*
+              tamTinhVnd = sum(unitPrice × soLuong)
+              unitPrice trong DB đã gồm giá phôi bulk + phí in ấn.
+              Đây là subtotal (chưa gồm phí TK, ship, giảm giá, VAT).
+            */}
             <PriceRow label="Tạm tính" value={order.tamTinhVnd} />
             {order.phiThietKeVnd > 0 ? (
               <PriceRow label="Phí thiết kế" value={order.phiThietKeVnd} />
@@ -605,6 +663,21 @@ function OrderDetailContent({
               <PriceRow label="Giảm giá" value={-order.giamGiaVnd} />
             ) : null}
             <PriceRow label="Phí vận chuyển" value={order.phiVanChuyenVnd} />
+            {/* Tính VAT dựa trên vatPercent lấy từ PricingConfiguration */}
+            {(() => {
+              const amountBeforeVat =
+                order.tamTinhVnd +
+                order.phiThietKeVnd +
+                order.phiVanChuyenVnd -
+                order.giamGiaVnd;
+              const vatAmount =
+                vatPercent > 0
+                  ? Math.round((amountBeforeVat * vatPercent) / 100)
+                  : 0;
+              return vatAmount > 0 ? (
+                <PriceRow label={`Thuế VAT (${vatPercent}%)`} value={vatAmount} />
+              ) : null;
+            })()}
           </div>
 
           {/* Cột phải: tổng cộng + thanh toán đặc biệt */}
@@ -615,16 +688,16 @@ function OrderDetailContent({
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm font-semibold text-text-secondary">Tổng cộng</span>
               <span className="text-xl font-extrabold text-primary-container">
-                {formatCurrency(order.tongTienVnd)}
+                {formatCurrency(finalTotal)}
               </span>
             </div>
             {order.tienCocVnd > 0 || order.tienThuHoCodVnd > 0 ? (
               <div className="mt-1 space-y-1 rounded-lg border border-primary-container/20 bg-sky-50 p-2">
                 {order.tienCocVnd > 0 ? (
-                  <PriceRow label="Thanh toán trước (Cọc)" value={order.tienCocVnd} />
+                  <PriceRow label="Thanh toán trước (Cọc)" value={finalDeposit} />
                 ) : null}
                 {order.tienThuHoCodVnd > 0 ? (
-                  <PriceRow label="Thu hộ COD khi giao" value={order.tienThuHoCodVnd} />
+                  <PriceRow label="Thu hộ COD khi giao" value={finalCod} />
                 ) : null}
               </div>
             ) : null}
@@ -671,6 +744,14 @@ export default function OrderDetailRouteClient() {
       return shouldPoll ? 3000 : false;
     },
   });
+
+  // Lấy cấu hình giá (vatPercent) từ PricingConfiguration
+  const { data: pricingFormula } = useQuery({
+    queryKey: ["admin-pricing-formula"],
+    queryFn: promotionService.layCongThucBaoGia,
+    staleTime: 5 * 60 * 1000, // cache 5 phút
+  });
+  const vatPercent = pricingFormula?.cauHinh?.vatPercent ?? 0;
 
   async function refreshOrderData() {
     await Promise.all([
@@ -814,7 +895,7 @@ export default function OrderDetailRouteClient() {
       ) : null}
 
       {!isLoading && !isError && order ? (
-        <OrderDetailContent order={order} canManagePayment={canManageOrder} />
+        <OrderDetailContent order={order} canManagePayment={canManageOrder} vatPercent={vatPercent} />
       ) : null}
 
 
