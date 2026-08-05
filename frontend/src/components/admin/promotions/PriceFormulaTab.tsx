@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { InfoCircleOutlined, LoadingOutlined, SaveOutlined } from "@ant-design/icons";
-import { message } from "antd";
+import { App } from "antd";
 import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import * as promotionService from "@/services/admin/promotionService";
 
@@ -32,6 +32,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 export default function PriceFormulaTab() {
+  const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [formChanges, setFormChanges] = useState<Partial<FormState>>({});
   const query = useQuery({

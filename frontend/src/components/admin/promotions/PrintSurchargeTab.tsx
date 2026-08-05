@@ -173,7 +173,7 @@ function PrintSurchargeContent() {
       <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
         <h3 style={{ margin: 0, fontSize: 15, color: "#0f172a" }}>Phụ phí in &amp; thiết kế</h3>
         <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>
-          Quản lý trực tiếp phụ phí của vị trí in và phương pháp in đang dùng trong Design Studio.
+          Quản lý trực tiếp phụ phí của phương pháp in đang dùng trong Design Studio.
         </p>
       </div>
 
@@ -188,7 +188,6 @@ function PrintSurchargeContent() {
         </div>
       ) : (
         <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 24 }}>
-          {renderGroup("Vị trí in", query.data?.viTriIn ?? [])}
           {renderGroup("Phương pháp in", query.data?.phuongPhapIn ?? [], true)}
         </div>
       )}
