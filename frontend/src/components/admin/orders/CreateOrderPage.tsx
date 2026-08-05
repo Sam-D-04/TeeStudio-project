@@ -38,6 +38,7 @@ import type {
   TaoMoiDonHangInput,
   ThietKe,
 } from "@/services/admin/orderService";
+import type { KetQuaCongThucBaoGia } from "@/services/admin/promotionService";
 
 type CreateOrderFormValues = {
   userId?: number;
@@ -67,12 +68,17 @@ type OrderPreviewLine = {
   quantity: number;
   design?: ThietKe;
   unitPrice: number;
-  printFee: number;
+  printFeeFront: number;
+  printFeeBack: number;
   lineProductTotal: number;
   designFee: number;
   lineTotal: number;
   discountPercent?: number;
   bulkMinQty?: number;
+  phiPhuongPhapInFront: number;
+  phiDienTichInFront: number;
+  phiPhuongPhapInBack: number;
+  phiDienTichInBack: number;
 };
 
 type OrderPreview = {
@@ -85,6 +91,8 @@ type OrderPreview = {
   selectedPromotion?: KhuyenMai;
   promotionBaseAmount: number;
   promotionNotEligible: boolean;
+  vatAmount: number;
+  vatPercent: number;
 };
 
 const initialValues: CreateOrderFormValues = {
@@ -320,7 +328,8 @@ function buildPreview(
   values: CreateOrderFormValues,
   productById: Record<number, SanPhamTimKiem>,
   designById: Record<number, ThietKe>,
-  promotions: KhuyenMai[]
+  promotions: KhuyenMai[],
+  vatPercent: number = 0
 ): OrderPreview {
   const qtyByProductId: Record<number, number> = {};
   values.items?.forEach((item) => {
@@ -348,8 +357,10 @@ function buildPreview(
         product,
         totalProductQty
       );
-      const printFee = design?.phiInAn ?? 0;
-      const lineProductTotal = (unitPrice + printFee) * quantity;
+      const phiInAnMatTruoc = design?.phiInAnMatTruoc ?? 0;
+      const phiInAnMatSau = design?.phiInAnMatSau ?? 0;
+      
+      const lineProductTotal = (unitPrice + phiInAnMatTruoc) * quantity + (phiInAnMatSau * quantity);
 
       let designFee = 0;
       if (design && !uniqueDesignIds.has(design.id)) {
@@ -364,12 +375,17 @@ function buildPreview(
         quantity,
         design,
         unitPrice,
-        printFee,
+        printFeeFront: phiInAnMatTruoc,
+        printFeeBack: phiInAnMatSau,
         lineProductTotal,
         designFee,
         lineTotal: lineProductTotal + designFee,
         discountPercent,
         bulkMinQty,
+        phiPhuongPhapInFront: design?.phiPhuongPhapInFront ?? 0,
+        phiDienTichInFront: design?.phiDienTichInFront ?? 0,
+        phiPhuongPhapInBack: design?.phiPhuongPhapInBack ?? 0,
+        phiDienTichInBack: design?.phiDienTichInBack ?? 0,
       };
     }) ?? [];
 
@@ -386,9 +402,13 @@ function buildPreview(
   );
   const shippingFee =
     selectedPromotion?.loaiGiam === "FREE_SHIPPING" ? 0 : shippingFeeInput;
+  
+  const amountBeforeVat = Math.max(0, subtotal + designFee + shippingFee - discountAmount);
+  const vatAmount = (amountBeforeVat * vatPercent) / 100;
+  
   const totalAmount = Math.max(
     0,
-    subtotal + designFee + shippingFee - discountAmount
+    amountBeforeVat + vatAmount
   );
 
   return {
@@ -403,6 +423,8 @@ function buildPreview(
     promotionNotEligible:
       Boolean(selectedPromotion) &&
       promotionBaseAmount < (selectedPromotion?.donHangToiThieu ?? 0),
+    vatAmount,
+    vatPercent,
   };
 }
 
@@ -863,11 +885,15 @@ function ProductItemRow({
           <span className="text-text-main">
             Đơn giá áo: <span className="font-semibold">{formatCurrency(previewLine?.unitPrice ?? 0)}</span>
           </span>
-          {previewLine?.printFee ? (
+          {(previewLine?.printFeeFront || previewLine?.printFeeBack) ? (
             <>
               <span className="text-border">•</span>
               <span className="text-text-main">
-                Phí in ấn: <span className="font-semibold text-blue-600">{formatCurrency(previewLine.printFee)}</span>
+                PP in: <span className="font-semibold text-blue-600">{formatCurrency(previewLine.phiPhuongPhapInFront + previewLine.phiPhuongPhapInBack)}</span>
+              </span>
+              <span className="text-border">•</span>
+              <span className="text-text-main">
+                Diện tích in: <span className="font-semibold text-blue-600">{formatCurrency(previewLine.phiDienTichInFront + previewLine.phiDienTichInBack)}</span>
               </span>
             </>
           ) : null}
@@ -1180,7 +1206,8 @@ function OrderSummary({
     ["Phí thiết kế", preview.designFee],
     ["Giảm giá", -preview.discountAmount],
     ["Phí ship", preview.shippingFee],
-  ] as const;
+    [`VAT (${preview.vatPercent}%)`, preview.vatAmount],
+  ].filter(row => row[1] !== 0) as [string, number][];
 
   return (
     <aside className="sticky top-5">
@@ -1209,6 +1236,29 @@ function OrderSummary({
                     : "Chưa chọn biến thể"}{" "}
                   · SL {line.quantity}
                 </div>
+                {line.productType === "CUSTOM" && (
+                  <div className="mt-1 flex flex-col gap-0.5 text-text-muted">
+                    <div>
+                      - Giá áo + In mặt 1: {formatCurrency(line.unitPrice + line.printFeeFront)} x {line.quantity}
+                      <div className="text-[11px] text-text-muted ml-2">
+                        (Giá áo: {formatCurrency(line.unitPrice)}, PP in: {formatCurrency(line.phiPhuongPhapInFront)}, Diện tích in: {formatCurrency(line.phiDienTichInFront)})
+                      </div>
+                    </div>
+                    {line.printFeeBack > 0 && (
+                      <div className="flex flex-col gap-0.5">
+                        <span>- In mặt 2: {formatCurrency(line.printFeeBack)} x {line.quantity}</span>
+                        <span className="text-text-muted ml-2 text-[11px]">
+                          (PP in: {formatCurrency(line.phiPhuongPhapInBack)}, Diện tích in: {formatCurrency(line.phiDienTichInBack)})
+                        </span>
+                      </div>
+                    )}
+                    {line.designFee > 0 && (
+                      <div>
+                        - Phí thiết kế: {formatCurrency(line.designFee)}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <span className="shrink-0 font-bold text-text-main">
                 {formatCurrency(line.lineTotal)}
@@ -1368,12 +1418,12 @@ export default function CreateOrderPage() {
   const {
     data: promotions = [],
     isFetching: isLoadingPromotions,
-  } = useQuery({
+  } = useQuery<KhuyenMai[]>({
     queryKey: ["admin-order-promotions"],
     queryFn: orderService.layDanhSachKhuyenMai,
   });
 
-  const { data: pricingFormula } = useQuery({
+  const { data: pricingFormula } = useQuery<KetQuaCongThucBaoGia>({
     queryKey: ["admin-pricing-formula"],
     queryFn: promotionService.layCongThucBaoGia,
   });
@@ -1385,8 +1435,8 @@ export default function CreateOrderPage() {
   }, [pricingFormula, form]);
 
   const preview = useMemo(
-    () => buildPreview(values, productById, designById, promotions),
-    [designById, productById, promotions, values]
+    () => buildPreview(values, productById, designById, promotions, pricingFormula?.cauHinh?.vatPercent ?? 0),
+    [designById, productById, promotions, values, pricingFormula]
   );
 
   const hasCustomDesign = preview.lines.some(
@@ -1468,7 +1518,11 @@ export default function CreateOrderPage() {
     );
   }
 
-  const createOrderMutation = useMutation({
+  const createOrderMutation = useMutation<
+    orderService.KetQuaTaoMoiDonHang,
+    Error,
+    orderService.TaoMoiDonHangInput
+  >({
     mutationFn: orderService.taoMoiDonHang,
     onSuccess: async (result, variables) => {
       syncStockAfterCreateOrder(variables.items);

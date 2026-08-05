@@ -348,7 +348,12 @@ export type ThietKe = {
   mauSanPham: string;
   anhXemTruoc: string;
   phiThietKe: number;
-  phiInAn?: number;
+  phiInAnMatTruoc?: number;
+  phiInAnMatSau?: number;
+  phiPhuongPhapInFront?: number;
+  phiDienTichInFront?: number;
+  phiPhuongPhapInBack?: number;
+  phiDienTichInBack?: number;
   trangThai: string;
   ngayTao: string;
   sanPham: SanPhamTimKiem;

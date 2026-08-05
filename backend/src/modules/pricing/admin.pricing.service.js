@@ -226,36 +226,36 @@ const calculateFeeForOneSide = (items) => {
   return Math.min(bboxFee, individualSumFee);
 };
 
-const calculateBoundingBoxAreaFee = (canvasData, printExtraCost = 0) => {
+const calculateAreaFeePerSide = (canvasData) => {
   try {
-    // Hỗ trợ cả dạng string JSON và object
     const data = typeof canvasData === 'string' ? JSON.parse(canvasData) : canvasData;
+    const items = data?.objects || data?.layers || data?.elements || [];
 
-    // Tự nhận diện cấu trúc: 'objects' (Fabric.js chuẩn), 'layers' (admin wrap),
-    // hoặc 'elements' (canvasData thật của Design Studio, xem useDesignStore.ts)
-    const items = data.objects || data.layers || data.elements || [];
+    if (!items || items.length === 0) return { frontAreaFee: 0, backAreaFee: 0 };
 
-    if (!items || items.length === 0) return 0;
-
-    // Tách theo mặt áo (side) - phần tử thiếu side (thiết kế cũ) mặc định là "front"
     const frontItems = items.filter((item) => (item.side ?? "front") !== "back");
     const backItems  = items.filter((item) => (item.side ?? "front") === "back");
 
-    const frontFee = calculateFeeForOneSide(frontItems);
-    const backFee  = calculateFeeForOneSide(backItems);
+    const frontAreaFee = calculateFeeForOneSide(frontItems);
+    const backAreaFee  = calculateFeeForOneSide(backItems);
 
-    const baseFee = frontFee + backFee;
-    return baseFee > 0 ? baseFee + Number(printExtraCost) : 0;
-
+    return { frontAreaFee, backAreaFee };
   } catch (err) {
-    console.error('[pricing] calculateBoundingBoxAreaFee error:', err.message);
-    return 0; // Nếu parse JSON lỗi thì miễn phí, không làm lỗi luồng lưu
+    console.error('[pricing] calculateAreaFeePerSide error:', err.message);
+    return { frontAreaFee: 0, backAreaFee: 0 };
   }
+};
+
+const calculateBoundingBoxAreaFee = (canvasData, printExtraCost = 0) => {
+  const { frontAreaFee, backAreaFee } = calculateAreaFeePerSide(canvasData);
+  const baseFee = frontAreaFee + backAreaFee;
+  return baseFee > 0 ? baseFee + Number(printExtraCost) : 0;
 };
 
 module.exports = {
   calculateDesignQuote,
   calculateBoundingBoxAreaFee,
+  calculateAreaFeePerSide,
   PIXELS_PER_CM_X,
   PIXELS_PER_CM_Y,
   FEE_TIERS,

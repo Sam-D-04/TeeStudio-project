@@ -15,6 +15,7 @@ const {
 } = require("../payments/momo.service");
 const { uploadBase64Image } = require("../uploads/upload.service");
 const { sendDesignRevisionEmail } = require("../../common/services/emailService");
+const { calculateAreaFeePerSide } = require("../pricing/admin.pricing.service");
 
 const DEPOSIT_PERCENT = 50;
 const ONLINE_PAYMENT_METHODS = new Set(["VNPAY", "MOMO"]);
@@ -1679,7 +1680,7 @@ async function timKiemThietKe(userId, keyword) {
   }
 
   const [rows] = await db.pool.query(
-    `SELECT cd.id, cd.productId, cd.variantId, cd.baseColor,
+    `SELECT cd.id, cd.productId, cd.variantId, cd.baseColor, cd.canvasData,
             cd.previewUrl, cd.designFee, cd.status, cd.createdAt, cd.name AS tenThietKe,
             (
               (SELECT IFNULL(SUM(extraCost), 0) FROM DesignPrintMethod dpm WHERE dpm.designId = cd.id) +
@@ -1724,20 +1725,44 @@ async function timKiemThietKe(userId, keyword) {
     productIds
   );
 
-  return rows.map((r) => ({
-    id: r.id,
-    productId: r.productId,
-    variantId: r.variantId,
-    tenSanPham: r.tenSanPham,
-    tenThietKe: r.tenThietKe,
-    mauNen: r.baseColor,
-    mauSanPham: r.mauSanPham || r.baseColor,
-    anhXemTruoc: r.previewUrl,
-    phiThietKe: Number(r.designFee),
-    phiInAn: Number(r.phiInAn || 0),
-    trangThai: r.status,
-    ngayTao: r.createdAt,
-    sanPham: {
+  return rows.map((r) => {
+    const { frontAreaFee, backAreaFee } = calculateAreaFeePerSide(r.canvasData);
+    
+    const phiInAnTuDB = Number(r.phiInAn || 0);
+    
+    let ppInFront = 0;
+    let ppInBack = 0;
+    if (frontAreaFee > 0 && backAreaFee > 0) {
+      ppInFront = phiInAnTuDB / 2;
+      ppInBack = phiInAnTuDB / 2;
+    } else if (backAreaFee > 0) {
+      ppInBack = phiInAnTuDB;
+    } else {
+      ppInFront = phiInAnTuDB;
+    }
+
+    const phiInAnMatTruoc = ppInFront + frontAreaFee;
+    const phiInAnMatSau = ppInBack + backAreaFee;
+
+    return {
+      id: r.id,
+      productId: r.productId,
+      variantId: r.variantId,
+      tenSanPham: r.tenSanPham,
+      tenThietKe: r.tenThietKe,
+      mauNen: r.baseColor,
+      mauSanPham: r.mauSanPham || r.baseColor,
+      anhXemTruoc: r.previewUrl,
+      phiThietKe: Number(r.designFee),
+      phiInAnMatTruoc: phiInAnMatTruoc,
+      phiInAnMatSau: phiInAnMatSau,
+      phiPhuongPhapInFront: ppInFront,
+      phiDienTichInFront: frontAreaFee,
+      phiPhuongPhapInBack: ppInBack,
+      phiDienTichInBack: backAreaFee,
+      trangThai: r.status,
+      ngayTao: r.createdAt,
+      sanPham: {
       id: r.productId,
       ten: r.tenSanPham,
       giaGoc: Number(r.basePrice),
@@ -1759,10 +1784,10 @@ async function timKiemThietKe(userId, keyword) {
           id: b.id,
           soLuongToiThieu: b.minQty,
           phanTramGiam: Number(b.discountPercent),
-          giaPreview: Number(r.basePrice) * (1 - Number(b.discountPercent) / 100),
         })),
-    },
-  }));
+      }
+    };
+  });
 }
 
 // =====================================================================
@@ -1943,7 +1968,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
 
     const [rowsDesign] = await db.pool.query(
       `SELECT cd.id, cd.userId AS designUserId, cd.productId, cd.variantId,
-              cd.baseColor, cd.designFee, cd.status, cd.previewUrl,
+              cd.baseColor, cd.designFee, cd.status, cd.previewUrl, cd.canvasData,
               (
                 (SELECT IFNULL(SUM(extraCost), 0) FROM DesignPrintMethod dpm WHERE dpm.designId = cd.id) +
                 (SELECT IFNULL(SUM(extraCost), 0) FROM DesignPrintPosition dpp WHERE dpp.designId = cd.id)
@@ -2017,7 +2042,14 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     } else {
       enriched.designFee = 0;
     }
-    enriched.printFee = Number(design.phiInAn || 0);
+    
+    // Tính printFee theo công thức mới: phiInAn từ DB (method + position) + phí diện tích từ canvasData
+    const { frontAreaFee, backAreaFee } = calculateAreaFeePerSide(design.canvasData);
+    const phiInAnTuDB = Number(design.phiInAn || 0);
+    const phiInAnMatTruoc = phiInAnTuDB + frontAreaFee;
+    const phiInAnMatSau = backAreaFee;
+
+    enriched.printFee = phiInAnMatTruoc + phiInAnMatSau;
     // Tính printFee vào unitPrice để lưu vào OrderItem và tính lineTotal, subtotal tự động
     enriched.unitPrice += enriched.printFee;
     enriched.designStatus = design.status;
