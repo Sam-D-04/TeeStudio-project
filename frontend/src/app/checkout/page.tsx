@@ -288,7 +288,7 @@ export default function CheckoutPage() {
     totalDesignFee += (item.designFee || 0) * qty;
 
     const totalQty = qtyByProductId[item.productId] || qty;
-    const baseItemPrice = item.price + (item.designFee || 0);
+    const baseItemPrice = item.price;
     let unitPrice = baseItemPrice;
     
     if (item.bulkPricing && item.bulkPricing.length > 0) {

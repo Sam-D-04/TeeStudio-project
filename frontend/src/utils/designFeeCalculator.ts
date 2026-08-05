@@ -59,7 +59,7 @@ export const FEE_TIERS = [
   { maxAreaCm2: 600, fee: 40000, label: "40.000đ" },
 ] as const;
 
-export const FEE_MAX       = 60000;
+export const FEE_MAX = 60000;
 export const FEE_MAX_LABEL = "60.000đ";
 
 // ─── Hàm nội bộ ─────────────────────────────────────────────────────────────
@@ -109,12 +109,12 @@ function calcFeeForOneSide(elements: DesignElement[]): {
   }
 
   const bboxAreaCm2 = calcBoundingBoxAreaCm2(elements);
-  const bboxFee     = getFeeForArea(bboxAreaCm2);
+  const bboxFee = getFeeForArea(bboxAreaCm2);
 
-  const sumAreaCm2    = calcSumIndividualAreasCm2(elements);
+  const sumAreaCm2 = calcSumIndividualAreasCm2(elements);
   const individualFee = getFeeForArea(sumAreaCm2);
 
-  const fee     = Math.min(bboxFee, individualFee);
+  const fee = Math.min(bboxFee, individualFee);
   const areaCm2 = fee === bboxFee ? bboxAreaCm2 : sumAreaCm2;
 
   return { fee, bboxAreaCm2, sumAreaCm2, areaCm2 };
@@ -129,13 +129,13 @@ function calcFeeForOneSide(elements: DesignElement[]): {
 export function calcBoundingBoxAreaCm2(elements: DesignElement[]): number {
   if (!elements || elements.length === 0) return 0;
 
-  let minX = Infinity,  minY = Infinity;
+  let minX = Infinity, minY = Infinity;
   let maxX = -Infinity, maxY = -Infinity;
 
   elements.forEach((el) => {
     const scaleX = 1; // Konva commit scale vào width sau resize; giữ =1 nhất quán BE
     const scaleY = 1;
-    const w = (el.width  ?? 0) * scaleX;
+    const w = (el.width ?? 0) * scaleX;
     const h = (el.height ?? 0) * scaleY;
     const x1 = el.x;
     const y1 = el.y;
@@ -148,7 +148,7 @@ export function calcBoundingBoxAreaCm2(elements: DesignElement[]): number {
     if (y2 > maxY) maxY = y2;
   });
 
-  const widthCm  = Math.max(0, maxX - minX) / PIXELS_PER_CM_X;
+  const widthCm = Math.max(0, maxX - minX) / PIXELS_PER_CM_X;
   const heightCm = Math.max(0, maxY - minY) / PIXELS_PER_CM_Y;
   return widthCm * heightCm;
 }
@@ -162,7 +162,7 @@ export function calcSumIndividualAreasCm2(elements: DesignElement[]): number {
   return elements.reduce((sum, el) => {
     const scaleX = 1; // Konva commit scale vào width sau resize
     const scaleY = 1;
-    const w = (el.width  ?? 0) * scaleX;
+    const w = (el.width ?? 0) * scaleX;
     const h = (el.height ?? 0) * scaleY;
     return sum + (w / PIXELS_PER_CM_X) * (h / PIXELS_PER_CM_Y);
   }, 0);
@@ -210,7 +210,7 @@ export function calcDesignFee(elements: DesignElement[], printExtraCost: number 
 
   const { front: frontElements, back: backElements } = splitBySide(elements);
   const front = calcFeeForOneSide(frontElements);
-  const back  = calcFeeForOneSide(backElements);
+  const back = calcFeeForOneSide(backElements);
 
   // Cập nhật theo công thức mới của backend: 
   // Phương pháp in sẽ được cộng cho MỖI MẶT (nếu mặt đó có in)

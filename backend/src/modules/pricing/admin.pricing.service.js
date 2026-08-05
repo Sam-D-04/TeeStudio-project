@@ -100,8 +100,8 @@ const calculateDesignQuote = async ({
     amountAfterBulkDiscount >= Number(promotion.minOrderAmount || 0);
   const shippingFee =
     (promotionEligible && promotion.discountType === "FREE_SHIPPING") ||
-    (configuration.freeShippingThreshold > 0 &&
-      amountAfterPromotion >= configuration.freeShippingThreshold)
+      (configuration.freeShippingThreshold > 0 &&
+        amountAfterPromotion >= configuration.freeShippingThreshold)
       ? 0
       : configuration.defaultShippingFee;
   const vatAmount = toMoney(
@@ -188,12 +188,12 @@ const calculateFeeForOneSide = (items) => {
     // Lấy kích thước thực tế sau khi scale
     const scaleX = item.scaleX ?? 1;
     const scaleY = item.scaleY ?? 1;
-    const w      = (item.width  ?? item.w ?? 0) * scaleX;
-    const h      = (item.height ?? item.h ?? 0) * scaleY;
+    const w = (item.width ?? item.w ?? 0) * scaleX;
+    const h = (item.height ?? item.h ?? 0) * scaleY;
 
     // (x, y)/(left, top) là góc trái-trên => góc phải-dưới = (x+w, y+h)
     const x1 = item.left ?? item.x ?? 0;
-    const y1 = item.top  ?? item.y ?? 0;
+    const y1 = item.top ?? item.y ?? 0;
     const x2 = x1 + w;
     const y2 = y1 + h;
 
@@ -204,18 +204,18 @@ const calculateFeeForOneSide = (items) => {
   });
 
   // Cách 1: Tính diện tích Bounding Box (px) và đổi sang cm²
-  const boundingWidthCm  = Math.max(0, maxX - minX) / PIXELS_PER_CM_X;
+  const boundingWidthCm = Math.max(0, maxX - minX) / PIXELS_PER_CM_X;
   const boundingHeightCm = Math.max(0, maxY - minY) / PIXELS_PER_CM_Y;
-  const bboxAreaCm2      = boundingWidthCm * boundingHeightCm;
-  const bboxFee          = getFeeForArea(bboxAreaCm2);
+  const bboxAreaCm2 = boundingWidthCm * boundingHeightCm;
+  const bboxFee = getFeeForArea(bboxAreaCm2);
 
   // Cách 2: Tính tổng diện tích rời rạc của từng item
   let sumOfIndividualAreasCm2 = 0;
   items.forEach((item) => {
     const scaleX = item.scaleX ?? 1;
     const scaleY = item.scaleY ?? 1;
-    const w      = (item.width  ?? item.w ?? 0) * scaleX;
-    const h      = (item.height ?? item.h ?? 0) * scaleY;
+    const w = (item.width ?? item.w ?? 0) * scaleX;
+    const h = (item.height ?? item.h ?? 0) * scaleY;
 
     const areaCm2 = (w / PIXELS_PER_CM_X) * (h / PIXELS_PER_CM_Y);
     sumOfIndividualAreasCm2 += areaCm2;
@@ -234,10 +234,10 @@ const calculateAreaFeePerSide = (canvasData) => {
     if (!items || items.length === 0) return { frontAreaFee: 0, backAreaFee: 0 };
 
     const frontItems = items.filter((item) => (item.side ?? "front") !== "back");
-    const backItems  = items.filter((item) => (item.side ?? "front") === "back");
+    const backItems = items.filter((item) => (item.side ?? "front") === "back");
 
     const frontAreaFee = calculateFeeForOneSide(frontItems);
-    const backAreaFee  = calculateFeeForOneSide(backItems);
+    const backAreaFee = calculateFeeForOneSide(backItems);
 
     return { frontAreaFee, backAreaFee };
   } catch (err) {
@@ -248,9 +248,11 @@ const calculateAreaFeePerSide = (canvasData) => {
 
 const calculateBoundingBoxAreaFee = (canvasData, printExtraCost = 0) => {
   const { frontAreaFee, backAreaFee } = calculateAreaFeePerSide(canvasData);
-  const baseFee = frontAreaFee + backAreaFee;
-  return baseFee > 0 ? baseFee + Number(printExtraCost) : 0;
+  const front = frontAreaFee > 0 ? frontAreaFee + Number(printExtraCost) : 0;
+  const back = backAreaFee > 0 ? backAreaFee + Number(printExtraCost) : 0;
+  return front + back;
 };
+
 
 module.exports = {
   calculateDesignQuote,

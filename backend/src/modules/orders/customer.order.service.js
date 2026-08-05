@@ -392,7 +392,7 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
 
   let bulkDiscountTotal = 0;
   for (const item of itemsEnriched) {
-    const baseItemPrice = item.unitPrice + item.designFee;
+    const baseItemPrice = item.unitPrice;
     if (item.bulkDiscountPercent > 0) {
       const discountedPrice = Math.round(baseItemPrice * (1 - item.bulkDiscountPercent / 100));
       bulkDiscountTotal += (baseItemPrice - discountedPrice) * item.quantity;
@@ -442,7 +442,7 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
     0,
     Math.round((subtotal + tongDesignFee + shippingFee - discountAmount) * 100) / 100
   );
-  
+
   const vatAmount = Math.round((amountBeforeVat * vatPercent) / 100);
   const totalAmount = amountBeforeVat + vatAmount;
   const {
@@ -579,9 +579,11 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
 
     // ── Bước 3.3: INSERT OrderItem, OrderProduction ──
     for (const item of itemsEnriched) {
-      const lineTotal = Math.round(
-        (item.unitPrice * item.quantity + item.designFee) * 100
-      ) / 100;
+      const baseItemPrice = item.unitPrice;
+      const discountedPrice = item.bulkDiscountPercent > 0 
+          ? Math.round(baseItemPrice * (1 - item.bulkDiscountPercent / 100))
+          : baseItemPrice;
+      const lineTotal = (discountedPrice + item.designFee) * item.quantity;
 
       const [resultItem] = await conn.query(
         `INSERT INTO OrderItem

@@ -316,13 +316,20 @@ export default function ChiTietDonHangPage() {
                   Tổng kết đơn hàng
                 </h3>
 
-                {[
-                  { label: "Tạm tính", value: donHang.subtotal },
-                  { label: "Phí vận chuyển", value: donHang.shippingFee },
-                  ...(donHang.discountAmount > 0
-                    ? [{ label: "Giảm giá", value: -donHang.discountAmount }]
-                    : []),
-                ].map((dong) => (
+                {(() => {
+                  const totalDesignFee = (donHang.items || []).reduce((sum: number, item: any) => sum + ((item.phiThietKeVnd || 0) * (item.soLuong || 1)), 0);
+                  const amountBeforeVat = donHang.subtotal + totalDesignFee + donHang.shippingFee - donHang.discountAmount;
+                  const vatAmount = Math.max(0, donHang.totalAmount - amountBeforeVat);
+                  
+                  return [
+                    { label: "Tạm tính (Phôi áo)", value: donHang.subtotal },
+                    ...(totalDesignFee > 0 ? [{ label: "Phí thiết kế & in ấn", value: totalDesignFee }] : []),
+                    { label: "Phí vận chuyển", value: donHang.shippingFee },
+                    ...(donHang.discountAmount > 0
+                      ? [{ label: "Giảm giá", value: -donHang.discountAmount }]
+                      : []),
+                    ...(vatAmount > 0 ? [{ label: "Thuế VAT", value: vatAmount }] : []),
+                  ].map((dong) => (
                   <div
                     key={dong.label}
                     style={{
@@ -339,7 +346,8 @@ export default function ChiTietDonHangPage() {
                       {formatVND(Math.abs(dong.value))}
                     </span>
                   </div>
-                ))}
+                  ));
+                })()}
 
                 <div
                   style={{
