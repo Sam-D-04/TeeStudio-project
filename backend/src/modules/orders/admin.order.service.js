@@ -1657,8 +1657,20 @@ async function timKiemThietKe(userId, keyword) {
   let extraCondition = "";
 
   if (keyword && keyword.trim()) {
-    extraCondition = " AND cd.id LIKE ?";
-    params.push(`%${keyword.trim()}%`);
+    const kw = keyword.trim();
+    
+    // Thử trích xuất ID nếu user nhập dạng TK-0036, TK36, hoặc 0036
+    const matchId = kw.match(/^(?:TK-?)?0*(\d+)$/i);
+    
+    if (matchId) {
+      // Nếu nhập đúng định dạng mã, tìm chính xác theo ID, hoặc tìm chuỗi trong tên
+      extraCondition = " AND (cd.id = ? OR cd.name LIKE ? OR p.name LIKE ?)";
+      params.push(matchId[1], `%${kw}%`, `%${kw}%`);
+    } else {
+      // Tìm tương đối theo ID (ép kiểu chuỗi) hoặc theo tên
+      extraCondition = " AND (CAST(cd.id AS CHAR) LIKE ? OR cd.name LIKE ? OR p.name LIKE ?)";
+      params.push(`%${kw}%`, `%${kw}%`, `%${kw}%`);
+    }
   }
 
   const [rows] = await db.pool.query(

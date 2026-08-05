@@ -166,6 +166,23 @@ function getDesignColor(design?: ThietKe, product?: SanPhamTimKiem) {
   return designVariant?.mau || design.mauSanPham || design.mauNen || "";
 }
 
+const HEX_TO_VI: Record<string, string> = {
+  "#ffffff": "trắng", "#fff": "trắng",
+  "#000000": "đen", "#000": "đen",
+  "#1d4ed8": "xanh navy", "#1e3a8a": "xanh navy", "#1e40af": "xanh navy",
+  "#9ca3af": "xám", "#94a3b8": "xám",
+  "#374151": "xám đậm",
+  "#8b4513": "nâu",
+  "#f5f5dc": "be", "#d6b89a": "be",
+  "#c5b28a": "kaki",
+  "#eab308": "vàng",
+  "#f472b6": "hồng",
+  "#7dd3fc": "xanh dương",
+  "#dc2626": "đỏ",
+  "#16a34a": "xanh lá",
+  "#9333ea": "tím",
+};
+
 function getDesignSizeOptions(
   product: SanPhamTimKiem | undefined,
   design: ThietKe | undefined
@@ -175,8 +192,12 @@ function getDesignSizeOptions(
   const lockedColor = normalizeComparableText(getDesignColor(design, product));
   if (!lockedColor) return [];
 
+  const mappedColorName = HEX_TO_VI[lockedColor] || lockedColor;
+
   return product.bienThe.filter(
-    (variant) => normalizeComparableText(variant.mau) === lockedColor
+    (variant) => 
+      normalizeComparableText(variant.mau) === lockedColor ||
+      normalizeComparableText(variant.mau) === mappedColorName
   );
 }
 
@@ -1468,12 +1489,29 @@ export default function CreateOrderPage() {
   });
 
   function handleCustomerChange(userId?: number) {
+    // Khi đổi khách hàng, reset lại các thiết kế đã chọn của khách cũ
+    setSelectedDesignById({});
+    
+    // Đồng thời xóa các thiết kế đã chọn trong form items
+    const currentItems = form.getFieldValue("items") || [];
+    const updatedItems = currentItems.map((item: any) => ({
+      ...item,
+      designId: undefined,
+      // Nếu là áo custom thì xóa luôn product/variant vì nó link với design
+      ...(item.productType === "CUSTOM" && {
+        productId: undefined,
+        variantId: undefined,
+        color: undefined,
+      }),
+    }));
+
     if (!userId) {
       form.setFieldsValue({
         userId: undefined,
         recipientName: "",
         phone: "",
         addressLine: "",
+        items: updatedItems,
       });
       return;
     }
@@ -1485,6 +1523,7 @@ export default function CreateOrderPage() {
         recipientName: customer.hoTen,
         phone: customer.soDienThoai ?? "",
         addressLine: "",
+        items: updatedItems,
       });
     }
   }
