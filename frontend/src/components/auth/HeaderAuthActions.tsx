@@ -10,6 +10,8 @@ import { getDefaultRouteForRole } from "@/lib/authorization";
 import { authService } from "@/services/authService";
 import useAuthStore from "@/store/useAuthStore";
 
+let hasFetchedProfile = false;
+
 export default function HeaderAuthActions({
   mobile = false,
   onNavigate,
@@ -30,6 +32,26 @@ export default function HeaderAuthActions({
 
   useEffect(() => {
     hydrate();
+    
+    // Đồng bộ lại thông tin user từ server (chỉ gọi 1 lần khi load app)
+    // Để khắc phục trường hợp localStorage lưu trạng thái cũ (chưa xác minh)
+    if (!hasFetchedProfile) {
+      hasFetchedProfile = true;
+      const fetchLatestProfile = async () => {
+        try {
+          const currentUser = useAuthStore.getState().user;
+          if (currentUser) {
+            const profile = await authService.getProfile();
+            if (profile) {
+              useAuthStore.getState().updateUser(profile);
+            }
+          }
+        } catch (e) {
+          // Lỗi (như token hết hạn) thì bỏ qua, interceptor sẽ tự xử lý
+        }
+      };
+      fetchLatestProfile();
+    }
   }, [hydrate]);
 
   const resendVerification = async () => {

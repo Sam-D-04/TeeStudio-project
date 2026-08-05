@@ -12,6 +12,8 @@ import { useCartStore } from "@/store/useCartStore";
 import AppHeader from "@/components/layout/AppHeader";
 import AppFooter from "@/components/layout/AppFooter";
 import type { Metadata } from "next";
+import { useRouter } from "next/navigation";
+import CheckoutPolicyModal from "@/components/cart/CheckoutPolicyModal";
 
 // Helper
 function formatVND(value: number) {
@@ -30,6 +32,8 @@ export default function CartPage() {
   const removeItem = useCartStore((s) => s.removeItem);
   const updateQty = useCartStore((s) => s.updateQuantity);
   const clearCart = useCartStore((s) => s.clearCart);
+  const router = useRouter();
+  const [policyOpen, setPolicyOpen] = useState(false);
 
   /* Hydration guard — Zustand persist only works client-side */
   const [hydrated, setHydrated] = useState(false);
@@ -568,21 +572,20 @@ export default function CartPage() {
                     Phí vận chuyển sẽ được tính ở bước thanh toán.
                   </p>
 
-                  <Link href="/checkout">
-                    <Button
-                      type="primary"
-                      block
-                      size="large"
-                      style={{
-                        height: 48,
-                        borderRadius: 10,
-                        fontWeight: 700,
-                        fontSize: 15,
-                      }}
-                    >
-                      Tiến hành thanh toán
-                    </Button>
-                  </Link>
+                  <Button
+                    type="primary"
+                    block
+                    size="large"
+                    onClick={() => setPolicyOpen(true)}
+                    style={{
+                      height: 48,
+                      borderRadius: 10,
+                      fontWeight: 700,
+                      fontSize: 15,
+                    }}
+                  >
+                    Tiến hành thanh toán
+                  </Button>
 
                   {/* Security note */}
                   <div
@@ -611,6 +614,14 @@ export default function CartPage() {
             </div>
           )}
         </div>
+        <CheckoutPolicyModal
+          open={policyOpen}
+          onCancel={() => setPolicyOpen(false)}
+          onConfirm={() => {
+            setPolicyOpen(false);
+            router.push("/checkout");
+          }}
+        />
       </main>
       <AppFooter />
     </>

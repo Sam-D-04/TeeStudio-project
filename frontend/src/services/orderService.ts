@@ -219,3 +219,15 @@ export async function getOrderById(orderId: number): Promise<OrderDetail> {
     throw new Error(getApiErrorMessage(err, "Không tải được chi tiết đơn hàng"));
   }
 }
+
+/**
+ * Gọi API POST /api/orders/:id/retry-payment để lấy link thanh toán mới.
+ */
+export async function retryPayment(orderId: number, paymentMethod: string): Promise<{ paymentUrl: string }> {
+  try {
+    const res = await apiClient.post(`/orders/${orderId}/retry-payment`, { paymentMethod });
+    return res.data.data as { paymentUrl: string };
+  } catch (err) {
+    throw new Error(getApiErrorMessage(err, "Không thể khởi tạo thanh toán lại"));
+  }
+}

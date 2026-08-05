@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { Button, Spin } from "antd";
-import { ArrowLeftOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import { useParams, useRouter } from "next/navigation";
+import { Button, Spin, Modal, Radio, message } from "antd";
+import { ArrowLeftOutlined, ShoppingCartOutlined, SyncOutlined } from "@ant-design/icons";
 import CustomerOrderStatusBadge from "@/components/orders/CustomerOrderStatusBadge";
-import { getOrderById, type OrderDetail } from "@/services/orderService";
+import { getOrderById, retryPayment, type OrderDetail } from "@/services/orderService";
 
 /* ── Hàm hỗ trợ định dạng ── */
 function formatVND(value: number) {
@@ -46,13 +46,18 @@ const sectionStyle: React.CSSProperties = {
 };
 
 export default function ChiTietDonHangPage() {
-  const params = useParams();
-  // params.id luôn là string (hoặc mảng nếu route có nhiều segment) - ép về số ở đây
-  const orderId = Number(Array.isArray(params.id) ? params.id[0] : params.id);
+  const { id } = useParams() as { id: string };
+  const orderId = Number(id);
+  const router = useRouter();
 
   const [donHang, setDonHang] = useState<OrderDetail | null>(null);
   const [dangTai, setDangTai] = useState(true);
   const [loiKhongTimThay, setLoiKhongTimThay] = useState(false);
+
+  // States cho modal Thanh toán lại
+  const [isRetryModalOpen, setIsRetryModalOpen] = useState(false);
+  const [retryPaymentMethod, setRetryPaymentMethod] = useState<"VNPAY" | "MOMO">("VNPAY");
+  const [isRetrying, setIsRetrying] = useState(false);
 
   useEffect(() => {
     if (!Number.isInteger(orderId) || orderId < 1) {
@@ -72,6 +77,21 @@ export default function ChiTietDonHangPage() {
       })
       .finally(() => setDangTai(false));
   }, [orderId]);
+
+  const handleRetryPayment = async () => {
+    if (!donHang) return;
+    try {
+      setIsRetrying(true);
+      const res = await retryPayment(donHang.id, retryPaymentMethod);
+      if (res.paymentUrl) {
+        message.success("Đang chuyển hướng đến cổng thanh toán...");
+        window.location.href = res.paymentUrl;
+      }
+    } catch (error: any) {
+      message.error(error.message || "Lỗi khi tạo liên kết thanh toán mới");
+      setIsRetrying(false);
+    }
+  };
 
   return (
     <div>
@@ -129,6 +149,16 @@ export default function ChiTietDonHangPage() {
             <span style={{ fontSize: 13, color: "#94a3b8" }}>
               Đặt lúc {formatNgayGio(donHang.createdAt)}
             </span>
+            <div style={{ flex: 1 }} />
+            {donHang.status === "PENDING" && donHang.paymentStatus === "PENDING" && donHang.paymentType !== "COD" && (
+              <Button 
+                type="primary" 
+                icon={<SyncOutlined />} 
+                onClick={() => setIsRetryModalOpen(true)}
+              >
+                Thanh toán lại
+              </Button>
+            )}
           </div>
 
           {/* ── Lý do hủy (nếu đơn đã bị hủy) ── */}
@@ -417,6 +447,30 @@ export default function ChiTietDonHangPage() {
               </section>
             </div>
           </div>
+          
+          {/* Modal Thanh Toán Lại */}
+          <Modal
+            title="Thanh toán lại đơn hàng"
+            open={isRetryModalOpen}
+            onOk={handleRetryPayment}
+            onCancel={() => !isRetrying && setIsRetryModalOpen(false)}
+            confirmLoading={isRetrying}
+            okText="Thanh toán ngay"
+            cancelText="Hủy"
+            maskClosable={false}
+          >
+            <p style={{ marginBottom: 16 }}>
+              Vui lòng chọn cổng thanh toán bạn muốn sử dụng:
+            </p>
+            <Radio.Group 
+              value={retryPaymentMethod} 
+              onChange={(e) => setRetryPaymentMethod(e.target.value)}
+              style={{ display: "flex", flexDirection: "column", gap: 12 }}
+            >
+              <Radio value="VNPAY">Thanh toán qua VNPAY</Radio>
+              <Radio value="MOMO">Thanh toán qua Ví MoMo</Radio>
+            </Radio.Group>
+          </Modal>
         </>
       )}
     </div>

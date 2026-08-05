@@ -220,4 +220,57 @@ router.get(
   }
 );
 
+/**
+ * Schema kiểm tra dữ liệu đầu vào khi thanh toán lại.
+ */
+const retryPaymentSchema = {
+  body: {
+    paymentMethod: {
+      required: true,
+      type: "string",
+      enum: ["VNPAY", "MOMO"],
+    },
+  },
+};
+
+/**
+ * POST /api/orders/:id/retry-payment
+ * Thanh toán lại đơn hàng (dành cho đơn bị lỗi thanh toán VNPAY/MOMO)
+ */
+router.post(
+  "/:id/retry-payment",
+  verifyToken,
+  requireRoles(ROLES.CUSTOMER),
+  validate(retryPaymentSchema),
+  async (req, res, next) => {
+    try {
+      const orderId = req.params.id;
+      const userId = req.user.id;
+      const { paymentMethod } = req.body;
+      const ipAddress = req.ip;
+
+      const result = await orderService.retryPaymentAsCustomer(
+        orderId,
+        userId,
+        paymentMethod,
+        ipAddress
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Tạo liên kết thanh toán mới thành công",
+        data: result,
+      });
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message,
+        });
+      }
+      next(error);
+    }
+  }
+);
+
 module.exports = router;

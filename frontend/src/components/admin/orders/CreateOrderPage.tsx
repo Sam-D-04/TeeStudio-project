@@ -203,7 +203,7 @@ function getDesignSizeOptions(
   const mappedColorName = HEX_TO_VI[lockedColor] || lockedColor;
 
   return product.bienThe.filter(
-    (variant) => 
+    (variant) =>
       normalizeComparableText(variant.mau) === lockedColor ||
       normalizeComparableText(variant.mau) === mappedColorName
   );
@@ -360,7 +360,7 @@ function buildPreview(
       );
       const phiInAnMatTruoc = design?.phiInAnMatTruoc ?? 0;
       const phiInAnMatSau = design?.phiInAnMatSau ?? 0;
-      
+
       const lineProductTotal = (unitPrice + phiInAnMatTruoc) * quantity + (phiInAnMatSau * quantity);
 
       let designFee = 0;
@@ -401,14 +401,14 @@ function buildPreview(
     selectedPromotion,
     promotionBaseAmount
   );
-  
-  const isFreeShipping = selectedPromotion?.loaiGiam === "FREE_SHIPPING" || 
+
+  const isFreeShipping = selectedPromotion?.loaiGiam === "FREE_SHIPPING" ||
     (freeShippingThreshold !== undefined && freeShippingThreshold > 0 && promotionBaseAmount >= freeShippingThreshold);
   const shippingFee = isFreeShipping ? 0 : shippingFeeInput;
-  
+
   const amountBeforeVat = Math.max(0, subtotal + designFee + shippingFee - discountAmount);
   const vatAmount = (amountBeforeVat * vatPercent) / 100;
-  
+
   const totalAmount = Math.max(
     0,
     amountBeforeVat + vatAmount
@@ -1436,10 +1436,10 @@ export default function CreateOrderPage() {
 
   const preview = useMemo(
     () => buildPreview(
-      values, 
-      productById, 
-      designById, 
-      promotions, 
+      values,
+      productById,
+      designById,
+      promotions,
       pricingFormula?.cauHinh?.vatPercent ?? 0,
       pricingFormula?.cauHinh?.freeShippingThreshold
     ),
@@ -1552,7 +1552,7 @@ export default function CreateOrderPage() {
   function handleCustomerChange(userId?: number) {
     // Khi đổi khách hàng, reset lại các thiết kế đã chọn của khách cũ
     setSelectedDesignById({});
-    
+
     // Đồng thời xóa các thiết kế đã chọn trong form items
     const currentItems = form.getFieldValue("items") || [];
     const updatedItems = currentItems.map((item: any) => ({

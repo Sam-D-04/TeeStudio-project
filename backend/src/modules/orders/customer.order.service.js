@@ -964,8 +964,121 @@ async function layChiTietDonHangCuaKhach(orderId, userId) {
   };
 }
 
+async function retryPaymentAsCustomer(orderId, userId, paymentMethod, ipAddress) {
+  if (!ONLINE_PAYMENT_METHODS.has(paymentMethod)) {
+    const err = new Error("Phương thức thanh toán không hợp lệ (chỉ hỗ trợ VNPAY hoặc MOMO)");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const conn = await db.pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [rows] = await conn.query(
+      `SELECT id, orderCode, totalAmount, depositAmount, paymentType, status, paymentStatus 
+       FROM CustomerOrder 
+       WHERE id = ? AND userId = ? 
+       FOR UPDATE`,
+      [orderId, userId]
+    );
+
+    if (rows.length === 0) {
+      const err = new Error("Không tìm thấy đơn hàng");
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const order = rows[0];
+
+    if (order.status !== "PENDING") {
+      const err = new Error("Chỉ có thể thanh toán lại cho đơn hàng đang chờ xác nhận");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (order.paymentStatus === "PAID") {
+      const err = new Error("Đơn hàng này đã được thanh toán đủ");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    let amountToPay = order.totalAmount;
+    let paymentTypeDb = "FULL_PAYMENT";
+    if (order.paymentType === "DEPOSIT") {
+      amountToPay = order.depositAmount;
+      paymentTypeDb = "DEPOSIT";
+    }
+
+    const [paidRows] = await conn.query(
+      `SELECT SUM(amount) AS totalPaid 
+       FROM Payment 
+       WHERE orderId = ? AND status = 'COMPLETED'`,
+      [orderId]
+    );
+    const totalPaid = Number(paidRows[0]?.totalPaid || 0);
+
+    const remainingAmount = amountToPay - totalPaid;
+    if (remainingAmount <= 0) {
+      const err = new Error("Số tiền cần thanh toán đã đủ, không thể tạo thêm");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Hủy các thanh toán online đang bị treo để tránh trùng lặp
+    await conn.query(
+      `UPDATE Payment 
+       SET status = 'CANCELLED' 
+       WHERE orderId = ? AND status = 'PENDING' AND paymentMethod IN ('VNPAY', 'MOMO')`,
+      [orderId]
+    );
+
+    // Bắt buộc phải thêm suffix để VNPAY không báo lỗi 94 (trùng mã giao dịch)
+    const transactionRef = `${order.orderCode}_${Date.now()}`;
+
+    const onlinePayment = await taoThongTinThanhToanOnline({
+      paymentMethod,
+      orderCode: order.orderCode,
+      amount: remainingAmount,
+      ipAddress,
+      transactionRef, // <-- Thêm vào để truyền vào VNPAY
+    });
+
+    if (!onlinePayment || !onlinePayment.paymentUrl) {
+      const err = new Error("Lỗi khi tạo liên kết thanh toán từ cổng thanh toán");
+      err.statusCode = 500;
+      throw err;
+    }
+
+    await conn.query(
+      `INSERT INTO Payment 
+         (orderId, amount, paymentMethod, paymentType, status, transactionId, gatewayResponse)
+       VALUES (?, ?, ?, ?, 'PENDING', ?, ?)`,
+      [
+        orderId,
+        remainingAmount,
+        paymentMethod,
+        paymentTypeDb,
+        onlinePayment.transactionRef || null,
+        JSON.stringify(onlinePayment),
+      ]
+    );
+
+    await conn.commit();
+    return {
+      paymentUrl: onlinePayment.paymentUrl,
+    };
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
 module.exports = {
   createOrderAsCustomer,
   layDanhSachDonHangCuaKhach,
   layChiTietDonHangCuaKhach,
+  retryPaymentAsCustomer,
 };

@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { Drawer } from "antd";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/useCartStore";
+import CheckoutPolicyModal from "@/components/cart/CheckoutPolicyModal";
 
 const fmt = (n: number) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(n);
 
@@ -18,6 +20,8 @@ export default function CartDrawer({ open, onClose }: Props) {
   const removeItem   = useCartStore((s) => s.removeItem);
   const updateQty    = useCartStore((s) => s.updateQuantity);
   const clearCart    = useCartStore((s) => s.clearCart);
+  const router       = useRouter();
+  const [policyOpen, setPolicyOpen] = useState(false);
 
   /* Hydration guard */
   const [hydrated, setHydrated] = useState(false);
@@ -70,17 +74,18 @@ export default function CartDrawer({ open, onClose }: Props) {
               </p>
             </div>
             {/* Nút chuyển sang trang thanh toán */}
-            <Link href="/checkout" onClick={onClose}>
-              <button style={{
+            <button
+              onClick={() => setPolicyOpen(true)}
+              style={{
                 width: "100%", height: 46, borderRadius: 10,
                 background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
                 border: "none", color: "#fff",
                 fontWeight: 700, fontSize: 15, cursor: "pointer",
                 boxShadow: "0 4px 14px rgba(14,165,233,0.35)",
-              }}>
-                Tiến hành thanh toán →
-              </button>
-            </Link>
+              }}
+            >
+              Tiến hành thanh toán →
+            </button>
           </div>
         ) : null
       }
@@ -234,6 +239,16 @@ export default function CartDrawer({ open, onClose }: Props) {
           })()}
         </div>
       )}
+
+      <CheckoutPolicyModal
+        open={policyOpen}
+        onCancel={() => setPolicyOpen(false)}
+        onConfirm={() => {
+          setPolicyOpen(false);
+          onClose();
+          router.push("/checkout");
+        }}
+      />
     </Drawer>
   );
 }
