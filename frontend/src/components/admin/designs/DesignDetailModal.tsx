@@ -115,6 +115,7 @@ export default function DesignDetailModal({
   const [modalApi, modalContextHolder] = Modal.useModal();
   const [revisionNote, setRevisionNote] = useState("");
   const [activeTab, setActiveTab] = useState<'front' | 'back'>('front');
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["thiet-ke-chi-tiet", designId],
@@ -284,38 +285,95 @@ export default function DesignDetailModal({
                       if (printSrc) {
                         const boundary = getPrintAreaBoundary(shirtType, currentView, containerW, containerH);
                         return (
-                          <div
-                            style={{
-                              width: containerW,
-                              height: containerH,
-                              position: "relative",
-                              backgroundColor: "#f8fafc",
-                              borderRadius: "8px",
-                              overflow: "hidden",
-                              boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
-                            }}
-                          >
-                            <AdminShirtMockupImage
-                              type={shirtType}
-                              view={currentView}
-                              color={data.mauAo || "#ffffff"}
-                              width={containerW}
-                              height={containerH}
-                            />
-                            <img
-                              src={printSrc}
-                              alt={`Thiết kế ${activeTab}`}
+                          <>
+                            <div
+                              onClick={() => setPreviewOpen(true)}
+                              className="group"
                               style={{
-                                position: "absolute",
-                                top: boundary.top,
-                                left: boundary.left,
-                                width: boundary.width,
-                                height: boundary.height,
-                                objectFit: "contain",
-                                pointerEvents: "none"
+                                width: containerW,
+                                height: containerH,
+                                position: "relative",
+                                backgroundColor: "#f8fafc",
+                                borderRadius: "8px",
+                                overflow: "hidden",
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                                cursor: "pointer"
                               }}
-                            />
-                          </div>
+                            >
+                              <AdminShirtMockupImage
+                                type={shirtType}
+                                view={currentView}
+                                color={data.mauAo || "#ffffff"}
+                                width={containerW}
+                                height={containerH}
+                              />
+                              <img
+                                src={printSrc}
+                                alt={`Thiết kế ${activeTab}`}
+                                style={{
+                                  position: "absolute",
+                                  top: boundary.top,
+                                  left: boundary.left,
+                                  width: boundary.width,
+                                  height: boundary.height,
+                                  objectFit: "contain",
+                                  pointerEvents: "none"
+                                }}
+                              />
+                              <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/30 opacity-0 transition-opacity group-hover:opacity-100">
+                                <span className="flex items-center gap-2 font-medium text-white">
+                                  Phóng to
+                                </span>
+                              </div>
+                            </div>
+                            <Modal
+                              open={previewOpen}
+                              onCancel={(e) => {
+                                e.stopPropagation();
+                                setPreviewOpen(false);
+                              }}
+                              footer={null}
+                              width={600}
+                              centered
+                              styles={{
+                                body: { padding: 0, display: 'flex', justifyContent: 'center' },
+                                mask: { backgroundColor: 'rgba(0, 0, 0, 0.85)' }
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 600,
+                                  height: 720,
+                                  position: "relative",
+                                  backgroundColor: "#f8fafc",
+                                  borderRadius: "8px",
+                                  overflow: "hidden",
+                                  boxShadow: "0 4px 24px rgba(0,0,0,0.2)",
+                                }}
+                              >
+                                <AdminShirtMockupImage
+                                  type={shirtType}
+                                  view={currentView}
+                                  color={data.mauAo || "#ffffff"}
+                                  width={600}
+                                  height={720}
+                                />
+                                <img
+                                  src={printSrc}
+                                  alt={`Thiết kế ${activeTab} phóng to`}
+                                  style={{
+                                    position: "absolute",
+                                    top: getPrintAreaBoundary(shirtType, currentView, 600, 720).top,
+                                    left: getPrintAreaBoundary(shirtType, currentView, 600, 720).left,
+                                    width: getPrintAreaBoundary(shirtType, currentView, 600, 720).width,
+                                    height: getPrintAreaBoundary(shirtType, currentView, 600, 720).height,
+                                    objectFit: "contain",
+                                    pointerEvents: "none"
+                                  }}
+                                />
+                              </div>
+                            </Modal>
+                          </>
                         );
                       }
 
@@ -392,9 +450,9 @@ export default function DesignDetailModal({
                       }
                     />
                     <Field label="Vị trí in" value={data.viTriIn || <EmptyValue />} />
-                    <Field label="Phí vị trí" value={formatCurrency(data.phiViTriIn)} />
                     <Field label="Phương pháp in" value={data.phuongPhapIn || <EmptyValue />} />
-                    <Field label="Phí PP in" value={formatCurrency(data.phiPhuongPhapIn)} />
+                    <Field label="Phí PP in" value={formatCurrency((data.phiPhuongPhapInFront ?? 0) + (data.phiPhuongPhapInBack ?? 0))} />
+                    <Field label="Phí diện tích in" value={formatCurrency((data.phiDienTichInFront ?? 0) + (data.phiDienTichInBack ?? 0))} />
                     <Field label="Phí thiết kế" value={formatCurrency(data.phiThietKe)} />
                   </div>
                 </Section>

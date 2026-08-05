@@ -1373,16 +1373,7 @@ async function taoLaiMaThanhToanOnline(id, actor, ipAddress) {
     await conn.beginTransaction();
 
     const [rows] = await conn.query(
-      `SELECT
-         co.id,
-         co.orderCode AS orderCode,
-         co.status AS orderStatus,
-         p.id AS paymentId,
-         p.amount,
-         p.paymentMethod,
-         p.status AS paymentStatus,
-         p.gatewayResponse
-       FROM CustomerOrder co
+      `SELECT co.id, co.orderCode AS orderCode, co.status AS orderStatus, co.subtotal, co.shippingFee, co.discountAmount, co.paymentType AS orderPaymentType, p.id AS paymentId, p.amount, p.paymentMethod, p.status AS paymentStatus, p.gatewayResponse FROM CustomerOrder co
        JOIN Payment p ON p.orderId = co.id
        WHERE co.id = ?
        LIMIT 1
@@ -2211,10 +2202,11 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     }
 
     // Tổng tiền cuối cùng
-    const totalAmount = Math.max(
-      0,
-      Math.round((subtotal + tongDesignFee + shippingFee - discountAmount) * 100) / 100
-    );
+    const amountBeforeVat = Math.max(0, Math.round((subtotal + tongDesignFee + shippingFee - discountAmount) * 100) / 100);
+    const [pricingConfigRows] = await db.pool.query("SELECT vatPercent FROM PricingConfiguration LIMIT 1");
+    const vatPercent = pricingConfigRows.length > 0 ? Number(pricingConfigRows[0].vatPercent) : 0;
+    const vatAmount = Math.round((amountBeforeVat * vatPercent) / 100);
+    const totalAmount = amountBeforeVat + vatAmount;
     const {
       depositPercent,
       depositAmount,
@@ -2413,3 +2405,6 @@ async function taoMoiDonHang(data, actor, ipAddress) {
       conn.release();
     }
   }
+
+
+
