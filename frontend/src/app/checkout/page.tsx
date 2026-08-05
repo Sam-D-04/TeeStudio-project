@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -15,17 +15,23 @@ import {
 import {
   ArrowLeftOutlined,
   LockOutlined,
+  MailOutlined,
   SafetyCertificateOutlined,
   ShoppingCartOutlined,
+  PlusOutlined,
 } from "@ant-design/icons";
 import { useCartStore } from "@/store/useCartStore";
 import useAuthStore from "@/store/useAuthStore";
+import { authService } from "@/services/authService";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import {
   createOrder,
   cartItemsToOrderItems,
   type CreateOrderPayload,
 } from "@/services/orderService";
 import { validatePromotionCode, type PromotionPreview } from "@/services/promotionService";
+import { pricingService, type PricingConfiguration } from "@/services/pricingService";
+import { addressService, type UserAddress } from "@/services/addressService";
 import AppHeader from "@/components/layout/AppHeader";
 import AppFooter from "@/components/layout/AppFooter";
 
@@ -38,11 +44,13 @@ function formatVND(value: number) {
   }).format(value);
 }
 
-const SHIPPING_FEE = 35_000;
-
 type PaymentMethod = "VNPAY" | "MOMO" | "COD";
 /** Các phương thức thanh toán online — chuyển hướng sang cổng thanh toán sau khi tạo đơn */
 const ONLINE_PAYMENT_METHODS = new Set<PaymentMethod>(["VNPAY", "MOMO"]);
+
+type PaymentType = "FULL" | "DEPOSIT";
+/** % cọc khi khách chọn đặt cọc — khớp DEPOSIT_PERCENT bên backend (customer.order.service.js) */
+const DEPOSIT_PERCENT = 50;
 
 interface CheckoutFormValues {
   recipientName: string;
@@ -53,6 +61,7 @@ interface CheckoutFormValues {
   addressDetail: string;
   note?: string;
   paymentMethod: PaymentMethod;
+  paymentType: PaymentType;
 }
 
 /* ── Dữ liệu tỉnh/thành – phường/xã (VN, 2 cấp sau sáp nhập hành chính) ── */
@@ -155,9 +164,31 @@ export default function CheckoutPage() {
   const token        = useAuthStore((s) => s.accessToken);
   const [loading, setLoading]         = useState(false);
   const [hydrated, setHydrated]       = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
   const [provinces, setProvinces]     = useState<ProvinceData[]>([]);
   const [addressLoading, setAddressLoading] = useState(true);
+  const [pricingConfig, setPricingConfig] = useState<PricingConfiguration | null>(null);
+  const [configLoading, setConfigLoading] = useState(true);
+  
+  const [userAddresses, setUserAddresses] = useState<UserAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<number | "NEW">("NEW");
+
   const provinceCode = Form.useWatch("provinceCode", form);
+  const watchedPaymentType = Form.useWatch("paymentType", form);
+
+  /** Đơn có ít nhất 1 sản phẩm thiết kế riêng (POD) → áp dụng luật thanh toán
+   *  hẳn/cọc 50% và không cho COD toàn phần, khớp guardrail backend
+   *  (customer.order.service.js: hasCustomDesign). */
+  const hasCustomDesign = items.some((item) => Boolean(item.designId));
+  const paymentOptionsVisible = hasCustomDesign
+    ? paymentOptions.filter((opt) => opt.value !== "COD")
+    : paymentOptions;
+
+  useEffect(() => {
+    if (hasCustomDesign && form.getFieldValue("paymentMethod") === "COD") {
+      form.setFieldValue("paymentMethod", "VNPAY");
+    }
+  }, [hasCustomDesign, form]);
 
   /* ── Mã khuyến mãi ── */
   const [promoInput, setPromoInput]     = useState("");
@@ -177,28 +208,91 @@ export default function CheckoutPage() {
       .finally(() => setAddressLoading(false));
   }, []);
 
+  /* Tải cấu hình giá (phí vận chuyển mặc định) */
+  useEffect(() => {
+    pricingService.getConfig()
+      .then(setPricingConfig)
+      .catch((err) => console.error("Failed to load pricing config:", err))
+      .finally(() => setConfigLoading(false));
+  }, []);
+
   const selectedProvince = provinces.find((p) => p.Code === provinceCode);
   const wardsForProvince = selectedProvince?.Wards ?? [];
 
-  /* Pre-fill user data */
+  const handleSelectAddress = (id: number | "NEW", addresses = userAddresses) => {
+    setSelectedAddressId(id);
+    if (id === "NEW") {
+      form.resetFields(["recipientName", "phone", "provinceCode", "wardCode", "addressDetail"]);
+      if (user) {
+        form.setFieldValue("recipientName", user.fullName ?? "");
+      }
+    } else {
+      const address = addresses.find(a => a.id === id);
+      if (address) {
+        const matchedProvince = provinces.find((p) => p.Name === address.city);
+        const matchedWard = matchedProvince?.Wards.find((w) => w.Name === address.ward);
+        form.setFieldsValue({
+          recipientName: address.recipientName,
+          phone: address.phone,
+          provinceCode: matchedProvince?.Code,
+          wardCode: matchedWard?.Code,
+          addressDetail: address.addressLine,
+        });
+      }
+    }
+  };
+
+  /* Pre-fill user data & Load saved addresses */
   useEffect(() => {
-    if (user) {
+    if (user && token && provinces.length > 0) {
+      // Fetch user addresses only when provinces are loaded so mapping works
+      addressService.list().then(addresses => {
+        setUserAddresses(addresses);
+        const def = addresses.find(a => a.isDefault);
+        if (def) {
+          handleSelectAddress(def.id, addresses);
+        } else if (addresses.length > 0) {
+          handleSelectAddress(addresses[0].id, addresses);
+        } else {
+          // If no address, just fill name and email from user
+          form.setFieldsValue({
+            recipientName: user.fullName ?? "",
+            email: user.email ?? "",
+          });
+        }
+      }).catch(err => console.error("Không tải được sổ địa chỉ", err));
+    } else if (user) {
       form.setFieldsValue({
         recipientName: user.fullName ?? "",
         email: user.email ?? "",
       });
     }
-  }, [user, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, token, provinces]);
 
   if (!hydrated) return null;
 
   const subtotal = totalPrice();
-  // Mã miễn phí vận chuyển thì trừ luôn phí ship; các loại giảm khác (PERCENT/FIXED)
-  // trừ vào discountAmount đã tính sẵn từ backend (validatePromotionCode) - không tự
-  // tính lại ở FE để tránh lệch công thức với backend.
-  const shippingFee   = appliedPromo?.mienPhiVanChuyen ? 0 : SHIPPING_FEE;
+  
+  let shippingFee = pricingConfig?.defaultShippingFee ?? 30_000;
+  if (appliedPromo?.mienPhiVanChuyen) {
+    shippingFee = 0;
+  } else if (
+    !appliedPromo && 
+    pricingConfig && 
+    pricingConfig.freeShippingThreshold > 0 && 
+    subtotal >= pricingConfig.freeShippingThreshold
+  ) {
+    shippingFee = 0;
+  }
   const discountAmount = appliedPromo?.discountAmount ?? 0;
   const total = Math.max(0, subtotal + shippingFee - discountAmount);
+
+  // Preview số tiền cọc/COD còn lại khi khách chọn đặt cọc — chỉ để hiển thị
+  // trước cho khách, số tiền thật do backend tính lại và trả về khi tạo đơn.
+  const isDepositSelected = hasCustomDesign && watchedPaymentType === "DEPOSIT";
+  const depositPreview = isDepositSelected ? Math.round(total * (DEPOSIT_PERCENT / 100)) : 0;
+  const codPreview = isDepositSelected ? Math.max(0, total - depositPreview) : 0;
 
   /* ── Áp dụng mã khuyến mãi ── */
   const handleApplyPromo = async () => {
@@ -256,14 +350,73 @@ export default function CheckoutPage() {
     );
   }
 
+  /* Chặn đặt hàng nếu tài khoản chưa xác minh email — mirror check 403 phía
+     backend (requireEmailVerified) để khách không điền hết form rồi mới báo lỗi. */
+  if (user && !user.emailVerified) {
+    const handleResend = async () => {
+      setResendingVerification(true);
+      try {
+        const responseMessage = await authService.resendVerification();
+        message.success(responseMessage || "Đã gửi lại email xác minh");
+      } catch (err) {
+        message.error(getApiErrorMessage(err, "Không thể gửi lại email xác minh."));
+      } finally {
+        setResendingVerification(false);
+      }
+    };
+
+    return (
+      <>
+        <AppHeader />
+        <main
+          style={{
+            minHeight: "100vh",
+            background: "#f1f5f9",
+            paddingTop: 80,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div style={{ textAlign: "center", maxWidth: 420 }}>
+            <MailOutlined style={{ fontSize: 56, color: "#bec8d2" }} />
+            <p style={{ margin: "16px 0 8px", fontSize: 16, color: "#475569", fontWeight: 600 }}>
+              Vui lòng xác minh email trước khi đặt hàng
+            </p>
+            <p style={{ margin: "0 0 24px", fontSize: 14, color: "#64748b" }}>
+              Chúng tôi đã gửi liên kết xác minh tới {user.email}. Kiểm tra hộp thư hoặc gửi lại
+              nếu bạn chưa nhận được.
+            </p>
+            <Button
+              type="primary"
+              size="large"
+              loading={resendingVerification}
+              onClick={() => void handleResend()}
+              style={{ borderRadius: 10 }}
+            >
+              Gửi lại email xác minh
+            </Button>
+          </div>
+        </main>
+        <AppFooter />
+      </>
+    );
+  }
+
   /* ── Submit handler ── */
+  const isSubmittingRef = useRef(false);
+
   const onFinish = async (values: CheckoutFormValues) => {
+    // Chặn gọi lại khi đang xử lý (double-click, hoặc form bị submit 2 lần) — tránh
+    // tạo 2 đơn hàng cho 1 lần đặt.
+    if (loading || isSubmittingRef.current) return;
     if (!token) {
       message.warning("Vui lòng đăng nhập để tiến hành thanh toán");
       router.push("/dang-nhap");
       return;
     }
     setLoading(true);
+    isSubmittingRef.current = true;
     try {
       const province = provinces.find((p) => p.Code === values.provinceCode);
       const ward = province?.Wards.find((w) => w.Code === values.wardCode);
@@ -280,8 +433,9 @@ export default function CheckoutPage() {
         ward: ward?.Name,
         note: values.note,
         paymentMethod: values.paymentMethod,
+        paymentType: hasCustomDesign ? values.paymentType : "FULL",
         items: cartItemsToOrderItems(items),
-        shippingFee: SHIPPING_FEE,
+        shippingFee: shippingFee,
         ...(appliedPromo ? { promotionId: appliedPromo.promotionId } : {}),
       };
       const result = await createOrder(payload, token);
@@ -298,6 +452,7 @@ export default function CheckoutPage() {
       );
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -349,7 +504,7 @@ export default function CheckoutPage() {
             form={form}
             layout="vertical"
             onFinish={(v) => void onFinish(v)}
-            initialValues={{ paymentMethod: "VNPAY" }}
+            initialValues={{ paymentMethod: "VNPAY", paymentType: "FULL" }}
             requiredMark={false}
           >
             {/* ── 2-column grid ── */}
@@ -371,7 +526,7 @@ export default function CheckoutPage() {
                   }}
                 >
                   <h2
-                    style={{
+                  style={{
                       fontSize: 15,
                       fontWeight: 800,
                       color: "#0f172a",
@@ -389,42 +544,12 @@ export default function CheckoutPage() {
                       />
                       <circle cx="12" cy="10" r="2.5" stroke="#0ea5e9" strokeWidth="1.8" />
                     </svg>
-                    Thông tin nhận hàng
+                    Thông tin liên hệ & nhận hàng
                   </h2>
-
-                  <div
-                    style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}
-                    className="max-sm:grid-cols-1"
-                  >
-                    <Form.Item
-                      name="recipientName"
-                      label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Họ và tên *</span>}
-                      rules={[{ required: true, message: "Vui lòng nhập họ tên" }]}
-                    >
-                      <Input
-                        placeholder="Nguyễn Văn A"
-                        style={{ height: 40, borderRadius: 8 }}
-                      />
-                    </Form.Item>
-
-                    <Form.Item
-                      name="phone"
-                      label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Số điện thoại *</span>}
-                      rules={[
-                        { required: true, message: "Vui lòng nhập số điện thoại" },
-                        { pattern: /^(0|\+84)[0-9]{8,9}$/, message: "Số điện thoại không hợp lệ" },
-                      ]}
-                    >
-                      <Input
-                        placeholder="0901 234 567"
-                        style={{ height: 40, borderRadius: 8 }}
-                      />
-                    </Form.Item>
-                  </div>
 
                   <Form.Item
                     name="email"
-                    label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Email *</span>}
+                    label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Email liên hệ *</span>}
                     rules={[
                       { required: true, message: "Vui lòng nhập email" },
                       { type: "email", message: "Email không hợp lệ" },
@@ -436,56 +561,164 @@ export default function CheckoutPage() {
                     />
                   </Form.Item>
 
-                  <div
-                    style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}
-                    className="max-sm:grid-cols-1"
-                  >
-                    <Form.Item
-                      name="provinceCode"
-                      label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Tỉnh/Thành phố *</span>}
-                      rules={[{ required: true, message: "Vui lòng chọn tỉnh/thành phố" }]}
+                  {/* Phần chọn địa chỉ có sẵn nếu đã đăng nhập và có địa chỉ */}
+                  {userAddresses.length > 0 && (
+                    <div style={{ marginBottom: 24, marginTop: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                        <span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Sổ địa chỉ của bạn</span>
+                      </div>
+                      
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {userAddresses.map(a => {
+                          const isSelected = selectedAddressId === a.id;
+                          return (
+                            <div 
+                              key={a.id}
+                              onClick={() => handleSelectAddress(a.id)}
+                              style={{ 
+                                padding: 16, 
+                                borderRadius: 12, 
+                                border: isSelected ? "2px solid #0ea5e9" : "1px solid #e2e8f0",
+                                background: isSelected ? "#f0f9ff" : "#fff",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease"
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                                <div>
+                                  <div style={{ fontWeight: 600, color: "#0f172a", marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
+                                    {a.recipientName}
+                                    {a.isDefault && (
+                                      <span style={{ fontSize: 10, padding: "2px 6px", background: "#0ea5e9", color: "#fff", borderRadius: 4, fontWeight: 700 }}>
+                                        Mặc định
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize: 13, color: "#475569", marginBottom: 4 }}>SĐT: {a.phone}</div>
+                                  <div style={{ fontSize: 13, color: "#475569" }}>{a.addressLine}, {a.ward}, {a.city}</div>
+                                </div>
+                                {isSelected && (
+                                  <div style={{ color: "#0ea5e9", display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, background: "#fff", borderRadius: "50%", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+
+                        {/* Nút thêm địa chỉ mới */}
+                        <div 
+                          onClick={() => handleSelectAddress("NEW")}
+                          style={{ 
+                            padding: 16, 
+                            borderRadius: 12, 
+                            border: selectedAddressId === "NEW" ? "2px solid #0ea5e9" : "1px dashed #cbd5e1",
+                            background: selectedAddressId === "NEW" ? "#f0f9ff" : "transparent",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            color: selectedAddressId === "NEW" ? "#0ea5e9" : "#64748b",
+                            fontWeight: 600,
+                            fontSize: 14,
+                            transition: "all 0.2s ease",
+                            justifyContent: "center"
+                          }}
+                        >
+                          <PlusOutlined /> Giao đến địa chỉ mới khác
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: selectedAddressId === "NEW" || userAddresses.length === 0 ? "block" : "none" }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "#0f172a", marginBottom: 12, marginTop: userAddresses.length > 0 ? 12 : 0 }}>
+                      {userAddresses.length > 0 ? "Nhập địa chỉ nhận hàng mới:" : ""}
+                    </div>
+                    <div
+                      style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}
+                      className="max-sm:grid-cols-1"
                     >
-                      <Select
-                        showSearch
-                        loading={addressLoading}
-                        placeholder="Tìm tỉnh/thành phố..."
-                        style={{ height: 40 }}
-                        options={provinces.map((p) => ({ value: p.Code, label: p.Name }))}
-                        filterOption={(input, option) =>
-                          stripDiacritics(option?.label ?? "").includes(stripDiacritics(input))
-                        }
-                        onChange={() => form.setFieldValue("wardCode", undefined)}
-                      />
-                    </Form.Item>
+                      <Form.Item
+                        name="recipientName"
+                        label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Họ và tên *</span>}
+                        rules={[{ required: true, message: "Vui lòng nhập họ tên" }]}
+                      >
+                        <Input
+                          placeholder="Nguyễn Văn A"
+                          style={{ height: 40, borderRadius: 8 }}
+                        />
+                      </Form.Item>
+
+                      <Form.Item
+                        name="phone"
+                        label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Số điện thoại *</span>}
+                        rules={[
+                          { required: true, message: "Vui lòng nhập số điện thoại" },
+                          { pattern: /^(0|\+84)[0-9]{8,9}$/, message: "Số điện thoại không hợp lệ" },
+                        ]}
+                      >
+                        <Input
+                          placeholder="0901 234 567"
+                          style={{ height: 40, borderRadius: 8 }}
+                        />
+                      </Form.Item>
+                    </div>
+                    
+                    <div
+                      style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}
+                      className="max-sm:grid-cols-1"
+                    >
+                      <Form.Item
+                        name="provinceCode"
+                        label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Tỉnh/Thành phố *</span>}
+                        rules={[{ required: true, message: "Vui lòng chọn tỉnh/thành phố" }]}
+                      >
+                        <Select
+                          showSearch
+                          loading={addressLoading}
+                          placeholder="Tìm tỉnh/thành phố..."
+                          style={{ height: 40 }}
+                          options={provinces.map((p) => ({ value: p.Code, label: p.Name }))}
+                          filterOption={(input, option) =>
+                            stripDiacritics(option?.label ?? "").includes(stripDiacritics(input))
+                          }
+                          onChange={() => form.setFieldValue("wardCode", undefined)}
+                        />
+                      </Form.Item>
+
+                      <Form.Item
+                        name="wardCode"
+                        label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Phường/Xã *</span>}
+                        rules={[{ required: true, message: "Vui lòng chọn phường/xã" }]}
+                      >
+                        <Select
+                          showSearch
+                          disabled={!provinceCode}
+                          placeholder={provinceCode ? "Tìm phường/xã..." : "Chọn tỉnh/thành phố trước"}
+                          style={{ height: 40 }}
+                          options={wardsForProvince.map((w) => ({ value: w.Code, label: w.Name }))}
+                          filterOption={(input, option) =>
+                            stripDiacritics(option?.label ?? "").includes(stripDiacritics(input))
+                          }
+                        />
+                      </Form.Item>
+                    </div>
 
                     <Form.Item
-                      name="wardCode"
-                      label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Phường/Xã *</span>}
-                      rules={[{ required: true, message: "Vui lòng chọn phường/xã" }]}
+                      name="addressDetail"
+                      label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Số nhà, tên đường *</span>}
+                      rules={[{ required: true, message: "Vui lòng nhập số nhà, tên đường" }]}
                     >
-                      <Select
-                        showSearch
-                        disabled={!provinceCode}
-                        placeholder={provinceCode ? "Tìm phường/xã..." : "Chọn tỉnh/thành phố trước"}
-                        style={{ height: 40 }}
-                        options={wardsForProvince.map((w) => ({ value: w.Code, label: w.Name }))}
-                        filterOption={(input, option) =>
-                          stripDiacritics(option?.label ?? "").includes(stripDiacritics(input))
-                        }
+                      <Input
+                        placeholder="Vd: 12 Nguyễn Trãi"
+                        style={{ height: 40, borderRadius: 8 }}
                       />
                     </Form.Item>
                   </div>
-
-                  <Form.Item
-                    name="addressDetail"
-                    label={<span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Số nhà, tên đường *</span>}
-                    rules={[{ required: true, message: "Vui lòng nhập số nhà, tên đường" }]}
-                  >
-                    <Input
-                      placeholder="Vd: 12 Nguyễn Trãi"
-                      style={{ height: 40, borderRadius: 8 }}
-                    />
-                  </Form.Item>
 
                   <Form.Item
                     name="note"
@@ -524,9 +757,74 @@ export default function CheckoutPage() {
                     Phương thức thanh toán
                   </h2>
 
+                  {/* Loại thanh toán (toàn bộ / cọc 50%) — chỉ áp dụng đơn có
+                      sản phẩm thiết kế riêng (POD), khớp guardrail backend */}
+                  {hasCustomDesign && (
+                    <div style={{ marginBottom: 20 }}>
+                      <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                        Loại thanh toán
+                      </p>
+                      <Form.Item
+                        name="paymentType"
+                        style={{ margin: 0 }}
+                        rules={[{ required: true, message: "Chọn loại thanh toán" }]}
+                      >
+                        <Radio.Group style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
+                          {(
+                            [
+                              {
+                                value: "FULL" as const,
+                                label: "Thanh toán toàn bộ",
+                                desc: "Thanh toán 100% giá trị đơn hàng ngay bây giờ",
+                              },
+                              {
+                                value: "DEPOSIT" as const,
+                                label: `Đặt cọc ${DEPOSIT_PERCENT}%`,
+                                desc: "Trả trước 50% online, phần còn lại thanh toán khi nhận hàng (COD)",
+                              },
+                            ]
+                          ).map((opt) => (
+                            <label key={opt.value} htmlFor={`payment_type_${opt.value}`} style={{ cursor: "pointer" }}>
+                              <Radio id={`payment_type_${opt.value}`} value={opt.value} style={{ display: "none" }} />
+                              <Form.Item noStyle shouldUpdate={(prev, next) => prev.paymentType !== next.paymentType}>
+                                {({ getFieldValue }) => {
+                                  const selected = getFieldValue("paymentType") === opt.value;
+                                  return (
+                                    <div
+                                      onClick={() => form.setFieldValue("paymentType", opt.value)}
+                                      style={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 2,
+                                        padding: "10px 14px",
+                                        borderRadius: 10,
+                                        border: selected ? "2px solid #0ea5e9" : "1.5px solid #e2e8f0",
+                                        background: selected ? "#f0f9ff" : "#ffffff",
+                                        cursor: "pointer",
+                                        transition: "all 0.15s",
+                                      }}
+                                    >
+                                      <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{opt.label}</span>
+                                      <span style={{ fontSize: 12, color: "#94a3b8" }}>{opt.desc}</span>
+                                    </div>
+                                  );
+                                }}
+                              </Form.Item>
+                            </label>
+                          ))}
+                        </Radio.Group>
+                      </Form.Item>
+                      <p style={{ margin: "10px 0 0", fontSize: 12, color: "#94a3b8", lineHeight: 1.5 }}>
+                        Đơn có sản phẩm thiết kế riêng cần thanh toán online trước — chọn thanh
+                        toán toàn bộ hoặc đặt cọc {DEPOSIT_PERCENT}%, phần còn lại thu COD khi
+                        giao hàng.
+                      </p>
+                    </div>
+                  )}
+
                   <Form.Item name="paymentMethod" style={{ margin: 0 }}>
                     <Radio.Group style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
-                      {paymentOptions.map((opt) => (
+                      {paymentOptionsVisible.map((opt) => (
                         <label
                           key={opt.value}
                           htmlFor={`payment_${opt.value}`}
@@ -758,9 +1056,9 @@ export default function CheckoutPage() {
 
                   {/* Totals */}
                   <div style={{ padding: "16px 24px", borderTop: "1px solid #f1f5f9" }}>
-                    {[
+                    {[ 
                       { label: "Tạm tính", value: formatVND(subtotal) },
-                      { label: "Phí vận chuyển", value: formatVND(shippingFee) },
+                      { label: "Phí vận chuyển", value: configLoading ? <Spin size="small" /> : formatVND(shippingFee) },
                     ].map((r) => (
                       <div
                         key={r.label}
@@ -808,13 +1106,33 @@ export default function CheckoutPage() {
                       </span>
                     </div>
 
+                    {isDepositSelected && (
+                      <div
+                        style={{
+                          marginBottom: 20,
+                          padding: "12px 14px",
+                          background: "#f0f9ff",
+                          border: "1px solid #bae6fd",
+                          borderRadius: 10,
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
+                          <span style={{ color: "#475569" }}>Đặt cọc ({DEPOSIT_PERCENT}%) — thanh toán ngay</span>
+                          <strong style={{ color: "#0ea5e9" }}>{formatVND(depositPreview)}</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                          <span style={{ color: "#475569" }}>Còn lại — thanh toán khi nhận hàng (COD)</span>
+                          <strong style={{ color: "#0f172a" }}>{formatVND(codPreview)}</strong>
+                        </div>
+                      </div>
+                    )}
+
                     <Button
                       type="primary"
                       htmlType="submit"
                       block
                       size="large"
                       loading={loading}
-                      onClick={() => form.submit()}
                       style={{
                         height: 48,
                         borderRadius: 10,

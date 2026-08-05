@@ -313,6 +313,35 @@ export default function CartPage() {
                           />
                           {item.colorLabel}
                         </span>
+                        {(item.designFee ?? 0) > 0 && (
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "#7c3aed",
+                              background: "#ede9fe",
+                              borderRadius: 6,
+                              padding: "2px 8px",
+                              fontWeight: 600,
+                            }}
+                          >
+                            + Phí in ấn: {formatVND(item.designFee ?? 0)}
+                          </span>
+                        )}
+                        {item.stockQty !== undefined && item.stockQty === 1 && (
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "#d97706",
+                              background: "#fffbeb",
+                              borderRadius: 6,
+                              padding: "2px 8px",
+                              border: "1px solid #fef3c7",
+                              fontWeight: 600,
+                            }}
+                          >
+                            Chỉ còn 1 sản phẩm
+                          </span>
+                        )}
                       </div>
 
                       <div
@@ -325,72 +354,89 @@ export default function CartPage() {
                         }}
                       >
                         {/* Qty adjuster */}
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 0,
-                            border: "1px solid #e2e8f0",
-                            borderRadius: 8,
-                            overflow: "hidden",
-                          }}
-                        >
-                          <button
-                            onClick={() =>
-                              updateQty(item.cartItemId, item.quantity - 1)
-                            }
-                            style={{
-                              width: 32,
-                              height: 32,
-                              background: "#f8fafc",
-                              border: "none",
-                              cursor: "pointer",
-                              fontSize: 16,
-                              fontWeight: 600,
-                              color: "#475569",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            −
-                          </button>
-                          <span
-                            style={{
-                              minWidth: 36,
-                              textAlign: "center",
-                              fontSize: 14,
-                              fontWeight: 700,
-                              color: "#0f172a",
-                              borderLeft: "1px solid #e2e8f0",
-                              borderRight: "1px solid #e2e8f0",
-                              height: 32,
-                              lineHeight: "32px",
-                            }}
-                          >
-                            {item.quantity}
-                          </span>
-                          <button
-                            onClick={() =>
-                              updateQty(item.cartItemId, item.quantity + 1)
-                            }
-                            style={{
-                              width: 32,
-                              height: 32,
-                              background: "#f8fafc",
-                              border: "none",
-                              cursor: "pointer",
-                              fontSize: 16,
-                              fontWeight: 600,
-                              color: "#475569",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            +
-                          </button>
-                        </div>
+                        {(() => {
+                          const isMaxReached =
+                            item.stockQty !== undefined
+                              ? item.quantity >= item.stockQty
+                              : false;
+                          return (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0,
+                                border: "1px solid #e2e8f0",
+                                borderRadius: 8,
+                                overflow: "hidden",
+                              }}
+                            >
+                              <button
+                                onClick={() =>
+                                  updateQty(item.cartItemId, item.quantity - 1)
+                                }
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  background: "#f8fafc",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: 16,
+                                  fontWeight: 600,
+                                  color: "#475569",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                −
+                              </button>
+                              <span
+                                style={{
+                                  minWidth: 36,
+                                  textAlign: "center",
+                                  fontSize: 14,
+                                  fontWeight: 700,
+                                  color: "#0f172a",
+                                  borderLeft: "1px solid #e2e8f0",
+                                  borderRight: "1px solid #e2e8f0",
+                                  height: 32,
+                                  lineHeight: "32px",
+                                }}
+                              >
+                                {item.quantity}
+                              </span>
+                              <button
+                                disabled={isMaxReached}
+                                onClick={() => {
+                                  if (isMaxReached) return;
+                                  updateQty(item.cartItemId, item.quantity + 1);
+                                }}
+                                title={
+                                  isMaxReached
+                                    ? item.stockQty === 1
+                                      ? "Sản phẩm trong kho chỉ còn 1 sản phẩm, không thể tăng thêm"
+                                      : "Đã đạt số lượng tồn kho tối đa"
+                                    : "Tăng số lượng"
+                                }
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  background: isMaxReached ? "#f1f5f9" : "#f8fafc",
+                                  border: "none",
+                                  cursor: isMaxReached ? "not-allowed" : "pointer",
+                                  fontSize: 16,
+                                  fontWeight: 600,
+                                  color: isMaxReached ? "#cbd5e1" : "#475569",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                +
+                              </button>
+                            </div>
+                          );
+                        })()}
 
                         {/* Price */}
                         <span
@@ -400,7 +446,7 @@ export default function CartPage() {
                             color: "#0ea5e9",
                           }}
                         >
-                          {formatVND(item.price * item.quantity)}
+                          {formatVND((item.price + (item.designFee || 0)) * item.quantity)}
                         </span>
 
                         {/* Remove */}

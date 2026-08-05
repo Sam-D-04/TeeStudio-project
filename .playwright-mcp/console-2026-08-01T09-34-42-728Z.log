@@ -1,0 +1,9 @@
+[     132ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2477
+[    1564ms] [LOG] [Fast Refresh] done in 1548ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2477
+[    1666ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2477
+[    1702ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2477
+[    1827ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2477
+[    1832ms] [ERROR] Warning: [antd: Drawer] `width` is deprecated. Please use `size` instead. @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:3318
+[    1879ms] [ERROR] Warning: [antd: Modal] `destroyOnClose` is deprecated. Please use `destroyOnHidden` instead. @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:3318
+[    1919ms] [LOG] [Fast Refresh] done in 197ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2477
+[   44289ms] [ERROR] Warning: [antd: message] Static function can not consume context like dynamic theme. Please use 'App' component instead. @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:3318

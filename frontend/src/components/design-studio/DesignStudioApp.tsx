@@ -2,13 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { LayersIcon } from "lucide-react";
 import type Konva from "konva";
 
-import { useDesignStore, type DesignElement } from "@/store/useDesignStore";
+import { useDesignStore, selectElementsBySide, type DesignElement } from "@/store/useDesignStore";
 import useAuthStore from "@/store/useAuthStore";
 import { userDesignService, SavedDesign } from "@/services/userDesignService";
+import { getProductById } from "@/services/productService";
 import { calcDesignFee } from "@/utils/designFeeCalculator";
-import { Modal } from "antd";
+import { getUploadedImages, saveUploadedImages } from "@/utils/indexedDB";
+import { printMethodService } from "@/services/printMethodService";
+import { Modal, message } from "antd";
 import html2canvas from "html2canvas";
 
 import Toolbar from "./Toolbar";
@@ -42,12 +46,18 @@ export default function DesignStudioApp() {
   const shirtContainerRef = useRef<HTMLDivElement>(null);
 
   const {
-    shirtType, shirtColor, shirtView,
+    shirtType, shirtColor, shirtView, mockupImages, availableColors,
     addElement, removeElement,
     undo, redo,
     setSelectedId, setShirtType, setShirtColor, setShirtView,
     currentDesignId, setCurrentDesignId,
+    currentDesignStatus, adminNote,
   } = useDesignStore();
+
+  /** Thiết kế đã được admin duyệt → khóa toàn bộ chỉnh sửa phía khách */
+  const isApproved = currentDesignStatus === "APPROVED";
+  /** Thiết kế đang bị yêu cầu sửa → khóa chức năng đổi áo/màu, chỉ cho sửa canvas */
+  const isRevisionMode = currentDesignStatus === "NEEDS_REVISION";
 
   const { isAuthenticated, accessToken } = useAuthStore();
 
@@ -55,6 +65,15 @@ export default function DesignStudioApp() {
 
   /* ── Uploaded images (object URLs) ── */
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+
+  useEffect(() => {
+    // Load ảnh từ IndexedDB khi khởi tạo
+    getUploadedImages().then((images) => {
+      setUploadedImages(images);
+      setImagesLoaded(true);
+    });
+  }, []);
 
   /* ── Toast ── */
   const [toast, setToast]   = useState<string | null>(null);
@@ -68,11 +87,15 @@ export default function DesignStudioApp() {
   /* ── Phụ phí thiết kế (real-time) ── */
   const [designFeeInfo, setDesignFeeInfo] = useState({ fee: 0, label: "Miễn phí", areaCm2: 0 });
 
-  // Cập nhật phí mỗi khi danh sách phần tử thay đổi
+  // Cập nhật phí mỗi khi danh sách phần tử hoặc phương pháp in thay đổi
   const elements = useDesignStore((s) => s.elements);
+  const printingMethodCode = useDesignStore((s) => s.printingMethodCode);
+  const printMethods = useDesignStore((s) => s.printMethods);
+  
   useEffect(() => {
-    setDesignFeeInfo(calcDesignFee(elements));
-  }, [elements]);
+    const extraCost = printMethods.find(m => m.code === printingMethodCode)?.extraCost || 0;
+    setDesignFeeInfo(calcDesignFee(elements, extraCost));
+  }, [elements, printingMethodCode, printMethods]);
 
   /* ── Cart modal — productId và tên màu từ URL ── */
   const [urlProductId, setUrlProductId] = useState<number | null>(null);
@@ -83,25 +106,106 @@ export default function DesignStudioApp() {
   const displayW = Math.round(CONTAINER_W * zoom);
   const displayH = Math.round(CONTAINER_H * zoom);
 
-  /* ── Init: parse URL params (không tự load thiết kế cũ) ── */
+  /* ── Init: parse URL params. Nếu có ?designId=xxx thì tự động load thiết kế đó
+     (dùng cho luồng email yêu cầu chỉnh sửa: khách click link → mở đúng bản thiết kế) ── */
   useEffect(() => {
-    const shirt = searchParams.get("shirt");
-    const color = searchParams.get("color");
-    const view  = searchParams.get("view");
-    const pid   = searchParams.get("productId");
+    const shirt    = searchParams.get("shirt");
+    const color    = searchParams.get("color");
+    const view     = searchParams.get("view");
+    const pid      = searchParams.get("productId");
+    const designId = searchParams.get("designId");
 
     if (shirt === "tshirt" || shirt === "polo" || shirt === "hoodie") setShirtType(shirt);
     if (color) {
       setColorName(color);
+      // Hex phải khớp đúng ProductVariant.colorHex trong DB (xem migration
+      // 20260804_add_productimage_colorhex_view.sql) — nếu không khớp, hiệu ứng
+      // "chọn màu theo tên" ở đây sẽ tự bị fetchColors() ghi đè về màu đầu tiên.
       const map: Record<string, string> = {
-        Black: "#000000", White: "#ffffff", Navy: "#1d4ed8",
+        Black: "#000000", White: "#ffffff", Navy: "#1e3a8a",
         Grey: "#9ca3af", Brown: "#8b4513", Beige: "#d6b89a",
       };
       setShirtColor(map[color] ?? color);
     }
     if (view === "front" || view === "back") setShirtView(view);
     if (pid) setUrlProductId(parseInt(pid, 10));
+
+    // Auto-load thiết kế từ URL param ?designId=xxx
+    // Dùng cho luồng: Admin gửi email có link → khách click → mở đúng thiết kế cần sửa
+    if (designId) {
+      const id = parseInt(designId, 10);
+      if (id > 0) {
+        // Nếu đã đăng nhập: load ngay
+        if (useAuthStore.getState().isAuthenticated && useAuthStore.getState().accessToken) {
+          userDesignService.getMyDesigns().then((designs) => {
+            const found = designs.find((d) => d.id === id);
+            if (found) {
+              handleLoadDesignById(found);
+            } else {
+              showToast("Không tìm thấy thiết kế hoặc bạn không có quyền truy cập");
+            }
+          }).catch(() => showToast("Lỗi khi tải thiết kế"));
+        } else {
+          // Chưa đăng nhập: lưu lại để load sau khi login
+          sessionStorage.setItem("pendingDesignId", String(id));
+        }
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ── Lấy danh sách màu áo + ảnh mockup động từ DB theo shirtType ── */
+  const { setAvailableColors, setMockupImages } = useDesignStore.getState();
+  useEffect(() => {
+    let isMounted = true;
+    const fetchColors = async () => {
+      try {
+        const pid = urlProductId ?? SHIRT_TO_PRODUCT_ID[shirtType] ?? 1;
+        const product = await getProductById(pid);
+        if (!isMounted) return;
+
+        setMockupImages(product.images);
+
+        // Trích xuất các màu duy nhất từ biến thể còn hoạt động và còn hàng
+        const colorSet = new Set<string>();
+        product.variants.forEach(v => {
+          if (v.colorHex && v.stockQty > 0) colorSet.add(v.colorHex.toLowerCase());
+        });
+
+        const colors = Array.from(colorSet);
+        if (colors.length > 0) {
+          setAvailableColors(colors);
+
+          // Nếu màu đang chọn không nằm trong danh sách mới, fallback về màu đầu tiên
+          const currentHex = useDesignStore.getState().shirtColor.toLowerCase();
+          if (!colors.includes(currentHex)) {
+            setShirtColor(colors[0]);
+          }
+        } else {
+          // Fallback an toàn nếu sản phẩm không có biến thể nào
+          setAvailableColors(["#ffffff", "#000000"]);
+        }
+      } catch (error) {
+        console.error("Failed to load available colors:", error);
+      }
+    };
+    fetchColors();
+    return () => { isMounted = false; };
+  }, [shirtType, urlProductId, setAvailableColors, setMockupImages, setShirtColor]);
+
+  /* ── Lấy danh sách phương pháp in từ DB ── */
+  useEffect(() => {
+    let isMounted = true;
+    const fetchMethods = async () => {
+      const methods = await printMethodService.getPrintMethods();
+      if (!isMounted) return;
+      useDesignStore.getState().setPrintMethods(methods);
+      if (methods.length > 0 && !useDesignStore.getState().printingMethodCode) {
+        useDesignStore.getState().setPrintingMethodCode(methods[0].code);
+      }
+    };
+    fetchMethods();
+    return () => { isMounted = false; };
   }, []);
 
   /* ── Keyboard shortcuts ── */
@@ -136,7 +240,11 @@ export default function DesignStudioApp() {
       if (file.size > 5 * 1024 * 1024) { showToast("File quá lớn (>5MB)"); return; }
       const reader = new FileReader();
       reader.onload = () => {
-        setUploadedImages((prev) => [...prev, reader.result as string]);
+        setUploadedImages((prev) => {
+          const newImages = [...prev, reader.result as string];
+          saveUploadedImages(newImages);
+          return newImages;
+        });
       };
       reader.readAsDataURL(file);
     });
@@ -146,6 +254,7 @@ export default function DesignStudioApp() {
     setUploadedImages((prev) => {
       const arr = [...prev];
       arr.splice(idx, 1);
+      saveUploadedImages(arr);
       return arr;
     });
   }, []);
@@ -226,13 +335,28 @@ export default function DesignStudioApp() {
       let previewUrl = "";
       if (shirtContainerRef.current) {
         setSelectedId(null);
-        
+
+        // Preview luôn ưu tiên chụp mặt trước (mặt "đại diện" thiết kế); nếu mặt
+        // trước không có phần tử nào nhưng mặt sau có thì chụp mặt sau thay thế,
+        // tránh trường hợp thiết kế chỉ ở mặt sau lại có ảnh preview là áo trắng trơn.
+        const currentElements = useDesignStore.getState().elements;
+        const originalView = useDesignStore.getState().shirtView;
+        const frontHasContent = selectElementsBySide(currentElements, "front").length > 0;
+        const backHasContent  = selectElementsBySide(currentElements, "back").length > 0;
+        const previewView: "front" | "back" =
+          !frontHasContent && backHasContent ? "back" : "front";
+
+        if (previewView !== originalView) {
+          setShirtView(previewView);
+        }
+
         // Ẩn khung đứt nét của vùng in
         const boundaries = shirtContainerRef.current.querySelectorAll('.ds-print-boundary');
         boundaries.forEach((el: any) => el.style.display = 'none');
 
+        // Đợi React render lại đúng mặt áo cần chụp trước khi html2canvas chụp DOM
         await new Promise((r) => setTimeout(r, 100));
-        
+
         const canvas = await html2canvas(shirtContainerRef.current, {
           useCORS: true,
           allowTaint: true,
@@ -242,6 +366,11 @@ export default function DesignStudioApp() {
 
         // Hiển thị lại khung đứt nét
         boundaries.forEach((el: any) => el.style.display = '');
+
+        // Trả UI về đúng mặt khách đang xem trước khi lưu (preview chỉ mượn tạm)
+        if (previewView !== originalView) {
+          setShirtView(originalView);
+        }
       }
 
       const payload = {
@@ -253,6 +382,7 @@ export default function DesignStudioApp() {
           elements: useDesignStore.getState().elements,
           shirtType: useDesignStore.getState().shirtType,
           shirtView: useDesignStore.getState().shirtView,
+          printingMethodCode: useDesignStore.getState().printingMethodCode,
           logicalCanvas: { width: CONTAINER_W, height: CONTAINER_H },
         },
         previewUrl
@@ -274,37 +404,58 @@ export default function DesignStudioApp() {
     } finally {
       setIsSaving(false);
     }
-  }, [accessToken, currentDesignId, shirtType, shirtColor, setSelectedId, setCurrentDesignId, showToast]);
+  }, [accessToken, currentDesignId, shirtType, shirtColor, setSelectedId, setShirtView, setCurrentDesignId, showToast]);
 
+  const handleSubmitRevision = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      setIsSaving(true);
+      const designName = useDesignStore.getState().designName;
+      const saved = await handleConfirmSave(designName);
+      if (saved && currentDesignId) {
+        await userDesignService.submitForReview(accessToken, currentDesignId);
+        showToast("Đã gửi xác nhận chỉnh sửa thành công!");
+        useDesignStore.getState().setCurrentDesignStatus("PENDING_REVIEW");
+        useDesignStore.getState().setAdminNote(null);
+      }
+    } catch (err: any) {
+      showToast(err.message || "Lỗi khi gửi xác nhận chỉnh sửa");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [accessToken, currentDesignId, handleConfirmSave, showToast]);
+
+
+  /** Hàm nội bộ: load một design object vào canvas (không hỏi confirm khi canvas trống) */
+  const handleLoadDesignById = useCallback((design: SavedDesign) => {
+    const state = useDesignStore.getState();
+    state.clearDesign();
+    const elements = (design.canvasData?.elements || []).map(
+      (el: DesignElement) => ({ ...el, side: el.side ?? "front" })
+    );
+    // Tự động focus vào mặt áo có NHIỀU phần tử hơn (không dựa vào shirtView lúc lưu,
+    // vì mặt đang xem lúc lưu có thể trống trong khi mặt còn lại mới là nơi chứa thiết kế
+    // → tránh cảm giác "mở thiết kế nhưng thấy áo trống").
+    const frontCount = selectElementsBySide(elements, "front").length;
+    const backCount  = selectElementsBySide(elements, "back").length;
+    const view: "front" | "back" = backCount > frontCount ? "back" : "front";
+    useDesignStore.setState({
+      elements,
+      shirtView: view,
+      shirtType: design.canvasData?.shirtType
+        || (design.productId === 1 ? "tshirt" : design.productId === 2 ? "polo" : "hoodie"),
+      shirtColor: design.baseColor,
+      currentDesignId: design.id,
+      currentDesignStatus: design.status,
+      adminNote: design.adminNote,
+      printingMethodCode: design.canvasData?.printingMethodCode || design.canvasData?.printingMethod || (state.printMethods.length > 0 ? state.printMethods[0].code : ""),
+      designName: design.name,
+    });
+  }, []);
 
   const handleLoadDesign = useCallback((design: SavedDesign) => {
     const doLoad = () => {
-      const state = useDesignStore.getState();
-      state.clearDesign(); // Xoá sạch canvas hiện tại (có lưu vào lịch sử undo)
-
-      // Thiết kế lưu TRƯỚC KHI có field "side" (phân biệt mặt trước/sau) sẽ
-      // không có "side" trong dữ liệu cũ - mặc định coi các phần tử đó thuộc
-      // mặt trước, để không bị mất nội dung thiết kế cũ khi tải lại.
-      const elements = (design.canvasData?.elements || []).map(
-        (el: DesignElement) => ({ ...el, side: el.side ?? "front" })
-      );
-      const view = design.canvasData?.shirtView || "front";
-
-      // Gán trực tiếp từng field vào store (không qua các action riêng lẻ)
-      // để tránh việc mỗi lần gọi action lại kích hoạt render/pushHistory thừa
-      useDesignStore.setState({
-        elements,
-        shirtView: view,
-        // productId không khớp 1-1 với shirtType nên phải suy ra thủ công;
-        // nếu không phải tshirt/polo thì mặc định coi là hoodie
-        shirtType: design.canvasData?.shirtType
-          || (design.productId === 1 ? "tshirt" : design.productId === 2 ? "polo" : "hoodie"),
-        shirtColor: design.baseColor,
-        currentDesignId: design.id,
-        currentDesignStatus: design.status,
-        designName: design.name,
-      });
-
+      handleLoadDesignById(design);
       setIsMyDesignsOpen(false);
       showToast("Đã nạp thiết kế: " + design.name);
     };
@@ -321,7 +472,7 @@ export default function DesignStudioApp() {
     } else {
       doLoad();
     }
-  }, [showToast]);
+  }, [handleLoadDesignById, showToast]);
 
   const handleDownloadImage = useCallback(async () => {
     if (!shirtContainerRef.current) return;
@@ -400,7 +551,7 @@ export default function DesignStudioApp() {
     const originalView = useDesignStore.getState().shirtView;
     const elementsNow   = useDesignStore.getState().elements;
     const sidesToCapture = (["front", "back"] as const).filter((side) =>
-      elementsNow.some((el) => (el.side ?? "front") === side)
+      selectElementsBySide(elementsNow, side).length > 0
     );
     if (sidesToCapture.length === 0) return {};
 
@@ -446,10 +597,22 @@ export default function DesignStudioApp() {
     return result;
   };
 
-  /* Mở modal thêm vào giỏ: chụp ảnh in (nếu có thiết kế) rồi mới mở */
+  /* Mở modal thêm vào giỏ: lưu thiết kế trước, chụp ảnh in (nếu có thiết kế) rồi mới mở */
   const handleOpenCart = async () => {
     setSelectedId(null);
     if (elements.length > 0) {
+      if (!accessToken) {
+        message.warning("Vui lòng đăng nhập để lưu thiết kế trước khi thêm vào giỏ hàng!");
+        return;
+      }
+
+      showToast("Đang lưu bản cập nhật thiết kế...");
+      const designName = useDesignStore.getState().designName || "Thiết kế mới";
+      const saved = await handleConfirmSave(designName);
+      if (!saved) {
+        return; // Lỗi khi lưu thì không mở modal
+      }
+
       showToast("Đang chuẩn bị ảnh in...");
       const { printImageFront: front, printImageBack: back } = await capturePrintImages();
       setPrintImageFront(front);
@@ -488,15 +651,61 @@ export default function DesignStudioApp() {
 
   return (
     <div className="ds-root">
+      {/* ── Banner: Thiết kế đã duyệt – khóa chỉnh sửa ── */}
+      {isApproved && (
+        <div style={{
+          background: "linear-gradient(90deg, #065f46 0%, #047857 100%)",
+          color: "#ecfdf5",
+          padding: "10px 20px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          fontSize: 14,
+          fontWeight: 600,
+          zIndex: 100,
+          borderBottom: "2px solid #34d399",
+        }}>
+          <span style={{ fontSize: 18 }}>✅</span>
+          Thiết kế này đã được Admin duyệt – không thể chỉnh sửa thêm.
+          <span style={{ fontWeight: 400, opacity: 0.8, fontSize: 13 }}>
+            Nếu cần thay đổi, vui lòng liên hệ TeeStudio.
+          </span>
+        </div>
+      )}
+
+      {/* ── Banner: Thiết kế bị yêu cầu chỉnh sửa ── */}
+      {isRevisionMode && adminNote && (
+        <div style={{
+          background: "linear-gradient(90deg, #b45309 0%, #d97706 100%)",
+          color: "#fffbeb",
+          padding: "10px 20px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          fontSize: 14,
+          fontWeight: 600,
+          zIndex: 100,
+          borderBottom: "2px solid #fbbf24",
+        }}>
+          <span style={{ fontSize: 18 }}>⚠️</span>
+          <span>
+            Admin yêu cầu chỉnh sửa: <span style={{ fontWeight: 400, fontStyle: "italic" }}>{adminNote}</span>
+          </span>
+        </div>
+      )}
+
       <Toolbar
         onSave={handleSaveClick}
         onDownloadImage={handleDownloadImage}
         onShowToast={showToast}
         onOpenMyDesigns={() => setIsMyDesignsOpen(true)}
         onNewDesign={handleNewDesign}
-        onAddToCart={handleOpenCart}
+        onAddToCart={isApproved || isRevisionMode ? undefined : handleOpenCart}
         onViewCart={() => setIsCartDrawerOpen(true)}
         isSaving={isSaving}
+        isReadOnly={isApproved}
+        isRevisionMode={isRevisionMode}
+        onSubmitRevision={handleSubmitRevision}
       />
 
       <div className="ds-body">
@@ -505,6 +714,9 @@ export default function DesignStudioApp() {
           onUploadImages={handleUploadImages}
           onRemoveUploadedImage={handleRemoveUploadedImage}
           onAddImageToCanvas={handleAddImageToCanvas}
+          lockShirtOptions={isApproved || isRevisionMode}
+          isReadOnly={isApproved}
+          showMyDesigns={!isRevisionMode}
         />
 
         {/* ─── Khu vực làm việc chính (áo + canvas thiết kế) ─── */}
@@ -538,6 +750,7 @@ export default function DesignStudioApp() {
                 type={shirtType}
                 view={shirtView}
                 color={shirtColor}
+                images={mockupImages}
                 width={displayW}
                 height={displayH}
               />
@@ -556,6 +769,7 @@ export default function DesignStudioApp() {
                 containerH={CONTAINER_H}
                 zoom={zoom}
                 clipPoints={polygonPoints}
+                isReadOnly={isApproved}
               />
 
               {/* L3: Viền nét đứt đánh dấu vùng in được phép thiết kế */}
@@ -635,17 +849,147 @@ export default function DesignStudioApp() {
               )}
             </div>
           </div>
+          {/* Cụm điều khiển: View Toggle, Color, Zoom, Printing Method */}
+          <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 16 }}>
+            {/* Chuyển đổi Mặt trước / Mặt sau */}
+            <div
+              style={{
+                display: "flex",
+                background: "rgba(30, 41, 59, 0.7)", // bg-slate-800/70
+                backdropFilter: "blur(12px)",
+                padding: 4,
+                borderRadius: 9999,
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+              }}
+            >
+              <button
+                onClick={() => setShirtView("front")}
+                style={{
+                  padding: "6px 16px",
+                  borderRadius: 9999,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  transition: "all 0.2s",
+                  cursor: "pointer",
+                  border: "none",
+                  ...(shirtView === "front"
+                    ? { background: "#0ea5e9", color: "#ffffff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" } // sky-500
+                    : { background: "transparent", color: "#cbd5e1" }), // slate-300
+                }}
+                title="Thiết kế mặt trước áo"
+              >
+                Mặt trước
+              </button>
+              <button
+                onClick={() => setShirtView("back")}
+                style={{
+                  padding: "6px 16px",
+                  borderRadius: 9999,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  transition: "all 0.2s",
+                  cursor: "pointer",
+                  border: "none",
+                  ...(shirtView === "back"
+                    ? { background: "#0ea5e9", color: "#ffffff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }
+                    : { background: "transparent", color: "#cbd5e1" }),
+                }}
+                title="Thiết kế mặt sau áo"
+              >
+                Mặt sau
+              </button>
+            </div>
 
-          {/* Nút điều khiển zoom */}
-          <div className="ds-zoom-controls">
-            <button className="ds-zoom-btn" onClick={zoomOut} title="Thu nhỏ">−</button>
-            <button className="ds-zoom-label" onClick={zoomReset} title="Reset về 100%">
-              {Math.round((zoom / 1.75) * 100)}%
-            </button>
-            <button className="ds-zoom-btn" onClick={zoomIn} title="Phóng to">+</button>
+            {/* Chọn Màu (Chỉ hiển thị khi có màu và không ở chế độ revision) */}
+            {availableColors.length > 0 && !isRevisionMode && (
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  justifyContent: "center",
+                  gap: 8,
+                  background: "rgba(30, 41, 59, 0.7)", // bg-slate-800/70
+                  backdropFilter: "blur(12px)",
+                  padding: "6px 12px",
+                  borderRadius: 9999,
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                }}
+              >
+                {availableColors.map((colorHex) => {
+                  const isActive = shirtColor.toLowerCase() === colorHex.toLowerCase();
+                  return (
+                    <button
+                      key={colorHex}
+                      onClick={() => setShirtColor(colorHex)}
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        background: colorHex,
+                        border: isActive ? "2px solid #0ea5e9" : "2px solid transparent",
+                        boxShadow: isActive ? "0 0 0 2px rgba(14, 165, 233, 0.3)" : "inset 0 1px 3px rgba(0,0,0,0.15)",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                      }}
+                      title={`Đổi màu áo`}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Nút điều khiển zoom */}
+            <div className="ds-zoom-controls">
+              <button className="ds-zoom-btn" onClick={zoomOut} title="Thu nhỏ">−</button>
+              <button className="ds-zoom-label" onClick={zoomReset} title="Reset về 100%">
+                {Math.round((zoom / 1.75) * 100)}%
+              </button>
+              <button className="ds-zoom-btn" onClick={zoomIn} title="Phóng to">+</button>
+            </div>
+
+            {/* Chọn Phương Pháp In */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                background: "rgba(30, 41, 59, 0.7)",
+                backdropFilter: "blur(12px)",
+                padding: "4px 12px",
+                borderRadius: 9999,
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+              }}
+            >
+              <span style={{ fontSize: 13, color: "#cbd5e1", fontWeight: 500 }}>In:</span>
+              <select
+                value={printingMethodCode}
+                onChange={(e) => useDesignStore.getState().setPrintingMethodCode(e.target.value)}
+                style={{
+                  background: "transparent",
+                  color: "#fff",
+                  border: "none",
+                  outline: "none",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                {printMethods.map((method) => {
+                  const displayName = method.name.replace(/\s*\(.*?\)/g, '');
+                  return (
+                    <option key={method.code} value={method.code} style={{ color: "#000" }}>
+                      {displayName} {method.extraCost > 0 ? `(+${method.extraCost.toLocaleString()}đ)` : ""}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
           </div>
 
-          {/* Hiển thị phụ phí thiết kế theo thời gian thực, cập nhật mỗi khi elements thay đổi */}
+          {/* Hiển thị phụ phí in ấn theo thời gian thực */}
           <div
             style={{
               display: "flex",
@@ -660,14 +1004,14 @@ export default function DesignStudioApp() {
               color: "#f1f5f9",
             }}
           >
-            <span style={{ opacity: 0.65 }}>Phụ phí thiết kế:</span>
+            <span style={{ opacity: 0.65 }}>Phí in ấn:</span>
             <span
               style={{
                 fontWeight: 700,
                 color:
                   designFeeInfo.fee === 0
                     ? "#4ade80"
-                    : designFeeInfo.fee === 30000
+                    : designFeeInfo.fee === 40000
                     ? "#facc15"
                     : "#f87171",
               }}
@@ -723,6 +1067,7 @@ export default function DesignStudioApp() {
         designId={currentDesignId ?? undefined}
         printImageFront={printImageFront}
         printImageBack={printImageBack}
+        designFee={designFeeInfo.fee}
         designPreviewUrl={printImageFront ?? printImageBack}
       />
 

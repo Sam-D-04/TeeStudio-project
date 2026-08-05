@@ -11,7 +11,7 @@ type RouterInstance = ReturnType<typeof useRouter>;
    SVG Vectors cho từng loại áo
 ───────────────────────────────────────── */
 
-function TshirtVector({ color = "#bae6fd" }: { color?: string }) {
+function TshirtVector({ color = "#bae6fd", isBack = false }: { color?: string; isBack?: boolean }) {
   return (
     <svg viewBox="0 0 160 170" fill="none" width="100%" style={{ maxHeight: 160 }}>
       {/* Body */}
@@ -23,13 +23,15 @@ function TshirtVector({ color = "#bae6fd" }: { color?: string }) {
         strokeLinejoin="round"
       />
       {/* Collar */}
-      <path
-        d="M58 46C62 56 98 56 102 46"
-        fill="none"
-        stroke="white"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
+      {!isBack && (
+        <path
+          d="M58 46C62 56 98 56 102 46"
+          fill="none"
+          stroke="white"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      )}
       {/* Print area (dashed rect) */}
       <rect x="57" y="80" width="46" height="46" rx="5"
         fill="white" fillOpacity="0.4"
@@ -41,7 +43,7 @@ function TshirtVector({ color = "#bae6fd" }: { color?: string }) {
   );
 }
 
-function HoodieVector({ color = "#c7d2fe" }: { color?: string }) {
+function HoodieVector({ color = "#c7d2fe", isBack = false }: { color?: string; isBack?: boolean }) {
   return (
     <svg viewBox="0 0 160 175" fill="none" width="100%" style={{ maxHeight: 160 }}>
       {/* Body */}
@@ -60,14 +62,18 @@ function HoodieVector({ color = "#c7d2fe" }: { color?: string }) {
         strokeWidth="2"
         strokeLinecap="round"
       />
-      {/* Front pocket */}
-      <path
-        d="M56 118Q56 130 80 130Q104 130 104 118L104 108H56Z"
-        fill="white" fillOpacity="0.3"
-        stroke="white" strokeWidth="1.5"
-      />
-      {/* Zipper line */}
-      <path d="M80 82v26" stroke="white" strokeWidth="2" strokeLinecap="round" strokeDasharray="4 3" />
+      {!isBack && (
+        <>
+          {/* Front pocket */}
+          <path
+            d="M56 118Q56 130 80 130Q104 130 104 118L104 108H56Z"
+            fill="white" fillOpacity="0.3"
+            stroke="white" strokeWidth="1.5"
+          />
+          {/* Zipper line */}
+          <path d="M80 82v26" stroke="white" strokeWidth="2" strokeLinecap="round" strokeDasharray="4 3" />
+        </>
+      )}
       {/* Print area */}
       <rect x="58" y="84" width="44" height="24" rx="4"
         fill="white" fillOpacity="0.35"
@@ -92,7 +98,7 @@ export default function ProductCategoriesClient({ products }: Props) {
   const router = useRouter();
 
   return (
-    <section style={{ background: "#ffffff", paddingTop: 80 }}>
+    <section className="relative z-10" style={{ paddingTop: 80, paddingBottom: 40 }}>
       <div className="container-main" style={{ padding: "40px 24px 56px" }}>
 
         {/* ── Header Row ── */}
@@ -180,95 +186,106 @@ function ProductCard({ product, router }: { product: ProductFromDB; router: Rout
     ? product.images
     : product.imageUrl ? [product.imageUrl] : [];
 
-  const [imgIndex, setImgIndex] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [randomIdx, setRandomIdx] = useState(0);
 
-  const stopCycle = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+  useEffect(() => {
+    if (images.length > 1) {
+      setRandomIdx(Math.floor(Math.random() * images.length));
     }
-    setImgIndex(0);
-  };
+  }, [images.length]);
 
-  const startCycle = () => {
-    if (images.length <= 1 || intervalRef.current) return;
-    intervalRef.current = setInterval(() => {
-      setImgIndex((i) => (i + 1) % images.length);
-    }, IMAGE_CYCLE_MS);
-  };
-
-  // Dọn interval nếu component unmount trong lúc đang hover
-  useEffect(() => () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-  }, []);
-
-  const currentImage = images[imgIndex] ?? product.imageUrl;
+  const currentImage = images[randomIdx] ?? null;
+  const backImage = images[(randomIdx + 1) % images.length] ?? null; // Dùng màu khác làm mặt sau khi lật nếu không có ảnh mặt sau thực sự
 
   return (
     <div
+      className="product-card glass-card group"
       onClick={() => router.push(`/product/${product.id}`)}
       style={{
-        background: "#ffffff",
-        borderRadius: 20,
-        border: "1px solid #e2e8f0",
         overflow: "hidden",
         cursor: "pointer",
-        transition: "all 0.25s ease",
-        boxShadow: "var(--shadow-sm)",
         display: "flex",
         flexDirection: "column",
+        position: "relative",
+        zIndex: 1,
       }}
       onMouseEnter={(e) => {
-        const el = e.currentTarget as HTMLDivElement;
-        el.style.transform = "translateY(-6px)";
-        el.style.boxShadow = "var(--shadow-hover)";
-        el.style.borderColor = ui.accentColor + "40";
-        startCycle();
+        // className glass-card:hover handles transform and shadow
       }}
       onMouseLeave={(e) => {
-        const el = e.currentTarget as HTMLDivElement;
-        el.style.transform = "translateY(0)";
-        el.style.boxShadow = "var(--shadow-sm)";
-        el.style.borderColor = "#e2e8f0";
-        stopCycle();
+        // className glass-card:hover handles restore
       }}
     >
       {/* ─ Visual area ─ */}
       <div
         style={{
-          background: ui.accentBg,
+          background: "transparent",
+          borderBottom: "1px solid rgba(255,255,255,0.2)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           padding: "36px 24px 20px",
           minHeight: 240,
           position: "relative",
+          perspective: "1000px",
         }}
       >
         {/* Vector shirt or real mockup */}
-        <div style={{ width: currentImage ? "100%" : (ui.mockupImg ? "70%" : "80%"), maxWidth: currentImage ? 210 : (ui.mockupImg ? 175 : 150), animation: "float 3.5s ease-in-out infinite" }}>
-          {currentImage ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={currentImage}
-              alt={product.name}
-              style={{ width: "100%", height: 210, objectFit: "contain", display: "block", mixBlendMode: "multiply", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.18))" }}
-              draggable={false}
-            />
-          ) : ui.mockupImg ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={ui.mockupImg}
-              alt={product.name}
-              style={{ width: "100%", objectFit: "contain", display: "block", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.18))" }}
-              draggable={false}
-            />
-          ) : product.form === "hoodie" ? (
-            <HoodieVector color={ui.svgColor} />
-          ) : (
-            <TshirtVector color={ui.svgColor} />
-          )}
+        <div className="flip-inner" style={{ width: currentImage ? "100%" : (ui.mockupImg ? "70%" : "80%"), maxWidth: currentImage ? 210 : (ui.mockupImg ? 175 : 150), animation: "float 3.5s ease-in-out infinite" }}>
+          <div className="flip-front">
+            {currentImage ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={currentImage}
+                alt={product.name}
+                style={{ width: "100%", height: 210, objectFit: "contain", display: "block", mixBlendMode: "multiply", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.18))" }}
+                draggable={false}
+              />
+            ) : ui.mockupImg ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={ui.mockupImg}
+                alt={product.name}
+                style={{ width: "100%", objectFit: "contain", display: "block", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.18))" }}
+                draggable={false}
+              />
+            ) : product.form === "hoodie" ? (
+              <HoodieVector color={ui.svgColor} />
+            ) : (
+              <TshirtVector color={ui.svgColor} />
+            )}
+          </div>
+          <div className="flip-back">
+            {backImage ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={backImage}
+                alt={`${product.name} Back`}
+                style={{ width: "100%", height: 210, objectFit: "contain", display: "block", mixBlendMode: "multiply", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.18))" }}
+                draggable={false}
+              />
+            ) : currentImage ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={currentImage}
+                alt={`${product.name} Back`}
+                style={{ width: "100%", height: 210, objectFit: "contain", display: "block", mixBlendMode: "multiply", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.18))", transform: "scaleX(-1)" }}
+                draggable={false}
+              />
+            ) : ui.mockupImg ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={ui.mockupImg}
+                alt={`${product.name} Back`}
+                style={{ width: "100%", objectFit: "contain", display: "block", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.18))", transform: "scaleX(-1)" }}
+                draggable={false}
+              />
+            ) : product.form === "hoodie" ? (
+              <HoodieVector color={ui.svgColor} isBack={true} />
+            ) : (
+              <TshirtVector color={ui.svgColor} isBack={true} />
+            )}
+          </div>
         </div>
       </div>
 
@@ -315,29 +332,12 @@ function ProductCard({ product, router }: { product: ProductFromDB; router: Rout
           </span>
 
           <div style={{ display: "flex", gap: 6 }}>
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                router.push(`/product/${product.id}`);
-              }}
-              style={{
-                border: `1px solid ${ui.accentColor}40`,
-                borderRadius: 8,
-                fontWeight: 600,
-                height: 36,
-                fontSize: 12,
-                padding: "0 12px",
-                color: ui.accentColor,
-                background: "#ffffff",
-              }}
-            >
-              Xem chi tiết
-            </Button>
+
             <Button
               type="primary"
               onClick={(e) => {
                 e.stopPropagation();
-                router.push(`/design-studio?shirt=${product.form}`);
+                router.push(`/design-studio?shirt=${product.form}&productId=${product.id}`);
               }}
               style={{
                 background: ui.accentColor,
@@ -354,6 +354,36 @@ function ProductCard({ product, router }: { product: ProductFromDB; router: Rout
           </div>
         </div>
       </div>
+      <style>{`
+        .flip-inner {
+          display: grid;
+          transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+          transform-style: preserve-3d;
+          min-width: 0;
+          min-height: 0;
+        }
+        .product-card:hover .flip-inner {
+          transform: rotateY(180deg);
+        }
+        .flip-front, .flip-back {
+          grid-area: 1 / 1;
+          backface-visibility: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 100%;
+          min-width: 0;
+          min-height: 0;
+        }
+        .flip-front img, .flip-back img {
+          max-width: 100%;
+          max-height: 100%;
+        }
+        .flip-back {
+          transform: rotateY(180deg);
+        }
+      `}</style>
     </div>
   );
 }

@@ -13,6 +13,20 @@ const calculateQuote = async (req, res, next) => {
   }
 };
 
+const getConfig = async (req, res, next) => {
+  try {
+    const config = await pricingService.layCauHinh();
+
+    res.json({
+      success: true,
+      data: config,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   calculateQuote,
+  getConfig,
 };

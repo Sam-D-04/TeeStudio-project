@@ -109,18 +109,18 @@ async function layChiTietSanPhamCongKhai(id) {
 
   const p = rows[0];
 
-  // Lấy tất cả variants
+  // Lấy tất cả variants còn hoạt động
   const [variants] = await db.pool.query(
-    `SELECT id, color, size, sku, stockQty
+    `SELECT id, color, colorHex, size, sku, stockQty
      FROM ProductVariant
-     WHERE productId = ?
+     WHERE productId = ? AND status = 'ACTIVE'
      ORDER BY color, size ASC`,
     [id]
   );
 
-  // Lấy ảnh sản phẩm
+  // Lấy ảnh sản phẩm (colorHex/view dùng để Design Studio tra đúng ảnh mockup theo màu)
   const [images] = await db.pool.query(
-    `SELECT id, imageUrl, altText, sortOrder, isPrimary
+    `SELECT id, imageUrl, altText, sortOrder, isPrimary, colorHex, view
      FROM ProductImage
      WHERE productId = ?
      ORDER BY sortOrder ASC`,
@@ -150,6 +150,7 @@ async function layChiTietSanPhamCongKhai(id) {
     variants: variants.map((v) => ({
       id: v.id,
       color: v.color,
+      colorHex: v.colorHex,
       size: v.size,
       sku: v.sku,
       stockQty: v.stockQty,
@@ -159,6 +160,8 @@ async function layChiTietSanPhamCongKhai(id) {
       url: img.imageUrl,
       altText: img.altText || p.name,
       isPrimary: img.isPrimary === 1,
+      colorHex: img.colorHex,
+      view: img.view,
     })),
     bulkPricing: bulkPricing.map((b) => ({
       minQty: b.minQty,

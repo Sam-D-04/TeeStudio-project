@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { message } from "antd";
 import type { CartItemFromAPI } from "@/services/cartService";
 
 /* ── Types ──────────────────────────────────── */
@@ -19,8 +20,12 @@ export interface CartItem {
   colorLabel: string;
   price: number;
   quantity: number;
+  /** Số lượng còn lại trong kho của biến thể sản phẩm */
+  stockQty?: number;
   /** ID của CustomDesign (nếu là sản phẩm có thiết kế riêng) */
   designId?: number;
+  /** Phụ phí thiết kế nếu có (ví dụ: in 1 mặt, 2 mặt) */
+  designFee?: number;
   /**
    * Ảnh in print-ready (base64 PNG nền trong suốt) export từ canvas Design Studio -
    * tối đa 2 ảnh (mặt trước/sau), mặt nào khách không thiết kế thì undefined.
@@ -69,7 +74,9 @@ function apiItemToCartItem(item: CartItemFromAPI): CartItem {
     color: item.color,
     colorLabel: item.color,
     price: item.price,
+    designFee: item.designFee ?? 0,
     quantity: item.quantity,
+    stockQty: item.stockQty,
     designId: item.designId ?? undefined,
   };
 }
@@ -81,19 +88,28 @@ export const useCartStore = create<CartState>()(
 
       totalItems: () => get().items.reduce((acc, i) => acc + i.quantity, 0),
       totalPrice: () =>
-        get().items.reduce((acc, i) => acc + i.price * i.quantity, 0),
+        get().items.reduce((acc, i) => acc + (i.price + (i.designFee || 0)) * i.quantity, 0),
 
       addItem: (item) => {
         const id = buildCartItemId(item.variantId, item.designId);
         set((s) => {
           const existing = s.items.find((i) => i.cartItemId === id);
           if (existing) {
+            const maxStock = item.stockQty ?? existing.stockQty;
+            let targetQty = existing.quantity + item.quantity;
+            if (maxStock !== undefined && targetQty > maxStock) {
+              targetQty = maxStock;
+              if (typeof window !== "undefined") {
+                message.warning(`Sản phẩm trong kho chỉ còn ${maxStock} sản phẩm, không thể thêm nữa`);
+              }
+            }
             return {
               items: s.items.map((i) =>
                 i.cartItemId === id
                   ? {
                       ...i,
-                      quantity: i.quantity + item.quantity,
+                      quantity: targetQty,
+                      stockQty: maxStock,
                       // Giữ ảnh in mới nhất (nếu lần thêm này có kèm)
                       printImageFront: item.printImageFront ?? i.printImageFront,
                       printImageBack: item.printImageBack ?? i.printImageBack,
@@ -114,6 +130,17 @@ export const useCartStore = create<CartState>()(
       updateQuantity: (cartItemId, quantity) => {
         if (quantity <= 0) {
           get().removeItem(cartItemId);
+          return;
+        }
+        const existing = get().items.find((i) => i.cartItemId === cartItemId);
+        if (existing && existing.stockQty !== undefined && quantity > existing.stockQty) {
+          if (typeof window !== "undefined") {
+            message.warning(
+              existing.stockQty === 1
+                ? "Sản phẩm trong kho chỉ còn 1 sản phẩm, không thể tăng thêm"
+                : `Sản phẩm trong kho chỉ còn ${existing.stockQty} sản phẩm, không thể tăng thêm`
+            );
+          }
           return;
         }
         set((s) => ({

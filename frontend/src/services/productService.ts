@@ -5,9 +5,19 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 export interface PublicVariant {
   id: number;
   color: string;
+  colorHex: string;
   size: string;
   sku: string;
   stockQty: number;
+}
+
+// Một ảnh mockup của sản phẩm, gắn với 1 màu (colorHex) + 1 mặt (front/back)
+export interface PublicProductImage {
+  url: string;
+  altText: string;
+  isPrimary: boolean;
+  colorHex: string;
+  view: "front" | "back";
 }
 
 // Một mốc ưu đãi số lượng: mua từ minQty trở lên được giảm discountPercent %
@@ -23,7 +33,7 @@ export interface PublicProduct {
   basePrice: number;
   form: string;
   variants: PublicVariant[];
-  images: Array<{ url: string; altText: string; isPrimary: boolean }>;
+  images: PublicProductImage[];
   bulkPricing: BulkPricingTier[];
 }
 

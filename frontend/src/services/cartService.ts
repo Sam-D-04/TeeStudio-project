@@ -8,9 +8,11 @@ export interface CartItemFromAPI {
   quantity: number;
   color: string;
   size: string;
+  stockQty?: number;
   productId: number;
   productName: string;
   price: number;
+  designFee?: number;
   image: string | null;
 }
 

@@ -20,6 +20,8 @@ export interface ProductImage {
   url: string;
   altText: string;
   isPrimary: boolean;
+  colorHex?: string;
+  view?: "front" | "back" | "model";
 }
 
 // Một mốc ưu đãi số lượng: mua từ minQty trở lên được giảm discountPercent %
@@ -252,7 +254,7 @@ export default function ProductDetailClient({ product }: Props) {
 
   const [selectedColor, setSelectedColor] = useState(() => initialColor);
   const [selectedSize, setSelectedSize] = useState("");
-  const [previewTab, setPreviewTab] = useState<"front" | "back">("front");
+  const [previewTab, setPreviewTab] = useState<"front" | "back" | "model">("front");
   const [activeTab, setActiveTab] = useState<"detail" | "size">("detail");
 
   // ── Zoom ảnh kiểu kính lúp (theo vị trí con trỏ) ──
@@ -321,10 +323,18 @@ export default function ProductDetailClient({ product }: Props) {
 
   const dbImageFront = findDbImage(selectedColor, "front");
   const dbImageBack = findDbImage(selectedColor, "back");
+  const dbImageModel = product.images?.find((img) => 
+    img.view === 'model' && 
+    (img.colorHex?.toLowerCase() === colorHex.toLowerCase() || 
+     img.altText?.toLowerCase().includes(englishColor.toLowerCase()))
+  )?.url;
 
   // Mockup image: ưu tiên ảnh từ DB, fallback về MOCKUP_MAP (Cloudinary hoặc local)
-  const mockupUrl = (previewTab === "front" ? dbImageFront : dbImageBack)
-    || MOCKUP_MAP[product.form]?.[englishColor]?.[previewTab];
+  let mockupUrl = undefined;
+  if (previewTab === "front") mockupUrl = dbImageFront || MOCKUP_MAP[product.form]?.[englishColor]?.front;
+  else if (previewTab === "back") mockupUrl = dbImageBack || MOCKUP_MAP[product.form]?.[englishColor]?.back;
+  else if (previewTab === "model") mockupUrl = dbImageModel;
+
   const hasMockup = !!mockupUrl;
 
   const addItem = useCartStore((s) => s.addItem);
@@ -415,28 +425,31 @@ export default function ProductDetailClient({ product }: Props) {
                     background: "#f8fafc",
                   }}
                 >
-                  {(["front", "back"] as const).map(tab => (
-                    <button
-                      key={tab}
-                      onClick={() => setPreviewTab(tab)}
-                      style={{
-                        flex: 1,
-                        padding: "12px 0",
-                        background: "none",
-                        border: "none",
-                        borderBottom: previewTab === tab ? "2px solid #0ea5e9" : "2px solid transparent",
-                        color: previewTab === tab ? "#0ea5e9" : "#94a3b8",
-                        fontWeight: previewTab === tab ? 700 : 500,
-                        fontSize: 13,
-                        cursor: "pointer",
-                        transition: "all 0.15s",
-                        fontFamily: "inherit",
-                        letterSpacing: "0.3px",
-                      }}
-                    >
-                      {tab === "front" ? "Mặt trước" : "Mặt sau"}
-                    </button>
-                  ))}
+                  {(["front", "back", "model"] as const).map(tab => {
+                    if (tab === "model" && !dbImageModel) return null; // Ẩn tab người mẫu nếu không có ảnh
+                    return (
+                      <button
+                        key={tab}
+                        onClick={() => setPreviewTab(tab)}
+                        style={{
+                          flex: 1,
+                          padding: "12px 0",
+                          background: "none",
+                          border: "none",
+                          borderBottom: previewTab === tab ? "2px solid #0ea5e9" : "2px solid transparent",
+                          color: previewTab === tab ? "#0ea5e9" : "#94a3b8",
+                          fontWeight: previewTab === tab ? 700 : 500,
+                          fontSize: 13,
+                          cursor: "pointer",
+                          transition: "all 0.15s",
+                          fontFamily: "inherit",
+                          letterSpacing: "0.3px",
+                        }}
+                      >
+                        {tab === "front" ? "Mặt trước" : tab === "back" ? "Mặt sau" : "Trên người mẫu"}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {/* Khu vực hiển thị ảnh áo */}
@@ -450,112 +463,59 @@ export default function ProductDetailClient({ product }: Props) {
                     padding: "48px 56px",
                     position: "relative",
                     transition: "background 0.3s ease",
-                    cursor: hasMockup ? "crosshair" : "default",
                   }}
-                  onMouseMove={hasMockup ? handleImageMouseMove : undefined}
-                  onMouseEnter={() => hasMockup && setIsZooming(true)}
-                  onMouseLeave={() => setIsZooming(false)}
                 >
-                  {/* Nhãn tình trạng tồn kho */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: 16,
-                      right: 16,
-                      background: totalStockForColor <= 10 ? "#fff7ed" : "#f0fdf4",
-                      color: totalStockForColor <= 10 ? "#ea580c" : "#16a34a",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      borderRadius: 20,
-                      padding: "3px 10px",
-                      border: `1px solid ${totalStockForColor <= 10 ? "#fed7aa" : "#bbf7d0"}`,
-                    }}
-                  >
-                    {totalStockForColor <= 0
-                      ? "Hết hàng"
-                      : totalStockForColor <= 10
-                        ? `Còn ${totalStockForColor}`
-                        : "Còn hàng"}
-                  </div>
-
-                  {/* Nhãn tên màu đang chọn */}
-                  {selectedColor && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 16,
-                        left: 16,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        background: "rgba(255,255,255,0.9)",
-                        borderRadius: 20,
-                        padding: "3px 10px 3px 6px",
-                        border: "1px solid #e2e8f0",
-                        backdropFilter: "blur(8px)",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: "50%",
-                          background: colorHex,
-                          border: "1px solid rgba(0,0,0,0.12)",
-                          display: "inline-block",
-                          flexShrink: 0,
-                        }}
-                      />
-                      <span style={{ fontSize: 11, fontWeight: 600, color: "#475569" }}>
-                        {getColorLabel(selectedColor)}
-                      </span>
-                    </div>
-                  )}
-
                   {/* Ảnh mockup thật (nếu có), fallback về hình SVG minh hoạ */}
                   <div
                     style={{
                       width: "100%",
                       maxWidth: 420,
+                      position: "relative",
+                      transition: "all 0.3s ease",
+                      cursor: hasMockup ? "crosshair" : "default",
+                    }}
+                    onMouseMove={hasMockup ? handleImageMouseMove : undefined}
+                    onMouseEnter={() => hasMockup && setIsZooming(true)}
+                    onMouseLeave={() => setIsZooming(false)}
+                  >
+                    <div style={{
                       filter: hasMockup
                         ? "drop-shadow(0 12px 32px rgba(0,0,0,0.18))"
                         : isLightColor
                           ? "drop-shadow(0 4px 12px rgba(0,0,0,0.12))"
                           : "drop-shadow(0 8px 24px rgba(0,0,0,0.22))",
-                      transition: "all 0.3s ease",
-                    }}
-                  >
-                    {hasMockup ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={mockupUrl}
-                        alt={`${product.name} ${selectedColor} ${previewTab}`}
-                        style={{ width: "100%", objectFit: "contain", display: "block" }}
-                        draggable={false}
+                    }}>
+                      {hasMockup ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={mockupUrl}
+                          alt={`${product.name} ${selectedColor} ${previewTab}`}
+                          style={{ width: "100%", objectFit: "contain", display: "block" }}
+                          draggable={false}
+                        />
+                      ) : (
+                        <ShirtSVG form={product.form} fillColor={colorHex} />
+                      )}
+                    </div>
+
+                    {/* Ô kính lúp theo con trỏ, chỉ hiện khi đang zoom ảnh thật */}
+                    {isZooming && hasMockup && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: `${zoomPos.x}%`,
+                          top: `${zoomPos.y}%`,
+                          transform: "translate(-50%, -50%)",
+                          width: 140,
+                          height: 140,
+                          background: "rgba(14,165,233,0.15)",
+                          border: "2px solid #0ea5e9",
+                          borderRadius: 8,
+                          pointerEvents: "none",
+                        }}
                       />
-                    ) : (
-                      <ShirtSVG form={product.form} fillColor={colorHex} />
                     )}
                   </div>
-
-                  {/* Ô kính lúp theo con trỏ, chỉ hiện khi đang zoom ảnh thật */}
-                  {isZooming && hasMockup && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: `${zoomPos.x}%`,
-                        top: `${zoomPos.y}%`,
-                        transform: "translate(-50%, -50%)",
-                        width: 140,
-                        height: 140,
-                        background: "rgba(14,165,233,0.15)",
-                        border: "2px solid #0ea5e9",
-                        borderRadius: 8,
-                        pointerEvents: "none",
-                      }}
-                    />
-                  )}
-
                 </div>
               </div>
 
@@ -603,7 +563,7 @@ export default function ProductDetailClient({ product }: Props) {
                   >
                     {FORM_LABEL[product.form] ?? product.form}
                   </Tag>
-                  {product.category && (
+                  {product.category && product.category.toLowerCase() !== (FORM_LABEL[product.form] ?? product.form).toLowerCase() && (
                     <Tag
                       style={{
                         background: "#f1f5f9",
@@ -655,28 +615,6 @@ export default function ProductDetailClient({ product }: Props) {
                   }}
                 >
                   <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Màu sắc</span>
-                  <span
-                    style={{
-                      fontSize: 13,
-                      color: "#0ea5e9",
-                      fontWeight: 600,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 5,
-                    }}
-                  >
-                    <span
-                      style={{
-                        display: "inline-block",
-                        width: 12,
-                        height: 12,
-                        borderRadius: "50%",
-                        background: colorHex,
-                        border: "1px solid rgba(0,0,0,0.1)",
-                      }}
-                    />
-                    {getColorLabel(selectedColor)}
-                  </span>
                 </div>
 
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -728,7 +666,10 @@ export default function ProductDetailClient({ product }: Props) {
                 >
                   <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Kích cỡ</span>
                   <button
-                    onClick={() => setActiveTab("size")}
+                    onClick={() => {
+                      setActiveTab("size");
+                      document.getElementById("tabs-section")?.scrollIntoView({ behavior: "smooth" });
+                    }}
                     style={{
                       background: "none",
                       border: "none",
@@ -994,7 +935,7 @@ export default function ProductDetailClient({ product }: Props) {
         </div>
 
         {/* ── Khu vực tab: thông tin chi tiết / bảng size ── */}
-        <div className="container-main" style={{ padding: "40px 24px 0" }}>
+        <div id="tabs-section" className="container-main" style={{ padding: "40px 24px 0" }}>
           <div
             style={{
               background: "#ffffff",

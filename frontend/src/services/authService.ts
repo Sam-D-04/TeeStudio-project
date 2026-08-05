@@ -1,5 +1,4 @@
 import apiClient from "@/lib/apiClient";
-import { getStoredRefreshToken } from "@/lib/authStorage";
 import type {
   ApiResponse,
   AuthSession,
@@ -23,9 +22,8 @@ export const authService = {
   },
 
   logout: async () => {
-    const refreshToken = getStoredRefreshToken();
-    if (!refreshToken) return;
-    await apiClient.post("/auth/logout", { refreshToken });
+    // Refresh token đi kèm tự động qua cookie HttpOnly, backend tự đọc và xoá.
+    await apiClient.post("/auth/logout");
   },
 
   logoutAll: async () => {
@@ -35,5 +33,44 @@ export const authService = {
   getProfile: async () => {
     const response = await apiClient.get<ApiResponse<AuthUser>>("/auth/me");
     return response.data.data;
+  },
+
+  updateProfile: async (data: { fullName: string; phone: string }) => {
+    const response = await apiClient.put<ApiResponse<AuthUser>>("/auth/me", data);
+    return response.data.data;
+  },
+
+  changePassword: async (data: { oldPassword: string; newPassword: string }) => {
+    const response = await apiClient.put<ApiResponse<null>>("/auth/me/password", data);
+    return response.data.message;
+  },
+
+  verifyEmail: async (token: string) => {
+    const response = await apiClient.post<ApiResponse<null>>("/auth/verify-email", {
+      token,
+    });
+    return response.data.message;
+  },
+
+  resendVerification: async () => {
+    const response = await apiClient.post<ApiResponse<null>>(
+      "/auth/resend-verification",
+    );
+    return response.data.message;
+  },
+
+  forgotPassword: async (email: string) => {
+    const response = await apiClient.post<ApiResponse<null>>("/auth/forgot-password", {
+      email,
+    });
+    return response.data.message;
+  },
+
+  resetPassword: async (token: string, newPassword: string) => {
+    const response = await apiClient.post<ApiResponse<null>>("/auth/reset-password", {
+      token,
+      newPassword,
+    });
+    return response.data.message;
   },
 };

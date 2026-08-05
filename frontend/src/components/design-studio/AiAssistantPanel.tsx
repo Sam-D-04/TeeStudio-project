@@ -2,9 +2,9 @@
 
 import React from "react";
 import { v4 as uuidv4 } from "uuid";
-import { useDesignStore, type DesignElement } from "@/store/useDesignStore";
+import { useDesignStore, selectElementsBySide, type DesignElement } from "@/store/useDesignStore";
 import { getPrintAreaBoundary } from "./ShirtMockupImage";
-import { aiDesignService, type AiTextElement } from "@/services/aiDesignService";
+import { aiDesignService, type AiDesignElement } from "@/services/aiDesignService";
 import {
   FONT_PAIRINGS,
   suggestTextPalette,
@@ -17,42 +17,28 @@ const CONTAINER_W = 500;
 const CONTAINER_H = 600;
 
 const SparkleIcon = () => (
-  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
   </svg>
 );
+
 const WandIcon = () => (
-  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
     <path strokeLinecap="round" strokeLinejoin="round" d="m15 4 1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2ZM4 20 14 10M18 14l.5 1 1 .5-1 .5-.5 1-.5-1-1-.5 1-.5.5-1Z" />
   </svg>
 );
 
-const sectionTitle: React.CSSProperties = {
-  fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em",
-  color: "#94a3b8", margin: "18px 0 8px", fontWeight: 700,
-};
-const primaryBtn: React.CSSProperties = {
-  width: "100%", padding: "10px 12px", borderRadius: 8, border: "none",
-  background: "linear-gradient(135deg,#0ea5e9,#6366f1)", color: "#fff",
-  fontWeight: 600, fontSize: 13, cursor: "pointer", marginBottom: 8,
-  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-};
-const ghostBtn: React.CSSProperties = {
-  width: "100%", padding: "9px 12px", borderRadius: 8,
-  border: "1px solid #334155", background: "#1e293b", color: "#e2e8f0",
-  fontWeight: 500, fontSize: 13, cursor: "pointer", marginBottom: 8, textAlign: "left",
-};
+const ContrastIcon = () => (
+  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18m0-18a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 0a9 9 0 0 1 0 18" />
+  </svg>
+);
 
-/**
- * Gán id + type:"text" cho các phần tử AI trả về (backend chỉ trả thuộc tính
- * text). Đồng thời gắn "side" theo mặt áo đang xem lúc gọi AI - vì nội dung
- * AI sinh ra là để đặt lên đúng mặt khách đang thiết kế.
- */
 function toDesignElements(
-  items: AiTextElement[],
+  items: AiDesignElement[],
   side: DesignElement["side"]
 ): DesignElement[] {
-  return items.map((el) => ({ ...el, id: uuidv4(), type: "text" as const, side }));
+  return items.map((el) => ({ ...el, id: uuidv4(), type: el.type || "text", side }));
 }
 
 export default function AiAssistantPanel() {
@@ -67,12 +53,8 @@ export default function AiAssistantPanel() {
   const [error, setError] = React.useState<string | null>(null);
 
   const hasItems = elements.length > 0;
-  // Chỉ lấy phần tử chữ CỦA MẶT ĐANG XEM - "Sắp xếp bố cục" chỉ nên sắp xếp
-  // lại chữ trên mặt khách đang thiết kế, không đụng tới chữ ở mặt kia.
-  const textElements = elements.filter(
-    (e) => e.type === "text" && (e.side ?? "front") === shirtView
-  );
-  const hasText = textElements.length > 0;
+  const currentElements = selectElementsBySide(elements, shirtView);
+  const hasText = currentElements.some((e) => e.type === "text");
   const palette = React.useMemo(() => suggestTextPalette(shirtColor), [shirtColor]);
 
   const printArea = React.useMemo(() => {
@@ -80,7 +62,6 @@ export default function AiAssistantPanel() {
     return { left: pa.left, top: pa.top, width: pa.width, height: pa.height };
   }, [shirtType, shirtView]);
 
-  /* Áp một mảng elements mới (gom 1 bước undo). */
   const applyElements = (next: DesignElement[]) => {
     useDesignStore.getState().pushHistory();
     useDesignStore.setState({ elements: next, selectedId: null });
@@ -101,21 +82,17 @@ export default function AiAssistantPanel() {
   };
 
   const handleArrange = async () => {
-    if (!hasText) return;
+    if (currentElements.length === 0) return;
     setError(null);
     setArranging(true);
     try {
-      const result = await aiDesignService.arrange({ shirtType, shirtView, shirtColor, printArea, elements: textElements });
-      // Ghép kết quả trở lại đúng vị trí trong mảng gốc - CHỈ áp dụng cho phần
-      // tử chữ của mặt đang xem (khớp với "textElements" đã gửi lên AI ở trên),
-      // giữ nguyên mọi phần tử khác (ảnh, và chữ ở mặt kia nếu có).
-      let i = 0;
-      const merged = elements.map((e) =>
-        e.type === "text" && (e.side ?? "front") === shirtView
-          ? { ...e, ...result[i++] }
-          : e
-      );
-      applyElements(merged);
+      const result = await aiDesignService.arrange({ shirtType, shirtView, shirtColor, printArea, elements: currentElements });
+      const updatedCurrentElements = result.map((aiEl, index) => {
+        const originalEl = currentElements[index];
+        return { ...originalEl, ...aiEl };
+      });
+      const otherSideElements = elements.filter(e => e.side !== shirtView);
+      applyElements([...otherSideElements, ...updatedCurrentElements]);
     } catch (err: any) {
       setError(err.message || "AI không sắp xếp được bố cục. Vui lòng thử lại.");
     } finally {
@@ -124,81 +101,78 @@ export default function AiAssistantPanel() {
   };
 
   return (
-    <div className="ds-sidebar-pane" style={{ padding: 12, overflowY: "auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#38bdf8", marginBottom: 4 }}>
+    <div className="ds-sidebar-pane flex flex-col gap-5" style={{ padding: 16, overflowY: "auto" }}>
+      <div className="flex items-center gap-2 text-sky-400">
         <SparkleIcon />
-        <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: "#e2e8f0" }}>Trợ lý thiết kế</h3>
-
+        <h3 className="text-base font-bold m-0 text-slate-100">Trợ lý thiết kế AI</h3>
       </div>
 
-
       {error && (
-        <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: 8, padding: "8px 10px", color: "#fca5a5", fontSize: 12, margin: "8px 0" }}>
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-xs shadow-inner">
           {error}
         </div>
       )}
 
       {/* ── Sinh thiết kế mới bằng AI ── */}
-      <div style={sectionTitle}>Sinh thiết kế mới</div>
-      <textarea
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        placeholder="Mô tả điều bạn muốn (VD: slogan về đam mê leo núi)… để trống để AI tự sáng tạo"
-        rows={3}
-        disabled={generating}
-        style={{
-          width: "100%", boxSizing: "border-box", resize: "vertical",
-          background: "#1e293b", border: "1px solid #334155", borderRadius: 8,
-          color: "#e2e8f0", fontSize: 12, padding: "8px 10px", marginBottom: 8,
-          fontFamily: "inherit",
-        }}
-      />
-      <button style={primaryBtn} onClick={handleGenerate} disabled={generating}>
-        <SparkleIcon /> {generating ? "AI đang sáng tạo…" : "Sinh thiết kế"}
-      </button>
+      <div className="flex flex-col gap-3">
+        <div className="text-xs uppercase tracking-wider text-slate-400 font-bold">Sáng tạo thiết kế mới</div>
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="Mô tả ý tưởng (VD: một phi hành gia leo núi)... để trống để AI tự phiêu"
+          rows={3}
+          disabled={generating}
+          className="w-full box-border resize-y bg-slate-800/50 border border-slate-700/50 focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/50 rounded-xl text-slate-200 text-sm p-3 font-inherit transition-all outline-none"
+        />
+        <button 
+          className="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-500 text-white font-semibold text-sm shadow-md hover:shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+          onClick={handleGenerate} 
+          disabled={generating}
+        >
+          <SparkleIcon /> {generating ? "AI đang vẽ..." : "Tạo bằng AI ngay"}
+        </button>
+      </div>
 
-      {/* ── Tự sắp xếp bố cục bằng AI ── */}
-      {hasText && (
-        <>
-          <div style={sectionTitle}>Cải thiện bố cục hiện tại</div>
-          <button style={primaryBtn} onClick={handleArrange} disabled={arranging}>
-            <WandIcon /> {arranging ? "AI đang sắp xếp…" : "Tự sắp xếp"}
-          </button>
+      <div className="h-px bg-slate-800/60 w-full my-1"></div>
 
-        </>
-      )}
+
 
       {/* ── Công cụ nhanh (không dùng AI) ── */}
       {hasText && (
-        <>
-          <div style={sectionTitle}>Công cụ nhanh</div>
-          <button style={ghostBtn} onClick={() => applyElements(fixTextContrast(elements, shirtColor))}>
-            Sửa tương phản màu chữ cho dễ đọc
-          </button>
+        <div className="flex flex-col gap-3">
+          <div className="text-xs uppercase tracking-wider text-slate-400 font-bold mt-2">Tiện ích nhanh</div>
 
-          <div style={{ fontSize: 11, color: "#64748b", margin: "4px 0 6px" }}>Phối màu gợi ý theo màu áo</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
-            {palette.map((c) => (
-              <button
-                key={c}
-                title={`Áp màu ${c} cho chữ`}
-                onClick={() => applyElements(applyTextColor(elements, c))}
-                style={{
-                  width: 30, height: 30, borderRadius: 8, cursor: "pointer",
-                  background: c, border: "2px solid #334155",
-                }}
-              />
-            ))}
+          <div className="flex flex-col gap-2 mt-2">
+            <div className="text-xs text-slate-500 font-medium">Bảng màu hợp với nền áo:</div>
+            <div className="flex flex-wrap gap-2">
+              {palette.map((c) => (
+                <button
+                  key={c}
+                  title={`Áp màu ${c} cho toàn bộ chữ`}
+                  onClick={() => applyElements(applyTextColor(elements, c))}
+                  className="w-8 h-8 rounded-full border-2 border-slate-700 hover:scale-110 hover:border-slate-400 transition-all shadow-sm"
+                  style={{ background: c }}
+                />
+              ))}
+            </div>
           </div>
 
-          <div style={{ fontSize: 11, color: "#64748b", margin: "10px 0 6px" }}>Đổi cặp font</div>
-          {FONT_PAIRINGS.map((p) => (
-            <button key={p.label} style={ghostBtn} onClick={() => applyElements(applyFontPairing(elements, p))}>
-              <span style={{ fontWeight: 700 }}>{p.label}</span>
-              <span style={{ color: "#64748b", fontSize: 11 }}> · {p.heading} + {p.body}</span>
-            </button>
-          ))}
-        </>
+          <div className="flex flex-col gap-2 mt-2">
+            <div className="text-xs text-slate-500 font-medium">Gợi ý cặp font chuyên gia:</div>
+            <div className="grid grid-cols-1 gap-2">
+              {FONT_PAIRINGS.map((p) => (
+                <button 
+                  key={p.label} 
+                  className="flex flex-col w-full py-3 px-4 rounded-xl border border-slate-700/40 bg-gradient-to-b from-slate-800/40 to-slate-800/80 hover:border-slate-500/50 hover:from-slate-700/60 hover:to-slate-800 text-left transition-all group"
+                  onClick={() => applyElements(applyFontPairing(elements, p))}
+                >
+                  <span className="text-[15px] font-medium text-slate-200 group-hover:text-white transition-colors tracking-wide" style={{ fontFamily: `"${p.heading}", sans-serif` }}>{p.label}</span>
+                  <span className="text-[11px] text-slate-500 mt-0.5" style={{ fontFamily: `"${p.body}", sans-serif` }}>{p.heading} + {p.body}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

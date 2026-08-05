@@ -602,9 +602,27 @@ function taoAltTextAnhSanPham(meta = {}) {
 }
 
 function chuanHoaMetadataAnh(meta = {}, index = 0) {
+  // --- Validate viewSide ---
   const viewSide = String(meta.viewSide || "").trim().toLowerCase();
   if (viewSide && viewSide !== "front" && viewSide !== "back") {
-    throw taoLoi("Mat anh phoi ao phai la front hoac back");
+    throw taoLoi("Mat anh phoi ao phai la front hoac back", 400);
+  }
+  // Default: nếu không truyền viewSide thì coi là mặt trước
+  const view = viewSide === "back" ? "BACK" : "FRONT";
+
+  // --- Validate colorHex (bắt buộc) ---
+  const colorHex = String(meta.colorHex || "").trim();
+  if (!colorHex) {
+    throw taoLoi(
+      `Mau sac (colorHex) la bat buoc cho anh thu ${index + 1}. Vui long truyen colorHex dang '#RRGGBB'.`,
+      400
+    );
+  }
+  if (!/^#[0-9a-fA-F]{6}$/.test(colorHex)) {
+    throw taoLoi(
+      `colorHex cua anh thu ${index + 1} khong dung dinh dang. Can dung dang '#RRGGBB' (vi du: '#1a2b3c').`,
+      400
+    );
   }
 
   const sortOrder = Number.isFinite(Number(meta.sortOrder))
@@ -615,6 +633,8 @@ function chuanHoaMetadataAnh(meta = {}, index = 0) {
     altText: taoAltTextAnhSanPham(meta),
     sortOrder,
     isPrimary: meta.isPrimary === true || meta.isPrimary === "true" || meta.isPrimary === 1,
+    colorHex,
+    view,
   };
 }
 
@@ -659,14 +679,16 @@ async function taiAnhSanPham(productId, files = [], metadataList = []) {
     const resultRows = [];
     for (const img of uploadedImages) {
       const [result] = await connection.query(
-        `INSERT INTO ProductImage (productId, variantId, imageUrl, altText, sortOrder, isPrimary)
-         VALUES (?, NULL, ?, ?, ?, ?)`,
+        `INSERT INTO ProductImage (productId, variantId, imageUrl, altText, sortOrder, isPrimary, colorHex, view)
+         VALUES (?, NULL, ?, ?, ?, ?, ?, ?)`,
         [
           productId,
           img.imageUrl,
           img.altText,
           img.sortOrder,
           img.isPrimary ? 1 : 0,
+          img.colorHex,
+          img.view,
         ]
       );
 
@@ -676,6 +698,8 @@ async function taiAnhSanPham(productId, files = [], metadataList = []) {
         altText: img.altText,
         sortOrder: img.sortOrder,
         laChinh: img.isPrimary,
+        colorHex: img.colorHex,
+        view: img.view,
       });
     }
 

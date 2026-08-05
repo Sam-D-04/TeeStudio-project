@@ -5,7 +5,6 @@ import axios, {
 import {
   clearAuthSession,
   getStoredAccessToken,
-  getStoredRefreshToken,
   saveAuthSession,
 } from "@/lib/authStorage";
 import type { ApiResponse, AuthSession } from "@/types/auth";
@@ -19,6 +18,7 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
 const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: 15000,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
@@ -36,15 +36,12 @@ const redirectToLogin = () => {
 };
 
 const refreshSession = async () => {
-  const refreshToken = getStoredRefreshToken();
-  if (!refreshToken) {
-    throw new Error("Missing refresh token");
-  }
-
+  // Refresh token đi kèm tự động qua cookie HttpOnly (withCredentials), không
+  // cần đọc/gửi thủ công từ localStorage nữa.
   const response = await axios.post<ApiResponse<AuthSession>>(
     `${BASE_URL}/auth/refresh`,
-    { refreshToken },
-    { timeout: 15000, headers: { "Content-Type": "application/json" } },
+    undefined,
+    { timeout: 15000, withCredentials: true, headers: { "Content-Type": "application/json" } },
   );
   saveAuthSession(response.data.data);
   return response.data.data;

@@ -86,11 +86,28 @@ interface Props {
 
 interface ToolbarPos { x: number; y: number; }
 
-/* Bề rộng toolbar khớp theo nội dung: ảnh có thêm 2 nút lật nên rộng hơn */
-const TOOLBAR_W_IMAGE = 224; // Nhân bản | Lật ngang · Lật dọc | Tách nền | Khoá | Xoá
-const TOOLBAR_W_DEFAULT = 114; // Nhân bản | Khoá | Xoá (không có nút lật)
+/* Bề rộng này chỉ dùng để ước lượng vị trí căn giữa (x) - kích thước hiển thị
+   thực tế do flex tự co giãn theo nội dung (xem width: "max-content" bên dưới),
+   nên không còn bị cắt/tràn icon nếu sau này thêm/bớt nút. */
+const TOOLBAR_W_IMAGE = 291; // Nhân bản | Lật ngang · Lật dọc | Tách nền | Lớp (2) | Khóa | Xóa
+const TOOLBAR_W_TEXT  = 254; // Nhân bản | Lật ngang · Lật dọc | Lớp (2) | Khóa | Xóa
+const TOOLBAR_W_DEFAULT = 185; // Nhân bản | Lớp (2) | Khóa | Xóa
 const TOOLBAR_H = 36;
 const MARGIN = 10;
+
+/* ─── Icon đưa lên trên cùng / xuống dưới cùng ─── */
+const BringFrontIcon = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4 4 4M17 8v12m0 0 4-4m-4 4-4-4" />
+    <rect x="13" y="2" width="8" height="8" rx="1.5" fill="currentColor" stroke="none" />
+  </svg>
+);
+const SendBackIcon = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4 4 4M17 8v12m0 0 4-4m-4 4-4-4" />
+    <rect x="3" y="14" width="8" height="8" rx="1.5" fill="currentColor" stroke="none" />
+  </svg>
+);
 
 /* ─── Icon lật ngang / lật dọc (chỉ dùng cho ảnh) ─── */
 const FlipHIcon = () => (
@@ -111,7 +128,7 @@ const MagicIcon = () => (
 );
 
 export default function FloatingToolbar({ shirtContainerRef, zoom }: Props) {
-  const { selectedId, elements, duplicateElement, removeElement, toggleLock, updateElement, pushHistory } =
+  const { selectedId, elements, duplicateElement, removeElement, toggleLock, updateElement, pushHistory, moveElementToTop, moveElementToBottom } =
     useDesignStore();
 
   const el = elements.find((e) => e.id === selectedId) ?? null;
@@ -122,7 +139,7 @@ export default function FloatingToolbar({ shirtContainerRef, zoom }: Props) {
   const [bgProgress, setBgProgress] = useState(0);
 
   /* Bề rộng thực tế của toolbar theo loại object đang chọn */
-  const toolbarW = el?.type === "image" ? TOOLBAR_W_IMAGE : TOOLBAR_W_DEFAULT;
+  const toolbarW = el?.type === "image" ? TOOLBAR_W_IMAGE : el?.type === "text" ? TOOLBAR_W_TEXT : TOOLBAR_W_DEFAULT;
 
   const handleRemoveBg = async () => {
     if (!el || el.type !== "image" || !el.src || bgProcessing) return;
@@ -198,7 +215,7 @@ export default function FloatingToolbar({ shirtContainerRef, zoom }: Props) {
           boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
           pointerEvents: "all",
           userSelect: "none",
-          width: toolbarW,
+          width: "max-content",
           height: TOOLBAR_H,
           boxSizing: "border-box",
           /* Hiệu ứng hiện mượt */
@@ -211,8 +228,8 @@ export default function FloatingToolbar({ shirtContainerRef, zoom }: Props) {
 
         <Divider />
 
-        {/* Flip — chỉ cho image */}
-        {el.type === "image" && (
+        {/* Flip — cho cả image lẫn text */}
+        {(el.type === "image" || el.type === "text") && (
           <>
             <ToolBtn
               title="Lật ngang"
@@ -229,6 +246,12 @@ export default function FloatingToolbar({ shirtContainerRef, zoom }: Props) {
               <FlipVIcon />
             </ToolBtn>
             <Divider />
+          </>
+        )}
+
+        {/* Tách nền — chỉ cho image */}
+        {el.type === "image" && (
+          <>
             <ToolBtn title="Tách nền ảnh (AI, chạy trên máy)" onClick={handleRemoveBg}>
               <MagicIcon />
             </ToolBtn>
@@ -236,8 +259,18 @@ export default function FloatingToolbar({ shirtContainerRef, zoom }: Props) {
           </>
         )}
 
+        {/* Lớp: đưa lên trên cùng / xuống dưới cùng */}
+        <ToolBtn title="Đưa lên trước" onClick={() => moveElementToTop(el.id)}>
+          <BringFrontIcon />
+        </ToolBtn>
+        <ToolBtn title="Đưa ra sau" onClick={() => moveElementToBottom(el.id)}>
+          <SendBackIcon />
+        </ToolBtn>
+
+        <Divider />
+
         <ToolBtn
-          title={el.locked ? "Mở khoá" : "Khoá vật thể"}
+          title={el.locked ? "Mở khóa" : "Khóa vật thể"}
           onClick={() => toggleLock(el.id)}
           active={el.locked}
         >

@@ -6,80 +6,20 @@ import { useCartStore } from "@/store/useCartStore";
 import { getProductById, type PublicProduct, type PublicVariant } from "@/services/productService";
 import { userDesignService } from "@/services/userDesignService";
 
-/* ── Các hàm hỗ trợ xử lý màu sắc (Việt hoá tên màu, quy đổi sang mã hex) ── */
-const VI_TO_EN: Record<string, string> = {
-  "Trắng": "White", "trắng": "White",
-  "Đen": "Black", "đen": "Black",
-  "Xám": "Gray", "xám": "Gray",
-  "Xanh navy": "Navy", "xanh navy": "Navy",
-  "Xanh dương": "Light Blue",
-  "Xanh lá": "Green",
-  "Vàng": "Yellow",
-  "Hồng": "Pink",
-  "Cam": "Orange",
-  "Tím": "Purple",
-  "Be": "Beige",
-  "Nâu": "Brown",
-  "Xám đậm": "Dark Gray",
-  "Xanh nhạt": "Light Blue",
-};
-
-/* Studio biểu diễn màu bằng mã hex → quy về tên màu để so khớp với variant */
-const HEX_TO_EN: Record<string, string> = {
-  "#ffffff": "White", "#fff": "White",
-  "#000000": "Black", "#000": "Black",
-  "#1d4ed8": "Navy", "#1e3a8a": "Navy", "#1e40af": "Navy",
-  "#9ca3af": "Gray", "#94a3b8": "Gray",
-  "#374151": "Dark Gray",
-  "#8b4513": "Brown",
-  "#f5f5dc": "Beige", "#d6b89a": "Beige",
-  "#c5b28a": "Khaki",
-  "#eab308": "Yellow",
-  "#f472b6": "Pink",
-  "#7dd3fc": "Light Blue",
-  "#dc2626": "Red",
-  "#16a34a": "Green",
-  "#9333ea": "Purple",
-};
-
-function normalizeColor(c: string): string {
-  const trimmed = c.trim();
-  // Nếu là mã hex (vd "#ffffff") thì quy về tên màu tương ứng trước
-  const mapped = trimmed.startsWith("#")
-    ? (HEX_TO_EN[trimmed.toLowerCase()] ?? trimmed)
-    : (VI_TO_EN[trimmed] ?? trimmed);
-  return mapped.toLowerCase().trim();
-}
-
+/* Khớp variant với màu đang chọn trên canvas. `shirtColor` thường là mã hex
+   (đọc từ store), nhưng luồng vào từ URL (?color=...) đôi khi truyền thẳng
+   tên màu — nên so khớp cả 2 khả năng bằng dữ liệu variant thật từ DB, không
+   dùng bảng dịch tên màu hardcode nữa. */
 function variantMatchesColor(variant: PublicVariant, shirtColor: string): boolean {
-  return normalizeColor(variant.color) === normalizeColor(shirtColor);
+  const target = shirtColor.trim().toLowerCase();
+  return (
+    variant.colorHex.toLowerCase() === target ||
+    variant.color.trim().toLowerCase() === target
+  );
 }
 
 const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 
-const COLOR_HEX: Record<string, string> = {
-  white: "#ffffff", black: "#1e293b", navy: "#1e3a8a", red: "#dc2626",
-  "light blue": "#7dd3fc", gray: "#94a3b8", grey: "#9ca3af",
-  "dark gray": "#374151", green: "#16a34a", yellow: "#eab308",
-  pink: "#f472b6", orange: "#f97316", purple: "#9333ea",
-  beige: "#d6b89a", brown: "#92400e", khaki: "#c5b28a",
-};
-
-function getColorHex(color: string): string {
-  return COLOR_HEX[normalizeColor(color)] ?? "#94a3b8";
-}
-
-const EN_TO_VI: Record<string, string> = {
-  white: "Trắng", black: "Đen", gray: "Xám", grey: "Xám", "dark gray": "Xám đậm",
-  navy: "Xanh navy", "light blue": "Xanh dương", green: "Xanh lá",
-  yellow: "Vàng", pink: "Hồng", orange: "Cam", purple: "Tím",
-  beige: "Be", brown: "Nâu", khaki: "Kaki", red: "Đỏ",
-};
-
-/* Tên màu thân thiện (tiếng Việt) từ hex hoặc tên tiếng Anh */
-function getColorLabel(color: string): string {
-  return EN_TO_VI[normalizeColor(color)] ?? color;
-}
 
 /* ── Props của component ── */
 interface Props {
@@ -94,9 +34,10 @@ interface Props {
   printImageBack?: string;
   /** Ảnh đại diện thiết kế (base64 hoặc URL) — chỉ để hiển thị thumbnail trong giỏ hàng */
   designPreviewUrl?: string;
+  designFee?: number;
 }
 
-export default function AddToCartModal({ open, onClose, productId, shirtColor, designId, printImageFront, printImageBack, designPreviewUrl }: Props) {
+export default function AddToCartModal({ open, onClose, productId, shirtColor, designId, printImageFront, printImageBack, designPreviewUrl, designFee }: Props) {
   const addItem   = useCartStore((s) => s.addItem);
   const cartItems = useCartStore((s) => s.items);
 
@@ -149,6 +90,12 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
     availableSizes.length > 0
       ? availableSizes
       : dedupeBySize(product?.variants.filter((v) => v.stockQty > 0) ?? []);
+
+  /* Variant đại diện cho màu đang chọn — dùng để lấy hex/tên màu thật từ DB
+     thay vì đoán qua bảng dịch hardcode. */
+  const matchedVariant = product?.variants.find((v) => variantMatchesColor(v, shirtColor));
+  const colorHex = matchedVariant?.colorHex ?? (shirtColor.startsWith("#") ? shirtColor : "#94a3b8");
+  const colorLabel = matchedVariant?.color ?? shirtColor;
 
   /* Số lượng variant này đã có sẵn trong giỏ (cartItemId = variant_<id>) */
   const getInCartQty = (variantId: number) =>
@@ -206,8 +153,9 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
         image: designPreviewUrl || primaryImage,
         size: v.size,
         color: colorHex,
-        colorLabel: getColorLabel(shirtColor),
+        colorLabel,
         price: product.basePrice,
+        designFee: designFee ?? 0,
         quantity: qty,
         designId,
         printImageFront,
@@ -220,8 +168,7 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
     onClose();
   };
 
-  const colorHex    = getColorHex(shirtColor);
-  const isLightColor = ["#ffffff", "#d6b89a", "#c5b28a", "#eab308", "#f472b6", "#7dd3fc"].includes(colorHex);
+  const isLightColor = ["#ffffff", "#d6b89a", "#c5b28a", "#eab308", "#f472b6", "#7dd3fc"].includes(colorHex.toLowerCase());
   const fmt = (n: number) => n.toLocaleString("vi-VN") + "đ";
 
   return (
@@ -271,7 +218,7 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
                   border: isLightColor ? "1.5px solid #e2e8f0" : "1.5px solid rgba(255,255,255,0.3)",
                   flexShrink: 0,
                 }} />
-                <span style={{ fontSize: 13, color: "#64748b" }}>{getColorLabel(shirtColor)}</span>
+                <span style={{ fontSize: 13, color: "#64748b" }}>{colorLabel}</span>
                 {designId && (
                   <span style={{
                     fontSize: 11, fontWeight: 600, padding: "1px 8px",
@@ -378,11 +325,12 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
               <div>
                 <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>Tổng cộng ({totalQty} sản phẩm)</p>
                 <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0ea5e9" }}>
-                  {fmt(product.basePrice * totalQty)}
+                  {fmt((product.basePrice + (designFee || 0)) * totalQty)}
                 </p>
               </div>
-              <div style={{ fontSize: 12, color: "#94a3b8", textAlign: "right" }}>
-                {fmt(product.basePrice)} × {totalQty}
+              <div style={{ fontSize: 12, color: "#94a3b8", textAlign: "right", display: "flex", flexDirection: "column", gap: 2 }}>
+                <span>{fmt(product.basePrice)} × {totalQty} (áo)</span>
+                {designFee ? <span>+ {fmt(designFee)} × {totalQty} (in)</span> : null}
               </div>
             </div>
 

@@ -1,0 +1,154 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - banner [ref=f1e3]:
+      - generic [ref=f1e4]:
+        - link "TeeStudio" [ref=f1e5] [cursor=pointer]:
+          - /url: /
+        - navigation [ref=f1e10]:
+          - link "Khám phá" [ref=f1e11] [cursor=pointer]:
+            - /url: /explore
+          - link "Thiết kế áo" [ref=f1e12] [cursor=pointer]:
+            - /url: /design-studio
+          - link "Bộ sưu tập" [ref=f1e13] [cursor=pointer]:
+            - /url: /collections
+        - generic [ref=f1e15]:
+          - generic [ref=f1e16]:
+            - searchbox "Tìm kiếm loại áo, chất liệu..."
+          - button [ref=f1e23] [cursor=pointer]:
+            - img "search" [ref=f1e25]
+        - generic [ref=f1e28]:
+          - generic [ref=f1e54]:
+            - generic [ref=f1e55] [cursor=pointer]: Chưa xác minh email — gửi lại
+            - link [ref=f1e56] [cursor=pointer]:
+              - /url: /tai-khoan
+              - button "Browser Test" [ref=f1e57]
+            - button "Đăng xuất" [ref=f1e59] [cursor=pointer]
+          - button [ref=f1e30] [cursor=pointer]
+          - button [ref=f1e34] [cursor=pointer]
+    - main [ref=f1e37]:
+      - generic [ref=f1e61]:
+        - heading "Tài khoản của tôi" [level=1] [ref=f1e63]
+        - generic [ref=f1e64]:
+          - navigation [ref=f1e65]:
+            - link [ref=f1e66] [cursor=pointer]:
+              - /url: /tai-khoan/ho-so
+              - img "user" [ref=f1e67]
+              - text: Hồ sơ của tôi
+            - link [ref=f1e70] [cursor=pointer]:
+              - /url: /tai-khoan/dia-chi
+              - img "environment" [ref=f1e71]
+              - text: Sổ địa chỉ
+            - link [ref=f1e74] [cursor=pointer]:
+              - /url: /tai-khoan/don-hang
+              - img "shopping-cart" [ref=f1e75]
+              - text: Đơn hàng của tôi
+            - button [ref=f1e78] [cursor=pointer]:
+              - img "logout" [ref=f1e79]
+              - text: Đăng xuất
+          - generic [ref=f1e83]:
+            - generic [ref=f1e84]:
+              - heading "Thông tin cá nhân" [level=2] [ref=f1e85]
+              - paragraph [ref=f1e86]: Cập nhật thông tin hồ sơ và bảo mật tài khoản của bạn.
+            - generic [ref=f1e87]:
+              - generic [ref=f1e88]: B
+              - generic [ref=f1e89]:
+                - paragraph [ref=f1e90]: Browser Test
+                - paragraph [ref=f1e91]: browser.test.taikhoan@teestudio.dev
+            - generic [ref=f1e92]:
+              - generic [ref=f1e93]:
+                - generic [ref=f1e95]:
+                  - generic [ref=f1e96]: Họ và tên
+                  - textbox "Họ và tên" [ref=f1e102]: Browser Test
+                - generic [ref=f1e104]:
+                  - generic [ref=f1e105]: Số điện thoại
+                  - textbox "Số điện thoại" [ref=f1e111]: "0977123456"
+              - generic [ref=f1e113]:
+                - generic [ref=f1e114]: Email
+                - textbox [disabled] [ref=f1e120]: browser.test.taikhoan@teestudio.dev
+              - button "Lưu thay đổi" [active] [ref=f1e122] [cursor=pointer]
+            - button [ref=f1e125] [cursor=pointer]:
+              - img "lock" [ref=f1e126]
+              - text: Đổi mật khẩu
+              - img "down" [ref=f1e129]
+    - contentinfo [ref=f1e132]:
+      - generic [ref=f1e133]:
+        - generic [ref=f1e134]:
+          - generic [ref=f1e135]:
+            - link "TeeStudio" [ref=f1e136] [cursor=pointer]:
+              - /url: "#"
+            - paragraph [ref=f1e141]: Nền tảng thiết kế áo cá nhân hoá & đặt đồng phục số lượng lớn chất lượng cao.
+            - generic [ref=f1e142]:
+              - link "Facebook" [ref=f1e143] [cursor=pointer]:
+                - /url: "#"
+              - link "Instagram" [ref=f1e146] [cursor=pointer]:
+                - /url: "#"
+              - link "YouTube" [ref=f1e151] [cursor=pointer]:
+                - /url: "#"
+          - generic [ref=f1e155]:
+            - heading "Sản phẩm" [level=4] [ref=f1e156]
+            - list [ref=f1e157]:
+              - listitem [ref=f1e158]:
+                - link "Áo Thun In Theo Yêu Cầu" [ref=f1e159] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f1e160]:
+                - link "Áo Polo Doanh Nghiệp" [ref=f1e161] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f1e162]:
+                - link "Áo Hoodie" [ref=f1e163] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f1e164]:
+                - link "Đặt Sỉ Đồng Phục" [ref=f1e165] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f1e166]:
+                - link "Công cụ Thiết Kế" [ref=f1e167] [cursor=pointer]:
+                  - /url: "#"
+          - generic [ref=f1e168]:
+            - heading "Chính sách" [level=4] [ref=f1e169]
+            - list [ref=f1e170]:
+              - listitem [ref=f1e171]:
+                - link "Chính sách đổi trả" [ref=f1e172] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f1e173]:
+                - link "Chính sách bảo mật" [ref=f1e174] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f1e175]:
+                - link "Điều khoản dịch vụ" [ref=f1e176] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f1e177]:
+                - link "Hướng dẫn đặt hàng" [ref=f1e178] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=f1e179]:
+                - link "FAQ" [ref=f1e180] [cursor=pointer]:
+                  - /url: "#"
+          - generic [ref=f1e181]:
+            - heading "Liên hệ" [level=4] [ref=f1e182]
+            - generic [ref=f1e183]:
+              - generic [ref=f1e184]:
+                - generic [ref=f1e185]: 📞
+                - generic [ref=f1e186]: 0901 234 567
+              - generic [ref=f1e187]:
+                - generic [ref=f1e188]: ✉️
+                - generic [ref=f1e189]: hello@teestudio.vn
+              - generic [ref=f1e190]:
+                - generic [ref=f1e191]: 📍
+                - generic [ref=f1e192]: 123 Nguyễn Văn Cừ, Q.5, TP.HCM
+        - separator [ref=f1e193]
+        - generic [ref=f1e194]:
+          - paragraph [ref=f1e195]: © 2025 TeeStudio. All rights reserved.
+          - paragraph [ref=f1e196]: Made with ❤️ in Việt Nam
+  - generic [ref=f1e49] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=f1e50]
+    - generic [ref=f1e197]:
+      - button "Open issues overlay" [ref=f1e198]:
+        - generic [ref=f1e207]:
+          - generic [ref=f1e208]: "1"
+          - generic [ref=f1e209]: "2"
+        - generic [ref=f1e202]:
+          - text: Issue
+          - generic [ref=f1e210]: s
+      - button "Collapse issues badge" [ref=f1e203]
+  - alert [ref=f1e206]
+  - alert [ref=f1e211]:
+    - generic [ref=f1e212]:
+      - img "check-circle" [ref=f1e214]
+      - generic [ref=f1e217]: Cập nhật thông tin thành công

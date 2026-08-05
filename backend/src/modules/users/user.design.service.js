@@ -1,5 +1,8 @@
 const db = require("../../database/mysql");
 const { calculateBoundingBoxAreaFee } = require("../pricing/admin.pricing.service");
+const { chuanHoaCanvasData } = require("../../common/utils/canvas.util");
+const { sendDesignSubmittedToAdminEmail } = require("../../common/services/emailService");
+const { dongBoViTriInTheoCanvas } = require("../designs/admin.design.service");
 
 /**
  * Maps frontend shirtType to a database product ID.
@@ -53,21 +56,46 @@ async function getMyDesigns(userId) {
  * Create a new DRAFT custom design.
  */
 async function saveNewDesign(userId, payload) {
-  const { name, shirtType, shirtColor, canvasData, previewUrl } = payload;
+  const { name, shirtType, shirtColor, previewUrl } = payload;
   
+  // Chuẩn hoá và validate dữ liệu từ client
+  const canvasData = chuanHoaCanvasData(payload.canvasData, shirtType);
+
   const productId = await mapShirtTypeToProductId(shirtType);
-  const dataStr = typeof canvasData === 'object' ? JSON.stringify(canvasData) : canvasData;
+  const dataStr = JSON.stringify(canvasData);
+
+  let printExtraCost = 0;
+  if (canvasData.printingMethodCode) {
+    const [pmRows] = await db.pool.query("SELECT extraCost FROM PrintMethod WHERE code = ? AND isActive = 1", [canvasData.printingMethodCode]);
+    if (pmRows.length > 0) printExtraCost = pmRows[0].extraCost || 0;
+  }
 
   // Tự động tính designFee từ canvasData – Backend không tin tưởng giá trị FE gửi lên
-  const designFee = calculateBoundingBoxAreaFee(canvasData);
+  const designFee = calculateBoundingBoxAreaFee(canvasData, printExtraCost);
 
-  const [result] = await db.pool.query(
-    `INSERT INTO CustomDesign (userId, name, productId, baseColor, canvasData, previewUrl, status, designFee) 
-     VALUES (?, ?, ?, ?, ?, ?, 'DRAFT', ?)`,
-    [userId, name || 'Thiết kế chưa đặt tên', productId, shirtColor, dataStr, previewUrl, designFee]
-  );
+  const conn = await db.pool.getConnection();
+  let insertId;
+  try {
+    await conn.beginTransaction();
 
-  return { id: result.insertId, designFee };
+    const [result] = await conn.query(
+      `INSERT INTO CustomDesign (userId, name, productId, baseColor, canvasData, previewUrl, status, designFee) 
+       VALUES (?, ?, ?, ?, ?, ?, 'DRAFT', ?)`,
+      [userId, name || 'Thiết kế chưa đặt tên', productId, shirtColor, dataStr, previewUrl, designFee]
+    );
+    insertId = result.insertId;
+
+    await dongBoViTriInTheoCanvas(conn, insertId, canvasData);
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+
+  return { id: insertId, designFee };
 }
 
 /**
@@ -76,7 +104,10 @@ async function saveNewDesign(userId, payload) {
  * đang xét duyệt hoặc thiết kế đã lên production.
  */
 async function updateDesign(userId, designId, payload) {
-  const { name, shirtType, shirtColor, canvasData, previewUrl } = payload;
+  const { name, shirtType, shirtColor, previewUrl } = payload;
+
+  // Chuẩn hoá và validate dữ liệu từ client
+  const canvasData = chuanHoaCanvasData(payload.canvasData, shirtType);
 
   // Verify ownership and status
   const [check] = await db.pool.query(
@@ -91,17 +122,37 @@ async function updateDesign(userId, designId, payload) {
   }
 
   const productId = await mapShirtTypeToProductId(shirtType);
-  const dataStr = typeof canvasData === 'object' ? JSON.stringify(canvasData) : canvasData;
+  const dataStr = JSON.stringify(canvasData);
+
+  let printExtraCost = 0;
+  if (canvasData.printingMethodCode) {
+    const [pmRows] = await db.pool.query("SELECT extraCost FROM PrintMethod WHERE code = ? AND isActive = 1", [canvasData.printingMethodCode]);
+    if (pmRows.length > 0) printExtraCost = pmRows[0].extraCost || 0;
+  }
 
   // Tự động tính lại designFee mỗi lần user lưu (dữ liệu thay đổi thì phí cũng thay đổi)
-  const designFee = calculateBoundingBoxAreaFee(canvasData);
+  const designFee = calculateBoundingBoxAreaFee(canvasData, printExtraCost);
 
-  await db.pool.query(
-    `UPDATE CustomDesign 
-     SET name = COALESCE(?, name), productId = ?, baseColor = ?, canvasData = ?, previewUrl = ?, designFee = ?
-     WHERE id = ?`,
-    [name || null, productId, shirtColor, dataStr, previewUrl, designFee, designId]
-  );
+  const conn = await db.pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    await conn.query(
+      `UPDATE CustomDesign 
+       SET name = COALESCE(?, name), productId = ?, baseColor = ?, canvasData = ?, previewUrl = ?, designFee = ?
+       WHERE id = ?`,
+      [name || null, productId, shirtColor, dataStr, previewUrl, designFee, designId]
+    );
+
+    await dongBoViTriInTheoCanvas(conn, designId, canvasData);
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 
   return { id: designId, designFee };
 }
@@ -158,18 +209,48 @@ async function deleteDesign(userId, designId) {
 
 /**
  * Gửi thiết kế cho admin duyệt: DRAFT hoặc NEEDS_REVISION → PENDING_REVIEW.
+ * Sau khi cập nhật DB thành công → gửi email thông báo cho Admin (fire-and-forget).
  * Không xoá adminNote cũ — giữ làm ngữ cảnh cho tới khi admin duyệt hoặc ghi chú mới đè lên.
  */
 async function submitForReview(userId, designId) {
+  // Lấy thông tin thiết kế + khách hàng trước khi update
+  const [rows] = await db.pool.query(
+    `SELECT cd.id, a.fullName, a.email
+     FROM CustomDesign cd
+     LEFT JOIN Account a ON a.id = cd.userId
+     WHERE cd.id = ? AND cd.userId = ? AND cd.status IN ('DRAFT', 'NEEDS_REVISION')`,
+    [designId, userId]
+  );
+  if (rows.length === 0) {
+    const error = new Error("Không tìm thấy thiết kế hoặc thiết kế không ở trạng thái có thể gửi duyệt");
+    error.status = 404;
+    throw error;
+  }
+
   const [result] = await db.pool.query(
     "UPDATE CustomDesign SET status = 'PENDING_REVIEW' WHERE id = ? AND userId = ? AND status IN ('DRAFT', 'NEEDS_REVISION')",
     [designId, userId]
   );
   if (result.affectedRows === 0) {
-    const error = new Error("Không tìm thấy thiết kế hoặc thiết kế không ở trạng thái có thể gửi duyệt");
-    error.status = 404;
+    const error = new Error("Không thể cập nhật trạng thái thiết kế");
+    error.status = 409;
     throw error;
   }
+
+  // Gửi email thông báo cho Admin (fire-and-forget, lỗi mail không block response khách)
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
+  if (adminEmail) {
+    const maThietKe = `TK-${String(designId).padStart(4, "0")}`;
+    sendDesignSubmittedToAdminEmail({
+      adminEmail,
+      customerName: rows[0].fullName || "Khách hàng",
+      maThietKe,
+      designId,
+    }).catch((err) =>
+      console.error("Lỗi gửi email thông báo admin (thiết kế nộp lại):", err?.message)
+    );
+  }
+
   return { id: designId, status: "PENDING_REVIEW" };
 }
 

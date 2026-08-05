@@ -86,13 +86,11 @@ export default function MyDesignsModal({ open, onCancel, onSelectDesign }: MyDes
             const canDelete = design.status === "DRAFT";
 
             const actions = [];
-            if (canEdit) {
-              actions.push(
-                <Button key="edit" type="text" icon={<EditOutlined />} onClick={() => onSelectDesign(design)}>
-                  Sửa
-                </Button>
-              );
-            }
+            actions.push(
+              <Button key="select" type="text" icon={<EditOutlined />} onClick={() => onSelectDesign(design)}>
+                {canEdit ? "Sửa" : "Xem"}
+              </Button>
+            );
             if (canDelete) {
               actions.push(
                 <Popconfirm

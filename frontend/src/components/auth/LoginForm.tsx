@@ -84,9 +84,14 @@ export default function LoginForm() {
       </div>
 
       <div>
-        <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">
-          Mật khẩu
-        </label>
+        <div className="flex items-center justify-between">
+          <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">
+            Mật khẩu
+          </label>
+          <Link href="/quen-mat-khau" className="text-sm font-medium text-sky-600 hover:text-sky-700">
+            Quên mật khẩu?
+          </Link>
+        </div>
         <input
           id="login-password"
           type="password"

@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { v4 as uuidv4 } from "uuid";
+import type { PrintMethodDef } from "@/utils/designFeeCalculator";
 
 /* ────────────────────────────────────────────────────────────
  * Kiểu dữ liệu cho một phần tử trên canvas thiết kế (ảnh hoặc chữ)
@@ -48,6 +49,13 @@ export interface DesignElement {
 export type ShirtType = "tshirt" | "polo" | "hoodie";
 export type ShirtView = "front" | "back";
 
+/** Ảnh mockup của phôi áo đang thiết kế, tải từ DB theo màu/mặt (xem ShirtMockupImage.tsx). */
+export interface MockupImage {
+  colorHex: string;
+  view: ShirtView;
+  url: string;
+}
+
 export interface DesignState {
   /* Nội dung canvas */
   elements: DesignElement[];
@@ -57,12 +65,21 @@ export interface DesignState {
   shirtType: ShirtType;
   shirtColor: string;
   shirtView: ShirtView;
+  availableColors: string[];
+  /** Ảnh mockup của sản phẩm đang chọn (tải từ DB theo productId), dùng để hiển thị áo trên canvas. */
+  mockupImages: MockupImage[];
 
   /* Trạng thái liên quan tới thiết kế đã lưu trong DB */
   currentDesignId: number | null;
   designName: string;
   /** Status (DRAFT/PENDING_REVIEW/NEEDS_REVISION/APPROVED) của thiết kế đang tải, nếu có. */
   currentDesignStatus: string | null;
+  /** Ghi chú yêu cầu chỉnh sửa từ admin (nếu status = NEEDS_REVISION). */
+  adminNote: string | null;
+
+  /* Phương pháp in */
+  printMethods: PrintMethodDef[];
+  printingMethodCode: string;
 
   /* Ngăn xếp Undo / Redo — mỗi phần tử là một bản snapshot của elements[] */
   undoStack: DesignElement[][];
@@ -77,17 +94,26 @@ export interface DesignState {
   duplicateElement: (id: string) => void;
   moveElementUp: (id: string) => void;
   moveElementDown: (id: string) => void;
+  moveElementToTop: (id: string) => void;
+  moveElementToBottom: (id: string) => void;
   toggleLock: (id: string) => void;
+  flipElement: (id: string, axis: "H" | "V") => void;
 
   /* Hành động thay đổi cấu hình áo */
   setShirtType: (t: ShirtType) => void;
   setShirtColor: (c: string) => void;
   setShirtView: (v: ShirtView) => void;
+  setAvailableColors: (colors: string[]) => void;
+  setMockupImages: (images: MockupImage[]) => void;
 
-  /* Hành động cập nhật trạng thái lưu trữ (id/tên thiết kế) */
+  setPrintMethods: (methods: PrintMethodDef[]) => void;
+  setPrintingMethodCode: (code: string) => void;
+
+  /* Quản lý thiết kế đã lưu / reset */
   setCurrentDesignId: (id: number | null) => void;
   setDesignName: (name: string) => void;
   setCurrentDesignStatus: (status: string | null) => void;
+  setAdminNote: (note: string | null) => void;
 
   /* Hành động Undo / Redo */
   undo: () => void;
@@ -104,10 +130,15 @@ export const useDesignStore = create<DesignState>((set, get) => ({
   currentDesignId: null,
   designName: "Thiết kế chưa đặt tên",
   currentDesignStatus: null,
+  adminNote: null,
+  printMethods: [],
+  printingMethodCode: "",
 
   shirtType: "tshirt",
   shirtColor: "#ffffff",
   shirtView: "front",
+  availableColors: [],
+  mockupImages: [],
 
   undoStack: [],
   redoStack: [],
@@ -224,6 +255,42 @@ export const useDesignStore = create<DesignState>((set, get) => ({
     set({ elements: arr });
   },
 
+  // Đưa phần tử lên lớp trên cùng của mặt đang xem
+  moveElementToTop: (id) => {
+    const state = get();
+    const idx = state.elements.findIndex((e) => e.id === id);
+    if (idx < 0) return;
+    const side = state.elements[idx].side ?? "front";
+    const el = state.elements[idx];
+    state.pushHistory();
+    const arr = state.elements.filter((e) => e.id !== id);
+    // Tìm index cao nhất của cùng mặt trong arr
+    let insertAt = arr.length;
+    for (let i = arr.length - 1; i >= 0; i--) {
+      if ((arr[i].side ?? "front") === side) { insertAt = i + 1; break; }
+    }
+    arr.splice(insertAt, 0, el);
+    set({ elements: arr });
+  },
+
+  // Đưa phần tử xuống lớp dưới cùng của mặt đang xem
+  moveElementToBottom: (id) => {
+    const state = get();
+    const idx = state.elements.findIndex((e) => e.id === id);
+    if (idx < 0) return;
+    const side = state.elements[idx].side ?? "front";
+    const el = state.elements[idx];
+    state.pushHistory();
+    const arr = state.elements.filter((e) => e.id !== id);
+    // Tìm index thấp nhất của cùng mặt trong arr
+    let insertAt = 0;
+    for (let i = 0; i < arr.length; i++) {
+      if ((arr[i].side ?? "front") === side) { insertAt = i; break; }
+    }
+    arr.splice(insertAt, 0, el);
+    set({ elements: arr });
+  },
+
   toggleLock: (id) => {
     set((s) => ({
       elements: s.elements.map((el) =>
@@ -232,10 +299,25 @@ export const useDesignStore = create<DesignState>((set, get) => ({
     }));
   },
 
+  // Lật ngang hoặc dọc phần tử (áp dụng cả cho image và text)
+  flipElement: (id, axis) => {
+    const state = get();
+    const el = state.elements.find((e) => e.id === id);
+    if (!el || el.locked) return;
+    state.pushHistory();
+    if (axis === "H") {
+      state.updateElement(id, { flipH: !(el.flipH ?? false) });
+    } else {
+      state.updateElement(id, { flipV: !(el.flipV ?? false) });
+    }
+  },
+
   /* ───────────── Cấu hình áo (loại áo / màu áo / mặt trước-sau) ───────────── */
 
   setShirtType: (t) => set({ shirtType: t }),
   setShirtColor: (c) => set({ shirtColor: c }),
+  setAvailableColors: (colors) => set({ availableColors: colors }),
+  setMockupImages: (images) => set({ mockupImages: images }),
 
   // Đổi mặt áo (trước/sau) cũng cần lưu lịch sử vì layout các phần tử
   // in trên mỗi mặt là độc lập với nhau.
@@ -250,8 +332,9 @@ export const useDesignStore = create<DesignState>((set, get) => ({
   setCurrentDesignId: (id) => set({ currentDesignId: id }),
   setDesignName: (name) => set({ designName: name }),
   setCurrentDesignStatus: (status) => set({ currentDesignStatus: status }),
+  setAdminNote: (note) => set({ adminNote: note }),
 
-  /* ───────────── Undo / Redo ───────────── */
+  /* ──────────────────────────────────────────────────────────── */
 
   undo: () => {
     const { undoStack, elements } = get();
@@ -288,6 +371,19 @@ export const useDesignStore = create<DesignState>((set, get) => ({
       currentDesignId: null,
       designName: "Thiết kế chưa đặt tên",
       currentDesignStatus: null,
+      adminNote: null,
+      printingMethodCode: get().printMethods.length > 0 ? get().printMethods[0].code : "",
     });
   },
+
+  setPrintMethods: (methods) => set({ printMethods: methods }),
+  setPrintingMethodCode: (code) => set({ printingMethodCode: code }),
 }));
+
+/**
+ * Selector lọc phần tử theo mặt áo.
+ * Mặc định phần tử cũ (không có side) được coi là mặt trước ("front").
+ */
+export const selectElementsBySide = (elements: DesignElement[], side: ShirtView) => {
+  return elements.filter((el) => (el.side ?? "front") === side);
+};

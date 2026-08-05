@@ -43,25 +43,32 @@ export default function AppHeader() {
   return (
     <>
       <header
+        className={pathname === "/" ? "floating-glass-header" : ""}
         style={{
-          position:   "fixed",
-          top: 0, left: 0, right: 0,
-          zIndex:     1000,
-          background: "#ffffff",
-          borderBottom: scrolled
-            ? "1px solid #e2e8f0"
-            : "1px solid transparent",
-          boxShadow: scrolled ? "0 2px 12px rgba(0,0,0,0.06)" : "none",
-          transition: "all 0.25s ease",
+          position: "fixed",
+          top: pathname === "/" ? (scrolled ? 12 : 24) : 0,
+          left: pathname === "/" ? "50%" : 0,
+          right: pathname === "/" ? "auto" : 0,
+          transform: pathname === "/" ? "translateX(-50%)" : "none",
+          width: pathname === "/" ? "calc(100% - 32px)" : "100%",
+          maxWidth: pathname === "/" ? 1200 : "100%",
+          zIndex: 1000,
+          background: pathname === "/" ? undefined : "#ffffff",
+          borderBottom: pathname !== "/" && scrolled ? "1px solid #e2e8f0" : pathname !== "/" ? "1px solid transparent" : undefined,
+          boxShadow: pathname !== "/" && scrolled ? "0 2px 12px rgba(0,0,0,0.06)" : undefined,
+          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          padding: pathname === "/" ? "0 8px" : 0,
         }}
       >
         <div
-          className="container-main"
+          className={pathname === "/" ? "" : "container-main"}
           style={{
-            display:        "flex",
-            alignItems:     "center",
-            height:         64,
-            gap:            24,
+            display: "flex",
+            alignItems: "center",
+            height: pathname === "/" ? 60 : 64,
+            padding: pathname === "/" ? "0 16px" : 0,
+            gap: 24,
+            width: "100%",
           }}
         >
           {/* ── Logo ── */}
@@ -155,29 +162,7 @@ export default function AppHeader() {
             })}
           </nav>
 
-          {/* ── Search ── */}
-          <div style={{ flex: 1, maxWidth: 380 }} className="hidden md:block">
-            <Input.Search
-              placeholder="Tìm kiếm loại áo, chất liệu..."
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
-              onSearch={handleSearch}
-              allowClear
-              onClear={() => { setSearchValue(""); router.push("/explore"); }}
-              prefix={
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <circle cx="7" cy="7" r="5.5" stroke="#94a3b8" strokeWidth="1.5" />
-                  <path d="M11 11l3 3" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              }
-              style={{
-                background:   "#f8fafc",
-                border:       "1px solid #e2e8f0",
-                borderRadius: 10,
-                fontSize:     14,
-              }}
-            />
-          </div>
+
 
           {/* ── Right Actions ── */}
           <div
@@ -217,7 +202,7 @@ export default function AppHeader() {
               </button>
             </Badge>
 
-            {/* Mobile menu */}
+            {/* Mobile menu - chỉ hiển thị khi màn hình nhỏ hơn md (768px) */}
             <button
               onClick={() => setDrawerOpen(true)}
               style={{
@@ -225,12 +210,11 @@ export default function AppHeader() {
                 borderRadius: 8,
                 background: "#f1f5f9",
                 border: "1px solid #e2e8f0",
-                display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
               }}
-              className="flex md:hidden"
+              className="hidden md:hidden max-[768px]:flex"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path d="M3 12h18M3 6h18M3 18h18" stroke="#475569" strokeWidth="1.8" strokeLinecap="round" />

@@ -6,7 +6,11 @@
  */
 
 const router = require("express").Router();
-const { verifyToken, requireRoles } = require("../../common/middlewares/auth.middleware");
+const {
+  verifyToken,
+  requireRoles,
+  requireEmailVerified,
+} = require("../../common/middlewares/auth.middleware");
 const { ROLES } = require("../../common/constants/roles");
 const validate = require("../../common/middlewares/validate.middleware");
 const orderService = require("./customer.order.service");
@@ -51,6 +55,10 @@ const customerCheckoutSchema = {
       required: true,
       type: "string",
       enum: ["COD", "VNPAY", "MOMO"],
+    },
+    paymentType: {
+      type: "string",
+      enum: ["FULL", "DEPOSIT"],
     },
     items: {
       required: true,
@@ -105,6 +113,7 @@ router.post(
   "/",
   verifyToken,
   requireRoles(ROLES.CUSTOMER),
+  requireEmailVerified,
   validate(customerCheckoutSchema),
   async (req, res, next) => {
     try {

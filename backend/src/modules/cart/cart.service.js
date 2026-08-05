@@ -30,9 +30,11 @@ async function layGioHang(userId) {
        ci.quantity,
        pv.color,
        pv.size,
+       pv.stockQty,
        pv.productId,
        p.name         AS productName,
        p.basePrice    AS price,
+       cd.designFee  AS designFee,
        -- Ưu tiên ảnh xem trước của thiết kế riêng (nếu có) thay vì ảnh phôi áo gốc,
        -- để giỏ hàng hiển thị đúng sản phẩm khách đã thiết kế.
        COALESCE(
@@ -55,13 +57,28 @@ async function layGioHang(userId) {
 async function themVaoGioHang(userId, { variantId, quantity, designId }) {
   const cartId = await layOrTaoCart(userId);
 
+  // Kiểm tra tồn kho của biến thể
+  const [variants] = await db.pool.query(
+    "SELECT stockQty FROM ProductVariant WHERE id = ?",
+    [variantId]
+  );
+  const stockQty = variants.length > 0 ? variants[0].stockQty : 0;
+
   const [existing] = await db.pool.query(
     "SELECT id, quantity FROM CartItem WHERE cartId = ? AND variantId = ? AND designId <=> ?",
     [cartId, variantId, designId ?? null]
   );
 
+  const currentQty = existing.length > 0 ? existing[0].quantity : 0;
+  const newQty = currentQty + quantity;
+
+  if (newQty > stockQty) {
+    const err = new Error(`Sản phẩm trong kho chỉ còn ${stockQty} sản phẩm, không thể tăng thêm`);
+    err.statusCode = 400;
+    throw err;
+  }
+
   if (existing.length > 0) {
-    const newQty = existing[0].quantity + quantity;
     await db.pool.query(
       "UPDATE CartItem SET quantity = ? WHERE id = ?",
       [newQty, existing[0].id]
@@ -78,8 +95,10 @@ async function themVaoGioHang(userId, { variantId, quantity, designId }) {
 
 async function capNhatSoLuong(userId, cartItemId, quantity) {
   const [rows] = await db.pool.query(
-    `SELECT ci.id FROM CartItem ci
+    `SELECT ci.id, ci.variantId, pv.stockQty
+     FROM CartItem ci
      JOIN Cart c ON ci.cartId = c.id
+     JOIN ProductVariant pv ON ci.variantId = pv.id
      WHERE ci.id = ? AND c.userId = ?`,
     [cartItemId, userId]
   );
@@ -88,6 +107,14 @@ async function capNhatSoLuong(userId, cartItemId, quantity) {
     err.statusCode = 404;
     throw err;
   }
+
+  const item = rows[0];
+  if (quantity > item.stockQty) {
+    const err = new Error(`Sản phẩm trong kho chỉ còn ${item.stockQty} sản phẩm, không thể tăng thêm`);
+    err.statusCode = 400;
+    throw err;
+  }
+
   await db.pool.query("UPDATE CartItem SET quantity = ? WHERE id = ?", [quantity, cartItemId]);
 }
 

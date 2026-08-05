@@ -33,7 +33,7 @@ const verifyToken = async (req, res, next) => {
     }
 
     const [accounts] = await db.pool.query(
-      `SELECT id, email, fullName, phone, role, status
+      `SELECT id, email, fullName, phone, role, status, emailVerified
        FROM Account
        WHERE id = ?
        LIMIT 1`,
@@ -52,6 +52,7 @@ const verifyToken = async (req, res, next) => {
       phone: account.phone,
       role: account.role,
       status: account.status,
+      emailVerified: Boolean(account.emailVerified),
     };
     return next();
   } catch (error) {
@@ -85,9 +86,21 @@ const requireRoles = (...roles) => {
 const verifyRole = (roles) => requireRoles(roles);
 const requireAdmin = requireRoles(ROLES.ADMIN);
 
+const requireEmailVerified = (req, res, next) => {
+  if (!req.user || !req.user.emailVerified) {
+    return res.status(403).json({
+      success: false,
+      message: "Vui lòng xác minh email trước khi đặt hàng",
+    });
+  }
+
+  return next();
+};
+
 module.exports = {
   verifyToken,
   verifyRole,
   requireRoles,
   requireAdmin,
+  requireEmailVerified,
 };

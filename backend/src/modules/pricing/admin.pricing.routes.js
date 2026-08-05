@@ -10,4 +10,6 @@ router.post(
   pricingController.calculateQuote
 );
 
+router.get("/config", pricingController.getConfig);
+
 module.exports = router;
