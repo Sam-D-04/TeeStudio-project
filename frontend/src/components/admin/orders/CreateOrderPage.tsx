@@ -329,7 +329,8 @@ function buildPreview(
   productById: Record<number, SanPhamTimKiem>,
   designById: Record<number, ThietKe>,
   promotions: KhuyenMai[],
-  vatPercent: number = 0
+  vatPercent: number = 0,
+  freeShippingThreshold?: number
 ): OrderPreview {
   const qtyByProductId: Record<number, number> = {};
   values.items?.forEach((item) => {
@@ -400,8 +401,10 @@ function buildPreview(
     selectedPromotion,
     promotionBaseAmount
   );
-  const shippingFee =
-    selectedPromotion?.loaiGiam === "FREE_SHIPPING" ? 0 : shippingFeeInput;
+  
+  const isFreeShipping = selectedPromotion?.loaiGiam === "FREE_SHIPPING" || 
+    (freeShippingThreshold !== undefined && freeShippingThreshold > 0 && promotionBaseAmount >= freeShippingThreshold);
+  const shippingFee = isFreeShipping ? 0 : shippingFeeInput;
   
   const amountBeforeVat = Math.max(0, subtotal + designFee + shippingFee - discountAmount);
   const vatAmount = (amountBeforeVat * vatPercent) / 100;
@@ -1432,7 +1435,14 @@ export default function CreateOrderPage() {
   }, [pricingFormula, form]);
 
   const preview = useMemo(
-    () => buildPreview(values, productById, designById, promotions, pricingFormula?.cauHinh?.vatPercent ?? 0),
+    () => buildPreview(
+      values, 
+      productById, 
+      designById, 
+      promotions, 
+      pricingFormula?.cauHinh?.vatPercent ?? 0,
+      pricingFormula?.cauHinh?.freeShippingThreshold
+    ),
     [designById, productById, promotions, values, pricingFormula]
   );
 
@@ -1674,7 +1684,7 @@ export default function CreateOrderPage() {
       items,
       paymentMethod: formValues.paymentMethod!,
       paymentType: formValues.paymentType!,
-      shippingFee: formValues.shippingFee ?? 0,
+      shippingFee: preview.shippingFee,
       promotionId: formValues.promotionId,
     });
   }
