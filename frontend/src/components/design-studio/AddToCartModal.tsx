@@ -160,6 +160,7 @@ export default function AddToCartModal({ open, onClose, productId, shirtColor, d
         designId,
         printImageFront,
         printImageBack,
+        bulkPricing: product.bulkPricing,
       });
     });
     const summary = entries.map(({ v, qty }) => `${v.size}×${qty}`).join(", ");

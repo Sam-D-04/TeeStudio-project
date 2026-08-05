@@ -212,9 +212,12 @@ export function calcDesignFee(elements: DesignElement[], printExtraCost: number 
   const front = calcFeeForOneSide(frontElements);
   const back  = calcFeeForOneSide(backElements);
 
-  const baseFee = front.fee + back.fee;
-  // Cộng thêm phụ phí phương pháp in (chỉ cộng nếu baseFee > 0, tức là có in)
-  const fee = baseFee > 0 ? baseFee + printExtraCost : 0;
+  // Cập nhật theo công thức mới của backend: 
+  // Phương pháp in sẽ được cộng cho MỖI MẶT (nếu mặt đó có in)
+  if (front.fee > 0) front.fee += printExtraCost;
+  if (back.fee > 0) back.fee += printExtraCost;
+
+  const fee = front.fee + back.fee;
 
   return {
     fee,

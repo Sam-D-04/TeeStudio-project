@@ -31,6 +31,7 @@ import SaveDesignModal from "./SaveDesignModal";
 import MyDesignsModal from "./MyDesignsModal";
 import AddToCartModal from "./AddToCartModal";
 import CartDrawer from "./CartDrawer";
+import ShirtSelector from "./ShirtSelector";
 
 import "../../app/design-studio/design-studio.css";
 
@@ -906,44 +907,9 @@ export default function DesignStudioApp() {
               </button>
             </div>
 
-            {/* Chọn Màu (Chỉ hiển thị khi có màu và không ở chế độ revision) */}
-            {availableColors.length > 0 && !isRevisionMode && (
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  justifyContent: "center",
-                  gap: 8,
-                  background: "rgba(30, 41, 59, 0.7)", // bg-slate-800/70
-                  backdropFilter: "blur(12px)",
-                  padding: "6px 12px",
-                  borderRadius: 9999,
-                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                }}
-              >
-                {availableColors.map((colorHex) => {
-                  const isActive = shirtColor.toLowerCase() === colorHex.toLowerCase();
-                  return (
-                    <button
-                      key={colorHex}
-                      onClick={() => setShirtColor(colorHex)}
-                      style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: "50%",
-                        background: colorHex,
-                        border: isActive ? "2px solid #0ea5e9" : "2px solid transparent",
-                        boxShadow: isActive ? "0 0 0 2px rgba(14, 165, 233, 0.3)" : "inset 0 1px 3px rgba(0,0,0,0.15)",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                      }}
-                      title={`Đổi màu áo`}
-                    />
-                  );
-                })}
-              </div>
-            )}
+            {/* Chọn Màu (và Phôi áo nếu cần) thông qua ShirtSelector */}
+            <ShirtSelector showShirtType={false} />
+
 
             {/* Nút điều khiển zoom */}
             <div className="ds-zoom-controls">

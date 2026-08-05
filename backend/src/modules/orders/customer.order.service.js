@@ -234,14 +234,8 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
       [variant.productId, totalProductQty]
     );
 
-    let unitPrice;
-    if (rowsBulk.length > 0) {
-      unitPrice = Number(variant.basePrice) * (1 - Number(rowsBulk[0].discountPercent) / 100);
-    } else {
-      unitPrice = Number(variant.basePrice);
-    }
-
-    unitPrice = Math.round(unitPrice * 100) / 100;
+    const bulkDiscountPercent = rowsBulk.length > 0 ? Number(rowsBulk[0].discountPercent) : 0;
+    const unitPrice = Number(variant.basePrice);
 
     itemsEnriched.push({
       variantId: item.variantId,
@@ -251,6 +245,7 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
       size: variant.size,
       quantity: item.quantity,
       unitPrice,
+      bulkDiscountPercent,
       designId: item.designId || null,
       designFee: 0,
       printImageFront: item.printImageFront || null,
@@ -391,14 +386,23 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
   );
 
   const tongDesignFee = itemsEnriched.reduce(
-    (tong, item) => tong + item.designFee,
+    (tong, item) => tong + item.designFee * item.quantity,
     0
   );
+
+  let bulkDiscountTotal = 0;
+  for (const item of itemsEnriched) {
+    const baseItemPrice = item.unitPrice + item.designFee;
+    if (item.bulkDiscountPercent > 0) {
+      const discountedPrice = Math.round(baseItemPrice * (1 - item.bulkDiscountPercent / 100));
+      bulkDiscountTotal += (baseItemPrice - discountedPrice) * item.quantity;
+    }
+  }
 
   let shippingFee = Math.max(0, Number(shippingFeeInput) || 0);
 
   // Tính discount từ promotion (nếu có)
-  let discountAmount = 0;
+  let discountAmount = bulkDiscountTotal;
   let promotionData = null;
 
   if (promotionId) {
@@ -417,21 +421,30 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
     }
 
     const promo = rowsPromo[0];
-    const orderBaseAmount = subtotal + tongDesignFee;
+    const orderBaseAmount = subtotal + tongDesignFee - bulkDiscountTotal;
 
     // Dùng chung apDungMaGiamGia với customer.promotion.service.js (validate lúc
     // checkout) để 2 nơi không bao giờ lệch luật hay lệch cách tính.
     const ketQuaApDung = await apDungMaGiamGia(promo, { userId, orderBaseAmount });
-    discountAmount = ketQuaApDung.discountAmount;
+    discountAmount = ketQuaApDung.discountAmount + bulkDiscountTotal;
     if (ketQuaApDung.mienPhiVanChuyen) shippingFee = 0;
 
     promotionData = promo;
   }
 
-  const totalAmount = Math.max(
+  // Lấy thuế VAT hiện tại
+  const [pricingConfigRows] = await db.pool.query(
+    `SELECT vatPercent FROM PricingConfiguration LIMIT 1`
+  );
+  const vatPercent = pricingConfigRows.length > 0 ? Number(pricingConfigRows[0].vatPercent) : 0;
+
+  const amountBeforeVat = Math.max(
     0,
     Math.round((subtotal + tongDesignFee + shippingFee - discountAmount) * 100) / 100
   );
+  
+  const vatAmount = Math.round((amountBeforeVat * vatPercent) / 100);
+  const totalAmount = amountBeforeVat + vatAmount;
   const {
     depositPercent,
     depositAmount,

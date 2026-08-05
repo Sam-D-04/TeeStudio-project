@@ -172,6 +172,7 @@ export default function CheckoutPage() {
   
   const [userAddresses, setUserAddresses] = useState<UserAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<number | "NEW">("NEW");
+  const isSubmittingRef = useRef(false);
 
   const provinceCode = Form.useWatch("provinceCode", form);
   const watchedPaymentType = Form.useWatch("paymentType", form);
@@ -272,7 +273,37 @@ export default function CheckoutPage() {
 
   if (!hydrated) return null;
 
-  const subtotal = totalPrice();
+  let rawBasePriceTotal = 0;
+  let totalDesignFee = 0;
+  let bulkDiscountTotal = 0;
+
+  const qtyByProductId: Record<number, number> = {};
+  items.forEach((i) => {
+    qtyByProductId[i.productId] = (qtyByProductId[i.productId] || 0) + i.quantity;
+  });
+
+  items.forEach((item) => {
+    const qty = item.quantity;
+    rawBasePriceTotal += item.price * qty;
+    totalDesignFee += (item.designFee || 0) * qty;
+
+    const totalQty = qtyByProductId[item.productId] || qty;
+    const baseItemPrice = item.price + (item.designFee || 0);
+    let unitPrice = baseItemPrice;
+    
+    if (item.bulkPricing && item.bulkPricing.length > 0) {
+      const matched = [...item.bulkPricing]
+        .sort((a, b) => b.minQty - a.minQty)
+        .find((bp) => totalQty >= bp.minQty);
+      if (matched) {
+        unitPrice = Math.round(baseItemPrice * (1 - matched.discountPercent / 100));
+      }
+    }
+    const discountPerItem = baseItemPrice - unitPrice;
+    bulkDiscountTotal += discountPerItem * qty;
+  });
+
+  const subtotal = rawBasePriceTotal + totalDesignFee - bulkDiscountTotal;
   
   let shippingFee = pricingConfig?.defaultShippingFee ?? 30_000;
   if (appliedPromo?.mienPhiVanChuyen) {
@@ -286,7 +317,9 @@ export default function CheckoutPage() {
     shippingFee = 0;
   }
   const discountAmount = appliedPromo?.discountAmount ?? 0;
-  const total = Math.max(0, subtotal + shippingFee - discountAmount);
+  const amountBeforeVat = Math.max(0, subtotal + shippingFee - discountAmount);
+  const vatAmount = pricingConfig && pricingConfig.vatPercent ? Math.round(amountBeforeVat * (pricingConfig.vatPercent / 100)) : 0;
+  const total = amountBeforeVat + vatAmount;
 
   // Preview số tiền cọc/COD còn lại khi khách chọn đặt cọc — chỉ để hiển thị
   // trước cho khách, số tiền thật do backend tính lại và trả về khi tạo đơn.
@@ -404,7 +437,6 @@ export default function CheckoutPage() {
   }
 
   /* ── Submit handler ── */
-  const isSubmittingRef = useRef(false);
 
   const onFinish = async (values: CheckoutFormValues) => {
     // Chặn gọi lại khi đang xử lý (double-click, hoặc form bị submit 2 lần) — tránh
@@ -917,7 +949,28 @@ export default function CheckoutPage() {
 
                   {/* Mini item list */}
                   <div style={{ maxHeight: 300, overflowY: "auto", padding: "12px 0" }}>
-                    {items.map((item) => (
+                    {(() => {
+                      const qtyByProductId: Record<number, number> = {};
+                      items.forEach((i) => {
+                        qtyByProductId[i.productId] = (qtyByProductId[i.productId] || 0) + i.quantity;
+                      });
+
+                      return items.map((item) => {
+                        const totalQty = qtyByProductId[item.productId] || item.quantity;
+                        const baseItemPrice = item.price + (item.designFee || 0);
+                        let unitPrice = baseItemPrice;
+                        
+                        if (item.bulkPricing && item.bulkPricing.length > 0) {
+                          const matched = [...item.bulkPricing]
+                            .sort((a, b) => b.minQty - a.minQty)
+                            .find((bp) => totalQty >= bp.minQty);
+                            
+                          if (matched) {
+                            unitPrice = Math.round(baseItemPrice * (1 - matched.discountPercent / 100));
+                          }
+                        }
+
+                        return (
                       <div
                         key={item.cartItemId}
                         style={{
@@ -1001,10 +1054,12 @@ export default function CheckoutPage() {
                             flexShrink: 0,
                           }}
                         >
-                          {formatVND(item.price * item.quantity)}
+                          <span style={{ fontWeight: 600 }}>{formatVND(unitPrice * item.quantity)}</span>
                         </span>
                       </div>
-                    ))}
+                        );
+                      });
+                    })()}
                   </div>
 
                   {/* Mã khuyến mãi */}
@@ -1056,22 +1111,25 @@ export default function CheckoutPage() {
 
                   {/* Totals */}
                   <div style={{ padding: "16px 24px", borderTop: "1px solid #f1f5f9" }}>
-                    {[ 
-                      { label: "Tạm tính", value: formatVND(subtotal) },
+                    {[
+                      { label: "Giá phôi áo", value: formatVND(rawBasePriceTotal) },
+                      ...(totalDesignFee > 0 ? [{ label: "Phí in ấn & thiết kế", value: formatVND(totalDesignFee) }] : []),
+                      ...(bulkDiscountTotal > 0 ? [{ label: "Giảm giá số lượng", value: `−${formatVND(bulkDiscountTotal)}` }] : []),
                       { label: "Phí vận chuyển", value: configLoading ? <Spin size="small" /> : formatVND(shippingFee) },
-                    ].map((r) => (
+                      ...(vatAmount > 0 ? [{ label: `Thuế VAT (${pricingConfig?.vatPercent}%)`, value: formatVND(vatAmount) }] : []),
+                    ].map((r, i) => (
                       <div
-                        key={r.label}
+                        key={i}
                         style={{
                           display: "flex",
                           justifyContent: "space-between",
                           fontSize: 13,
-                          color: "#475569",
+                          color: r.label.includes("Giảm") ? "#16a34a" : "#475569",
                           marginBottom: 10,
                         }}
                       >
                         <span>{r.label}</span>
-                        <span style={{ fontWeight: 600, color: "#0f172a" }}>{r.value}</span>
+                        <span style={{ fontWeight: 600, color: r.label.includes("Giảm") ? "#16a34a" : "#0f172a" }}>{r.value}</span>
                       </div>
                     ))}
 

@@ -34,6 +34,7 @@ export interface CartItem {
    */
   printImageFront?: string;
   printImageBack?: string;
+  bulkPricing?: { minQty: number; discountPercent: number }[];
 }
 
 export interface CartState {
@@ -78,6 +79,7 @@ function apiItemToCartItem(item: CartItemFromAPI): CartItem {
     quantity: item.quantity,
     stockQty: item.stockQty,
     designId: item.designId ?? undefined,
+    bulkPricing: typeof item.bulkPricing === 'string' ? JSON.parse(item.bulkPricing) : item.bulkPricing,
   };
 }
 
@@ -87,8 +89,32 @@ export const useCartStore = create<CartState>()(
       items: [],
 
       totalItems: () => get().items.reduce((acc, i) => acc + i.quantity, 0),
-      totalPrice: () =>
-        get().items.reduce((acc, i) => acc + (i.price + (i.designFee || 0)) * i.quantity, 0),
+      totalPrice: () => {
+        const items = get().items;
+        const qtyByProductId: Record<number, number> = {};
+        items.forEach((i) => {
+          qtyByProductId[i.productId] = (qtyByProductId[i.productId] || 0) + i.quantity;
+        });
+
+        return items.reduce((acc, i) => {
+          const totalQty = qtyByProductId[i.productId] || i.quantity;
+          const baseItemPrice = i.price + (i.designFee || 0);
+          let unitPrice = baseItemPrice;
+          
+          if (i.bulkPricing && i.bulkPricing.length > 0) {
+            // Sắp xếp các mốc giảm giá theo số lượng giảm dần
+            const matched = [...i.bulkPricing]
+              .sort((a, b) => b.minQty - a.minQty)
+              .find((bp) => totalQty >= bp.minQty);
+              
+            if (matched) {
+              unitPrice = Math.round(baseItemPrice * (1 - matched.discountPercent / 100));
+            }
+          }
+          
+          return acc + unitPrice * i.quantity;
+        }, 0);
+      },
 
       addItem: (item) => {
         const id = buildCartItemId(item.variantId, item.designId);

@@ -260,4 +260,5 @@ module.exports = {
   PIXELS_PER_CM_Y,
   FEE_TIERS,
   FEE_MAX,
+  getPricingConfiguration,
 };

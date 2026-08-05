@@ -69,7 +69,7 @@ export default function MyDesignsModal({ open, onCancel, onSelectDesign }: MyDes
       onCancel={onCancel}
       footer={null}
       width={800}
-      bodyStyle={{ maxHeight: "60vh", overflowY: "auto", padding: "20px 0" }}
+      styles={{ body: { maxHeight: "60vh", overflowY: "auto", padding: "20px 0" } }}
     >
       {loading ? (
         <div style={{ textAlign: "center", padding: "40px" }}>

@@ -15,7 +15,7 @@ const calculateQuote = async (req, res, next) => {
 
 const getConfig = async (req, res, next) => {
   try {
-    const config = await pricingService.layCauHinh();
+    const config = await pricingService.getPricingConfiguration();
 
     res.json({
       success: true,

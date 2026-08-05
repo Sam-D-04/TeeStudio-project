@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { authService } from "@/services/authService";
 import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
@@ -120,14 +121,17 @@ export default function AuthModal({ isOpen, defaultTab = "login", onClose, theme
     return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!isOpen || !mounted) return null;
 
   const handleSuccess = (session: any) => {
     onSuccess?.(session);
     onClose();
   };
 
-  return (
+  return createPortal(
     <div
       ref={backdropRef}
       onClick={(e) => { if (e.target === backdropRef.current) onClose(); }}
@@ -214,7 +218,8 @@ export default function AuthModal({ isOpen, defaultTab = "login", onClose, theme
         @keyframes ds-modal-bg-in { from { opacity:0 } to { opacity:1 } }
         @keyframes ds-modal-in { from { opacity:0; transform:scale(0.92) translateY(16px) } to { opacity:1; transform:scale(1) translateY(0) } }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 }
 

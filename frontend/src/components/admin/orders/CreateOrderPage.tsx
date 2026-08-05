@@ -1241,15 +1241,12 @@ function OrderSummary({
                     <div>
                       - Giá áo + In mặt 1: {formatCurrency(line.unitPrice + line.printFeeFront)} x {line.quantity}
                       <div className="text-[11px] text-text-muted ml-2">
-                        (Giá áo: {formatCurrency(line.unitPrice)}, PP in: {formatCurrency(line.phiPhuongPhapInFront)}, Diện tích in: {formatCurrency(line.phiDienTichInFront)})
+                        (Giá áo: {formatCurrency(line.unitPrice)}, Phí in mặt 1: {formatCurrency(line.printFeeFront)})
                       </div>
                     </div>
                     {line.printFeeBack > 0 && (
                       <div className="flex flex-col gap-0.5">
                         <span>- In mặt 2: {formatCurrency(line.printFeeBack)} x {line.quantity}</span>
-                        <span className="text-text-muted ml-2 text-[11px]">
-                          (PP in: {formatCurrency(line.phiPhuongPhapInBack)}, Diện tích in: {formatCurrency(line.phiDienTichInBack)})
-                        </span>
                       </div>
                     )}
                     {line.designFee > 0 && (

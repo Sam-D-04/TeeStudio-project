@@ -42,7 +42,12 @@ async function layGioHang(userId) {
          (SELECT pi.imageUrl FROM ProductImage pi
           WHERE pi.productId = p.id AND pi.isPrimary = 1
           LIMIT 1)
-       )              AS image
+       )              AS image,
+       (SELECT JSON_ARRAYAGG(
+                 JSON_OBJECT('minQty', bp.minQty, 'discountPercent', bp.discountPercent)
+               )
+        FROM BulkPricing bp
+        WHERE bp.productId = p.id) AS bulkPricing
      FROM CartItem ci
      JOIN ProductVariant pv ON ci.variantId = pv.id
      JOIN Product p ON pv.productId = p.id

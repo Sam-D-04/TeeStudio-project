@@ -47,7 +47,7 @@ export default function CartDrawer({ open, onClose }: Props) {
         </div>
       }
       placement="right"
-      width={400}
+      size="default"
       open={open}
       onClose={onClose}
       zIndex={10002}
@@ -100,7 +100,28 @@ export default function CartDrawer({ open, onClose }: Props) {
       ) : (
         /* Danh sách sản phẩm trong giỏ */
         <div style={{ flex: 1, overflowY: "auto" }}>
-          {items.map((item, idx) => (
+          {(() => {
+            const qtyByProductId: Record<number, number> = {};
+            items.forEach((i) => {
+              qtyByProductId[i.productId] = (qtyByProductId[i.productId] || 0) + i.quantity;
+            });
+
+            return items.map((item, idx) => {
+              const totalQty = qtyByProductId[item.productId] || item.quantity;
+              const baseItemPrice = item.price + (item.designFee || 0);
+              let unitPrice = baseItemPrice;
+              
+              if (item.bulkPricing && item.bulkPricing.length > 0) {
+                const matched = [...item.bulkPricing]
+                  .sort((a, b) => b.minQty - a.minQty)
+                  .find((bp) => totalQty >= bp.minQty);
+                  
+                if (matched) {
+                  unitPrice = Math.round(baseItemPrice * (1 - matched.discountPercent / 100));
+                }
+              }
+
+              return (
             <div
               key={item.cartItemId}
               style={{
@@ -191,7 +212,7 @@ export default function CartDrawer({ open, onClose }: Props) {
                   })()}
 
                   <span style={{ fontSize: 14, fontWeight: 800, color: "#0ea5e9" }}>
-                    {fmt((item.price + (item.designFee || 0)) * item.quantity)}
+                    {fmt(unitPrice * item.quantity)}
                   </span>
 
                   <button
@@ -208,7 +229,9 @@ export default function CartDrawer({ open, onClose }: Props) {
                 </div>
               </div>
             </div>
-          ))}
+              );
+            });
+          })()}
         </div>
       )}
     </Drawer>

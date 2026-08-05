@@ -18,6 +18,7 @@ import * as accountService from "@/services/admin/accountService";
 import * as designService from "@/services/admin/designService";
 import CanvasEditor from "@/components/design-studio/CanvasEditor";
 import FloatingToolbar from "@/components/design-studio/FloatingToolbar";
+import ShirtSelector from "@/components/design-studio/ShirtSelector";
 import LayersPanel from "@/components/design-studio/LayersPanel";
 import PropertiesPanel from "@/components/design-studio/PropertiesPanel";
 import {
@@ -526,6 +527,10 @@ export default function AdminDesignStudio() {
                 Mặt sau
               </button>
             </div>
+
+            {/* Chọn Loại áo & Màu áo qua ShirtSelector dùng chung */}
+            <ShirtSelector showShirtType={true} ignoreRevisionMode={true} />
+
 
             <div className="ds-zoom-controls" style={{ position: "static" }}>
               <button className="ds-zoom-btn" onClick={() => setZoom((value) => Math.max(0.5, value - 0.25))}>−</button>

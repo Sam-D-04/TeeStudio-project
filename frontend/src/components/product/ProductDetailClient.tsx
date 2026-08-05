@@ -371,6 +371,7 @@ export default function ProductDetailClient({ product }: Props) {
       colorLabel: getColorLabel(selectedColor),
       price: product.basePrice,
       quantity: 1,
+      bulkPricing: product.bulkPricing,
     });
     void message.success(`Đã thêm ${product.name} (${selectedSize}) vào giỏ hàng!`);
   };

@@ -14,8 +14,8 @@ export interface CartItemFromAPI {
   price: number;
   designFee?: number;
   image: string | null;
+  bulkPricing?: { minQty: number; discountPercent: number }[];
 }
-
 /*
  * Dùng apiClient (axios): tự gắn access token mới nhất + tự refresh khi 401.
  * Tham số `token` giữ lại cho tương thích chỗ gọi cũ, không cần dùng
