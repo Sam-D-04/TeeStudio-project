@@ -127,7 +127,7 @@ function PrintSurchargeContent() {
             {/* Giá trị & hành động */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <strong style={{ color: "#0284c7" }}>
-                +{item.giaTri.toLocaleString("vi-VN")}đ/áo
+                +{item.giaTri.toLocaleString("vi-VN")}đ/mặt áo
               </strong>
 
               <Button
