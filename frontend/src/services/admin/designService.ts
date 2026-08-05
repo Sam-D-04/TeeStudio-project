@@ -56,6 +56,10 @@ export type ChiTietThietKe = ThietKe & {
   phuongPhapIn: string;
   phiPhuongPhapIn: number;
   phiThietKe: number;
+  phiPhuongPhapInFront?: number;
+  phiPhuongPhapInBack?: number;
+  phiDienTichInFront?: number;
+  phiDienTichInBack?: number;
   ngayCapNhat: string | null;
   maDonHang: string | null;
   donHangLienQuan: {

@@ -451,7 +451,8 @@ export default function DesignDetailModal({
                     />
                     <Field label="Vị trí in" value={data.viTriIn || <EmptyValue />} />
                     <Field label="Phương pháp in" value={data.phuongPhapIn || <EmptyValue />} />
-                    <Field label="Phí PP in" value={formatCurrency(data.phiPhuongPhapIn)} />
+                    <Field label="Phí PP in" value={formatCurrency((data.phiPhuongPhapInFront ?? 0) + (data.phiPhuongPhapInBack ?? 0))} />
+                    <Field label="Phí diện tích in" value={formatCurrency((data.phiDienTichInFront ?? 0) + (data.phiDienTichInBack ?? 0))} />
                     <Field label="Phí thiết kế" value={formatCurrency(data.phiThietKe)} />
                   </div>
                 </Section>

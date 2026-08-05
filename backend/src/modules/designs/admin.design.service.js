@@ -13,7 +13,7 @@
 
 const db = require("../../database/mysql");
 
-const { calculateBoundingBoxAreaFee } = require("../pricing/admin.pricing.service");
+const { calculateBoundingBoxAreaFee, calculateAreaFeePerSide } = require("../pricing/admin.pricing.service");
 const { taoBaoCaoExcel } = require("../../common/utils/excel-report");
 const { chuanHoaCanvasData } = require("../../common/utils/canvas.util");
 const { sendDesignRevisionEmail } = require("../../common/services/emailService");
@@ -789,6 +789,7 @@ async function layChiTietThietKe(id) {
        cd.printFileUrlBack,
        cd.baseColor AS mauAo,
        cd.status,
+       cd.canvasData,
        cd.createdAt AS ngayGui,
        cd.updatedAt AS ngayCapNhat,
        cd.adminNote AS ghiChu,
@@ -849,6 +850,31 @@ async function layChiTietThietKe(id) {
   }
 
   const row = rows[0];
+
+  let canvasData = null;
+  if (row.canvasData) {
+    try {
+      canvasData = typeof row.canvasData === "string"
+        ? JSON.parse(row.canvasData)
+        : row.canvasData;
+    } catch {
+      canvasData = null;
+    }
+  }
+  const { frontAreaFee, backAreaFee } = calculateAreaFeePerSide(canvasData);
+  const phiInAnTuDB = Number(row.phiPhuongPhapIn || 0) + Number(row.phiViTriIn || 0);
+
+  let ppInFront = 0;
+  let ppInBack = 0;
+  if (frontAreaFee > 0 && backAreaFee > 0) {
+    ppInFront = phiInAnTuDB / 2;
+    ppInBack = phiInAnTuDB / 2;
+  } else if (backAreaFee > 0) {
+    ppInBack = phiInAnTuDB;
+  } else {
+    ppInFront = phiInAnTuDB;
+  }
+
   const [rowsDonHang] = await db.pool.query(
     `SELECT
        oi.id AS orderItemId,
@@ -859,7 +885,7 @@ async function layChiTietThietKe(id) {
        oi.quantity AS soLuong,
        oi.unitPrice AS donGia,
        oi.designFee AS phiThietKe,
-       oi.lineTotal AS thanhTien,
+       co.totalAmount AS thanhTien,
        oi.productionStatus AS trangThaiSanXuat,
        pv.size AS sizeAo,
        pv.color AS tenMauAo,
@@ -899,6 +925,10 @@ async function layChiTietThietKe(id) {
     phiViTriIn: Number(row.phiViTriIn || 0),
     phuongPhapIn: row.phuongPhapIn || "Chưa chọn",
     phiPhuongPhapIn: Number(row.phiPhuongPhapIn || 0),
+    phiPhuongPhapInFront: ppInFront,
+    phiPhuongPhapInBack: ppInBack,
+    phiDienTichInFront: frontAreaFee,
+    phiDienTichInBack: backAreaFee,
     phiThietKe: Number(row.phiThietKe || 0),
     trangThai: MAP_TRANG_THAI_THIET_KE_DB_FE[row.status] || "cho_kiem_tra",
     ngayGui: formatNgay(row.ngayGui),
