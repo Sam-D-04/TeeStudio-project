@@ -178,7 +178,7 @@ function BulkPricingContent() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                  {["Từ số lượng", "Đến số lượng", "Mức giảm", "Đơn giá sau giảm", "Thao tác"].map(
+                  {["Từ số lượng", "Đến số lượng", "Mức giảm", "Thao tác"].map(
                     (title) => (
                       <th key={title} style={{ padding: "11px 16px", textAlign: "left", color: "#475569" }}>
                         {title}
@@ -196,9 +196,6 @@ function BulkPricingContent() {
                     </td>
                     <td style={{ padding: "12px 16px", color: "#0284c7", fontWeight: 700 }}>
                       -{tier.phanTramGiam}%
-                    </td>
-                    <td style={{ padding: "12px 16px" }}>
-                      {tier.donGiaSauGiam.toLocaleString("vi-VN")}đ
                     </td>
                     <td style={{ padding: "12px 16px" }}>
                       <button
@@ -231,7 +228,7 @@ function BulkPricingContent() {
                 ))}
                 {danhSach.length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>
+                    <td colSpan={4} style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>
                       Sản phẩm này chưa có mức giá theo số lượng.
                     </td>
                   </tr>
