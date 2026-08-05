@@ -241,7 +241,18 @@ export default function AdminDesignStudio() {
       setSelectedId(null);
       const boundaries = shirtContainerRef.current.querySelectorAll<HTMLElement>(".ds-print-boundary");
       boundaries.forEach((element) => { element.style.display = "none"; });
-      await new Promise((resolve) => window.setTimeout(resolve, 100));
+
+      const state = useDesignStore.getState();
+      const hasFront = state.elements.some(e => (e.side ?? "front") === "front");
+      const targetPreviewSide = hasFront ? "front" : "back";
+      const originalView = state.shirtView;
+
+      if (state.shirtView !== targetPreviewSide) {
+        useDesignStore.setState({ shirtView: targetPreviewSide, selectedId: null });
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+      } else {
+        await new Promise((resolve) => window.setTimeout(resolve, 100));
+      }
 
       let previewUrl = "";
       try {
@@ -253,6 +264,9 @@ export default function AdminDesignStudio() {
         previewUrl = preview.toDataURL("image/png");
       } finally {
         boundaries.forEach((element) => { element.style.display = ""; });
+        if (originalView !== targetPreviewSide) {
+          useDesignStore.setState({ shirtView: originalView, selectedId: null });
+        }
       }
 
       const { printImageFront, printImageBack } = await captureAdminPrintImages({
