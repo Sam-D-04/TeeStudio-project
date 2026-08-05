@@ -54,6 +54,9 @@ type OrderFilterBarProps = {
 
   searchSlot?: ReactNode;
   onResetFilters?: () => void;
+
+  excludeReason?: string;
+  onExcludeReasonChange?: (value: string) => void;
 };
 
 export default function OrderFilterBar({
@@ -73,6 +76,8 @@ export default function OrderFilterBar({
   onTypeFilterChange,
   searchSlot,
   onResetFilters,
+  excludeReason,
+  onExcludeReasonChange,
 }: OrderFilterBarProps) {
   return (
     // Khu vực filter: nền xám nhạt, viền dưới, padding gọn
@@ -185,6 +190,24 @@ export default function OrderFilterBar({
           selectClassName="h-control-h"
           rangePickerClassName="h-control-h min-w-[240px] sm:w-[280px]"
         />
+
+        {/* Select Lọc đơn lỗi kỹ thuật */}
+        {onExcludeReasonChange && (
+          <div className="relative shrink-0">
+            <select
+              value={excludeReason ?? "TECH_ADJUST"}
+              onChange={(e) => onExcludeReasonChange(e.target.value)}
+              className="h-control-h appearance-none rounded-lg border border-border bg-surface pl-3 pr-9 text-sm text-text-main outline-none focus:border-primary-container"
+            >
+              <option value="TECH_ADJUST">Ẩn đơn lỗi kỹ thuật</option>
+              <option value="">Bao gồm tất cả</option>
+              <option value="ONLY_TECH_ADJUST">Chỉ hiện đơn lỗi kỹ thuật</option>
+            </select>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary">
+              ▾
+            </span>
+          </div>
+        )}
 
         {/* Nút Đặt lại */}
         {onResetFilters && (

@@ -69,6 +69,7 @@ function taoLinkDoanhThuTheoCot(
     status: "COMPLETED",
     payment: "COMPLETED",
     dateField: "completed",
+    excludeReason: "TECH_ADJUST",
   });
   const mocThoiGian = dayjs(item.ngay);
 

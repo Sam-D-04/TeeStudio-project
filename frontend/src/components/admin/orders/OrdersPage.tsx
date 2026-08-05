@@ -98,7 +98,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
     initialFilters?.excludeStatus ?? ""
   );
   const [excludeReason, setExcludeReason] = useState(
-    initialFilters?.excludeReason ?? ""
+    initialFilters?.excludeReason ?? "TECH_ADJUST"
   );
   const [typeFilter, setTypeFilter] = useState("tat_ca");
   const [tuKhoa, setTuKhoa] = useState("");
@@ -226,7 +226,7 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
     setDenNgay("");
     setCompletionHour("");
     setExcludeStatus("");
-    setExcludeReason("");
+    setExcludeReason("TECH_ADJUST");
     setDateField("created");
     setCurrentPage(1);
     setResetKey((prev) => prev + 1);
@@ -355,6 +355,11 @@ export default function OrdersPage({ initialFilters }: OrdersPageProps) {
           typeFilter={typeFilter}
           onTypeFilterChange={handleTypeChange}
           onResetFilters={handleResetFilters}
+          excludeReason={excludeReason}
+          onExcludeReasonChange={(value) => {
+            setExcludeReason(value);
+            setCurrentPage(1);
+          }}
           searchSlot={(
             <AdminSearchInput
               placeholder="Tìm mã đơn hàng, tên khách hàng..."

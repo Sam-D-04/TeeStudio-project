@@ -154,8 +154,8 @@ export default function StatisticsPage() {
       pct > 0 ? "up" : pct < 0 ? "down" : undefined;
 
     // Tạo query params ngày từ khoảng thời gian đang xem
-    const dateParams = start && end ? `&startDate=${start}&endDate=${end}` : "";
-    const completedDateParams = start && end ? `&startDate=${start}&endDate=${end}&dateField=completed` : "&dateField=completed";
+    const dateParams = start && end ? `&startDate=${start}&endDate=${end}&excludeReason=TECH_ADJUST` : "&excludeReason=TECH_ADJUST";
+    const completedDateParams = start && end ? `&startDate=${start}&endDate=${end}&dateField=completed&excludeReason=TECH_ADJUST` : "&dateField=completed&excludeReason=TECH_ADJUST";
 
     return [
       {
@@ -208,10 +208,10 @@ export default function StatisticsPage() {
     if (!data) return [];
 
     // Query params khoảng thời gian cho link điều hướng
-    const dateParams = khoang ? `&startDate=${khoang.tuNgay}&endDate=${khoang.denNgay}` : "";
+    const dateParams = khoang ? `&startDate=${khoang.tuNgay}&endDate=${khoang.denNgay}&excludeReason=TECH_ADJUST` : "&excludeReason=TECH_ADJUST";
     const completedDateParams = khoang
-      ? `&startDate=${khoang.tuNgay}&endDate=${khoang.denNgay}&dateField=completed`
-      : "&dateField=completed";
+      ? `&startDate=${khoang.tuNgay}&endDate=${khoang.denNgay}&dateField=completed&excludeReason=TECH_ADJUST`
+      : "&dateField=completed&excludeReason=TECH_ADJUST";
 
     const paidDateParams = khoang
       ? `&startDate=${khoang.tuNgay}&endDate=${khoang.denNgay}&dateField=paid`
@@ -272,7 +272,7 @@ export default function StatisticsPage() {
         value: formatTiLe(data.tyLeHuyDon),
         description: "Đơn CANCELLED / tổng đơn phát sinh",
         tone: data.tyLeHuyDon > 0 ? "text-red-600" : "text-success",
-        href: `/admin/don-hang?status=da_huy&excludeReason=TECH_ADJUST${dateParams}`,
+        href: `/admin/don-hang?status=da_huy${dateParams}`,
       },
     ];
   }, [chiSo]);
@@ -291,7 +291,7 @@ export default function StatisticsPage() {
   // ── Map phân bổ trạng thái đơn + thanh toán với href điều hướng ──────────
   const phanBoDateParams = useMemo(() => {
     const khoang = phanBo?.khoangThoiGian;
-    return khoang ? `&startDate=${khoang.tuNgay}&endDate=${khoang.denNgay}` : "";
+    return khoang ? `&startDate=${khoang.tuNgay}&endDate=${khoang.denNgay}&excludeReason=TECH_ADJUST` : "&excludeReason=TECH_ADJUST";
   }, [phanBo]);
 
   // Map label trạng thái đơn → filter key

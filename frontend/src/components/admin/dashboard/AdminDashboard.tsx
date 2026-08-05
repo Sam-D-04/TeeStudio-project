@@ -132,10 +132,10 @@ export default function AdminDashboard() {
     ? `&startDate=${encodeURIComponent(tuNgay)}&endDate=${encodeURIComponent(denNgay)}`
     : "";
   const allOrdersHref = hasDateRange
-    ? `/admin/don-hang?startDate=${encodeURIComponent(tuNgay)}&endDate=${encodeURIComponent(denNgay)}`
-    : "/admin/don-hang";
+    ? `/admin/don-hang?startDate=${encodeURIComponent(tuNgay)}&endDate=${encodeURIComponent(denNgay)}&excludeReason=TECH_ADJUST`
+    : "/admin/don-hang?excludeReason=TECH_ADJUST";
   const completedOrdersHref =
-    `/admin/don-hang?status=hoan_tat&payment=da_thanh_toan&dateField=completed${dateQuery}`;
+    `/admin/don-hang?status=hoan_tat&payment=da_thanh_toan&dateField=completed&excludeReason=TECH_ADJUST${dateQuery}`;
 
   // ── Cấu hình thẻ chỉ số hàng 1 ──
   const primaryMetrics = [

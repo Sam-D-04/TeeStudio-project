@@ -450,8 +450,12 @@ async function layDanhSachDonHang({
   }
 
   if (excludeReason) {
-    dieuKien.push("(co.cancelReason NOT LIKE ? OR co.cancelReason IS NULL)");
-    thamSo.push(`[${excludeReason}]%`);
+    if (excludeReason === "ONLY_TECH_ADJUST") {
+      dieuKien.push("co.cancelReason LIKE '[TECH_ADJUST]%'");
+    } else {
+      dieuKien.push("(co.cancelReason NOT LIKE ? OR co.cancelReason IS NULL)");
+      thamSo.push(`[${excludeReason}]%`);
+    }
   }
 
   // Lọc theo thanh toán
