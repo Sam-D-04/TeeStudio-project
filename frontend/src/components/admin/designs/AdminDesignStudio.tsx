@@ -21,7 +21,7 @@ import FloatingToolbar from "@/components/design-studio/FloatingToolbar";
 import ShirtSelector from "@/components/design-studio/ShirtSelector";
 import LayersPanel from "@/components/design-studio/LayersPanel";
 import PropertiesPanel from "@/components/design-studio/PropertiesPanel";
-import {
+import ShirtMockupImage, {
   getPoloFrontPolygon,
   getPrintAreaBoundary,
   hasPrintAreaPolygon,
@@ -29,9 +29,11 @@ import {
 import Sidebar from "@/components/design-studio/Sidebar";
 import StaticTextToolbar from "@/components/design-studio/StaticTextToolbar";
 import "@/app/design-studio/design-studio.css";
-import AdminShirtMockupImage from "./AdminShirtMockupImage";
 import { normalizeAdminTextFill } from "./adminDesignColorUtils";
 import { captureAdminPrintImages } from "./adminPrintCapture";
+import { getProductById } from "@/services/productService";
+
+const SHIRT_TO_PRODUCT_ID: Record<string, number> = { tshirt: 1, polo: 4, hoodie: 3 };
 
 const CONTAINER_W = 500;
 const CONTAINER_H = 600;
@@ -64,6 +66,7 @@ export default function AdminDesignStudio() {
     shirtType,
     shirtColor,
     shirtView,
+    mockupImages,
     addElement,
     updateElement,
     removeElement,
@@ -113,6 +116,40 @@ export default function AdminDesignStudio() {
       });
     };
   }, [message]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchColors = async () => {
+      try {
+        const pid = SHIRT_TO_PRODUCT_ID[shirtType] ?? 1;
+        const product = await getProductById(pid);
+        if (!isMounted) return;
+
+        useDesignStore.getState().setMockupImages(product.images);
+
+        const colorSet = new Set<string>();
+        product.variants.forEach(v => {
+          if (v.colorHex && v.stockQty > 0) colorSet.add(v.colorHex.toLowerCase());
+        });
+
+        const colors = Array.from(colorSet);
+        if (colors.length > 0) {
+          useDesignStore.getState().setAvailableColors(colors);
+
+          const currentHex = useDesignStore.getState().shirtColor.toLowerCase();
+          if (!colors.includes(currentHex)) {
+            useDesignStore.getState().setShirtColor(colors[0]);
+          }
+        } else {
+          useDesignStore.getState().setAvailableColors(["#ffffff", "#000000"]);
+        }
+      } catch (error) {
+        console.error("Failed to load available colors:", error);
+      }
+    };
+    fetchColors();
+    return () => { isMounted = false; };
+  }, [shirtType]);
 
   useEffect(() => {
     let active = true;
@@ -442,7 +479,7 @@ export default function AdminDesignStudio() {
               </div>
             )}
             <div ref={shirtContainerRef} style={{ position: "relative", width: displayW, height: displayH, flexShrink: 0 }}>
-              <AdminShirtMockupImage type={shirtType} view={shirtView} color={shirtColor} width={displayW} height={displayH} />
+              <ShirtMockupImage type={shirtType} view={shirtView} color={shirtColor} images={mockupImages} width={displayW} height={displayH} />
               <CanvasEditor
                 stageRef={stageRef}
                 printArea={printArea}
