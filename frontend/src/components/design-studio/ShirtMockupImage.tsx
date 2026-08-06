@@ -53,6 +53,10 @@ export function getPrintAreaBoundary(
       front: { top: 0.34, left: 0.30, w: 0.40, h: 0.26 },
       back: { top: 0.3, left: 0.26, w: 0.48, h: 0.46 },
     },
+    sweater: {
+      front: { top: 0.32, left: 0.30, w: 0.40, h: 0.38 },
+      back: { top: 0.28, left: 0.28, w: 0.44, h: 0.46 },
+    },
   };
 
   const cfg = configs[type][view];

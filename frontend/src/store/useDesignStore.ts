@@ -46,7 +46,7 @@ export interface DesignElement {
   lineHeight?: number;
 }
 
-export type ShirtType = "tshirt" | "polo" | "hoodie";
+export type ShirtType = "tshirt" | "polo" | "hoodie" | "sweater";
 export type ShirtView = "front" | "back";
 
 /** Ảnh mockup của phôi áo đang thiết kế, tải từ DB theo màu/mặt (xem ShirtMockupImage.tsx). */

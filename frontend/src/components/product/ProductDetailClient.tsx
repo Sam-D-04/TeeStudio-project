@@ -56,7 +56,7 @@ const COLOR_HEX_MAP: Record<string, string> = {
   Gray: "#94a3b8",
   Grey: "#9ca3af",
   "Dark Gray": "#374151",
-  Green: "#16a34a",
+  Green: "#15803d",
   Yellow: "#eab308",
   Pink: "#f472b6",
   Orange: "#f97316",
@@ -64,6 +64,7 @@ const COLOR_HEX_MAP: Record<string, string> = {
   Beige: "#d6b89a",
   Brown: "#8b4513",
   Khaki: "#c5b28a",
+  Blue: "#1e3a8a",
   // Tiếng Việt (từ DB)
   "Trắng": "#ffffff",
   "trắng": "#ffffff",
@@ -73,7 +74,7 @@ const COLOR_HEX_MAP: Record<string, string> = {
   "Xám": "#94a3b8",
   "Xanh navy": "#1e3a8a",
   "Xanh dương": "#3b82f6",
-  "Xanh lá": "#16a34a",
+  "Xanh lá": "#15803d",
   "Xanh nhạt": "#7dd3fc",
   "Vàng": "#eab308",
   "Hồng": "#f472b6",
@@ -127,7 +128,7 @@ const getColorLabel = (color: string): string => {
 const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 
 const FORM_LABEL: Record<string, string> = {
-  tshirt: "Áo Thun", polo: "Áo Polo", hoodie: "Áo Hoodie",
+  tshirt: "Áo Thun", polo: "Áo Polo", hoodie: "Áo Hoodie", sweater: "Áo Sweater"
 };
 
 const MOCKUP_MAP: Record<string, Record<string, { front?: string; back?: string }>> = {
@@ -307,18 +308,28 @@ export default function ProductDetailClient({ product }: Props) {
 
   const englishColor = VI_TO_EN[selectedColor] || selectedColor;
 
-  // Tìm ảnh từ DB theo altText (nhiều format: Color-front, color-front, v.v.)
+  // Tìm ảnh từ DB ưu tiên theo colorHex + view, fallback theo altText
   const findDbImage = (color: string, view: string): string | undefined => {
+    const targetColorHex = COLOR_HEX_MAP[color]?.toLowerCase() || "";
+    // 1. Tìm chính xác theo colorHex và view
+    const exact = product.images?.find(
+      (img) => img.view === view && img.colorHex?.toLowerCase() === targetColorHex
+    );
+    if (exact) return exact.url;
+
+    // 2. Fallback tìm theo altText
     const enColor = VI_TO_EN[color] || color;
     const candidates = [
-      `${enColor}-${view}`,          // e.g. "Grey-front"
-      `${color}-${view}`,            // e.g. "Xám-front"
-      `${enColor}-${view}`.toLowerCase(), // e.g. "grey-front"
-      `${view}`,                     // fallback nếu chỉ có 1 màu
-    ];
-    return product.images?.find((img) =>
-      candidates.some(c => img.altText?.toLowerCase() === c.toLowerCase())
-    )?.url;
+      `${enColor}-${view}`,
+      `${color}-${view}`,
+      `${view}`,
+    ].map(c => c.toLowerCase());
+    
+    return product.images?.find((img) => {
+      const alt = img.altText?.toLowerCase() || "";
+      if (alt === view) return true; // strict match for fallback
+      return candidates.filter(c => c !== view).some(c => alt === c || alt.endsWith(c) || alt.includes(`-${c}`));
+    })?.url;
   };
 
   const dbImageFront = findDbImage(selectedColor, "front");

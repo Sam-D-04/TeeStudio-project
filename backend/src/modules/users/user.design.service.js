@@ -13,6 +13,7 @@ async function mapShirtTypeToProductId(shirtType) {
   let nameLike = 'Áo Thun%';
   if (shirtType === 'polo') nameLike = 'Áo Polo%';
   if (shirtType === 'hoodie') nameLike = 'Áo Hoodie%';
+  if (shirtType === 'sweater') nameLike = 'Áo Sweater%';
 
   const [rows] = await db.pool.query(
     "SELECT id FROM Product WHERE name LIKE ? LIMIT 1",

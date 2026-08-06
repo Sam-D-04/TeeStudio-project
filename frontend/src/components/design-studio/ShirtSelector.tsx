@@ -22,6 +22,7 @@ const SHIRT_TYPE_OPTIONS: { value: ShirtType; label: string }[] = [
   { value: "tshirt", label: "Áo Thun" },
   { value: "polo", label: "Áo Polo" },
   { value: "hoodie", label: "Áo Hoodie" },
+  { value: "sweater", label: "Áo Sweater" },
 ];
 
 export default function ShirtSelector({ 
