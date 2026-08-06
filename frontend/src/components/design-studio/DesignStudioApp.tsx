@@ -395,8 +395,19 @@ export default function DesignStudioApp() {
       };
 
       if (currentDesignId) {
-        await userDesignService.updateDesign(accessToken, currentDesignId, payload);
-        showToast("Đã cập nhật thiết kế thành công");
+        const currentStatus = useDesignStore.getState().currentDesignStatus;
+        if (currentStatus === "PENDING_REVIEW" || currentStatus === "APPROVED") {
+          // Thiết kế đang chờ duyệt hoặc đã duyệt (locked) -> Tạo bản sao mới
+          const newName = name.endsWith(" (Bản sao)") ? name : name + " (Bản sao)";
+          const res = await userDesignService.createDesign(accessToken, { ...payload, name: newName });
+          setCurrentDesignId(res.id);
+          useDesignStore.getState().setCurrentDesignStatus("DRAFT");
+          useDesignStore.getState().setDesignName(newName);
+          showToast("Đã tạo bản sao mới do thiết kế gốc đang/đã duyệt");
+        } else {
+          await userDesignService.updateDesign(accessToken, currentDesignId, payload);
+          showToast("Đã cập nhật thiết kế thành công");
+        }
       } else {
         const res = await userDesignService.createDesign(accessToken, payload);
         setCurrentDesignId(res.id);
