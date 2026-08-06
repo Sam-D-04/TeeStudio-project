@@ -596,73 +596,53 @@ export default function CheckoutPage() {
                   {/* Phần chọn địa chỉ có sẵn nếu đã đăng nhập và có địa chỉ */}
                   {userAddresses.length > 0 && (
                     <div style={{ marginBottom: 24, marginTop: 12 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <div style={{ marginBottom: 12 }}>
                         <span style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>Sổ địa chỉ của bạn</span>
                       </div>
                       
-                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                        {userAddresses.map(a => {
-                          const isSelected = selectedAddressId === a.id;
-                          return (
-                            <div 
-                              key={a.id}
-                              onClick={() => handleSelectAddress(a.id)}
-                              style={{ 
-                                padding: 16, 
-                                borderRadius: 12, 
-                                border: isSelected ? "2px solid #0ea5e9" : "1px solid #e2e8f0",
-                                background: isSelected ? "#f0f9ff" : "#fff",
-                                cursor: "pointer",
-                                transition: "all 0.2s ease"
-                              }}
-                            >
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                                <div>
-                                  <div style={{ fontWeight: 600, color: "#0f172a", marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
-                                    {a.recipientName}
-                                    {a.isDefault && (
-                                      <span style={{ fontSize: 10, padding: "2px 6px", background: "#0ea5e9", color: "#fff", borderRadius: 4, fontWeight: 700 }}>
-                                        Mặc định
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div style={{ fontSize: 13, color: "#475569", marginBottom: 4 }}>SĐT: {a.phone}</div>
-                                  <div style={{ fontSize: 13, color: "#475569" }}>{a.addressLine}, {a.ward}, {a.city}</div>
-                                </div>
-                                {isSelected && (
-                                  <div style={{ color: "#0ea5e9", display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, background: "#fff", borderRadius: "50%", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                  </div>
+                      <Select
+                        value={selectedAddressId}
+                        onChange={(val) => handleSelectAddress(val)}
+                        style={{ width: "100%", height: 50 }}
+                        popupMatchSelectWidth={false}
+                        optionLabelProp="label"
+                      >
+                        {userAddresses.map(a => (
+                          <Select.Option 
+                            key={a.id} 
+                            value={a.id} 
+                            label={
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontWeight: 600, color: "#0f172a" }}>{a.recipientName}</span>
+                                <span>- {a.phone}</span>
+                                {a.isDefault && (
+                                  <span style={{ fontSize: 10, padding: "2px 6px", background: "#0ea5e9", color: "#fff", borderRadius: 4, fontWeight: 700 }}>
+                                    Mặc định
+                                  </span>
                                 )}
                               </div>
+                            }
+                          >
+                            <div style={{ padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
+                              <div style={{ fontWeight: 600, color: "#0f172a", marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
+                                {a.recipientName}
+                                {a.isDefault && (
+                                  <span style={{ fontSize: 10, padding: "2px 6px", background: "#0ea5e9", color: "#fff", borderRadius: 4, fontWeight: 700 }}>
+                                    Mặc định
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: 13, color: "#475569", marginBottom: 4 }}>SĐT: {a.phone}</div>
+                              <div style={{ fontSize: 13, color: "#475569" }}>{a.addressLine}, {a.ward}, {a.city}</div>
                             </div>
-                          )
-                        })}
-
-                        {/* Nút thêm địa chỉ mới */}
-                        <div 
-                          onClick={() => handleSelectAddress("NEW")}
-                          style={{ 
-                            padding: 16, 
-                            borderRadius: 12, 
-                            border: selectedAddressId === "NEW" ? "2px solid #0ea5e9" : "1px dashed #cbd5e1",
-                            background: selectedAddressId === "NEW" ? "#f0f9ff" : "transparent",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            color: selectedAddressId === "NEW" ? "#0ea5e9" : "#64748b",
-                            fontWeight: 600,
-                            fontSize: 14,
-                            transition: "all 0.2s ease",
-                            justifyContent: "center"
-                          }}
-                        >
-                          <PlusOutlined /> Giao đến địa chỉ mới khác
-                        </div>
-                      </div>
+                          </Select.Option>
+                        ))}
+                        <Select.Option key="NEW" value="NEW" label={<span style={{ color: "#0ea5e9", fontWeight: 600 }}><PlusOutlined /> Giao đến địa chỉ mới khác</span>}>
+                          <div style={{ color: "#0ea5e9", fontWeight: 600, padding: '8px 0', display: "flex", alignItems: "center", gap: 8 }}>
+                            <PlusOutlined /> Giao đến địa chỉ mới khác
+                          </div>
+                        </Select.Option>
+                      </Select>
                     </div>
                   )}
 
