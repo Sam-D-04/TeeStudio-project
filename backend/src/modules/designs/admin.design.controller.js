@@ -183,7 +183,8 @@ const getBienTheTaoThietKe = async (req, res, next) => {
   try {
     const data = await designService.layBienTheTaoThietKe(
       req.query.shirtType,
-      req.query.shirtColor
+      req.query.shirtColor,
+      req.query.productId
     );
     res.json({ success: true, data });
   } catch (error) {

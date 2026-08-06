@@ -392,11 +392,12 @@ export async function yeuCauChinhSuaThietKe(
 /** Lấy các size đúng với loại áo và màu đang chọn trong Admin Design Studio. */
 export async function layBienTheTaoThietKe(
   shirtType: ShirtType,
-  shirtColor: string
+  shirtColor: string,
+  productId?: number
 ): Promise<TuyChonBienTheTaoThietKe> {
   const res = await apiClient.get<{ success: boolean; data: TuyChonBienTheTaoThietKe }>(
-    "/admin/designs/customer-draft-variants",
-    { params: { shirtType, shirtColor } }
+    `/admin/designs/customer-draft-variants`,
+    { params: { shirtType, shirtColor, productId } }
   );
   return res.data.data;
 }

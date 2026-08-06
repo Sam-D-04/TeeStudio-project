@@ -206,7 +206,7 @@ async function timSanPhamTheoLoaiAo(shirtType, executor = db.pool) {
   return rows[0].id;
 }
 
-async function layBienTheTaoThietKe(shirtType, shirtColor) {
+async function layBienTheTaoThietKe(shirtType, shirtColor, explicitProductId) {
   if (!LOAI_AO_HOP_LE.has(shirtType)) {
     throw taoLoi("Loại áo không hợp lệ", 400);
   }
@@ -214,7 +214,7 @@ async function layBienTheTaoThietKe(shirtType, shirtColor) {
     throw taoLoi("Màu áo không hợp lệ", 400);
   }
 
-  const productId = await timSanPhamTheoLoaiAo(shirtType);
+  const productId = explicitProductId ? Number(explicitProductId) : await timSanPhamTheoLoaiAo(shirtType);
   const [products] = await db.pool.query(
     "SELECT name FROM Product WHERE id = ? LIMIT 1",
     [productId]
@@ -1137,22 +1137,22 @@ async function suaThietKeChoKhach(
     }
 
     if (!quyenSua.hasOrder) {
-      productId = await timSanPhamTheoLoaiAo(requestedShirtType, conn);
       selectedVariantId = Number(variantId);
       if (!Number.isInteger(selectedVariantId) || selectedVariantId <= 0) {
         throw taoLoi("Vui lòng chọn size áo", 400);
       }
 
       const [variants] = await conn.query(
-        `SELECT id, colorHex, color, size
+        `SELECT id, productId, colorHex, color, size
          FROM ProductVariant
-         WHERE id = ? AND productId = ? AND (status IS NULL OR status = 'ACTIVE')
+         WHERE id = ? AND (status IS NULL OR status = 'ACTIVE')
          LIMIT 1`,
-        [selectedVariantId, productId]
+        [selectedVariantId]
       );
       if (!variants.length) {
         throw taoLoi("Size da chon khong thuoc loai ao nay hoac khong con hoat dong", 400);
       }
+      productId = variants[0].productId;
 
       normalizedColor = chuanHoaMauAo(
         shirtColor,
@@ -1313,6 +1313,22 @@ async function taoThietKeChoKhach({
   if (hasCustomer && (!Number.isInteger(customerId) || customerId <= 0)) {
     throw taoLoi("Vui lòng chọn khách hàng hợp lệ", 400);
   }
+  const selectedVariantId = Number(variantId);
+  if (!Number.isInteger(selectedVariantId) || selectedVariantId <= 0) {
+    throw taoLoi("Vui lòng chọn size áo", 400);
+  }
+
+  const [variants] = await db.pool.query(
+    `SELECT id, productId, colorHex, size
+     FROM ProductVariant
+     WHERE id = ? AND (status IS NULL OR status = 'ACTIVE')
+     LIMIT 1`,
+    [selectedVariantId]
+  );
+  if (!variants.length) {
+    throw taoLoi("Size đã chọn không hợp lệ hoặc không còn hoạt động", 400);
+  }
+  const productId = variants[0].productId;
   if (!name || !String(name).trim()) {
     throw taoLoi("Vui lòng nhập tên thiết kế", 400);
   }
@@ -1330,22 +1346,7 @@ async function taoThietKeChoKhach({
     }
   }
 
-  const productId = await timSanPhamTheoLoaiAo(shirtType);
-  const selectedVariantId = Number(variantId);
-  if (!Number.isInteger(selectedVariantId) || selectedVariantId <= 0) {
-    throw taoLoi("Vui lòng chọn size áo", 400);
-  }
 
-  const [variants] = await db.pool.query(
-    `SELECT id, colorHex, size
-     FROM ProductVariant
-     WHERE id = ? AND productId = ? AND (status IS NULL OR status = 'ACTIVE')
-     LIMIT 1`,
-    [selectedVariantId, productId]
-  );
-  if (!variants.length) {
-    throw taoLoi("Size đã chọn không thuộc loại áo này hoặc không còn hoạt động", 400);
-  }
   if (
     String(variants[0].colorHex || "").trim().toLowerCase() !==
     String(shirtColor || "").trim().toLowerCase()

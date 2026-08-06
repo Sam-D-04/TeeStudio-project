@@ -32,8 +32,7 @@ import "@/app/design-studio/design-studio.css";
 import { normalizeAdminTextFill } from "./adminDesignColorUtils";
 import { captureAdminPrintImages } from "./adminPrintCapture";
 import { getProductById } from "@/services/productService";
-
-const SHIRT_TO_PRODUCT_ID: Record<string, number> = { tshirt: 1, polo: 4, hoodie: 3 };
+import * as productService from "@/services/admin/productService";
 
 const CONTAINER_W = 500;
 const CONTAINER_H = 600;
@@ -45,6 +44,8 @@ export default function AdminDesignStudio() {
   const shirtContainerRef = useRef<HTMLDivElement>(null);
   const [customers, setCustomers] = useState<accountService.TaiKhoanKhachHang[]>([]);
   const [customerId, setCustomerId] = useState<number>();
+  const [products, setProducts] = useState<productService.SanPham[]>([]);
+  const [adminSelectedProductId, setAdminSelectedProductId] = useState<number>();
   const [variantSelection, setVariantSelection] = useState<{ id: number; key: string }>();
   const [sizeResult, setSizeResult] = useState<{
     key: string;
@@ -78,7 +79,7 @@ export default function AdminDesignStudio() {
     redoStack,
   } = useDesignStore();
 
-  const variantKey = `${shirtType}|${shirtColor.toLowerCase()}`;
+  const variantKey = `${shirtType}|${shirtColor.toLowerCase()}|${adminSelectedProductId}`;
   const variantId = variantSelection?.key === variantKey ? variantSelection.id : undefined;
   const sizeOptions = sizeResult.key === variantKey ? sizeResult.variants : [];
   const loadingSizes = sizeResult.key !== variantKey;
@@ -102,6 +103,20 @@ export default function AdminDesignStudio() {
       .catch(() => message.error("Không thể tải danh sách khách hàng"))
       .finally(() => setLoadingCustomers(false));
 
+    productService
+      .layDanhSachSanPham({ soMoiTrang: 100, trangThai: "dang_hien_thi" })
+      .then((res) => {
+        setProducts(res.danhSach);
+        if (res.danhSach.length > 0) {
+          setAdminSelectedProductId(res.danhSach[0].id);
+          const st = res.danhSach[0].shirtType;
+          if (st) {
+            useDesignStore.getState().setShirtType(st as any);
+          }
+        }
+      })
+      .catch(() => message.error("Không thể tải danh sách phôi áo"));
+
     designService.layDanhSachPhuongPhapIn()
       .then(setPrintMethods)
       .catch(() => message.warning("Không thể tải danh sách phương pháp in"));
@@ -119,10 +134,10 @@ export default function AdminDesignStudio() {
 
   useEffect(() => {
     let isMounted = true;
+    if (!adminSelectedProductId) return;
     const fetchColors = async () => {
       try {
-        const pid = SHIRT_TO_PRODUCT_ID[shirtType] ?? 1;
-        const product = await getProductById(pid);
+        const product = await getProductById(adminSelectedProductId);
         if (!isMounted) return;
 
         useDesignStore.getState().setMockupImages(product.images);
@@ -149,14 +164,15 @@ export default function AdminDesignStudio() {
     };
     fetchColors();
     return () => { isMounted = false; };
-  }, [shirtType]);
+  }, [adminSelectedProductId]);
 
   useEffect(() => {
     let active = true;
-    const requestedKey = `${shirtType}|${shirtColor.toLowerCase()}`;
+    if (!adminSelectedProductId) return;
+    const requestedKey = `${shirtType}|${shirtColor.toLowerCase()}|${adminSelectedProductId}`;
 
     designService
-      .layBienTheTaoThietKe(shirtType, shirtColor)
+      .layBienTheTaoThietKe(shirtType, shirtColor, adminSelectedProductId)
       .then((result) => {
         if (active) setSizeResult({ key: requestedKey, variants: result.variants });
       })
@@ -170,7 +186,7 @@ export default function AdminDesignStudio() {
     return () => {
       active = false;
     };
-  }, [message, shirtColor, shirtType]);
+  }, [message, shirtColor, shirtType, adminSelectedProductId]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -565,8 +581,48 @@ export default function AdminDesignStudio() {
               </button>
             </div>
 
-            {/* Chọn Loại áo & Màu áo qua ShirtSelector dùng chung */}
-            <ShirtSelector showShirtType={true} ignoreRevisionMode={true} />
+            <div
+              style={{
+                display: "flex",
+                background: "rgba(30, 41, 59, 0.7)",
+                backdropFilter: "blur(12px)",
+                padding: "4px 12px",
+                borderRadius: 9999,
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 13, color: "#cbd5e1", fontWeight: 500 }}>Phôi áo:</span>
+              <select
+                value={adminSelectedProductId || ""}
+                onChange={(e) => {
+                  const pid = Number(e.target.value);
+                  setAdminSelectedProductId(pid);
+                  const p = products.find(x => x.id === pid);
+                  if (p && p.shirtType) {
+                    useDesignStore.getState().setShirtType(p.shirtType as any);
+                  }
+                }}
+                style={{
+                  background: "transparent",
+                  color: "#fff",
+                  border: "none",
+                  outline: "none",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                {products.map((p) => (
+                  <option key={p.id} value={p.id} style={{ color: "#000" }}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Chỉ chọn màu áo qua ShirtSelector dùng chung */}
+            <ShirtSelector showShirtType={false} ignoreRevisionMode={true} />
 
 
             <div className="ds-zoom-controls" style={{ position: "static" }}>
