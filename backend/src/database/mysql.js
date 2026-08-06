@@ -34,6 +34,23 @@ const getDatabaseConfig = () => {
 
 const pool = mysql.createPool(getDatabaseConfig());
 
+// Ping DB lúc khởi động để log rõ đã kết nối được chưa (không log password).
+const testConnection = async () => {
+  const { host, port, database, user } = getDatabaseConfig();
+  try {
+    await pool.query("SELECT 1");
+    console.log(
+      `[DB] Kết nối MySQL thành công -> user=${user} host=${host} port=${port} database=${database}`
+    );
+    return true;
+  } catch (error) {
+    console.error(
+      `[DB] Kết nối MySQL THẤT BẠI -> user=${user} host=${host} port=${port} database=${database} | ${error.code || ""} ${error.message}`
+    );
+    return false;
+  }
+};
+
 const query = async (sql, params = []) => {
   const [rows] = await pool.query(sql, params);
   return rows;
@@ -70,4 +87,5 @@ module.exports = {
   execute,
   transaction,
   closePool,
+  testConnection,
 };

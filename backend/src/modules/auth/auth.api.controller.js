@@ -11,17 +11,25 @@ const getSessionMetadata = (req) => ({
 // Refresh token không còn trả về trong JSON body — được set làm cookie
 // HttpOnly để giảm rủi ro bị đánh cắp qua XSS (frontend chỉ đọc được qua request).
 const setRefreshCookie = (res, refreshToken, refreshTokenExpiresAt) => {
+  const isProduction = process.env.NODE_ENV === "production";
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProduction,
+    // "none" để trình duyệt vẫn gửi cookie khi frontend (Vercel) và backend (Render)
+    // khác domain nhau (cross-site); "none" bắt buộc phải đi kèm secure: true.
+    sameSite: isProduction ? "none" : "lax",
     path: REFRESH_COOKIE_PATH,
     expires: new Date(refreshTokenExpiresAt),
   });
 };
 
 const clearRefreshCookie = (res) => {
-  res.clearCookie(REFRESH_COOKIE_NAME, { path: REFRESH_COOKIE_PATH });
+  const isProduction = process.env.NODE_ENV === "production";
+  res.clearCookie(REFRESH_COOKIE_NAME, {
+    path: REFRESH_COOKIE_PATH,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+  });
 };
 
 const respondWithSession = (res, statusCode, message, session) => {
