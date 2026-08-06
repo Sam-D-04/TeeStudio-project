@@ -50,7 +50,7 @@ import {
 import { captureAdminPrintImages } from "./adminPrintCapture";
 import { getProductById } from "@/services/productService";
 
-const SHIRT_TO_PRODUCT_ID: Record<string, number> = { tshirt: 1, polo: 4, hoodie: 3 };
+const SHIRT_TO_PRODUCT_ID: Record<string, number> = { tshirt: 1, polo: 4, hoodie: 3, sweater: 5 };
 
 
 const CONTAINER_W = 500;

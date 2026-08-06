@@ -171,6 +171,7 @@ function ExternalTransformer({
           /* node.x() = storeX + (flipH ? newW : 0) → giải ngược về storeX */
           const storeX = node.x() - (flipH ? newW : 0);
           const storeY = node.y() - (flipV ? newH : 0);
+          console.log("Vị trí:", { x: storeX, y: storeY, rotation: node.rotation(), el });
           updateElement(el.id, { x: storeX, y: storeY, width: newW, height: newH, rotation: node.rotation() });
         } else if (el.type === "text") {
           const flipH = el.flipH ?? false;

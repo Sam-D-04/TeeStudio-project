@@ -39,7 +39,7 @@ import "../../app/design-studio/design-studio.css";
 const CONTAINER_W = 500;
 const CONTAINER_H = 600;
 
-const SHIRT_TO_PRODUCT_ID: Record<string, number> = { tshirt: 1, polo: 4, hoodie: 3 };
+const SHIRT_TO_PRODUCT_ID: Record<string, number> = { tshirt: 1, polo: 4, hoodie: 3, sweater: 5 };
 
 export default function DesignStudioApp() {
   const stageRef         = useRef<Konva.Stage | null>(null);
@@ -116,7 +116,7 @@ export default function DesignStudioApp() {
     const pid      = searchParams.get("productId");
     const designId = searchParams.get("designId");
 
-    if (shirt === "tshirt" || shirt === "polo" || shirt === "hoodie") setShirtType(shirt);
+    if (shirt === "tshirt" || shirt === "polo" || shirt === "hoodie" || shirt === "sweater") setShirtType(shirt);
     if (color) {
       setColorName(color);
       // Hex phải khớp đúng ProductVariant.colorHex trong DB (xem migration
@@ -381,6 +381,7 @@ export default function DesignStudioApp() {
         name,
         shirtType,
         shirtColor,
+        productId: urlProductId ?? SHIRT_TO_PRODUCT_ID[shirtType] ?? 1,
         canvasData: {
           version: 1,
           elements: useDesignStore.getState().elements,
@@ -405,8 +406,23 @@ export default function DesignStudioApp() {
           useDesignStore.getState().setDesignName(newName);
           showToast("Đã tạo bản sao mới do thiết kế gốc đang/đã duyệt");
         } else {
-          await userDesignService.updateDesign(accessToken, currentDesignId, payload);
-          showToast("Đã cập nhật thiết kế thành công");
+          try {
+            await userDesignService.updateDesign(accessToken, currentDesignId, payload);
+            showToast("Đã cập nhật thiết kế thành công");
+          } catch (err: any) {
+            // Nếu lỗi 404 (Design not found or cannot be edited)
+            // Có thể do thiết kế đã được chuyển sang PENDING_REVIEW khi khách đặt hàng (bị lệch state với store)
+            if (err.message.includes("404") || err.message.toLowerCase().includes("not found")) {
+              const newName = name.endsWith(" (Bản sao)") ? name : name + " (Bản sao)";
+              const res = await userDesignService.createDesign(accessToken, { ...payload, name: newName });
+              setCurrentDesignId(res.id);
+              useDesignStore.getState().setCurrentDesignStatus("DRAFT");
+              useDesignStore.getState().setDesignName(newName);
+              showToast("Thiết kế gốc đã khoá (đã đặt hàng/gửi duyệt). Đã tạo bản sao mới!");
+            } else {
+              throw err;
+            }
+          }
         }
       } else {
         const res = await userDesignService.createDesign(accessToken, payload);

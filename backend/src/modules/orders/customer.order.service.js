@@ -176,6 +176,7 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
   if (rowsUser.length === 0) {
     const err = new Error("Khách hàng không tồn tại hoặc đã bị vô hiệu hóa");
     err.statusCode = 400;
+    console.error("[DEBUG] Lỗi 400: ", err.message);
     throw err;
   }
   // Dùng email đã đăng ký trong Account để gửi mail xác nhận đơn (đáng tin cậy
@@ -202,6 +203,7 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
     if (rowsVariant.length === 0) {
       const err = new Error(`Biến thể sản phẩm ID=${item.variantId} không tồn tại`);
       err.statusCode = 400;
+      console.error("[DEBUG] Lỗi 400: ", err.message);
       throw err;
     }
 
@@ -213,6 +215,7 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
         `Sản phẩm "${variant.tenSanPham}" (${variant.color}/${variant.size}) chỉ còn ${variant.stockQty} trong kho, không đủ ${item.quantity} sản phẩm`
       );
       err.statusCode = 400;
+      console.error("[DEBUG] Lỗi 400: ", err.message);
       throw err;
     }
 
@@ -276,6 +279,7 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
     if (rowsDesign.length === 0) {
       const err = new Error(`Thiết kế ID=${enriched.designId} không tồn tại`);
       err.statusCode = 400;
+      console.error("[DEBUG] Lỗi 400: ", err.message);
       throw err;
     }
 
@@ -285,16 +289,13 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
     if (design.designUserId !== userId) {
       const err = new Error(`Thiết kế ID=${enriched.designId} không thuộc khách hàng này`);
       err.statusCode = 400;
+      console.error("[DEBUG] Lỗi 400: ", err.message);
       throw err;
     }
 
     // KHÁC biệt so với admin:
     // Không kiểm tra "status === APPROVED" — khách được đặt hàng với bất kỳ status nào (DRAFT, PENDING_REVIEW, etc.)
-    // Thay vào đó, tự động chuyển thiết kế sang PENDING_REVIEW để gửi admin duyệt
-    await db.pool.query(
-      "UPDATE CustomDesign SET status = 'PENDING_REVIEW' WHERE id = ?",
-      [enriched.designId]
-    );
+    // Trạng thái PENDING_REVIEW sẽ được cập nhật bên trong transaction lúc tạo đơn
 
     // Phôi áo và màu của item phải khớp với thiết kế
     if (design.productId !== enriched.productId) {
@@ -302,9 +303,15 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
         `Thiết kế ID=${enriched.designId} thuộc sản phẩm khác, không thể gán vào "${enriched.tenSanPham}"`
       );
       err.statusCode = 400;
+      console.error("[DEBUG] Lỗi 400: ", err.message);
       throw err;
     }
 
+    /* 
+    // BỎ QUA KIỂM TRA MÀU: 
+    // Khách hàng có thể thay đổi màu thiết kế và thêm vào giỏ nhiều lần. 
+    // Thiết kế chỉ lưu variantId cuối cùng, nên nếu kiểm tra sẽ gây lỗi "Thiết kế ID=... chỉ được đặt với màu...".
+    // Khách hàng đặt màu nào (variantId) thì xưởng in sẽ in lên áo màu đó.
     const designColor = design.designColor || design.baseColor;
     if (
       designColor &&
@@ -316,6 +323,7 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
       err.statusCode = 400;
       throw err;
     }
+    */
 
     if (!uniqueDesignIdsFee.has(enriched.designId)) {
       enriched.designFee = Number(design.designFee);
@@ -367,12 +375,14 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
       "Đơn có sản phẩm Áo in POD / Thiết kế POD chỉ được thanh toán online bằng VNPAY hoặc MoMo"
     );
     err.statusCode = 400;
+    console.error("[DEBUG] Lỗi 400: ", err.message);
     throw err;
   }
 
   if (!hasCustomDesign && paymentType === "DEPOSIT") {
     const err = new Error("Chỉ đơn hàng POD mới được chọn hình thức đặt cọc");
     err.statusCode = 400;
+    console.error("[DEBUG] Lỗi 400: ", err.message);
     throw err;
   }
 
@@ -610,6 +620,11 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
           `INSERT INTO OrderProduction (orderItemId, designId, status)
            VALUES (?, ?, 'READY_TO_PRINT')`,
           [orderItemId, item.designId]
+        );
+        
+        await conn.query(
+          "UPDATE CustomDesign SET status = 'PENDING_REVIEW' WHERE id = ?",
+          [item.designId]
         );
       }
 

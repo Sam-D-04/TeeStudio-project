@@ -57,12 +57,12 @@ async function getMyDesigns(userId) {
  * Create a new DRAFT custom design.
  */
 async function saveNewDesign(userId, payload) {
-  const { name, shirtType, shirtColor, previewUrl } = payload;
+  const { name, shirtType, shirtColor, previewUrl, productId: payloadProductId } = payload;
   
   // Chuẩn hoá và validate dữ liệu từ client
   const canvasData = chuanHoaCanvasData(payload.canvasData, shirtType);
 
-  const productId = await mapShirtTypeToProductId(shirtType);
+  const productId = payloadProductId || await mapShirtTypeToProductId(shirtType);
   const dataStr = JSON.stringify(canvasData);
 
   let printExtraCost = 0;
@@ -105,7 +105,7 @@ async function saveNewDesign(userId, payload) {
  * đang xét duyệt hoặc thiết kế đã lên production.
  */
 async function updateDesign(userId, designId, payload) {
-  const { name, shirtType, shirtColor, previewUrl } = payload;
+  const { name, shirtType, shirtColor, previewUrl, productId: payloadProductId } = payload;
 
   // Chuẩn hoá và validate dữ liệu từ client
   const canvasData = chuanHoaCanvasData(payload.canvasData, shirtType);
@@ -122,7 +122,7 @@ async function updateDesign(userId, designId, payload) {
     throw error;
   }
 
-  const productId = await mapShirtTypeToProductId(shirtType);
+  const productId = payloadProductId || await mapShirtTypeToProductId(shirtType);
   const dataStr = JSON.stringify(canvasData);
 
   let printExtraCost = 0;

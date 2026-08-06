@@ -158,10 +158,21 @@ export const useDesignStore = create<DesignState>((set, get) => ({
 
   addElement: (el) => {
     const state = get();
+    const side = state.shirtView;
+
+    if (el.type === "image") {
+      const imagesOnSide = state.elements.filter(
+        (e) => e.type === "image" && (e.side ?? "front") === side
+      );
+      if (imagesOnSide.length >= 2) {
+        return;
+      }
+    }
+
     state.pushHistory();
     // Gắn "side" theo mặt áo đang xem tại thời điểm thêm - đây là nơi DUY NHẤT
     // quyết định 1 phần tử mới thuộc mặt trước hay mặt sau.
-    const newEl: DesignElement = { ...el, id: uuidv4(), side: state.shirtView };
+    const newEl: DesignElement = { ...el, id: uuidv4(), side };
     set({ elements: [...state.elements, newEl], selectedId: newEl.id });
   },
 
@@ -192,6 +203,20 @@ export const useDesignStore = create<DesignState>((set, get) => ({
     const state = get();
     const el = state.elements.find((e) => e.id === id);
     if (!el) return;
+
+    if (el.type === "image") {
+      const side = el.side ?? "front";
+      const imagesOnSide = state.elements.filter(
+        (e) => e.type === "image" && (e.side ?? "front") === side
+      );
+
+
+      //Giới hạn 2 ảnh trên 1 mặt
+      //  if (imagesOnSide.length >= 2) {
+      //  return;
+      // }
+    }
+
     state.pushHistory();
     const dup: DesignElement = {
       ...el,
@@ -203,7 +228,7 @@ export const useDesignStore = create<DesignState>((set, get) => ({
   },
 
   // Đưa phần tử lên trên 1 lớp.
-  // LƯU Ý: "lớp trên" phải là phần tử TIẾP THEO CÙNG MẶT (front/back), không
+  // LƯU Ý: "lớp trên" phải là phần tử TIẾP THEO CÙNG MẶT, không
   // phải phần tử liền kề tuyệt đối trong mảng - vì mảng "elements" chứa chung
   // phần tử của cả 2 mặt, phần tử của mặt kia có thể nằm xen giữa. Nếu chỉ
   // đổi chỗ với phần tử liền kề tuyệt đối, thứ tự lớp có thể vô tình hoán đổi
