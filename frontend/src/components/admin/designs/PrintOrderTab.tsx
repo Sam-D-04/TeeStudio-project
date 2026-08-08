@@ -778,7 +778,6 @@ export default function PrintOrderTab({
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                           <DesignPreview
                             urlAnh={don.urlPreview ?? undefined}
-                            urlAnhMatSau={don.urlFileInBack ?? undefined}
                             mauAo={don.mauAo}
                             maThietKe={don.maThietKe}
                           />
@@ -855,33 +854,35 @@ export default function PrintOrderTab({
                           >
                             <FileTextOutlined />
                           </button>
-                          {/* Nút Xem file in chuẩn - mặt trước (luôn có, kể cả đơn cũ chỉ 1 mặt) */}
-                          <button
-                            title={don.urlFileInBack ? "Xem file in mặt trước" : "Xem file in chuẩn"}
-                            onClick={() => xemFileIn(don, "truoc")}
-                            style={{
-                              width: 32,
-                              height: 32,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              borderRadius: 6,
-                              border: "1px solid #e2e8f0",
-                              background: "#f8fafc",
-                              color: "#475569",
-                              cursor: "pointer",
-                              fontSize: 14,
-                              transition: "all 0.15s ease",
-                            }}
-                            onMouseEnter={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.color = "#0ea5e9";
-                            }}
-                            onMouseLeave={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.color = "#475569";
-                            }}
-                          >
-                            <EyeOutlined />
-                          </button>
+                          {/* Nút Xem file in chuẩn - mặt trước (luôn có, kể cả đơn cũ chỉ 1 mặt, trừ khi rõ ràng chỉ thiết kế mặt sau) */}
+                          {(don.urlFileIn || !don.urlFileInBack) && (
+                            <button
+                              title={don.urlFileInBack ? "Xem file in mặt trước" : "Xem file in chuẩn"}
+                              onClick={() => xemFileIn(don, "truoc")}
+                              style={{
+                                width: 32,
+                                height: 32,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                borderRadius: 6,
+                                border: "1px solid #e2e8f0",
+                                background: "#f8fafc",
+                                color: "#475569",
+                                cursor: "pointer",
+                                fontSize: 14,
+                                transition: "all 0.15s ease",
+                              }}
+                              onMouseEnter={(e) => {
+                                (e.currentTarget as HTMLButtonElement).style.color = "#0ea5e9";
+                              }}
+                              onMouseLeave={(e) => {
+                                (e.currentTarget as HTMLButtonElement).style.color = "#475569";
+                              }}
+                            >
+                              <EyeOutlined />
+                            </button>
+                          )}
 
                           {/* Nút Xem file in mặt sau - chỉ hiện khi thiết kế có in mặt sau */}
                           {don.urlFileInBack && (
