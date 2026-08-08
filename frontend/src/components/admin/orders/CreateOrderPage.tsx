@@ -87,6 +87,9 @@ type OrderPreview = {
   designFee: number;
   discountAmount: number;
   shippingFee: number;
+  shippingFeeInput: number;
+  isFreeShipping: boolean;
+  freeShippingDiscount: number;
   totalAmount: number;
   selectedPromotion?: KhuyenMai;
   promotionBaseAmount: number;
@@ -404,6 +407,7 @@ function buildPreview(
 
   const isFreeShipping = selectedPromotion?.loaiGiam === "FREE_SHIPPING" ||
     (freeShippingThreshold !== undefined && freeShippingThreshold > 0 && promotionBaseAmount >= freeShippingThreshold);
+  const freeShippingDiscount = isFreeShipping ? shippingFeeInput : 0;
   const shippingFee = isFreeShipping ? 0 : shippingFeeInput;
 
   const amountBeforeVat = Math.max(0, subtotal + designFee + shippingFee - discountAmount);
@@ -420,6 +424,9 @@ function buildPreview(
     designFee,
     discountAmount,
     shippingFee,
+    shippingFeeInput,
+    isFreeShipping,
+    freeShippingDiscount,
     totalAmount,
     selectedPromotion,
     promotionBaseAmount,
@@ -900,17 +907,9 @@ function ProductItemRow({
               </span>
             </>
           ) : null}
-          {previewLine?.designFee ? (
-            <>
-              <span className="text-border">•</span>
-              <span className="text-text-main">
-                Phí thiết kế: <span className="font-semibold text-orange-600">{formatCurrency(previewLine.designFee)}</span>
-              </span>
-            </>
-          ) : null}
           <span className="text-border">•</span>
           <span className="text-primary-container">
-            Thành tiền: <span className="font-bold">{formatCurrency(previewLine?.lineTotal ?? 0)}</span>
+            Thành tiền: <span className="font-bold">{formatCurrency(previewLine?.lineProductTotal ?? 0)}</span>
           </span>
         </div>
       </div>
@@ -1089,7 +1088,10 @@ function PaymentShippingSection({
             },
           ]}
         >
-          <ShippingFeeInput />
+          <ShippingFeeInput
+            disabled={preview.isFreeShipping}
+            overrideValue={preview.isFreeShipping ? 0 : undefined}
+          />
         </Form.Item>
 
         <Form.Item label="Mã khuyến mãi" name="promotionId" className="mb-0">
@@ -1166,17 +1168,23 @@ function ShippingFeeInput({
   value,
   onChange,
   id,
+  overrideValue,
+  disabled,
 }: {
   value?: number;
   onChange?: (value: number | null) => void;
   id?: string;
+  overrideValue?: number;
+  disabled?: boolean;
 }) {
+  const displayValue = overrideValue !== undefined ? overrideValue : value;
   return (
     <div className="inline-flex h-8 w-auto max-w-full items-stretch">
       <InputNumber<number>
         id={id}
-        value={value}
+        value={displayValue}
         onChange={onChange}
+        disabled={disabled}
         className="!h-8 !w-[150px] rounded-r-none [&_.ant-input-number-input]:!h-8 [&_.ant-input-number-input]:!py-0"
         min={0}
         step={1000}
@@ -1208,7 +1216,8 @@ function OrderSummary({
     ["Tạm tính", preview.subtotal],
     ["Phí thiết kế", preview.designFee],
     ["Giảm giá", -preview.discountAmount],
-    ["Phí ship", preview.shippingFee],
+    ["Phí ship", preview.shippingFeeInput],
+    preview.isFreeShipping ? ["Miễn phí vận chuyển", -preview.freeShippingDiscount] : ["", 0],
     [`VAT (${preview.vatPercent}%)`, preview.vatAmount],
   ].filter(row => row[1] !== 0) as [string, number][];
 
