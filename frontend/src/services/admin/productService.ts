@@ -53,6 +53,7 @@ export type AnhSanPham = {
   altText: string;
   sortOrder?: number;
   laChinh: boolean;
+  view?: "FRONT" | "BACK";
 };
 
 /** Một phôi áo (blank product) trong danh sách */
