@@ -445,40 +445,40 @@ async function ghiGiaoDichKho(payload) {
     throw error;
   }
 
-  // Kiểm tra biến thể tồn tại
-  const [variants] = await db.pool.query(
-    `SELECT id, stockQty FROM ProductVariant WHERE id = ? FOR UPDATE`,
-    [variantId]
-  );
-
-  if (!variants.length) {
-    const error = new Error("Không tìm thấy biến thể phôi áo");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  const variant = variants[0];
-  const soLuongMoi = Number(variant.stockQty) + Number(quantityChanged);
-
-  // Không cho phép xuất kho làm tồn kho về âm
-  if (soLuongMoi < 0) {
-    const error = new Error(
-      `Tồn kho không đủ. Hiện có ${variant.stockQty} áo, yêu cầu xuất ${Math.abs(quantityChanged)} áo.`
-    );
-    error.statusCode = 400;
-    throw error;
-  }
-
-  // Thực hiện trong transaction để đảm bảo toàn vẹn dữ liệu
+  // Thực hiện toàn bộ logic đọc và ghi trong cùng 1 transaction để đảm bảo toàn vẹn dữ liệu
   const result = await db.transaction(async (connection) => {
-    // Ghi giao dịch
+    // 1. Khóa row để đọc số lượng tồn kho hiện tại (tránh race condition)
+    const [variants] = await connection.query(
+      `SELECT id, stockQty FROM ProductVariant WHERE id = ? FOR UPDATE`,
+      [variantId]
+    );
+
+    if (!variants.length) {
+      const error = new Error("Không tìm thấy biến thể phôi áo");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const variant = variants[0];
+    const soLuongMoi = Number(variant.stockQty) + Number(quantityChanged);
+
+    // Không cho phép xuất kho làm tồn kho về âm
+    if (soLuongMoi < 0) {
+      const error = new Error(
+        `Tồn kho không đủ. Hiện có ${variant.stockQty} áo, yêu cầu xuất ${Math.abs(quantityChanged)} áo.`
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 2. Ghi giao dịch
     const [insertResult] = await connection.query(
       `INSERT INTO InventoryTransaction (variantId, orderId, supplierId, quantityChanged, transactionType, reason)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [variantId, orderId, supplierId, quantityChanged, transactionType, reason]
     );
 
-    // Cập nhật tồn kho
+    // 3. Cập nhật tồn kho
     await connection.query(
       `UPDATE ProductVariant SET stockQty = ? WHERE id = ?`,
       [soLuongMoi, variantId]

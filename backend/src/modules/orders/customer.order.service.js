@@ -631,7 +631,7 @@ async function createOrderAsCustomer(data, actor, ipAddress) {
       await conn.query(
         `INSERT INTO InventoryTransaction
            (variantId, orderId, supplierId, quantityChanged, transactionType, reason)
-         VALUES (?, ?, NULL, ?, 'EXPORT', ?)`,
+         VALUES (?, ?, NULL, ?, 'ORDER_EXPORT', ?)`,
         [
           item.variantId,
           orderId,
