@@ -166,6 +166,8 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
         <tbody>
           {items.map((item) => {
             const imageUrl = item.anhXemTruocThietKe || item.anhUrl;
+            const tongPhiIn = (item.phiDienTichInFront || 0) + (item.phiDienTichInBack || 0) + (item.phiPhuongPhapInFront || 0) + (item.phiPhuongPhapInBack || 0);
+            const donGiaAo = item.loai === "custom_design" ? item.donGiaVnd - tongPhiIn : item.donGiaVnd;
 
             return (
               <tr key={item.id} className="border-b border-border last:border-b-0">
@@ -229,19 +231,29 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
                   {item.soLuong}
                 </td>
                 <td className="px-2 py-2 text-right align-middle text-text-main">
-                  <div className="font-semibold">{formatCurrency(item.donGiaVnd)}</div>
+                  <div className="font-semibold">
+                    {formatCurrency(item.donGiaVnd)}
+                  </div>
                   {item.loai === "custom_design" ? (
-                    <div className="mt-0.5 text-xs text-blue-500">
-                      (đã gồm phí in)
+                    <div className="mt-0.5 text-xs text-text-secondary">
+                      ({formatCurrency(donGiaAo)} + {formatCurrency((item.phiPhuongPhapInFront || 0) + (item.phiPhuongPhapInBack || 0))} + {formatCurrency((item.phiDienTichInFront || 0) + (item.phiDienTichInBack || 0))})
                     </div>
                   ) : null}
-                  {item.phiThietKeVnd > 0 ? (
+                  {item.phiThietKeVnd > 0 && item.loai === "custom_design" ? (
+                    <div className="mt-1 flex flex-col items-end text-xs text-text-secondary">
+                      <div className="font-semibold text-text-main">Phí in ấn:</div>
+                      {item.phiDienTichInFront ? <div>+ DT in (trước): {formatCurrency(item.phiDienTichInFront)}</div> : null}
+                      {item.phiDienTichInBack ? <div>+ DT in (sau): {formatCurrency(item.phiDienTichInBack)}</div> : null}
+                      {item.phiPhuongPhapInFront ? <div>+ PP in (trước): {formatCurrency(item.phiPhuongPhapInFront)}</div> : null}
+                      {item.phiPhuongPhapInBack ? <div>+ PP in (sau): {formatCurrency(item.phiPhuongPhapInBack)}</div> : null}
+                    </div>
+                  ) : item.phiThietKeVnd > 0 ? (
                     <div className="mt-0.5 text-xs text-text-secondary">
                       + phí TK: {formatCurrency(item.phiThietKeVnd)}
                     </div>
                   ) : null}
                 </td>
-                {/* Thành tiền = donGiaVnd (đã gồm phí in) × soLuong + phiThietKeVnd */}
+                {/* Thành tiền = (donGiaVnd + phiThietKeVnd) × soLuong (đã tính trong db: lineTotal) */}
                 <td className="px-2 py-2 text-right align-middle font-bold text-primary-container">
                   {formatCurrency(item.thanhTienVnd)}
                 </td>
@@ -300,10 +312,10 @@ function OnlinePaymentQrButton({
     order.giamGiaVnd;
   const vatAmount =
     vatPercent > 0 ? Math.round((amountBeforeVat * vatPercent) / 100) : 0;
-  
+
   const backendHasVat = order.tongTienVnd > amountBeforeVat;
   const finalTotal = backendHasVat ? order.tongTienVnd : order.tongTienVnd + vatAmount;
-  
+
   const finalPaymentAmount = backendHasVat
     ? (order.thanhToan.soTienVnd || (order.tienCocVnd > 0 ? order.tienCocVnd : order.tongTienVnd))
     : (order.tienCocVnd > 0 ? Math.round(finalTotal / 2) : finalTotal);
@@ -478,8 +490,8 @@ function OrderHistoryDrawer({ order }: { order: ChiTietDonHang }) {
               <div className="flex flex-col items-center">
                 <span
                   className={`mt-1 h-3 w-3 shrink-0 rounded-full border-2 ${step.laDangHienTai
-                      ? "border-primary-container bg-primary-container"
-                      : "border-border bg-white"
+                    ? "border-primary-container bg-primary-container"
+                    : "border-border bg-white"
                     }`}
                 />
                 {index < order.thoiGianXuLy.length - 1 && (
@@ -525,7 +537,7 @@ function OrderDetailContent({
     order.giamGiaVnd;
   const vatAmount =
     vatPercent > 0 ? Math.round((amountBeforeVat * vatPercent) / 100) : 0;
-  
+
   const backendHasVat = order.tongTienVnd > amountBeforeVat;
   const finalTotal = backendHasVat ? order.tongTienVnd : order.tongTienVnd + vatAmount;
 
