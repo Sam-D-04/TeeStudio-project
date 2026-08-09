@@ -69,6 +69,7 @@ const TU_KHOA_LOAI_GD = [
   { value: "tat_ca", label: "Tất cả loại" },
   { value: "IMPORT",       label: "📦 Nhập kho" },
   { value: "EXPORT",       label: "📤 Xuất kho" },
+  { value: "ORDER_EXPORT", label: "🛍️ Xuất cho đơn" },
   { value: "RETURN",       label: "↩️ Hoàn trả" },
   { value: "ADJUSTMENT",   label: "⚙️ Điều chỉnh" },
 ];
