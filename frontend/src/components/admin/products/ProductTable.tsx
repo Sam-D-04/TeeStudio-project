@@ -79,15 +79,15 @@ function getDisplayImage(product: SanPham): string | undefined {
   if (!product.images || product.images.length === 0) return undefined;
 
   // 1. Ảnh chính (laChinh === true) và là mặt trước (FRONT)
-  const primaryFront = product.images.find(img => img.laChinh && img.view === "FRONT");
+  const primaryFront = product.images.find(img => img.laChinh && img.view === "front");
   if (primaryFront) return primaryFront.url;
 
   // 2. Bất kỳ ảnh mặt trước nào
-  const anyFront = product.images.find(img => img.view === "FRONT");
+  const anyFront = product.images.find(img => img.view === "front");
   if (anyFront) return anyFront.url;
 
   // 3. Ảnh chính nhưng mặt sau
-  const primaryBack = product.images.find(img => img.laChinh && img.view === "BACK");
+  const primaryBack = product.images.find(img => img.laChinh && img.view === "back");
   if (primaryBack) return primaryBack.url;
 
   // 4. Nếu không có gì thoả mãn, lấy ảnh chính hoặc ảnh đầu tiên
