@@ -383,9 +383,26 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
     variantMap[v.productId].push(v);
   }
 
+  // Lấy ảnh của các sản phẩm này
+  const [rowsImages] = await db.pool.query(
+    `SELECT id, productId, imageUrl, altText, sortOrder, isPrimary, view
+     FROM ProductImage
+     WHERE productId IN (?)
+     ORDER BY sortOrder ASC`,
+    [productIds]
+  );
+
+  // Nhóm ảnh theo productId
+  const imageMap = {};
+  for (const img of rowsImages) {
+    if (!imageMap[img.productId]) imageMap[img.productId] = [];
+    imageMap[img.productId].push(img);
+  }
+
   // Lọc theo tồn kho (client-side sau khi lấy variants)
   const danhSach = rowsProduct.map((p) => {
     const variants = variantMap[p.id] || [];
+    const images = imageMap[p.id] || [];
 
     const mappedVariants = variants.map((v) => {
       const stock = Number(v.stockQty);
@@ -406,6 +423,15 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
       };
     });
 
+    const mappedImages = images.map((img) => ({
+      id: img.id,
+      url: img.imageUrl,
+      altText: img.altText,
+      sortOrder: img.sortOrder,
+      laChinh: img.isPrimary === 1,
+      view: img.view,
+    }));
+
     return {
       id: p.id,
       name: p.name,
@@ -417,6 +443,7 @@ async function layDanhSachSanPham({ trang, soMoiTrang, tuKhoa, danhMuc, trangTha
       basePrice: Number(p.basePrice),
       displayStatus: MAP_TRANG_THAI_DB_SANG_FE[p.status] || "dang_hien_thi",
       variants: mappedVariants,
+      images: mappedImages,
     };
   });
 
@@ -515,7 +542,7 @@ async function layChiTietSanPham(id) {
   );
 
   const [images] = await db.pool.query(
-    "SELECT id, imageUrl, altText, sortOrder, isPrimary FROM ProductImage WHERE productId = ? ORDER BY sortOrder ASC",
+    "SELECT id, imageUrl, altText, sortOrder, isPrimary, view FROM ProductImage WHERE productId = ? ORDER BY sortOrder ASC",
     [id]
   );
 
@@ -557,6 +584,7 @@ async function layChiTietSanPham(id) {
       altText: img.altText,
       sortOrder: img.sortOrder,
       laChinh: img.isPrimary === 1,
+      view: img.view,
     })),
   };
 }

@@ -763,6 +763,7 @@ async function layChiTietDonHang(id) {
        cd.baseColor,
        cd.status AS designStatus,
        cd.adminNote AS designAdminNote,
+       cd.canvasData,
        (
          SELECT GROUP_CONCAT(DISTINCT pp2.name ORDER BY pp2.name SEPARATOR ', ')
          FROM DesignPrintPosition dpp2
@@ -770,11 +771,21 @@ async function layChiTietDonHang(id) {
          WHERE dpp2.designId = cd.id
        ) AS viTriIn,
        (
+         SELECT COALESCE(SUM(dpp2.extraCost), 0)
+         FROM DesignPrintPosition dpp2
+         WHERE dpp2.designId = cd.id
+       ) AS phiViTriInTuDB,
+       (
          SELECT GROUP_CONCAT(DISTINCT pm2.name ORDER BY pm2.name SEPARATOR ', ')
          FROM DesignPrintMethod dpm2
          JOIN PrintMethod pm2 ON pm2.id = dpm2.printMethodId
          WHERE dpm2.designId = cd.id
-       ) AS phuongPhapIn
+       ) AS phuongPhapIn,
+       (
+         SELECT COALESCE(SUM(dpm2.extraCost), 0)
+         FROM DesignPrintMethod dpm2
+         WHERE dpm2.designId = cd.id
+       ) AS phiPhuongPhapInTuDB
      FROM OrderItem oi
      JOIN ProductVariant pv ON pv.id = oi.variantId
      JOIN Product pr ON pr.id = pv.productId
@@ -799,28 +810,61 @@ async function layChiTietDonHang(id) {
   // Tính tạm tính (subtotal = tổng unitPrice * quantity của các item)
   const tamTinh = rowsItems.reduce((tong, item) => tong + Number(item.unitPrice) * item.quantity, 0);
   const tongPhiThietKe = rowsItems.reduce((tong, item) => tong + Number(item.designFee || 0), 0);
-  const items = rowsItems.map((item) => ({
-    id: item.id,
-    productId: item.productId,
-    variantId: item.variantId,
-    designId: item.designId || null,
-    designStatus: item.designStatus || null,
-    designAdminNote: item.designAdminNote || null,
-    productionStatus: item.productionStatus || null,
-    tenSanPham: item.tenSanPham || "Sản phẩm",
-    mauSac: item.color || "",
-    kichCo: item.size || "",
-    sku: item.sku || "",
-    soLuong: Number(item.quantity || 0),
-    donGiaVnd: Number(item.unitPrice || 0),
-    phiThietKeVnd: Number(item.designFee || 0),
-    thanhTienVnd: Number(item.lineTotal || 0),
-    loai: item.designId ? "custom_design" : "ao_mau",
-    anhUrl: item.anhUrl || null,
-    anhXemTruocThietKe: item.anhXemTruocThietKe || null,
-    viTriIn: item.viTriIn || null,
-    phuongPhapIn: item.phuongPhapIn || null,
-  }));
+  const items = rowsItems.map((item) => {
+    let frontAreaFee = 0;
+    let backAreaFee = 0;
+    let ppInFront = 0;
+    let ppInBack = 0;
+
+    if (item.designId && item.canvasData) {
+      let canvasDataParsed = null;
+      try {
+        canvasDataParsed = typeof item.canvasData === "string" ? JSON.parse(item.canvasData) : item.canvasData;
+      } catch (e) {}
+
+      const areaFees = calculateAreaFeePerSide(canvasDataParsed);
+      frontAreaFee = areaFees.frontAreaFee;
+      backAreaFee = areaFees.backAreaFee;
+
+      const phiInAnTuDB = Number(item.phiPhuongPhapInTuDB || 0) + Number(item.phiViTriInTuDB || 0);
+
+      if (frontAreaFee > 0 && backAreaFee > 0) {
+        ppInFront = phiInAnTuDB / 2;
+        ppInBack = phiInAnTuDB / 2;
+      } else if (backAreaFee > 0) {
+        ppInBack = phiInAnTuDB;
+      } else {
+        ppInFront = phiInAnTuDB;
+      }
+    }
+
+    return {
+      id: item.id,
+      productId: item.productId,
+      variantId: item.variantId,
+      designId: item.designId || null,
+      designStatus: item.designStatus || null,
+      designAdminNote: item.designAdminNote || null,
+      productionStatus: item.productionStatus || null,
+      tenSanPham: item.tenSanPham || "Sản phẩm",
+      mauSac: item.color || "",
+      kichCo: item.size || "",
+      sku: item.sku || "",
+      soLuong: Number(item.quantity || 0),
+      donGiaVnd: Number(item.unitPrice || 0),
+      phiThietKeVnd: Number(item.designFee || 0),
+      phiDienTichInFront: frontAreaFee,
+      phiDienTichInBack: backAreaFee,
+      phiPhuongPhapInFront: ppInFront,
+      phiPhuongPhapInBack: ppInBack,
+      thanhTienVnd: Number(item.lineTotal || 0),
+      loai: item.designId ? "custom_design" : "ao_mau",
+      anhUrl: item.anhUrl || null,
+      anhXemTruocThietKe: item.anhXemTruocThietKe || null,
+      viTriIn: item.viTriIn || null,
+      phuongPhapIn: item.phuongPhapIn || null,
+    };
+  });
 
   const gatewayResponse = parseGatewayResponse(donHang.gatewayResponse);
   const isOnlinePayment = ONLINE_PAYMENT_METHODS.has(donHang.paymentMethod);
@@ -2333,7 +2377,7 @@ async function taoMoiDonHang(data, actor, ipAddress) {
         await conn.query(
           `INSERT INTO InventoryTransaction
            (variantId, orderId, supplierId, quantityChanged, transactionType, reason)
-         VALUES (?, ?, NULL, ?, 'EXPORT', ?)`,
+         VALUES (?, ?, NULL, ?, 'ORDER_EXPORT', ?)`,
           [
             item.variantId,
             orderId,

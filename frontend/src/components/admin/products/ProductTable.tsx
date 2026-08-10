@@ -22,6 +22,7 @@ import {
 } from "@ant-design/icons";
 import Link from "next/link";
 import { Fragment, useState } from "react";
+import { Image } from "antd";
 import type { SanPham, BienTheSanPham } from "@/services/admin/productService";
 import {
   InventoryStatusBadge,
@@ -71,6 +72,29 @@ function countColors(variants: BienTheSanPham[]): number {
 function countSizes(variants: BienTheSanPham[]): number {
   const uniqueSizes = new Set(variants.map((v) => v.size));
   return uniqueSizes.size;
+}
+
+/** Lấy ảnh phù hợp nhất để hiển thị đại diện (ưu tiên ảnh chính mặt trước -> mặt trước -> ảnh chính mặt sau -> ảnh bất kỳ) */
+function getDisplayImage(product: SanPham): string | undefined {
+  if (!product.images || product.images.length === 0) return undefined;
+
+  // 1. Ảnh chính (laChinh === true) và là mặt trước (FRONT)
+  const primaryFront = product.images.find(img => img.laChinh && img.view === "front");
+  if (primaryFront) return primaryFront.url;
+
+  // 2. Bất kỳ ảnh mặt trước nào
+  const anyFront = product.images.find(img => img.view === "front");
+  if (anyFront) return anyFront.url;
+
+  // 3. Ảnh chính nhưng mặt sau
+  const primaryBack = product.images.find(img => img.laChinh && img.view === "back");
+  if (primaryBack) return primaryBack.url;
+
+  // 4. Nếu không có gì thoả mãn, lấy ảnh chính hoặc ảnh đầu tiên
+  const primary = product.images.find(img => img.laChinh);
+  if (primary) return primary.url;
+
+  return product.images[0].url;
 }
 
 // ===== COMPONENT CON: Hàng biến thể mở rộng =====
@@ -280,11 +304,25 @@ export default function ProductTable({
                     {/* Tên sản phẩm + slug */}
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
-                        {/* Thumbnail placeholder (icon áo) */}
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border bg-surface p-1">
-                          <div className="flex h-full w-full items-center justify-center rounded-md bg-surface-alt text-text-muted">
-                            <SkinOutlined className="text-[22px]" />
-                          </div>
+                        {/* Thumbnail placeholder (icon áo) hoặc ảnh thật */}
+                        <div
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border bg-surface p-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {getDisplayImage(product) ? (
+                            <Image
+                              src={getDisplayImage(product)}
+                              alt={product.name}
+                              width={40}
+                              height={40}
+                              className="h-full w-full object-contain"
+                              preview={true}
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center rounded-md bg-surface-alt text-text-muted">
+                              <SkinOutlined className="text-[22px]" />
+                            </div>
+                          )}
                         </div>
                         <div>
                           {/* Tên phôi áo – đậm, màu đen */}

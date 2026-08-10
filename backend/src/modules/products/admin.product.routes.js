@@ -20,7 +20,8 @@
 
 const router = require("express").Router();
 const multer = require("multer");
-const { verifyToken, requireAdmin } = require("../../common/middlewares/auth.middleware");
+const { verifyToken, requireRoles } = require("../../common/middlewares/auth.middleware");
+const { ROLES } = require("../../common/constants/roles");
 const productController = require("./admin.product.controller");
 
 const productImageUpload = multer({
@@ -60,8 +61,8 @@ const uploadProductImages = (req, res, next) => {
   });
 };
 
-// ─── Tất cả routes đều yêu cầu đăng nhập + quyền Admin ───────────────────────
-router.use(verifyToken, requireAdmin);
+// ─── Tất cả routes đều yêu cầu đăng nhập + quyền Admin / Warehouse ──────────────
+router.use(verifyToken, requireRoles(ROLES.ADMIN, ROLES.WAREHOUSE));
 
 // ─── Thống kê KPI ─────────────────────────────────────────────────────────────
 // GET /api/admin/products/stats

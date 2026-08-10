@@ -62,6 +62,10 @@ export type ChiTietDonHangItem = {
   anhXemTruocThietKe: string | null;
   viTriIn: string | null;
   phuongPhapIn: string | null;
+  phiDienTichInFront?: number;
+  phiDienTichInBack?: number;
+  phiPhuongPhapInFront?: number;
+  phiPhuongPhapInBack?: number;
 };
 
 /** Một đơn hàng trong danh sách */

@@ -428,11 +428,11 @@ export default function PrintOrderTab({
                   <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>Thông số in</div>
                   {thongSoDangXem ? (
                     <>
-                      <div style={{ fontSize: 18, lineHeight: 1.35, color: "#0f172a", fontWeight: 800 }}>
-                        {thongSoDangXem.summary}
+                      <div style={{ fontSize: 16, lineHeight: 1.35, color: "#0f172a", fontWeight: 700 }}>
+                        Kích thước khung thiết kế: 30cm x 40cm
                       </div>
                       <div style={{ marginTop: 8, color: "#475569", fontSize: 13 }}>
-                        {thongSoDangXem.detail}
+                        Vị trí in: Đặt khung in theo chuẩn (Standard Pattern) của xưởng đối với phôi áo này. Căn giữa trục dọc.
                       </div>
                     </>
                   ) : (
@@ -584,310 +584,343 @@ export default function PrintOrderTab({
         </div>
       </Modal>
       <div style={{ padding: 24 }}>
-      {/* ── Thanh lọc ── */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-start",
-          alignItems: "center",
-          gap: 16,
-          marginBottom: 20,
-          flexWrap: "wrap",
-        }}
-      >
-        {/* Bộ lọc ngày và trạng thái */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ position: "relative", minWidth: 220, width: 260 }}>
-            <SearchOutlined
-              style={{
-                position: "absolute",
-                left: 10,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "#94a3b8",
-                fontSize: 14,
-                pointerEvents: "none",
+        {/* ── Thanh lọc ── */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-start",
+            alignItems: "center",
+            gap: 16,
+            marginBottom: 20,
+            flexWrap: "wrap",
+          }}
+        >
+          {/* Bộ lọc ngày và trạng thái */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ position: "relative", minWidth: 220, width: 260 }}>
+              <SearchOutlined
+                style={{
+                  position: "absolute",
+                  left: 10,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#94a3b8",
+                  fontSize: 14,
+                  pointerEvents: "none",
+                }}
+              />
+              <input
+                type="search"
+                placeholder="Tìm mã TK, mã đơn, tên khách..."
+                value={tuKhoa}
+                onChange={(e) => {
+                  const giaTriMoi = e.target.value;
+                  setTuKhoa(giaTriMoi);
+                  if (giaTriMoi.trim()) {
+                    onStatusFilterChange("");
+                  }
+                  setTrang(1);
+                }}
+                style={{
+                  width: "100%",
+                  height: 36,
+                  padding: "0 12px 0 34px",
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: "#0f172a",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+            <DateRangeFilter
+              key={`${dateRange.tuNgay}-${dateRange.denNgay}`}
+              initialPreset={dateRange.tuNgay && dateRange.denNgay ? "custom" : "all"}
+              initialStartDate={dateRange.tuNgay}
+              initialEndDate={dateRange.denNgay}
+              allowClear
+              onChange={(tuNgay, denNgay) => {
+                onDateRangeChange({ tuNgay, denNgay });
+                setTrang(1);
               }}
+              onClear={() => {
+                onDateRangeChange({ tuNgay: "", denNgay: "" });
+                setTrang(1);
+              }}
+              className="w-full sm:w-auto"
+              selectClassName="h-9"
+              rangePickerClassName="h-9 min-w-[240px] sm:w-[280px]"
             />
-            <input
-              type="search"
-              placeholder="Tìm mã TK, mã đơn, tên khách..."
-              value={tuKhoa}
+            <select
+              value={statusFilter}
               onChange={(e) => {
-                const giaTriMoi = e.target.value;
-                setTuKhoa(giaTriMoi);
-                if (giaTriMoi.trim()) {
-                  onStatusFilterChange("");
-                }
+                onStatusFilterChange(e.target.value);
                 setTrang(1);
               }}
               style={{
-                width: "100%",
                 height: 36,
-                padding: "0 12px 0 34px",
+                padding: "0 12px",
                 background: "#f8fafc",
                 border: "1px solid #e2e8f0",
                 borderRadius: 8,
                 fontSize: 13,
-                color: "#0f172a",
+                color: statusFilter ? "#0f172a" : "#94a3b8",
                 outline: "none",
-                boxSizing: "border-box",
+                cursor: "pointer",
+                minWidth: 160,
               }}
-            />
+            >
+              <option value="">Tất cả trạng thái</option>
+              <option value="cho_gui_xuong">Chờ gửi xưởng</option>
+              <option value="dang_in">Đang in</option>
+              <option value="da_in_xong">Đã in xong</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                setTrang(1);
+                setTuKhoa("");
+                onResetFilters();
+              }}
+              className="flex h-9 shrink-0 items-center gap-2 rounded-lg border border-[#e2e8f0] bg-white px-3 text-sm font-medium text-[#475569] transition-colors hover:bg-[#f8fafc] hover:text-[#0f172a]"
+            >
+              <SyncOutlined /> Đặt lại
+            </button>
           </div>
-          <DateRangeFilter
-            key={`${dateRange.tuNgay}-${dateRange.denNgay}`}
-            initialPreset={dateRange.tuNgay && dateRange.denNgay ? "custom" : "all"}
-            initialStartDate={dateRange.tuNgay}
-            initialEndDate={dateRange.denNgay}
-            allowClear
-            onChange={(tuNgay, denNgay) => {
-              onDateRangeChange({ tuNgay, denNgay });
-              setTrang(1);
-            }}
-            onClear={() => {
-              onDateRangeChange({ tuNgay: "", denNgay: "" });
-              setTrang(1);
-            }}
-            className="w-full sm:w-auto"
-            selectClassName="h-9"
-            rangePickerClassName="h-9 min-w-[240px] sm:w-[280px]"
-          />
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              onStatusFilterChange(e.target.value);
-              setTrang(1);
-            }}
-            style={{
-              height: 36,
-              padding: "0 12px",
-              background: "#f8fafc",
-              border: "1px solid #e2e8f0",
-              borderRadius: 8,
-              fontSize: 13,
-              color: statusFilter ? "#0f172a" : "#94a3b8",
-              outline: "none",
-              cursor: "pointer",
-              minWidth: 160,
-            }}
-          >
-            <option value="">Tất cả trạng thái</option>
-            <option value="cho_gui_xuong">Chờ gửi xưởng</option>
-            <option value="dang_in">Đang in</option>
-            <option value="da_in_xong">Đã in xong</option>
-          </select>
-          <button
-            type="button"
-            onClick={() => {
-              setTrang(1);
-              setTuKhoa("");
-              onResetFilters();
-            }}
-            className="flex h-9 shrink-0 items-center gap-2 rounded-lg border border-[#e2e8f0] bg-white px-3 text-sm font-medium text-[#475569] transition-colors hover:bg-[#f8fafc] hover:text-[#0f172a]"
-          >
-            <SyncOutlined /> Đặt lại
-          </button>
         </div>
-      </div>
 
-      {/* ── Bảng danh sách đơn cần in ── */}
-      <div
-        style={{
-          background: "#ffffff",
-          borderRadius: 16,
-          border: "1px solid #e2e8f0",
-          overflow: "hidden",
-        }}
-      >
-        {/* Trạng thái đang tải */}
-        {isLoading && (
-          <div style={{ padding: "48px 0", textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
-            <LoadingOutlined style={{ fontSize: 24, marginBottom: 8, display: "block" }} />
-            Đang tải danh sách đơn in...
-          </div>
-        )}
+        {/* ── Bảng danh sách đơn cần in ── */}
+        <div
+          style={{
+            background: "#ffffff",
+            borderRadius: 16,
+            border: "1px solid #e2e8f0",
+            overflow: "hidden",
+          }}
+        >
+          {/* Trạng thái đang tải */}
+          {isLoading && (
+            <div style={{ padding: "48px 0", textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+              <LoadingOutlined style={{ fontSize: 24, marginBottom: 8, display: "block" }} />
+              Đang tải danh sách đơn in...
+            </div>
+          )}
 
-        {/* Trạng thái lỗi */}
-        {isError && !isLoading && (
-          <div style={{ padding: "48px 0", textAlign: "center", color: "#ef4444", fontSize: 14 }}>
-            <WarningOutlined style={{ fontSize: 24, marginBottom: 8, display: "block" }} />
-            Không thể tải dữ liệu. Vui lòng thử lại sau.
-          </div>
-        )}
+          {/* Trạng thái lỗi */}
+          {isError && !isLoading && (
+            <div style={{ padding: "48px 0", textAlign: "center", color: "#ef4444", fontSize: 14 }}>
+              <WarningOutlined style={{ fontSize: 24, marginBottom: 8, display: "block" }} />
+              Không thể tải dữ liệu. Vui lòng thử lại sau.
+            </div>
+          )}
 
-        {/* Trống */}
-        {!isLoading && !isError && danhSach.length === 0 && (
-          <div style={{ padding: "48px 0", textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
-            Không có đơn cần in nào phù hợp.
-          </div>
-        )}
+          {/* Trống */}
+          {!isLoading && !isError && danhSach.length === 0 && (
+            <div style={{ padding: "48px 0", textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+              Không có đơn cần in nào phù hợp.
+            </div>
+          )}
 
-        {/* Bảng */}
-        {!isLoading && !isError && danhSach.length > 0 && (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-              <thead>
-                <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                  {["MÃ ĐƠN", "THIẾT KẾ", "KHÁCH HÀNG", "SỐ LƯỢNG", "VỊ TRÍ IN", "TRẠNG THÁI", "NGÀY ĐẶT ĐƠN", "THAO TÁC"].map(
-                    (tieuDe, viTri) => (
-                      <th
-                        key={tieuDe}
-                        style={{
-                          padding: "12px 16px",
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: "#475569",
-                          letterSpacing: "0.05em",
-                          whiteSpace: "nowrap",
-                          textAlign: viTri === 7 ? "right" : "left",
-                        }}
-                      >
-                        {tieuDe}
-                      </th>
-                    )
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {danhSach.map((don) => {
-                  const cauHinh = CAU_HINH_TRANG_THAI[don.trangThai] ?? CAU_HINH_TRANG_THAI.cho_gui_xuong;
-                  return (
-                    <tr
-                      key={don.id}
-                      style={{
-                        borderBottom: "1px solid #e2e8f0",
-                        transition: "background-color 0.15s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "#f8fafc";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "transparent";
-                      }}
-                    >
-                      {/* Mã đơn */}
-                      <td style={{ padding: "14px 16px" }}>
-                        <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
-                          {don.maDon}
-                        </span>
-                      </td>
-
-                      {/* Thiết kế: thumbnail + mã TK */}
-                      <td style={{ padding: "14px 16px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <DesignPreview
-                            urlAnh={don.urlPreview ?? undefined}
-                            urlAnhMatSau={don.urlFileInBack ?? undefined}
-                            mauAo={don.mauAo}
-                            maThietKe={don.maThietKe}
-                          />
-                          <span style={{ fontSize: 13, color: "#475569", fontWeight: 500 }}>
-                            {don.maThietKe}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Khách hàng */}
-                      <td style={{ padding: "14px 16px" }}>
-                        <span style={{ fontSize: 14, color: "#0f172a" }}>{don.tenKhachHang}</span>
-                      </td>
-
-                      {/* Số lượng */}
-                      <td style={{ padding: "14px 16px" }}>
-                        <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
-                          {don.soLuong}
-                        </span>
-                        <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: 4 }}>áo</span>
-                      </td>
-
-                      {/* Vị trí in */}
-                      <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                        <span style={{ fontSize: 13, color: "#475569" }}>{don.viTriIn}</span>
-                      </td>
-
-                      {/* Trạng thái */}
-                      <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                        <span
+          {/* Bảng */}
+          {!isLoading && !isError && danhSach.length > 0 && (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                <thead>
+                  <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                    {["MÃ ĐƠN", "THIẾT KẾ", "KHÁCH HÀNG", "SỐ LƯỢNG", "VỊ TRÍ IN", "TRẠNG THÁI", "NGÀY ĐẶT ĐƠN", "THAO TÁC"].map(
+                      (tieuDe, viTri) => (
+                        <th
+                          key={tieuDe}
                           style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            padding: "3px 10px",
-                            borderRadius: 20,
+                            padding: "12px 16px",
                             fontSize: 12,
                             fontWeight: 700,
-                            backgroundColor: cauHinh.mauNen,
-                            color: cauHinh.mauChu,
+                            color: "#475569",
+                            letterSpacing: "0.05em",
+                            whiteSpace: "nowrap",
+                            textAlign: viTri === 7 ? "right" : "left",
                           }}
                         >
-                          {cauHinh.icon}
-                          {cauHinh.nhan}
-                        </span>
-                      </td>
+                          {tieuDe}
+                        </th>
+                      )
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {danhSach.map((don) => {
+                    const cauHinh = CAU_HINH_TRANG_THAI[don.trangThai] ?? CAU_HINH_TRANG_THAI.cho_gui_xuong;
+                    return (
+                      <tr
+                        key={don.id}
+                        style={{
+                          borderBottom: "1px solid #e2e8f0",
+                          transition: "background-color 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "#f8fafc";
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLTableRowElement).style.backgroundColor = "transparent";
+                        }}
+                      >
+                        {/* Mã đơn */}
+                        <td style={{ padding: "14px 16px" }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
+                            {don.maDon}
+                          </span>
+                        </td>
 
-                      {/* Ngày khách đặt đơn (CustomerOrder.createdAt) */}
-                      <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                        <span style={{ fontSize: 13, color: "#475569" }}>{don.ngayDatDon}</span>
-                      </td>
+                        {/* Thiết kế: thumbnail + mã TK */}
+                        <td style={{ padding: "14px 16px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <DesignPreview
+                              urlAnh={don.urlPreview ?? undefined}
+                              mauAo={don.mauAo}
+                              maThietKe={don.maThietKe}
+                            />
+                            <span style={{ fontSize: 13, color: "#475569", fontWeight: 500 }}>
+                              {don.maThietKe}
+                            </span>
+                          </div>
+                        </td>
 
-                      {/* Thao tác */}
-                      <td style={{ padding: "14px 16px", textAlign: "right", whiteSpace: "nowrap" }}>
-                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
-                          <button
-                            title="Phiếu thông số in"
-                            aria-label={`Phiếu thông số in ${don.maDon}`}
-                            onClick={() => moPhieuIn(don)}
+                        {/* Khách hàng */}
+                        <td style={{ padding: "14px 16px" }}>
+                          <span style={{ fontSize: 14, color: "#0f172a" }}>{don.tenKhachHang}</span>
+                        </td>
+
+                        {/* Số lượng */}
+                        <td style={{ padding: "14px 16px" }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
+                            {don.soLuong}
+                          </span>
+                          <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: 4 }}>áo</span>
+                        </td>
+
+                        {/* Vị trí in */}
+                        <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
+                          <span style={{ fontSize: 13, color: "#475569" }}>{don.viTriIn}</span>
+                        </td>
+
+                        {/* Trạng thái */}
+                        <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
+                          <span
                             style={{
-                              width: 32,
-                              height: 32,
-                              display: "flex",
+                              display: "inline-flex",
                               alignItems: "center",
-                              justifyContent: "center",
-                              borderRadius: 6,
-                              border: "1px solid #bae6fd",
-                              background: "#e0f2fe",
-                              color: "#0284c7",
-                              cursor: "pointer",
-                              fontSize: 14,
-                              transition: "all 0.15s ease",
+                              gap: 4,
+                              padding: "3px 10px",
+                              borderRadius: 20,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              backgroundColor: cauHinh.mauNen,
+                              color: cauHinh.mauChu,
                             }}
                           >
-                            <FileTextOutlined />
-                          </button>
-                          {/* Nút Xem file in chuẩn - mặt trước (luôn có, kể cả đơn cũ chỉ 1 mặt) */}
-                          <button
-                            title={don.urlFileInBack ? "Xem file in mặt trước" : "Xem file in chuẩn"}
-                            onClick={() => xemFileIn(don, "truoc")}
-                            style={{
-                              width: 32,
-                              height: 32,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              borderRadius: 6,
-                              border: "1px solid #e2e8f0",
-                              background: "#f8fafc",
-                              color: "#475569",
-                              cursor: "pointer",
-                              fontSize: 14,
-                              transition: "all 0.15s ease",
-                            }}
-                            onMouseEnter={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.color = "#0ea5e9";
-                            }}
-                            onMouseLeave={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.color = "#475569";
-                            }}
-                          >
-                            <EyeOutlined />
-                          </button>
+                            {cauHinh.icon}
+                            {cauHinh.nhan}
+                          </span>
+                        </td>
 
-                          {/* Nút Xem file in mặt sau - chỉ hiện khi thiết kế có in mặt sau */}
-                          {don.urlFileInBack && (
+                        {/* Ngày khách đặt đơn (CustomerOrder.createdAt) */}
+                        <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
+                          <span style={{ fontSize: 13, color: "#475569" }}>{don.ngayDatDon}</span>
+                        </td>
+
+                        {/* Thao tác */}
+                        <td style={{ padding: "14px 16px", textAlign: "right", whiteSpace: "nowrap" }}>
+                          <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
                             <button
-                              title="Xem file in mặt sau"
-                              onClick={() => xemFileIn(don, "sau")}
+                              title="Phiếu thông số in"
+                              aria-label={`Phiếu thông số in ${don.maDon}`}
+                              onClick={() => moPhieuIn(don)}
+                              style={{
+                                width: 32,
+                                height: 32,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                borderRadius: 6,
+                                border: "1px solid #bae6fd",
+                                background: "#e0f2fe",
+                                color: "#0284c7",
+                                cursor: "pointer",
+                                fontSize: 14,
+                                transition: "all 0.15s ease",
+                              }}
+                            >
+                              <FileTextOutlined />
+                            </button>
+                            {/* Nút Xem file in chuẩn - mặt trước (luôn có, kể cả đơn cũ chỉ 1 mặt, trừ khi rõ ràng chỉ thiết kế mặt sau) */}
+                            {(don.urlFileIn || !don.urlFileInBack) && (
+                              <button
+                                title={don.urlFileInBack ? "Xem file in mặt trước" : "Xem file in chuẩn"}
+                                onClick={() => xemFileIn(don, "truoc")}
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  borderRadius: 6,
+                                  border: "1px solid #e2e8f0",
+                                  background: "#f8fafc",
+                                  color: "#475569",
+                                  cursor: "pointer",
+                                  fontSize: 14,
+                                  transition: "all 0.15s ease",
+                                }}
+                                onMouseEnter={(e) => {
+                                  (e.currentTarget as HTMLButtonElement).style.color = "#0ea5e9";
+                                }}
+                                onMouseLeave={(e) => {
+                                  (e.currentTarget as HTMLButtonElement).style.color = "#475569";
+                                }}
+                              >
+                                <EyeOutlined />
+                              </button>
+                            )}
+
+                            {/* Nút Xem file in mặt sau - chỉ hiện khi thiết kế có in mặt sau */}
+                            {don.urlFileInBack && (
+                              <button
+                                title="Xem file in mặt sau"
+                                onClick={() => xemFileIn(don, "sau")}
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  borderRadius: 6,
+                                  border: "1px solid #e2e8f0",
+                                  background: "#f8fafc",
+                                  color: "#475569",
+                                  cursor: "pointer",
+                                  fontSize: 14,
+                                  transition: "all 0.15s ease",
+                                }}
+                                onMouseEnter={(e) => {
+                                  (e.currentTarget as HTMLButtonElement).style.color = "#0ea5e9";
+                                }}
+                                onMouseLeave={(e) => {
+                                  (e.currentTarget as HTMLButtonElement).style.color = "#475569";
+                                }}
+                              >
+                                <EyeOutlined rotate={180} />
+                              </button>
+                            )}
+
+                            <button
+                              title={don.trangThai === "da_in_xong"
+                                ? "Đơn in đã hoàn tất"
+                                : "Cập nhật trạng thái"}
+                              aria-label={`Cập nhật trạng thái ${don.maDon}`}
+                              onClick={() => moModalCapNhatTrangThai(don)}
+                              disabled={don.trangThai === "da_in_xong" || mutationTrangThai.isPending}
                               style={{
                                 width: 32,
                                 height: 32,
@@ -897,115 +930,83 @@ export default function PrintOrderTab({
                                 borderRadius: 6,
                                 border: "1px solid #e2e8f0",
                                 background: "#f8fafc",
-                                color: "#475569",
-                                cursor: "pointer",
+                                color: don.trangThai === "da_in_xong" ? "#cbd5e1" : "#0ea5e9",
+                                cursor: don.trangThai === "da_in_xong" ? "not-allowed" : "pointer",
                                 fontSize: 14,
                                 transition: "all 0.15s ease",
                               }}
-                              onMouseEnter={(e) => {
-                                (e.currentTarget as HTMLButtonElement).style.color = "#0ea5e9";
-                              }}
-                              onMouseLeave={(e) => {
-                                (e.currentTarget as HTMLButtonElement).style.color = "#475569";
-                              }}
                             >
-                              <EyeOutlined rotate={180} />
+                              <EditOutlined />
                             </button>
-                          )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-                          <button
-                            title={don.trangThai === "da_in_xong"
-                              ? "Đơn in đã hoàn tất"
-                              : "Cập nhật trạng thái"}
-                            aria-label={`Cập nhật trạng thái ${don.maDon}`}
-                            onClick={() => moModalCapNhatTrangThai(don)}
-                            disabled={don.trangThai === "da_in_xong" || mutationTrangThai.isPending}
-                            style={{
-                              width: 32,
-                              height: 32,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              borderRadius: 6,
-                              border: "1px solid #e2e8f0",
-                              background: "#f8fafc",
-                              color: don.trangThai === "da_in_xong" ? "#cbd5e1" : "#0ea5e9",
-                              cursor: don.trangThai === "da_in_xong" ? "not-allowed" : "pointer",
-                              fontSize: 14,
-                              transition: "all 0.15s ease",
-                            }}
-                          >
-                            <EditOutlined />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Phân trang */}
-        {!isLoading && !isError && danhSach.length > 0 && (
-          <div
-            style={{
-              padding: "12px 16px",
-              borderTop: "1px solid #e2e8f0",
-              backgroundColor: "#f8fafc",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <span style={{ fontSize: 13, color: "#475569" }}>Tổng cộng {tongSo} đơn</span>
-            <div style={{ display: "flex", gap: 4 }}>
-              <button
-                disabled={trang <= 1}
-                onClick={() => setTrang((t) => Math.max(1, t - 1))}
-                style={{
-                  width: 32, height: 32, display: "flex", alignItems: "center",
-                  justifyContent: "center", border: "1px solid #e2e8f0", borderRadius: 6,
-                  background: "#ffffff", color: trang <= 1 ? "#94a3b8" : "#0f172a",
-                  cursor: trang <= 1 ? "not-allowed" : "pointer", fontSize: 16,
-                }}
-              >
-                ‹
-              </button>
-              {Array.from({ length: tongSoTrang }, (_, i) => i + 1).map((p) => (
+          {/* Phân trang */}
+          {!isLoading && !isError && danhSach.length > 0 && (
+            <div
+              style={{
+                padding: "12px 16px",
+                borderTop: "1px solid #e2e8f0",
+                backgroundColor: "#f8fafc",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <span style={{ fontSize: 13, color: "#475569" }}>Tổng cộng {tongSo} đơn</span>
+              <div style={{ display: "flex", gap: 4 }}>
                 <button
-                  key={p}
-                  onClick={() => setTrang(p)}
+                  disabled={trang <= 1}
+                  onClick={() => setTrang((t) => Math.max(1, t - 1))}
                   style={{
                     width: 32, height: 32, display: "flex", alignItems: "center",
-                    justifyContent: "center",
-                    border: p === trang ? "1px solid #0ea5e9" : "1px solid #e2e8f0",
-                    borderRadius: 6,
-                    background: p === trang ? "#0ea5e9" : "#ffffff",
-                    color: p === trang ? "#ffffff" : "#0f172a",
-                    cursor: "pointer", fontSize: 14, fontWeight: p === trang ? 600 : 400,
+                    justifyContent: "center", border: "1px solid #e2e8f0", borderRadius: 6,
+                    background: "#ffffff", color: trang <= 1 ? "#94a3b8" : "#0f172a",
+                    cursor: trang <= 1 ? "not-allowed" : "pointer", fontSize: 16,
                   }}
                 >
-                  {p}
+                  ‹
                 </button>
-              ))}
-              <button
-                disabled={trang >= tongSoTrang}
-                onClick={() => setTrang((t) => Math.min(tongSoTrang, t + 1))}
-                style={{
-                  width: 32, height: 32, display: "flex", alignItems: "center",
-                  justifyContent: "center", border: "1px solid #e2e8f0", borderRadius: 6,
-                  background: "#ffffff", color: trang >= tongSoTrang ? "#94a3b8" : "#0f172a",
-                  cursor: trang >= tongSoTrang ? "not-allowed" : "pointer", fontSize: 16,
-                }}
-              >
-                ›
-              </button>
+                {Array.from({ length: tongSoTrang }, (_, i) => i + 1).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setTrang(p)}
+                    style={{
+                      width: 32, height: 32, display: "flex", alignItems: "center",
+                      justifyContent: "center",
+                      border: p === trang ? "1px solid #0ea5e9" : "1px solid #e2e8f0",
+                      borderRadius: 6,
+                      background: p === trang ? "#0ea5e9" : "#ffffff",
+                      color: p === trang ? "#ffffff" : "#0f172a",
+                      cursor: "pointer", fontSize: 14, fontWeight: p === trang ? 600 : 400,
+                    }}
+                  >
+                    {p}
+                  </button>
+                ))}
+                <button
+                  disabled={trang >= tongSoTrang}
+                  onClick={() => setTrang((t) => Math.min(tongSoTrang, t + 1))}
+                  style={{
+                    width: 32, height: 32, display: "flex", alignItems: "center",
+                    justifyContent: "center", border: "1px solid #e2e8f0", borderRadius: 6,
+                    background: "#ffffff", color: trang >= tongSoTrang ? "#94a3b8" : "#0f172a",
+                    cursor: trang >= tongSoTrang ? "not-allowed" : "pointer", fontSize: 16,
+                  }}
+                >
+                  ›
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
       </div>
     </>
   );

@@ -19,7 +19,8 @@
  */
 
 const router = require("express").Router();
-const { verifyToken, requireAdmin } = require("../../common/middlewares/auth.middleware");
+const { verifyToken, requireRoles } = require("../../common/middlewares/auth.middleware");
+const { ROLES } = require("../../common/constants/roles");
 const validate = require("../../common/middlewares/validate.middleware");
 const {
   createInventoryTransactionSchema,
@@ -39,8 +40,8 @@ const {
   createNhaCungCap,
 } = require("./admin.inventory.controller");
 
-// Áp dụng xác thực JWT + quyền Admin cho toàn bộ routes này
-router.use(verifyToken, requireAdmin);
+// Áp dụng xác thực JWT + quyền Admin / Warehouse cho toàn bộ routes này
+router.use(verifyToken, requireRoles(ROLES.ADMIN, ROLES.WAREHOUSE));
 
 // ─── Thống kê KPI ──────────────────────────────────────────────────────────
 router.get("/stats", getThongKeKho);
