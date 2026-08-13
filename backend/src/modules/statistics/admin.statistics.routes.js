@@ -79,4 +79,16 @@ router.get(
   statisticsController.exportBaoCaoThongKe
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/statistics/phan-tich-ai
+// Gom số liệu từ DB rồi gửi lên Gemini API, trả về nhận xét doanh thu bằng AI.
+// Body JSON: { tuNgay, denNgay } – cả hai optional
+// ─────────────────────────────────────────────────────────────────────────────
+router.post(
+  "/phan-tich-ai",
+  verifyToken,
+  requireAdmin,
+  statisticsController.getAIPhanTich
+);
+
 module.exports = router;

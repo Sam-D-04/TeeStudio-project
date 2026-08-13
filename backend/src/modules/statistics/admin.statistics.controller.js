@@ -14,6 +14,7 @@
 const statisticsService = require("./admin.statistics.service");
 const statisticsReportService = require("./admin.statistics.report.service");
 const { guiBaoCaoExcel } = require("../../common/utils/excel-report");
+const aiStatisticsService = require("./admin.statistics.ai.service");
 
 // =====================================================================
 // CONTROLLER 1: Chỉ số tổng hợp
@@ -123,6 +124,25 @@ const exportBaoCaoThongKe = async (req, res, next) => {
 };
 
 // =====================================================================
+// CONTROLLER 6: AI Phân Tích Doanh Thu
+// =====================================================================
+
+/**
+ * POST /api/admin/statistics/phan-tich-ai
+ * Body (JSON): { tuNgay, denNgay } – cả hai optional
+ * Gom số liệu từ DB rồi gửi lên Gemini API, trả về nhận xét bằng tiếng Việt.
+ */
+const getAIPhanTich = async (req, res, next) => {
+  try {
+    const { tuNgay, denNgay } = req.body;
+    const result = await aiStatisticsService.phanTichDoanhThu(tuNgay, denNgay);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// =====================================================================
 // EXPORTS
 // =====================================================================
 
@@ -132,4 +152,5 @@ module.exports = {
   getTopSanPham,
   getPhanBoTrangThai,
   exportBaoCaoThongKe,
+  getAIPhanTich,
 };
