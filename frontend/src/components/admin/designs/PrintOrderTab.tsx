@@ -428,9 +428,7 @@ export default function PrintOrderTab({
                   <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>Thông số in</div>
                   {thongSoDangXem ? (
                     <>
-                      <div style={{ fontSize: 16, lineHeight: 1.35, color: "#0f172a", fontWeight: 700 }}>
-                        Kích thước khung thiết kế: 30cm x 40cm
-                      </div>
+
                       <div style={{ marginTop: 8, color: "#475569", fontSize: 13 }}>
                         Vị trí in: Đặt khung in theo chuẩn (Standard Pattern) của xưởng đối với phôi áo này. Căn giữa trục dọc.
                       </div>
