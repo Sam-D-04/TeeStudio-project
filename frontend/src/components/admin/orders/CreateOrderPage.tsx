@@ -361,6 +361,12 @@ function buildPreview(
         product,
         totalProductQty
       );
+      // Lấy phí phương pháp in mặt trước làm chuẩn
+      const phiPhuongPhapInFront = design?.phiPhuongPhapInFront ?? 0;
+
+      // Sử dụng trực tiếp giá trị backend trả về, vì backend đã xử lý nhân đôi phí phương pháp in cho thiết kế 2 mặt
+      const phiPhuongPhapInBack = design?.phiPhuongPhapInBack ?? 0;
+
       const phiInAnMatTruoc = design?.phiInAnMatTruoc ?? 0;
       const phiInAnMatSau = design?.phiInAnMatSau ?? 0;
 
@@ -386,11 +392,12 @@ function buildPreview(
         lineTotal: lineProductTotal + designFee,
         discountPercent,
         bulkMinQty,
-        phiPhuongPhapInFront: design?.phiPhuongPhapInFront ?? 0,
+        phiPhuongPhapInFront,
         phiDienTichInFront: design?.phiDienTichInFront ?? 0,
-        phiPhuongPhapInBack: design?.phiPhuongPhapInBack ?? 0,
+        phiPhuongPhapInBack,
         phiDienTichInBack: design?.phiDienTichInBack ?? 0,
       };
+
     }) ?? [];
 
   const subtotal = lines.reduce((sum, line) => sum + line.lineProductTotal, 0);
