@@ -93,7 +93,7 @@ function xacDinhDonViNhom(batDau, ketThuc) {
 
 // SQL subquery chung để chỉ lấy đơn đã thu đủ tiền (không tính cọc).
 const JOIN_PAYMENT_HOAN_THANH = `
-  JOIN (
+  LEFT JOIN (
     SELECT orderId, MAX(paidAt) AS fullyPaidAt
     FROM Payment
     WHERE status = 'COMPLETED'
