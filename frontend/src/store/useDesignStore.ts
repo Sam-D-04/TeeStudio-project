@@ -164,9 +164,12 @@ export const useDesignStore = create<DesignState>((set, get) => ({
       const imagesOnSide = state.elements.filter(
         (e) => e.type === "image" && (e.side ?? "front") === side
       );
-      if (imagesOnSide.length >= 2) {
+
+
+      if (imagesOnSide.length >= 20) {
         return;
       }
+
     }
 
     state.pushHistory();
@@ -211,10 +214,10 @@ export const useDesignStore = create<DesignState>((set, get) => ({
       );
 
 
-      //Giới hạn 2 ảnh trên 1 mặt
-      //  if (imagesOnSide.length >= 2) {
-      //  return;
-      // }
+      //Giới hạn 2 ảnh trên 1 mặt, thêm 2 chỗ, ở đây và ở add element
+      if (imagesOnSide.length >= 20) {
+        return;
+      }
     }
 
     state.pushHistory();

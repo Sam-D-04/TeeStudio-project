@@ -25,11 +25,10 @@ export interface SavedDesign {
 }
 
 /*
- * Dùng apiClient (axios) thay cho fetch thô để:
+ * Dùng apiClient thay cho fetch thô để:
  *  - Luôn gắn access token mới nhất từ storage (interceptor request).
  *  - Tự động refresh token khi gặp 401 rồi retry (interceptor response).
  * Tham số `token` được giữ lại cho tương thích chỗ gọi cũ nhưng không cần dùng
- * (auth do interceptor xử lý).
  */
 export const userDesignService = {
   getMyDesigns: async (_token?: string): Promise<SavedDesign[]> => {
@@ -43,7 +42,7 @@ export const userDesignService = {
 
   createDesign: async (_token: string | undefined, payload: any): Promise<SavedDesign> => {
     try {
-      // Timeout dài hơn vì có upload ảnh preview (base64) lên Cloudinary
+      // Timeout dài hơn vì có upload ảnh preview lên Cloudinary
       const res = await apiClient.post(DESIGNS_PATH, payload, { timeout: 60000 });
       return res.data.data;
     } catch (err) {

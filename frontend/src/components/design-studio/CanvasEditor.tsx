@@ -64,7 +64,7 @@ function SnapGuides({
   return <>{guides}</>;
 }
 
-/* ─── Hook tự viết: tải icon xoay (rotate) dùng cho tay cầm của Transformer ─── */
+/* ─── Hook: tải icon xoay dùng cho tay cầm của Transformer ─── */
 function useRotateIcon() {
   const [img, setImg] = useState<HTMLImageElement | undefined>();
   useEffect(() => {
@@ -151,6 +151,7 @@ function ExternalTransformer({
           : [...TR_ANCHORS]
       }
       onTransformStart={() => pushHistory()}
+
       onTransformEnd={() => {
         if (!el) return;
         const node = shapeRefs.current.get(selectedId);
@@ -171,8 +172,12 @@ function ExternalTransformer({
           /* node.x() = storeX + (flipH ? newW : 0) → giải ngược về storeX */
           const storeX = node.x() - (flipH ? newW : 0);
           const storeY = node.y() - (flipV ? newH : 0);
-          console.log("Vị trí:", { x: storeX, y: storeY, rotation: node.rotation(), el });
+
+
+
+          // console.log("Vị trí:", { x: storeX, y: storeY, rotation: node.rotation() });
           updateElement(el.id, { x: storeX, y: storeY, width: newW, height: newH, rotation: node.rotation() });
+
         } else if (el.type === "text") {
           const flipH = el.flipH ?? false;
           const flipV = el.flipV ?? false;

@@ -25,7 +25,7 @@ async function getAvailableStickers() {
   try {
     const result = await cloudinary.search
       .expression('folder:Stickers/*')
-      .max_results(50)
+      .max_results(60)
       .execute();
     cachedStickers = result.resources.map(r => r.secure_url);
     return cachedStickers;
@@ -66,7 +66,7 @@ const elementSchema = {
     align: { type: Type.STRING, enum: ["left", "center", "right"] },
     letterSpacing: { type: Type.NUMBER },
   },
-  required: ["type", "x", "y", "width", "height", "rotation"], 
+  required: ["type", "x", "y", "width", "height", "rotation"],
 };
 
 const responseSchema = {
@@ -144,10 +144,14 @@ async function callGemini(systemInstruction, userPrompt) {
 
 async function generateDesign({ shirtType, shirtView, shirtColor, printArea, prompt }) {
   const contextBlock = await buildContextBlock({ shirtType, shirtView, shirtColor, printArea });
-  
+
   const systemInstruction =
-    "Bạn là một nhà thiết kế áo thun chuyên nghiệp. Nhiệm vụ: sinh ra 1-4 phần tử thiết kế " +
-    "(có thể kết hợp cả type='text' và type='image' - sticker) để in lên áo, bố cục đẹp, cân đối, dễ đọc, phù hợp thẩm mỹ thời trang hiện đại.\n" +
+    "Bạn là một nhà thiết kế áo thun chuyên nghiệp. Nhiệm vụ: sinh ra 2-6 phần tử thiết kế để in lên áo.\n" +
+    "Quy tắc bắt buộc:\n" +
+    "- Phải có ÍT NHẤT 1 phần tử type='text' (dòng chữ chính/phụ đề/tagline).\n" +
+    "- Nếu có sticker khả dụng, PHẢI dùng ÍT NHẤT 1 sticker (type='image'). Có thể dùng 2-3 sticker nếu phù hợp bố cục.\n" +
+    "- Có thể có 1-3 dòng chữ (tiêu đề, phụ đề, slogan) với font, cỡ chữ khác nhau.\n" +
+    "- Bố cục đẹp, cân đối, không chồng chéo, phù hợp thẩm mỹ thời trang hiện đại.\n" +
     contextBlock +
     "\nTrả về JSON đúng schema đã cho, không thêm giải thích.";
 
@@ -160,7 +164,7 @@ async function generateDesign({ shirtType, shirtView, shirtColor, printArea, pro
 
 async function arrangeDesign({ shirtType, shirtView, shirtColor, printArea, elements }) {
   const contextBlock = await buildContextBlock({ shirtType, shirtView, shirtColor, printArea });
-  
+
   const systemInstruction =
     "Bạn là một nhà thiết kế áo thun chuyên nghiệp. Nhiệm vụ: SẮP XẾP LẠI bố cục của các phần tử thiết kế " +
     "đã cho — cải thiện vị trí, kích thước, khoảng cách, màu sắc và font cho cân đối, hài hoà, thẩm mỹ. " +

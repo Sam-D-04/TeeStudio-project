@@ -1,0 +1,222 @@
+- generic [active] [ref=e1]:
+  - main [ref=e3]:
+    - generic [ref=e5]:
+      - link "TeeStudio" [ref=e6] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=e11]:
+        - link "Khám phá" [ref=e12] [cursor=pointer]:
+          - /url: /explore
+        - link "Thiết kế áo" [ref=e13] [cursor=pointer]:
+          - /url: /design-studio
+        - link "Bộ sưu tập" [ref=e14] [cursor=pointer]:
+          - /url: /collections
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - button "Đăng nhập" [ref=e17] [cursor=pointer]
+          - button "Đăng ký" [ref=e19] [cursor=pointer]
+        - generic [ref=e21]:
+          - button [ref=e22] [cursor=pointer]
+          - superscript [ref=e26]:
+            - generic [ref=e27]: "1"
+    - generic [ref=e29]:
+      - generic [ref=e31]:
+        - generic [ref=e32]:
+          - heading "Thiết kế chất riêng In ấn siêu tốc" [level=1] [ref=e33]: Thiết kế chất riêngIn ấn siêu tốc
+          - paragraph [ref=e34]: Trải nghiệm công cụ thiết kế lơ lửng hiện đại. Đặt áo theo yêu cầu chỉ với vài cú click chuột.
+          - link "Khám phá Design Studio" [ref=e36] [cursor=pointer]:
+            - /url: /design-studio
+        - generic:
+          - generic:
+            - img "T-shirt Mockup"
+          - generic:
+            - img "Bg Mockup"
+          - generic:
+            - img "Bg Mockup"
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - heading "Tạo thiết kế mới" [level=1] [ref=e43]
+            - paragraph [ref=e44]: Chọn loại áo để bắt đầu — công cụ thiết kế trực tuyến, không cần phần mềm.
+          - button "Xem tất cả →" [ref=e45] [cursor=pointer]
+        - generic [ref=e47]:
+          - generic [ref=e48] [cursor=pointer]:
+            - generic [ref=e50]:
+              - img "Áo Thun Wide Form" [ref=e52]
+              - img "Áo Thun Wide Form Back" [ref=e54]
+            - generic [ref=e55]:
+              - heading "Áo Thun Wide Form" [level=3] [ref=e56]
+              - paragraph [ref=e57]: 100% Cotton 180gsm
+              - generic [ref=e58]:
+                - generic [ref=e59]: từ 120.000đ
+                - button "Thiết kế" [ref=e61]
+          - generic [ref=e63] [cursor=pointer]:
+            - generic [ref=e65]:
+              - img "Áo Polo" [ref=e67]
+              - img "Áo Polo Back" [ref=e69]
+            - generic [ref=e70]:
+              - heading "Áo Polo" [level=3] [ref=e71]
+              - paragraph [ref=e72]: Cotton pique 220gsm
+              - generic [ref=e73]:
+                - generic [ref=e74]: từ 180.000đ
+                - button "Thiết kế" [ref=e76]
+          - generic [ref=e78] [cursor=pointer]:
+            - generic [ref=e80]:
+              - img "Áo Hoodie" [ref=e82]
+              - img "Áo Hoodie Back" [ref=e84]
+            - generic [ref=e85]:
+              - heading "Áo Hoodie" [level=3] [ref=e86]
+              - paragraph [ref=e87]: Nỉ bông 320gsm
+              - generic [ref=e88]:
+                - generic [ref=e89]: từ 280.000đ
+                - button "Thiết kế" [ref=e91]
+      - generic [ref=e95]:
+        - generic [ref=e96]:
+          - generic [ref=e103]: "1"
+          - heading "Chọn sản phẩm" [level=3] [ref=e104]
+          - paragraph [ref=e105]: Chọn loại áo và màu nền phù hợp với phong cách của bạn.
+        - generic [ref=e109]:
+          - generic [ref=e116]: "2"
+          - heading "Tự do thiết kế" [level=3] [ref=e117]
+          - paragraph [ref=e118]: Thêm hình, chữ, sticker — không cần phần mềm chuyên nghiệp.
+        - generic [ref=e122]:
+          - generic [ref=e129]: "3"
+          - heading "Giao hàng tận nơi" [level=3] [ref=e130]
+          - paragraph [ref=e131]: Đặt hàng và nhận áo tại địa chỉ của bạn trong 5–7 ngày.
+      - generic [ref=e133]:
+        - generic [ref=e134]:
+          - generic [ref=e135]:
+            - heading "Sản phẩm nổi bật" [level=2] [ref=e136]
+            - paragraph [ref=e137]: Các sản phẩm được yêu thích nhất đang có sẵn trong kho — thiết kế và đặt hàng ngay.
+          - button "Xem tất cả →" [ref=e138] [cursor=pointer]
+        - generic [ref=e140]:
+          - button "Tất cả" [ref=e141] [cursor=pointer]
+          - button "Áo Thun" [ref=e142] [cursor=pointer]
+          - button "Áo Hoodie" [ref=e143] [cursor=pointer]
+          - button "Áo Polo" [ref=e144] [cursor=pointer]
+          - button "Oversize" [ref=e145] [cursor=pointer]
+        - generic [ref=e146]:
+          - generic [ref=e147] [cursor=pointer]:
+            - generic [ref=e148]:
+              - generic [ref=e149]: Còn hàng
+              - generic [ref=e150]:
+                - img "Áo Thun Wide Form" [ref=e152]
+                - img "Áo Thun Wide Form" [ref=e154]
+            - generic [ref=e155]:
+              - paragraph [ref=e156]: Áo Thun Wide Form
+              - generic [ref=e157]:
+                - generic "White" [ref=e158]
+                - generic "Black" [ref=e159]
+                - generic "Navy" [ref=e160]
+              - generic [ref=e161]:
+                - generic [ref=e162]: từ 120.000đ
+                - button "Thiết kế" [ref=e163]
+          - generic [ref=e165] [cursor=pointer]:
+            - generic [ref=e166]:
+              - generic [ref=e167]: Còn hàng
+              - generic [ref=e168]:
+                - img "Áo Hoodie" [ref=e170]
+                - img "Áo Hoodie" [ref=e172]
+            - generic [ref=e173]:
+              - paragraph [ref=e174]: Áo Hoodie
+              - generic [ref=e175]:
+                - generic "Grey" [ref=e176]
+                - generic "Brown" [ref=e177]
+              - generic [ref=e178]:
+                - generic [ref=e179]: từ 280.000đ
+                - button "Thiết kế" [ref=e180]
+          - generic [ref=e182] [cursor=pointer]:
+            - generic [ref=e183]:
+              - generic [ref=e184]: Còn hàng
+              - generic [ref=e185]:
+                - img "Áo Polo" [ref=e187]
+                - img "Áo Polo" [ref=e189]
+            - generic [ref=e190]:
+              - paragraph [ref=e191]: Áo Polo
+              - generic [ref=e192]:
+                - generic "Beige" [ref=e193]
+                - generic "Navy" [ref=e194]
+                - generic "White" [ref=e195]
+              - generic [ref=e196]:
+                - generic [ref=e197]: từ 180.000đ
+                - button "Thiết kế" [ref=e198]
+          - generic [ref=e200] [cursor=pointer]:
+            - generic [ref=e201]:
+              - generic [ref=e202]: Còn hàng
+              - generic [ref=e203]:
+                - img "Áo Sweater" [ref=e205]
+                - img "Áo Sweater" [ref=e207]
+            - generic [ref=e208]:
+              - paragraph [ref=e209]: Áo Sweater
+              - generic [ref=e210]:
+                - generic "Beige" [ref=e211]
+                - generic "Blue" [ref=e212]
+                - generic "Green" [ref=e213]
+              - generic [ref=e214]:
+                - generic [ref=e215]: từ 250.000đ
+                - button "Thiết kế" [ref=e216]
+      - generic [ref=e219]:
+        - generic [ref=e220]:
+          - generic [ref=e221]:
+            - link "TeeStudio" [ref=e222] [cursor=pointer]:
+              - /url: "#"
+            - paragraph [ref=e227]: Nền tảng thiết kế áo cá nhân hoá & đặt đồng phục số lượng lớn chất lượng cao.
+            - generic [ref=e228]:
+              - link "Facebook" [ref=e229] [cursor=pointer]:
+                - /url: "#"
+              - link "Instagram" [ref=e232] [cursor=pointer]:
+                - /url: "#"
+              - link "YouTube" [ref=e237] [cursor=pointer]:
+                - /url: "#"
+          - generic [ref=e241]:
+            - heading "Sản phẩm" [level=4] [ref=e242]
+            - list [ref=e243]:
+              - listitem [ref=e244]:
+                - link "Áo Thun In Theo Yêu Cầu" [ref=e245] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e246]:
+                - link "Áo Polo Doanh Nghiệp" [ref=e247] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e248]:
+                - link "Áo Hoodie" [ref=e249] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e250]:
+                - link "Đặt Sỉ Đồng Phục" [ref=e251] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e252]:
+                - link "Công cụ Thiết Kế" [ref=e253] [cursor=pointer]:
+                  - /url: "#"
+          - generic [ref=e254]:
+            - heading "Chính sách" [level=4] [ref=e255]
+            - list [ref=e256]:
+              - listitem [ref=e257]:
+                - link "Chính sách đổi trả" [ref=e258] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e259]:
+                - link "Chính sách bảo mật" [ref=e260] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e261]:
+                - link "Điều khoản dịch vụ" [ref=e262] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e263]:
+                - link "Hướng dẫn đặt hàng" [ref=e264] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e265]:
+                - link "FAQ" [ref=e266] [cursor=pointer]:
+                  - /url: "#"
+          - generic [ref=e267]:
+            - heading "Liên hệ" [level=4] [ref=e268]
+            - generic [ref=e269]:
+              - generic [ref=e270]:
+                - generic [ref=e271]: 📞
+                - generic [ref=e272]: 0901 234 567
+              - generic [ref=e273]:
+                - generic [ref=e274]: ✉️
+                - generic [ref=e275]: teestudiocompany@gmail.com
+              - generic [ref=e276]:
+                - generic [ref=e277]: 📍
+                - generic [ref=e278]: 180 Cao Lỗ, Q.8, TP.HCM
+        - separator [ref=e279]
+        - generic [ref=e280]:
+          - paragraph [ref=e281]: © 2025 TeeStudio. All rights reserved.
+          - paragraph [ref=e282]: Made with ❤️ in Việt Nam
+  - alert [ref=e283]
