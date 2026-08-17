@@ -12,6 +12,12 @@ const {
 
 const app = express();
 
+// Render đặt server sau đúng 1 lớp reverse proxy - cần khai báo để Express đọc
+// IP thật của client từ header X-Forwarded-For (thay vì IP nội bộ của proxy).
+// Thiếu dòng này thì express-rate-limit không xác định đúng IP để giới hạn theo
+// từng người dùng (báo lỗi ERR_ERL_UNEXPECTED_X_FORWARDED_FOR).
+app.set("trust proxy", 1);
+
 // Chỉ cho phép origin của frontend gọi API (nhiều origin thì phân tách bằng dấu phẩy trong .env).
 const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:3000")
   .split(",")

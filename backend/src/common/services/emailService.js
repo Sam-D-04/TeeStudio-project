@@ -1,6 +1,8 @@
 const nodemailer = require("nodemailer");
+const dns = require("dns").promises;
 
 let transporter;
+let gmailIpv4Cache = null;
 
 const createServiceError = (message, statusCode) => {
   const error = new Error(message);
@@ -8,7 +10,28 @@ const createServiceError = (message, statusCode) => {
   return error;
 };
 
-const getTransporter = () => {
+/**
+ * nodemailer tự resolve DNS của host SMTP bằng dns.Resolver().resolve4()/resolve6()
+ * (lib/shared/index.js), gộp chung địa chỉ IPv4+IPv6 rồi CHỌN NGẪU NHIÊN 1 địa chỉ để
+ * kết nối (formatDNSValue) - không ưu tiên IPv4. smtp.gmail.com có cả 2 loại bản ghi,
+ * nên mỗi lần gửi có xác suất trúng địa chỉ IPv6, mà Render không có route IPv6 outbound
+ * thật -> "connect ENETUNREACH ...:465" xảy ra ngẫu nhiên giữa các lần gửi.
+ * (Đã thử family:4 trong transport options và dns.setDefaultResultOrder toàn cục - cả
+ * hai đều không có tác dụng vì nodemailer không dùng dns.lookup() cho việc này.)
+ *
+ * Né bằng cách tự resolve A record (chỉ IPv4) bằng dns.resolve4() của Node rồi đưa
+ * thẳng ĐỊA CHỈ IP vào `host` của transporter - nodemailer bỏ qua toàn bộ logic
+ * resolve/random ở trên khi host đã là 1 IP hợp lệ (net.isIP kiểm tra ngay đầu
+ * resolveHostname), nên chắc chắn không còn khả năng rơi trúng IPv6.
+ */
+async function resolveGmailSmtpIpv4() {
+  if (gmailIpv4Cache) return gmailIpv4Cache;
+  const addresses = await dns.resolve4("smtp.gmail.com");
+  gmailIpv4Cache = addresses[0];
+  return gmailIpv4Cache;
+}
+
+const getTransporter = async () => {
   const user = process.env.EMAIL_USER?.trim();
   const pass = process.env.EMAIL_PASS?.replace(/\s/g, "");
 
@@ -20,16 +43,15 @@ const getTransporter = () => {
   }
 
   if (!transporter) {
+    const ip = await resolveGmailSmtpIpv4();
     transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
+      host: ip,
       port: 465,
       secure: true,          // true = SSL trực tiếp (port 465), false = STARTTLS (port 587).
-                              // Việc ép ưu tiên IPv4 (tránh ENETUNREACH trên Render với host có
-                              // cả AAAA/A như smtp.gmail.com) được xử lý ở tầng dns của Node,
-                              // đầu file server.js - family:4 ở đây từng thử nhưng không có
-                              // tác dụng vì nodemailer không chuyển tiếp option đó xuống socket.
       auth: { user, pass },
       tls: {
+        servername: "smtp.gmail.com", // Bắt buộc: giữ đúng hostname thật để xác thực chứng chỉ TLS
+                                       // dù đang kết nối thẳng qua IP.
         rejectUnauthorized: false, // Tương thích với các cloud server như Render
       },
     });
@@ -53,7 +75,7 @@ const sendAccountCredentialsEmail = async ({
   temporaryPassword,
 }) => {
   try {
-    const { transporter: gmailTransporter, user } = getTransporter();
+    const { transporter: gmailTransporter, user } = await getTransporter();
     const safeName = escapeHtml(fullName);
     const safeEmail = escapeHtml(to);
     const safePassword = escapeHtml(temporaryPassword);
@@ -104,7 +126,7 @@ const sendAccountCredentialsEmail = async ({
 
 const sendVerificationEmail = async ({ to, fullName, verifyUrl }) => {
   try {
-    const { transporter: gmailTransporter, user } = getTransporter();
+    const { transporter: gmailTransporter, user } = await getTransporter();
     const safeName = escapeHtml(fullName);
     const safeUrl = escapeHtml(verifyUrl);
 
@@ -152,7 +174,7 @@ const sendVerificationEmail = async ({ to, fullName, verifyUrl }) => {
 
 const sendPasswordResetEmail = async ({ to, fullName, resetUrl }) => {
   try {
-    const { transporter: gmailTransporter, user } = getTransporter();
+    const { transporter: gmailTransporter, user } = await getTransporter();
     const safeName = escapeHtml(fullName);
     const safeUrl = escapeHtml(resetUrl);
 
@@ -233,7 +255,7 @@ const sendOrderConfirmationEmail = async ({
   diaChiGiaoHang,
 }) => {
   try {
-    const { transporter: gmailTransporter, user } = getTransporter();
+    const { transporter: gmailTransporter, user } = await getTransporter();
     const safeName = escapeHtml(recipientName);
     const safeOrderCode = escapeHtml(orderCode);
     const nhanPhuongThuc =
@@ -371,7 +393,7 @@ const sendDesignRevisionEmail = async ({
   revisionLink, // URL trực tiếp đến trang sửa thiết kế (tùy chọn)
 }) => {
   try {
-    const { transporter: gmailTransporter, user } = getTransporter();
+    const { transporter: gmailTransporter, user } = await getTransporter();
     const safeName = escapeHtml(fullName);
     const safeMa = escapeHtml(maThietKe);
     const safeGhiChu = escapeHtml(ghiChu || "");
@@ -450,7 +472,7 @@ const sendDesignSubmittedToAdminEmail = async ({
   designId,     // ID số của thiết kế
 }) => {
   try {
-    const { transporter: gmailTransporter, user } = getTransporter();
+    const { transporter: gmailTransporter, user } = await getTransporter();
     const safeName = escapeHtml(customerName);
     const safeMa   = escapeHtml(maThietKe);
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
