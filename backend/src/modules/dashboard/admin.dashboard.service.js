@@ -642,7 +642,7 @@ async function laySanPhamBanChay(tuNgay, denNgay, limit = 3) {
          FROM OrderItem oiBest
          JOIN ProductVariant pvBest ON pvBest.id = oiBest.variantId
          JOIN CustomerOrder coBest ON coBest.id = oiBest.orderId
-         LEFT LEFT JOIN (
+         LEFT JOIN (
            SELECT orderId, MAX(paidAt) AS fullyPaidAt
            FROM Payment
            WHERE status = 'COMPLETED'
