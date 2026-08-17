@@ -37,7 +37,7 @@ const productColumns = [
   { key: "product", label: "Sản phẩm" },
   { key: "bienThe", label: "Biến thể phổ biến" },
   { key: "quantity", label: "Đã bán", align: "right" as const },
-  { key: "revenue", label: "Doanh thu", align: "right" as const },
+  //{ key: "revenue", label: "Doanh thu", align: "right" as const },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
