@@ -23,12 +23,11 @@ const getTransporter = () => {
     transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 465,
-      secure: true,          // true = SSL trực tiếp (port 465). Đổi từ 587/STARTTLS vì
-                              // 587 bị "Connection timeout" trên Render (nghi bị chặn/nghẽn ở
-                              // tầng mạng) - 465 dùng đường TLS riêng, không qua bước STARTTLS.
-      family: 4,             // Ép kết nối qua IPv4 - Render không có route IPv6 outbound,
-                              // trong khi smtp.gmail.com có cả bản ghi AAAA (IPv6) lẫn A (IPv4),
-                              // nên nếu không ép sẽ bị "connect ENETUNREACH ...:587" ngẫu nhiên.
+      secure: true,          // true = SSL trực tiếp (port 465), false = STARTTLS (port 587).
+                              // Việc ép ưu tiên IPv4 (tránh ENETUNREACH trên Render với host có
+                              // cả AAAA/A như smtp.gmail.com) được xử lý ở tầng dns của Node,
+                              // đầu file server.js - family:4 ở đây từng thử nhưng không có
+                              // tác dụng vì nodemailer không chuyển tiếp option đó xuống socket.
       auth: { user, pass },
       tls: {
         rejectUnauthorized: false, // Tương thích với các cloud server như Render
