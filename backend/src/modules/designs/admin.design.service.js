@@ -867,8 +867,8 @@ async function layChiTietThietKe(id) {
   let ppInFront = 0;
   let ppInBack = 0;
   if (frontAreaFee > 0 && backAreaFee > 0) {
-    ppInFront = phiInAnTuDB / 2;
-    ppInBack = phiInAnTuDB / 2;
+    ppInFront = phiInAnTuDB;
+    ppInBack = phiInAnTuDB;
   } else if (backAreaFee > 0) {
     ppInBack = phiInAnTuDB;
   } else {

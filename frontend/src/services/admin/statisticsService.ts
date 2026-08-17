@@ -191,3 +191,36 @@ export async function xuatBaoCaoThongKe(
     `bao-cao-thong-ke-${tuNgay}-den-${denNgay}.xlsx`
   );
 }
+
+// =====================================================================
+// AI PHÂN TÍCH DOANH THU
+// =====================================================================
+
+/** Kết quả trả về từ API phân tích AI */
+export type KetQuaAIPhanTich = {
+  nhanXet: string;
+  duLieu: {
+    khoangThoiGian: KhoangThoiGian;
+    doanhThuVnd: number;
+    soDonHoanTat: number;
+    tongSoDon: number;
+    topSanPham: { ten: string; soLuong: number; doanhThu: number }[];
+  };
+};
+
+/**
+ * Gửi yêu cầu phân tích AI lên backend.
+ * Backend sẽ gom số liệu từ DB rồi gửi lên Gemini API.
+ * POST /api/admin/statistics/phan-tich-ai
+ */
+export async function phanTichAI(
+  tuNgay?: string,
+  denNgay?: string
+): Promise<KetQuaAIPhanTich> {
+  const res = await apiClient.post<{ success: boolean; data: KetQuaAIPhanTich }>(
+    "/admin/statistics/phan-tich-ai",
+    { tuNgay: tuNgay || null, denNgay: denNgay || null }
+  );
+  return res.data.data;
+}
+

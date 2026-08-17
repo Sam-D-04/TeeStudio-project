@@ -139,11 +139,11 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
         kichCo: order.sanPham.sizes,
         sku: "",
         soLuong: 1,
-        // tamTinhVnd = sum(unitPrice * qty), phiThietKeVnd = sum(designFee)
-        // Đây là fallback khi items rỗng: coi toàn bộ là 1 item
+        // donGiaVnd = unitPrice (giá phôi áo), phiThietKeVnd = designFee (phí in ấn mỗi áo)
+        // thanhTienVnd = (donGiaVnd + phiThietKeVnd) * soLuong = lineTotal từ DB
         donGiaVnd: order.tamTinhVnd,
         phiThietKeVnd: order.phiThietKeVnd,
-        thanhTienVnd: order.tamTinhVnd + order.phiThietKeVnd,
+        thanhTienVnd: order.tongTienVnd,
         loai: order.sanPham.loai,
         anhUrl: order.sanPham.anhUrl,
         anhXemTruocThietKe: order.anhXemTruocThietKe,
@@ -166,8 +166,10 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
         <tbody>
           {items.map((item) => {
             const imageUrl = item.anhXemTruocThietKe || item.anhUrl;
-            const tongPhiIn = (item.phiDienTichInFront || 0) + (item.phiDienTichInBack || 0) + (item.phiPhuongPhapInFront || 0) + (item.phiPhuongPhapInBack || 0);
-            const donGiaAo = item.loai === "custom_design" ? item.donGiaVnd - tongPhiIn : item.donGiaVnd;
+            // donGiaVnd = giá phôi áo thuần (unitPrice từ DB)
+            // phiThietKeVnd = phí in ấn mỗi áo (designFee từ DB)
+            const donGiaAo = item.donGiaVnd;
+            const phiInAn = item.phiThietKeVnd;
 
             return (
               <tr key={item.id} className="border-b border-border last:border-b-0">
@@ -232,28 +234,15 @@ function OrderItemsTable({ order }: { order: ChiTietDonHang }) {
                 </td>
                 <td className="px-2 py-2 text-right align-middle text-text-main">
                   <div className="font-semibold">
-                    {formatCurrency(item.donGiaVnd)}
+                    {item.loai === "custom_design" ? formatCurrency(donGiaAo + phiInAn) : formatCurrency(donGiaAo)}
                   </div>
-                  {item.loai === "custom_design" ? (
+                  {item.loai === "custom_design" && phiInAn > 0 ? (
                     <div className="mt-0.5 text-xs text-text-secondary">
-                      ({formatCurrency(donGiaAo)} + {formatCurrency((item.phiPhuongPhapInFront || 0) + (item.phiPhuongPhapInBack || 0))} + {formatCurrency((item.phiDienTichInFront || 0) + (item.phiDienTichInBack || 0))})
-                    </div>
-                  ) : null}
-                  {item.phiThietKeVnd > 0 && item.loai === "custom_design" ? (
-                    <div className="mt-1 flex flex-col items-end text-xs text-text-secondary">
-                      <div className="font-semibold text-text-main">Phí in ấn:</div>
-                      {item.phiDienTichInFront ? <div>+ DT in (trước): {formatCurrency(item.phiDienTichInFront)}</div> : null}
-                      {item.phiDienTichInBack ? <div>+ DT in (sau): {formatCurrency(item.phiDienTichInBack)}</div> : null}
-                      {item.phiPhuongPhapInFront ? <div>+ PP in (trước): {formatCurrency(item.phiPhuongPhapInFront)}</div> : null}
-                      {item.phiPhuongPhapInBack ? <div>+ PP in (sau): {formatCurrency(item.phiPhuongPhapInBack)}</div> : null}
-                    </div>
-                  ) : item.phiThietKeVnd > 0 ? (
-                    <div className="mt-0.5 text-xs text-text-secondary">
-                      + phí TK: {formatCurrency(item.phiThietKeVnd)}
+                      ({formatCurrency(donGiaAo)} + phí in: {formatCurrency(phiInAn)})
                     </div>
                   ) : null}
                 </td>
-                {/* Thành tiền = (donGiaVnd + phiThietKeVnd) × soLuong (đã tính trong db: lineTotal) */}
+                {/* Thành tiền = (donGiaVnd + phiThietKeVnd) × soLuong = lineTotal từ DB */}
                 <td className="px-2 py-2 text-right align-middle font-bold text-primary-container">
                   {formatCurrency(item.thanhTienVnd)}
                 </td>
@@ -669,7 +658,7 @@ function OrderDetailContent({
             */}
             <PriceRow label="Tạm tính" value={order.tamTinhVnd} />
             {order.phiThietKeVnd > 0 ? (
-              <PriceRow label="Phí thiết kế" value={order.phiThietKeVnd} />
+              <PriceRow label="Phí in ấn" value={order.phiThietKeVnd} />
             ) : null}
             {order.giamGiaVnd > 0 ? (
               <PriceRow label="Giảm giá" value={-order.giamGiaVnd} />

@@ -103,7 +103,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     key: string;
     variants: designService.BienTheTaoThietKe[];
   }>({ key: "", variants: [] });
-  const [designFee, setDesignFee] = useState<number | null>(null);
+
   const [selectedPrintMethodId, setSelectedPrintMethodId] = useState<number | undefined>();
   const [printMethods, setPrintMethods] = useState<designService.PhuongPhapIn[]>([]);
 
@@ -166,8 +166,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
 
         setHasRelatedOrder(Boolean(data.coDonHang));
 
-        // Load phí thiết kế và phương pháp in hiện tại
-        if (data.designFee != null) setDesignFee(data.designFee);
+        // Load phương pháp in hiện tại
         if (data.printMethodId != null) setSelectedPrintMethodId(data.printMethodId);
 
         const cd = data.canvasData;
@@ -475,7 +474,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
         previewUrl,
         printImageFront: printImageFront ?? null,
         printImageBack: printImageBack ?? null,
-        designFeeOverride: designFee != null ? designFee : 0,
+        designFeeOverride: 0,
         printMethodId: selectedPrintMethodId,
       });
 
@@ -495,7 +494,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
     } finally {
       setSaving(false);
     }
-  }, [designFee, designId, elements.length, hasRelatedOrder, maThietKe, message, modal, router, selectedPrintMethodId, setSelectedId, shirtColor, shirtType, shirtView, variantId, zoom]);
+  }, [designId, elements.length, hasRelatedOrder, maThietKe, message, modal, router, selectedPrintMethodId, setSelectedId, shirtColor, shirtType, shirtView, variantId, zoom]);
 
   // ─── Hủy bỏ – quay về danh sách không lưu gì ─────────────────────────
   const handleCancel = useCallback(() => {
@@ -729,17 +728,7 @@ export default function AdminEditDesignStudio({ designId }: AdminEditDesignStudi
             )}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <InputNumber
-              value={designFee}
-              onChange={(value) => setDesignFee(value)}
-              placeholder="Phí thiết kế (để trống = 0đ)"
-              min={0}
-              step={10000}
-              formatter={(value) => value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : ""}
-              parser={(value) => Number((value ?? "").replace(/[^\d]/g, ""))}
-              style={{ width: 220 }}
-              suffix="₫"
-            />
+
             <Select
               allowClear
               value={selectedPrintMethodId}

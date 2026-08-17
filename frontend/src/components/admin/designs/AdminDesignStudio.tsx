@@ -52,7 +52,7 @@ export default function AdminDesignStudio() {
     variants: designService.BienTheTaoThietKe[];
   }>({ key: "", variants: [] });
   const [designName, setDesignName] = useState("");
-  const [designFee, setDesignFee] = useState<number | null>(null);
+
   const [selectedPrintMethodId, setSelectedPrintMethodId] = useState<number | undefined>();
   const [printMethods, setPrintMethods] = useState<designService.PhuongPhapIn[]>([]);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
@@ -346,7 +346,7 @@ export default function AdminDesignStudio() {
         previewUrl,
         printImageFront: printImageFront ?? null,
         printImageBack: printImageBack ?? null,
-        designFeeOverride: designFee != null ? designFee : 0,
+        designFeeOverride: 0,
         printMethodId: selectedPrintMethodId,
       });
 
@@ -367,7 +367,7 @@ export default function AdminDesignStudio() {
     } finally {
       setSaving(false);
     }
-  }, [customerId, designFee, designName, elements.length, message, modal, router, selectedPrintMethodId, setSelectedId, shirtColor, shirtType, shirtView, variantId, zoom]);
+  }, [customerId, designName, elements.length, message, modal, router, selectedPrintMethodId, setSelectedId, shirtColor, shirtType, shirtView, variantId, zoom]);
 
   const area = getPrintAreaBoundary(shirtType, shirtView, CONTAINER_W, CONTAINER_H);
   const printArea = { x: area.left, y: area.top, w: area.width, h: area.height };
@@ -440,17 +440,7 @@ export default function AdminDesignStudio() {
             />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <InputNumber
-              value={designFee}
-              onChange={(value) => setDesignFee(value)}
-              placeholder="Phí thiết kế (để trống = 0đ)"
-              min={0}
-              step={10000}
-              formatter={(value) => value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : ""}
-              parser={(value) => Number((value ?? "").replace(/[^\d]/g, ""))}
-              style={{ width: 220 }}
-              suffix="₫"
-            />
+
             <Select
               allowClear
               value={selectedPrintMethodId}

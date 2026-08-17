@@ -107,7 +107,7 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
     `SELECT COALESCE(SUM(co.totalAmount), 0) AS doanh_thu,
             COUNT(co.id) AS so_don_doanh_thu
      FROM CustomerOrder co
-     JOIN (
+     LEFT JOIN (
        SELECT orderId, MAX(paidAt) AS fullyPaidAt
        FROM Payment
        WHERE status = 'COMPLETED'
@@ -125,7 +125,7 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
     `SELECT COALESCE(SUM(oi.designFee), 0) AS doanh_thu_thiet_ke
      FROM OrderItem oi
      JOIN CustomerOrder co ON co.id = oi.orderId
-     JOIN (
+     LEFT JOIN (
        SELECT orderId, MAX(paidAt) AS fullyPaidAt
        FROM Payment
        WHERE status = 'COMPLETED'
@@ -225,6 +225,7 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
     tyLeThanhCongPhanTram: tyLeThanhCong,
     doanhThuKhacDenBuVnd: doanhThuKhac,
     tyLeHuyPhanTram: tyLeHuy,
+    soDonHoanTat: soDonDoanhThu,
     khoangThoiGian: { tuNgay: batDau, denNgay: ketThuc },
   };
 }
@@ -386,7 +387,7 @@ async function layDuLieuBieuDo(tuNgay, denNgay) {
          COALESCE(SUM(co.totalAmount), 0) AS doanh_thu,
          COUNT(*)                      AS so_don_hoan_tat
        FROM CustomerOrder co
-       JOIN (
+       LEFT JOIN (
          SELECT orderId, MAX(paidAt) AS fullyPaidAt
          FROM Payment
          WHERE status = 'COMPLETED'
@@ -422,7 +423,7 @@ async function layDuLieuBieuDo(tuNgay, denNgay) {
          COALESCE(SUM(co.totalAmount), 0)   AS doanh_thu,
          COUNT(*)                        AS so_don_hoan_tat
        FROM CustomerOrder co
-       JOIN (
+       LEFT JOIN (
          SELECT orderId, MAX(paidAt) AS fullyPaidAt
          FROM Payment
          WHERE status = 'COMPLETED'
@@ -461,7 +462,7 @@ async function layDuLieuBieuDo(tuNgay, denNgay) {
          COALESCE(SUM(co.totalAmount), 0)      AS doanh_thu,
          COUNT(*)                           AS so_don_hoan_tat
        FROM CustomerOrder co
-       JOIN (
+       LEFT JOIN (
          SELECT orderId, MAX(paidAt) AS fullyPaidAt
          FROM Payment
          WHERE status = 'COMPLETED'
@@ -641,7 +642,7 @@ async function laySanPhamBanChay(tuNgay, denNgay, limit = 3) {
          FROM OrderItem oiBest
          JOIN ProductVariant pvBest ON pvBest.id = oiBest.variantId
          JOIN CustomerOrder coBest ON coBest.id = oiBest.orderId
-         JOIN (
+         LEFT JOIN (
            SELECT orderId, MAX(paidAt) AS fullyPaidAt
            FROM Payment
            WHERE status = 'COMPLETED'
@@ -662,7 +663,7 @@ async function laySanPhamBanChay(tuNgay, denNgay, limit = 3) {
      JOIN ProductVariant pv ON pv.id = oi.variantId
      JOIN Product p          ON p.id  = pv.productId
      JOIN CustomerOrder co   ON co.id = oi.orderId
-     JOIN (
+     LEFT JOIN (
        SELECT orderId, MAX(paidAt) AS fullyPaidAt
        FROM Payment
        WHERE status = 'COMPLETED'

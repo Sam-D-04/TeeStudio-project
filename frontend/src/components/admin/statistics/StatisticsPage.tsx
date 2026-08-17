@@ -12,8 +12,9 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import * as statisticsService from "@/services/admin/statisticsService";
+import type { KetQuaAIPhanTich } from "@/services/admin/statisticsService";
 import StatisticsFilterBar from "./components/StatisticsFilterBar";
 import StatisticsMetricCard, {
   StatisticsMetricCardSkeleton,
@@ -36,7 +37,7 @@ const productColumns = [
   { key: "product", label: "Sản phẩm" },
   { key: "bienThe", label: "Biến thể phổ biến" },
   { key: "quantity", label: "Đã bán", align: "right" as const },
-  { key: "revenue", label: "Doanh thu", align: "right" as const },
+  //{ key: "revenue", label: "Doanh thu", align: "right" as const },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,6 +90,30 @@ function InlineError({ message }: { message: string }) {
 
 export default function StatisticsPage() {
   const [dateRange, setDateRange] = useState({ startDate: "", endDate: "" });
+
+  // ── Trạng thái AI phân tích ─────────────────────────────────────────────────
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<KetQuaAIPhanTich | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const aiPanelRef = useRef<HTMLDivElement>(null);
+
+  const handleAIPhanTich = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    setAiResult(null);
+    try {
+      const tuNgay = dateRange.startDate || undefined;
+      const denNgay = dateRange.endDate || undefined;
+      const result = await statisticsService.phanTichAI(tuNgay, denNgay);
+      setAiResult(result);
+      // Cuộn xuống panel kết quả
+      setTimeout(() => aiPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    } catch {
+      setAiError("Không thể kết nối Gemini AI. Vui lòng kiểm tra API Key hoặc thử lại sau.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   // Chuyển chuỗi rỗng sang undefined để backend dùng giá trị mặc định
   const tuNgay = dateRange.startDate || undefined;
@@ -176,7 +201,7 @@ export default function StatisticsPage() {
         tone: "success",
         direction: pctDir(ss.soDonPhanTram),
         directionLabel: formatPct(ss.soDonPhanTram),
-        href: `/admin/don-hang?status=tat_ca${dateParams}`,
+        href: `/admin/don-hang?status=tat_ca${completedDateParams}`,
       },
       {
         label: "Sản phẩm bán ra",
@@ -225,26 +250,20 @@ export default function StatisticsPage() {
         tone: "text-primary-container",
         href: `/admin/don-hang?status=hoan_tat&payment=da_thanh_toan${completedDateParams}`,
       },
-      {
-        label: "Tiền đã thu trong kỳ",
-        value: formatTien(data.tienDaThuTrongKyVnd),
-        description: "Tổng tiền thực nhận từ các giao dịch đã hoàn tất (bao gồm cả cọc)",
-        tone: "text-success",
-        href: `/admin/thanh-toan?startDate=${khoang?.tuNgay ?? ""}&endDate=${khoang?.denNgay ?? ""}&dateField=paid`,
-      },
+
       {
         label: "Dòng tiền COD đang treo",
         value: formatTien(data.dongTienCodDangTreoVnd),
         description: "Tiền COD chưa được kế toán xác nhận đối soát",
         tone: "text-warning",
-        href: `/admin/don-hang?payment=can_doi_soat${dateParams}`,
+        href: `/admin/don-hang?payment=can_doi_soat${completedDateParams}`,
       },
       {
         label: "Tổng giá trị đơn hàng",
         value: formatTien(data.tongGiaTriDonHangVnd),
         description: "Tổng giá trị tất cả đơn phát sinh trong kỳ",
         tone: "text-text-main",
-        href: `/admin/don-hang?status=tat_ca${dateParams}`,
+        href: `/admin/don-hang?status=tat_ca${completedDateParams}`,
       },
       {
         label: "Đơn hoàn tất",
@@ -265,14 +284,14 @@ export default function StatisticsPage() {
         value: data.soDonChoDoiSoatCod.toLocaleString("vi-VN"),
         description: "Đơn còn khoản COD đang treo",
         tone: "text-warning",
-        href: `/admin/don-hang?payment=can_doi_soat${dateParams}`,
+        href: `/admin/don-hang?payment=can_doi_soat${completedDateParams}`,
       },
       {
         label: "Tỷ lệ hủy đơn",
         value: formatTiLe(data.tyLeHuyDon),
         description: "Đơn CANCELLED / tổng đơn phát sinh",
         tone: data.tyLeHuyDon > 0 ? "text-red-600" : "text-success",
-        href: `/admin/don-hang?status=da_huy${dateParams}`,
+        href: `/admin/don-hang?status=da_huy${completedDateParams}`,
       },
     ];
   }, [chiSo]);
@@ -291,7 +310,7 @@ export default function StatisticsPage() {
   // ── Map phân bổ trạng thái đơn + thanh toán với href điều hướng ──────────
   const phanBoDateParams = useMemo(() => {
     const khoang = phanBo?.khoangThoiGian;
-    return khoang ? `&startDate=${khoang.tuNgay}&endDate=${khoang.denNgay}&excludeReason=TECH_ADJUST` : "&excludeReason=TECH_ADJUST";
+    return khoang ? `&startDate=${khoang.tuNgay}&endDate=${khoang.denNgay}&dateField=completed&excludeReason=TECH_ADJUST` : "&dateField=completed&excludeReason=TECH_ADJUST";
   }, [phanBo]);
 
   // Map label trạng thái đơn → filter key
@@ -539,6 +558,103 @@ export default function StatisticsPage() {
           )}
         </Panel>
       </div>
+
+      {/* ── AI Phân Tích Doanh Thu ───────────────────────────────────────── */}
+      <section ref={aiPanelRef} className="rounded-[16px] border border-border bg-surface overflow-hidden">
+        {/* Header */}
+        <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#8b5cf6" }}>
+              Tích hợp Gemini AI
+            </p>
+            <h3 className="mt-0.5 text-base font-bold text-text-main">
+              Nhận xét &amp; Phân tích Doanh thu
+            </h3>
+            <p className="mt-1 text-xs text-text-secondary">
+              AI sẽ đọc số liệu thống kê theo khoảng thời gian đang xem và đưa ra nhận xét, xu hướng cùng lời khuyên kinh doanh.
+            </p>
+          </div>
+          <button
+            id="btn-ai-phan-tich"
+            onClick={handleAIPhanTich}
+            disabled={aiLoading}
+            className="flex shrink-0 items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+            style={{
+              background: aiLoading
+                ? "#a78bfa"
+                : "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+            }}
+          >
+            {aiLoading ? (
+              <>
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+                <span>Đang phân tích...</span>
+              </>
+            ) : (
+              <>
+                <span>✨</span>
+                <span>Phân tích bằng AI</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Kết quả AI */}
+        {(aiResult || aiError || aiLoading) && (
+          <div className="border-t border-border px-5 py-5">
+            {aiLoading && (
+              <div className="flex flex-col items-center gap-3 py-8 text-center">
+                <div
+                  className="h-10 w-10 rounded-full border-4 border-t-transparent animate-spin"
+                  style={{ borderColor: "#8b5cf6", borderTopColor: "transparent" }}
+                />
+                <p className="text-sm text-text-secondary">Gemini AI đang đọc số liệu và phân tích...</p>
+              </div>
+            )}
+
+            {aiError && !aiLoading && (
+              <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                <ExclamationCircleOutlined className="mt-0.5 shrink-0 text-red-500" />
+                <p className="text-sm text-red-600">{aiError}</p>
+              </div>
+            )}
+
+            {aiResult && !aiLoading && (
+              <div className="space-y-4">
+                {/* Nhận xét chính */}
+                <div
+                  className="rounded-xl px-5 py-4"
+                  style={{
+                    background: "linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)",
+                    border: "1px solid #c4b5fd",
+                  }}
+                >
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-lg">🤖</span>
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "#7c3aed" }}>
+                      Nhận xét từ Gemini AI
+                    </span>
+                  </div>
+                  <p className="text-sm leading-7 text-gray-700" style={{ whiteSpace: "pre-wrap" }}>
+                    {aiResult.nhanXet}
+                  </p>
+                </div>
+
+                {/* Thời gian phân tích */}
+                <p className="text-right text-[11px] text-text-muted">
+                  Phân tích dựa trên dữ liệu: {aiResult.duLieu.khoangThoiGian.tuNgay} –{" "}
+                  {aiResult.duLieu.khoangThoiGian.denNgay} &nbsp;•&nbsp;
+                  {aiResult.duLieu.soDonHoanTat} đơn hoàn tất &nbsp;•&nbsp;
+                  {aiResult.duLieu.tongSoDon} đơn tổng
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

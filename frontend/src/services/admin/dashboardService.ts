@@ -31,6 +31,7 @@ export type TongQuanChiSo = {
   tyLeThanhCongPhanTram: number;
   doanhThuKhacDenBuVnd: number;
   tyLeHuyPhanTram: number;
+  soDonHoanTat: number;
   khoangThoiGian: KhoangThoiGian;
 };
 
