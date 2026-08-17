@@ -4,6 +4,7 @@ import HeroParallax      from "@/components/home/HeroParallax";
 import ProductCategories from "@/components/home/ProductCategories";
 import SimpleWorkflow    from "@/components/home/SimpleWorkflow";
 import ProductShowcase   from "@/components/home/ProductShowcase";
+import DesignShowcase    from "@/components/home/DesignShowcase";
 
 export default function HomePage() {
   return (
@@ -16,6 +17,7 @@ export default function HomePage() {
         <ProductCategories />
         <SimpleWorkflow />
         <ProductShowcase />
+        <DesignShowcase />
         <AppFooter />
       </div>
     </main>

@@ -174,4 +174,59 @@ module.exports = {
   layDanhSachSanPhamCongKhai,
   laySanPhamNoiBat,
   layChiTietSanPhamCongKhai,
+  layThietKeMauTuAdmin,
+  layChiTietThietKeMau,
 };
+
+// =====================================================================
+// SERVICE 4: Thiết kế mẫu từ admin — hiển thị trên trang chủ (public)
+// GET /api/public/showcase-designs
+// =====================================================================
+async function layThietKeMauTuAdmin(limit = 12) {
+  const adminUserId = Number(process.env.SHOWCASE_ADMIN_USER_ID);
+  if (!adminUserId) return [];
+
+  const [rows] = await db.pool.query(
+    `SELECT id, name, baseColor, previewUrl
+     FROM CustomDesign
+     WHERE userId = ?
+       AND previewUrl IS NOT NULL
+       AND previewUrl != ''
+     ORDER BY updatedAt DESC
+     LIMIT ?`,
+    [adminUserId, limit]
+  );
+  return rows;
+}
+
+// =====================================================================
+// SERVICE 5: Chi tiết 1 thiết kế mẫu (canvasData) — dùng để load vào
+// Design Studio khi khách click "Dùng mẫu này".
+// GET /api/public/showcase-designs/:id
+// =====================================================================
+async function layChiTietThietKeMau(id) {
+  const adminUserId = Number(process.env.SHOWCASE_ADMIN_USER_ID);
+  if (!adminUserId) return null;
+
+  const [rows] = await db.pool.query(
+    `SELECT id, name, baseColor, canvasData, previewUrl
+     FROM CustomDesign
+     WHERE id = ? AND userId = ?
+     LIMIT 1`,
+    [id, adminUserId]
+  );
+
+  if (!rows[0]) return null;
+
+  const row = rows[0];
+  // Parse canvasData nếu là string JSON
+  try {
+    if (typeof row.canvasData === "string") {
+      row.canvasData = JSON.parse(row.canvasData);
+    }
+  } catch (_) {
+    row.canvasData = null;
+  }
+  return row;
+}
+

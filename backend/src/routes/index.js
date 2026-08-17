@@ -72,6 +72,12 @@ router.get("/public/products/colors", publicController.getMauAoNoiBat);
 // GET /api/public/products/:id → chi tiết 1 sản phẩm (cho Product Detail Page)
 router.get("/public/products/:id", publicController.getChiTietSanPhamCongKhai);
 
+// ── Thiết kế mẫu từ admin (trang chủ) ─────────────────────────────────────────
+// GET /api/public/showcase-designs      → danh sách thumbnail (gallery trang chủ)
+// GET /api/public/showcase-designs/:id  → canvasData để load vào Design Studio
+router.get("/public/showcase-designs", publicController.getThietKeMau);
+router.get("/public/showcase-designs/:id", publicController.getChiTietThietKeMau);
+
 // Xác thực Return URL và nhận IPN từ các cổng thanh toán online / VNPAY.
 router.use("/payments", paymentRoutes);
 

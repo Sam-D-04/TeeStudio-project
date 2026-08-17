@@ -9,7 +9,9 @@ import { useDesignStore, selectElementsBySide, type DesignElement } from "@/stor
 import useAuthStore from "@/store/useAuthStore";
 import { userDesignService, SavedDesign } from "@/services/userDesignService";
 import { getProductById } from "@/services/productService";
+import { showcaseService } from "@/services/showcaseService";
 import { calcDesignFee } from "@/utils/designFeeCalculator";
+
 import { getUploadedImages, saveUploadedImages } from "@/utils/indexedDB";
 import { printMethodService } from "@/services/printMethodService";
 import { Modal, message } from "antd";
@@ -115,6 +117,7 @@ export default function DesignStudioApp() {
     const view     = searchParams.get("view");
     const pid      = searchParams.get("productId");
     const designId = searchParams.get("designId");
+    const templateDesignId = searchParams.get("templateDesignId");
 
     if (shirt === "tshirt" || shirt === "polo" || shirt === "hoodie" || shirt === "sweater") setShirtType(shirt);
     if (color) {
@@ -130,6 +133,31 @@ export default function DesignStudioApp() {
     }
     if (view === "front" || view === "back") setShirtView(view);
     if (pid) setUrlProductId(parseInt(pid, 10));
+
+    // Auto-load thiết kế mẫu từ URL param ?templateDesignId=xxx (từ trang chủ)
+    if (templateDesignId) {
+      const id = parseInt(templateDesignId, 10);
+      if (id > 0) {
+        showcaseService.getShowcaseDesignById(id).then((design) => {
+          // Mock data to match SavedDesign structure, id=0 so it's treated as a new design
+          const mockDesign: SavedDesign = {
+            id: 0,
+            name: design.name,
+            productId: 1, // Fallback, will use canvasData.shirtType
+            baseColor: design.baseColor,
+            canvasData: design.canvasData,
+            previewUrl: design.previewUrl,
+            printFileUrlFront: null,
+            printFileUrlBack: null,
+            status: "DRAFT",
+            adminNote: null,
+            updatedAt: new Date().toISOString()
+          };
+          handleLoadDesignById(mockDesign);
+          showToast("Đã tải thiết kế mẫu: " + design.name);
+        }).catch(() => showToast("Lỗi khi tải thiết kế mẫu"));
+      }
+    }
 
     // Auto-load thiết kế từ URL param ?designId=xxx
     // Dùng cho luồng: Admin gửi email có link → khách click → mở đúng thiết kế cần sửa
