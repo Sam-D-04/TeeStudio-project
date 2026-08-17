@@ -809,7 +809,8 @@ async function layChiTietDonHang(id) {
 
   // Tính tạm tính (subtotal = tổng unitPrice * quantity của các item)
   const tamTinh = rowsItems.reduce((tong, item) => tong + Number(item.unitPrice) * item.quantity, 0);
-  const tongPhiThietKe = rowsItems.reduce((tong, item) => tong + Number(item.designFee || 0), 0);
+  // tongPhiThietKe = tổng phí in ấn, designFee tính trên mỗi chiếc áo → nhân quantity
+  const tongPhiThietKe = rowsItems.reduce((tong, item) => tong + Number(item.designFee || 0) * item.quantity, 0);
   const items = rowsItems.map((item) => {
     let frontAreaFee = 0;
     let backAreaFee = 0;
@@ -2070,23 +2071,18 @@ async function taoMoiDonHang(data, actor, ipAddress) {
       throw err;
     }
 
-    // Gán designFee và trạng thái thiết kế từ DB
-    if (!uniqueDesignIdsFee.has(enriched.designId)) {
-      enriched.designFee = Number(design.designFee);
-      uniqueDesignIdsFee.add(enriched.designId);
-    } else {
-      enriched.designFee = 0;
-    }
-
-    // Tính printFee theo công thức mới: phiInAn từ DB (method + position) + phí diện tích từ canvasData
+    // Tính printFee = phí in ấn cho 1 chiếc áo (phí diện tích + phí phương pháp in)
+    // Đồng nhất với luồng Customer (calculateBoundingBoxAreaFee):
+    //   designFee = tổng phí in ấn mỗi áo, không cộng vào unitPrice
     const { frontAreaFee, backAreaFee } = calculateAreaFeePerSide(design.canvasData);
     const phiInAnTuDB = Number(design.phiInAn || 0);
-    const phiInAnMatTruoc = phiInAnTuDB + frontAreaFee;
-    const phiInAnMatSau = backAreaFee;
+    const phiInAnMatTruoc = frontAreaFee > 0 ? frontAreaFee + phiInAnTuDB : 0;
+    const phiInAnMatSau = backAreaFee > 0 ? backAreaFee + phiInAnTuDB : 0;
+    const printFee = phiInAnMatTruoc + phiInAnMatSau;
 
-    enriched.printFee = phiInAnMatTruoc + phiInAnMatSau;
-    // Tính printFee vào unitPrice để lưu vào OrderItem và tính lineTotal, subtotal tự động
-    enriched.unitPrice += enriched.printFee;
+    // Lưu printFee vào designFee (không cộng vào unitPrice)
+    // unitPrice = giá phôi áo thuần (BulkPricing), designFee = phí in ấn mỗi áo
+    enriched.designFee = printFee;
     enriched.designStatus = design.status;
 
     // Upload ảnh in print-ready lên Cloudinary rồi lưu URL vào CustomDesign.printFileUrlFront.
@@ -2141,9 +2137,10 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     0
   );
 
-  // Tổng phí thiết kế (nếu là đơn POD)
+  // Tổng phí in ấn: designFee tính trên từng chiếc áo → phải nhân với quantity
+  // Đồng nhất với luồng Customer: (unitPrice + designFee) * quantity
   const tongDesignFee = itemsEnriched.reduce(
-    (tong, item) => tong + item.designFee,
+    (tong, item) => tong + item.designFee * item.quantity,
     0
   );
 
@@ -2326,9 +2323,10 @@ async function taoMoiDonHang(data, actor, ipAddress) {
 
     // ── Bước 3.3: INSERT OrderItem, OrderProduction và giữ tồn kho ──
     for (const item of itemsEnriched) {
-      // lineTotal = (unitPrice * quantity) + designFee của item này
+      // lineTotal = (unitPrice + designFee) * quantity
+      // designFee là phí in ấn mỗi chiếc áo (đồng nhất với luồng Customer)
       const lineTotal = Math.round(
-        (item.unitPrice * item.quantity + item.designFee) * 100
+        (item.unitPrice + item.designFee) * item.quantity * 100
       ) / 100;
 
       await conn.query(

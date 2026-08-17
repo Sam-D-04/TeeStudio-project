@@ -343,7 +343,6 @@ function buildPreview(
     }
   });
 
-  const uniqueDesignIds = new Set<number>();
 
   const lines =
     values.items?.map((item) => {
@@ -372,11 +371,10 @@ function buildPreview(
 
       const lineProductTotal = (unitPrice + phiInAnMatTruoc) * quantity + (phiInAnMatSau * quantity);
 
-      let designFee = 0;
-      if (design && !uniqueDesignIds.has(design.id)) {
-        designFee = design.phiThietKe ?? 0;
-        uniqueDesignIds.add(design.id);
-      }
+      // Phí in ấn đã được cộng vào lineProductTotal rồi
+      // (phiInAnMatTruoc * quantity + phiInAnMatSau * quantity)
+      // Không cần tính designFee riêng nữa, tránh tính 2 lần
+      const lineDesignFee = 0;
 
       return {
         productType,
@@ -388,8 +386,8 @@ function buildPreview(
         printFeeFront: phiInAnMatTruoc,
         printFeeBack: phiInAnMatSau,
         lineProductTotal,
-        designFee,
-        lineTotal: lineProductTotal + designFee,
+        designFee: lineDesignFee,
+        lineTotal: lineProductTotal + lineDesignFee,
         discountPercent,
         bulkMinQty,
         phiPhuongPhapInFront,
@@ -401,7 +399,7 @@ function buildPreview(
     }) ?? [];
 
   const subtotal = lines.reduce((sum, line) => sum + line.lineProductTotal, 0);
-  const designFee = lines.reduce((sum, line) => sum + line.designFee, 0);
+  const designFee = 0; // Phí in ấn đã nằm trong subtotal (lineProductTotal)
   const shippingFeeInput = Math.max(0, Number(values.shippingFee) || 0);
   const selectedPromotion = values.promotionId
     ? promotions.find((promo) => promo.id === values.promotionId)
@@ -1221,7 +1219,6 @@ function OrderSummary({
 }) {
   const rows = [
     ["Tạm tính", preview.subtotal],
-    ["Phí thiết kế", preview.designFee],
     ["Giảm giá", -preview.discountAmount],
     ["Phí ship", preview.shippingFeeInput],
     preview.isFreeShipping ? ["Miễn phí vận chuyển", -preview.freeShippingDiscount] : ["", 0],
@@ -1270,7 +1267,7 @@ function OrderSummary({
                     )}
                     {line.designFee > 0 && (
                       <div>
-                        - Phí thiết kế: {formatCurrency(line.designFee)}
+                        - Phí in ấn: {formatCurrency(line.designFee)}
                       </div>
                     )}
                   </div>
