@@ -298,7 +298,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
     ? getApiErrorMessage(listQuery.error, "Không thể tải danh sách giao dịch")
     : null;
   const today = dayjs().format("YYYY-MM-DD");
-  const hasNoSecondaryFilters =
+  const isDefaultStatusAndSearch =
     searchValue === "" && statusFilter === "tat_ca";
 
   return (
@@ -350,14 +350,14 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
               <path d="M2 10h20" strokeLinecap="round" />
             </svg>
           }
-          href={`/admin/thanh-toan?status=COMPLETED&date=${today}&dateField=paid`}
+          href={`/admin/thanh-toan?startDate=${today}&endDate=${today}&dateField=paid`}
           isActive={
-            statusFilter === "da_thanh_toan" &&
+            statusFilter === "tat_ca" &&
             methodFilter === "tat_ca" &&
             tuNgay === today &&
             denNgay === today &&
             dateField === "paid" &&
-            hasNoSecondaryFilters
+            isDefaultStatusAndSearch
           }
           badge={
             stats && stats.phanTramThayDoi !== 0 ? (
@@ -403,7 +403,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
             methodFilter === "tat_ca" &&
             tuNgay === "" &&
             denNgay === "" &&
-            hasNoSecondaryFilters
+            searchValue === ""
           }
         />
 
@@ -429,7 +429,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
             methodFilter === "cod" &&
             tuNgay === "" &&
             denNgay === "" &&
-            hasNoSecondaryFilters
+            searchValue === ""
           }
         />
 
@@ -458,7 +458,7 @@ export default function PaymentPage({ initialFilters }: PaymentPageProps) {
             methodFilter === "tat_ca" &&
             tuNgay === "" &&
             denNgay === "" &&
-            hasNoSecondaryFilters
+            searchValue === ""
           }
         />
 
