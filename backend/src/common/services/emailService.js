@@ -21,13 +21,19 @@ const getTransporter = () => {
 
   if (!transporter) {
     transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,        // false = STARTTLS (port 587), true = SSL (port 465)
       auth: { user, pass },
+      tls: {
+        rejectUnauthorized: false, // Tương thích với các cloud server như Render
+      },
     });
   }
 
   return { transporter, user };
 };
+
 
 const escapeHtml = (value) =>
   String(value)
