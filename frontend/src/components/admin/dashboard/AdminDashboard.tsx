@@ -2,6 +2,7 @@
 
 import {
   AlertOutlined,
+  CheckCircleOutlined,
   InboxOutlined,
   PercentageOutlined,
   RiseOutlined,
@@ -147,6 +148,13 @@ export default function AdminDashboard() {
       iconClassName: "text-success",
     },
     {
+      label: "Số đơn hoàn tất",
+      value: isLoadingChiSo ? "..." : String(chiSo?.soDonHoanTat ?? "—"),
+      href: completedOrdersHref,
+      icon: <CheckCircleOutlined />,
+      iconClassName: "text-success",
+    },
+    {
       label: "Tổng số đơn hàng",
       value: isLoadingChiSo ? "..." : String(chiSo?.tongSoDonHang ?? chiSo?.soDonMoi ?? "—"),
       href: allOrdersHref,
@@ -209,8 +217,8 @@ export default function AdminDashboard() {
       {/* Bộ lọc thời gian */}
       <DashboardFilterToolbar onDateChange={handleDateChange} />
 
-      {/* ── Hàng 1: Thẻ chỉ số tài chính & đơn hàng (3 thẻ chính) ── */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3">
+      {/* ── Hàng 1: Thẻ chỉ số tài chính & đơn hàng (4 thẻ chính) ── */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-4">
         {primaryMetrics.map((metric) => (
           <MetricCard
             key={metric.label}

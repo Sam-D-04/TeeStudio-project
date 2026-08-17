@@ -225,6 +225,7 @@ async function layTongQuanChiSo(tuNgay, denNgay) {
     tyLeThanhCongPhanTram: tyLeThanhCong,
     doanhThuKhacDenBuVnd: doanhThuKhac,
     tyLeHuyPhanTram: tyLeHuy,
+    soDonHoanTat: soDonDoanhThu,
     khoangThoiGian: { tuNgay: batDau, denNgay: ketThuc },
   };
 }
