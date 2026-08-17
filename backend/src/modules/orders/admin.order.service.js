@@ -1766,15 +1766,23 @@ async function timKiemThietKe(userId, keyword) {
 
     const phiInAnTuDB = Number(r.phiInAn || 0);
 
+    let phiPhuongPhapInTinhNguoc = 0;
+    const soMatIn = (frontAreaFee > 0 ? 1 : 0) + (backAreaFee > 0 ? 1 : 0);
+    if (soMatIn > 0) {
+      phiPhuongPhapInTinhNguoc = (Number(r.designFee) - frontAreaFee - backAreaFee) / soMatIn;
+    }
+
+    const ppInFee = phiPhuongPhapInTinhNguoc > 0 ? phiPhuongPhapInTinhNguoc : phiInAnTuDB;
+
     let ppInFront = 0;
     let ppInBack = 0;
     if (frontAreaFee > 0 && backAreaFee > 0) {
-      ppInFront = phiInAnTuDB;
-      ppInBack = phiInAnTuDB;
+      ppInFront = ppInFee;
+      ppInBack = ppInFee;
     } else if (backAreaFee > 0) {
-      ppInBack = phiInAnTuDB;
+      ppInBack = ppInFee;
     } else {
-      ppInFront = phiInAnTuDB;
+      ppInFront = ppInFee;
     }
 
     const phiInAnMatTruoc = ppInFront + frontAreaFee;
@@ -2076,8 +2084,17 @@ async function taoMoiDonHang(data, actor, ipAddress) {
     //   designFee = tổng phí in ấn mỗi áo, không cộng vào unitPrice
     const { frontAreaFee, backAreaFee } = calculateAreaFeePerSide(design.canvasData);
     const phiInAnTuDB = Number(design.phiInAn || 0);
-    const phiInAnMatTruoc = frontAreaFee > 0 ? frontAreaFee + phiInAnTuDB : 0;
-    const phiInAnMatSau = backAreaFee > 0 ? backAreaFee + phiInAnTuDB : 0;
+
+    let phiPhuongPhapInTinhNguoc = 0;
+    const soMatIn = (frontAreaFee > 0 ? 1 : 0) + (backAreaFee > 0 ? 1 : 0);
+    if (soMatIn > 0) {
+      phiPhuongPhapInTinhNguoc = (Number(design.designFee) - frontAreaFee - backAreaFee) / soMatIn;
+    }
+
+    const ppInFee = phiPhuongPhapInTinhNguoc > 0 ? phiPhuongPhapInTinhNguoc : phiInAnTuDB;
+
+    const phiInAnMatTruoc = frontAreaFee > 0 ? frontAreaFee + ppInFee : 0;
+    const phiInAnMatSau = backAreaFee > 0 ? backAreaFee + ppInFee : 0;
     const printFee = phiInAnMatTruoc + phiInAnMatSau;
 
     // Lưu printFee vào designFee (không cộng vào unitPrice)

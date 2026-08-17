@@ -473,7 +473,7 @@ export default function DesignDetailModal({
                               <th className="py-2 pr-3 font-semibold">SL</th>
                               <th className="py-2 pr-3 font-semibold">Đơn hàng</th>
                               <th className="py-2 pr-3 font-semibold">Sản xuất</th>
-                              <th className="py-2 text-right font-semibold">Thành tiền</th>
+                              {/* <th className="py-2 text-right font-semibold">Thành tiền</th> */}
                             </tr>
                           </thead>
                           <tbody>
@@ -496,9 +496,9 @@ export default function DesignDetailModal({
                                 <td className="py-2 pr-3 text-text-secondary">
                                   {getStatusLabel(order.trangThaiSanXuat, PRODUCTION_STATUS_LABELS)}
                                 </td>
-                                <td className="py-2 text-right font-semibold">
+                                {/* <td className="py-2 text-right font-semibold">
                                   {formatCurrency(order.thanhTien)}
-                                </td>
+                                </td> */}
                               </tr>
                             ))}
                           </tbody>
