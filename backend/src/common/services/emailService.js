@@ -24,6 +24,9 @@ const getTransporter = () => {
       host: "smtp.gmail.com",
       port: 587,
       secure: false,        // false = STARTTLS (port 587), true = SSL (port 465)
+      family: 4,             // Ép kết nối qua IPv4 - Render không có route IPv6 outbound,
+                              // trong khi smtp.gmail.com có cả bản ghi AAAA (IPv6) lẫn A (IPv4),
+                              // nên nếu không ép sẽ bị "connect ENETUNREACH ...:587" ngẫu nhiên.
       auth: { user, pass },
       tls: {
         rejectUnauthorized: false, // Tương thích với các cloud server như Render
