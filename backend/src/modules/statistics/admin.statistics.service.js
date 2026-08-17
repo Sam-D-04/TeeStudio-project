@@ -129,7 +129,7 @@ async function _queryMetrics(batDau, ketThuc) {
     db.pool.query(
       `SELECT SUM(CASE WHEN status != 'CANCELLED' OR cancelReason IS NULL OR cancelReason NOT LIKE '[TECH_ADJUST]%' THEN 1 ELSE 0 END) AS soDon
        FROM CustomerOrder
-       WHERE DATE(createdAt) >= ? AND DATE(createdAt) <= ?`,
+       WHERE DATE(updatedAt) >= ? AND DATE(updatedAt) <= ?`,
       [batDau, ketThuc]
     ),
     db.pool.query(
@@ -174,7 +174,7 @@ async function _queryDoiSoatBaoCao(batDau, ketThuc) {
        FROM Payment
        GROUP BY orderId
      ) paymentSummary ON paymentSummary.orderId = co.id
-     WHERE co.createdAt >= ? AND co.createdAt < DATE_ADD(?, INTERVAL 1 DAY)`,
+     WHERE co.updatedAt >= ? AND co.updatedAt < DATE_ADD(?, INTERVAL 1 DAY)`,
     [batDau, ketThuc]
   );
 
@@ -470,7 +470,7 @@ async function layPhanBoTrangThai(tuNgay, denNgay) {
          SUM(CASE WHEN status = 'COMPLETED'                                      THEN 1 ELSE 0 END) AS hoanTat,
          SUM(CASE WHEN status = 'CANCELLED' AND (cancelReason IS NULL OR cancelReason NOT LIKE '[TECH_ADJUST]%') THEN 1 ELSE 0 END) AS daHuy
        FROM CustomerOrder
-       WHERE DATE(createdAt) >= ? AND DATE(createdAt) <= ?`,
+       WHERE DATE(updatedAt) >= ? AND DATE(updatedAt) <= ?`,
       [batDau, ketThuc]
     ),
     // --- Phân bổ tình trạng thanh toán ---
@@ -483,7 +483,7 @@ async function layPhanBoTrangThai(tuNgay, denNgay) {
          SUM(CASE WHEN status NOT IN ('COMPLETED','CANCELLED')         THEN 1 ELSE 0 END) AS choThanhToan,
          SUM(CASE WHEN status = 'CANCELLED' AND (cancelReason IS NULL OR cancelReason NOT LIKE '[TECH_ADJUST]%') THEN 1 ELSE 0 END) AS thatBaiHuy
        FROM CustomerOrder
-       WHERE DATE(createdAt) >= ? AND DATE(createdAt) <= ?`,
+       WHERE DATE(updatedAt) >= ? AND DATE(updatedAt) <= ?`,
       [batDau, ketThuc]
     ),
   ]);

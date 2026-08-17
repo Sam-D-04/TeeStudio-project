@@ -385,8 +385,8 @@ async function layDuLieuBaoCao(batDau, ketThuc) {
          FROM Payment
          GROUP BY orderId
        ) paymentSummary ON paymentSummary.orderId = co.id
-       WHERE co.createdAt >= ? AND co.createdAt < DATE_ADD(?, INTERVAL 1 DAY)
-       ORDER BY co.createdAt DESC`,
+       WHERE co.updatedAt >= ? AND co.updatedAt < DATE_ADD(?, INTERVAL 1 DAY)
+       ORDER BY co.updatedAt DESC`,
       [batDau, ketThuc]
     ),
     db.pool.query(
@@ -400,8 +400,8 @@ async function layDuLieuBaoCao(batDau, ketThuc) {
        JOIN ProductVariant pv ON pv.id = oi.variantId
        JOIN Product p ON p.id = pv.productId
        LEFT JOIN CustomDesign cd ON cd.id = oi.designId
-       WHERE co.createdAt >= ? AND co.createdAt < DATE_ADD(?, INTERVAL 1 DAY)
-       ORDER BY co.createdAt DESC, oi.id`,
+       WHERE co.updatedAt >= ? AND co.updatedAt < DATE_ADD(?, INTERVAL 1 DAY)
+       ORDER BY co.updatedAt DESC, oi.id`,
       [batDau, ketThuc]
     ),
     db.pool.query(
@@ -425,7 +425,7 @@ async function layDuLieuBaoCao(batDau, ketThuc) {
               DATE_FORMAT(cd.updatedAt, '%Y-%m-%d %H:%i:%s') AS updatedAt
        FROM CustomDesign cd
        WHERE cd.status IN ('PENDING_REVIEW', 'NEEDS_REVISION', 'APPROVED')
-         AND cd.createdAt >= ? AND cd.createdAt < DATE_ADD(?, INTERVAL 1 DAY)
+         AND cd.updatedAt >= ? AND cd.updatedAt < DATE_ADD(?, INTERVAL 1 DAY)
        ORDER BY cd.updatedAt DESC`,
       [batDau, ketThuc]
     ),

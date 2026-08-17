@@ -201,7 +201,7 @@ export default function StatisticsPage() {
         tone: "success",
         direction: pctDir(ss.soDonPhanTram),
         directionLabel: formatPct(ss.soDonPhanTram),
-        href: `/admin/don-hang?status=tat_ca${dateParams}`,
+        href: `/admin/don-hang?status=tat_ca${completedDateParams}`,
       },
       {
         label: "Sản phẩm bán ra",
@@ -250,26 +250,20 @@ export default function StatisticsPage() {
         tone: "text-primary-container",
         href: `/admin/don-hang?status=hoan_tat&payment=da_thanh_toan${completedDateParams}`,
       },
-      {
-        label: "Tiền đã thu trong kỳ",
-        value: formatTien(data.tienDaThuTrongKyVnd),
-        description: "Tổng tiền thực nhận từ các giao dịch đã hoàn tất (bao gồm cả cọc)",
-        tone: "text-success",
-        href: `/admin/thanh-toan?startDate=${khoang?.tuNgay ?? ""}&endDate=${khoang?.denNgay ?? ""}&dateField=paid`,
-      },
+
       {
         label: "Dòng tiền COD đang treo",
         value: formatTien(data.dongTienCodDangTreoVnd),
         description: "Tiền COD chưa được kế toán xác nhận đối soát",
         tone: "text-warning",
-        href: `/admin/don-hang?payment=can_doi_soat${dateParams}`,
+        href: `/admin/don-hang?payment=can_doi_soat${completedDateParams}`,
       },
       {
         label: "Tổng giá trị đơn hàng",
         value: formatTien(data.tongGiaTriDonHangVnd),
         description: "Tổng giá trị tất cả đơn phát sinh trong kỳ",
         tone: "text-text-main",
-        href: `/admin/don-hang?status=tat_ca${dateParams}`,
+        href: `/admin/don-hang?status=tat_ca${completedDateParams}`,
       },
       {
         label: "Đơn hoàn tất",
@@ -290,14 +284,14 @@ export default function StatisticsPage() {
         value: data.soDonChoDoiSoatCod.toLocaleString("vi-VN"),
         description: "Đơn còn khoản COD đang treo",
         tone: "text-warning",
-        href: `/admin/don-hang?payment=can_doi_soat${dateParams}`,
+        href: `/admin/don-hang?payment=can_doi_soat${completedDateParams}`,
       },
       {
         label: "Tỷ lệ hủy đơn",
         value: formatTiLe(data.tyLeHuyDon),
         description: "Đơn CANCELLED / tổng đơn phát sinh",
         tone: data.tyLeHuyDon > 0 ? "text-red-600" : "text-success",
-        href: `/admin/don-hang?status=da_huy${dateParams}`,
+        href: `/admin/don-hang?status=da_huy${completedDateParams}`,
       },
     ];
   }, [chiSo]);
@@ -316,7 +310,7 @@ export default function StatisticsPage() {
   // ── Map phân bổ trạng thái đơn + thanh toán với href điều hướng ──────────
   const phanBoDateParams = useMemo(() => {
     const khoang = phanBo?.khoangThoiGian;
-    return khoang ? `&startDate=${khoang.tuNgay}&endDate=${khoang.denNgay}&excludeReason=TECH_ADJUST` : "&excludeReason=TECH_ADJUST";
+    return khoang ? `&startDate=${khoang.tuNgay}&endDate=${khoang.denNgay}&dateField=completed&excludeReason=TECH_ADJUST` : "&dateField=completed&excludeReason=TECH_ADJUST";
   }, [phanBo]);
 
   // Map label trạng thái đơn → filter key
