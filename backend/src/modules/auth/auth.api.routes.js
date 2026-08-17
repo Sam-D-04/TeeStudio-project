@@ -39,16 +39,15 @@ const lightRateLimiter = rateLimit({
   },
 });
 
-// Giới hạn cho các endpoint gửi email chủ động (chống spam hộp thư người khác).
-// 10 lần/giờ/IP — đủ cho người dùng thật nhưng vẫn chặn spam bot.
+// Giới hạn chặt cho các endpoint gửi email chủ động (chống spam hộp thư người khác).
 const emailActionRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  limit: 10,
+  limit: 5,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     success: false,
-    message: "Quá nhiều yêu cầu, vui lòng thử lại sau 1 giờ.",
+    message: "Quá nhiều yêu cầu, vui lòng thử lại sau.",
   },
 });
 
